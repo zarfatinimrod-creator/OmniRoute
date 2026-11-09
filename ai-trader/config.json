@@ -7,7 +7,8 @@
     "dividend_withholding": 0.25
   },
   "calendar": {
-    "_note": "NYSE full-day holidays and 13:00 ET early closes (source: vendor/jake-trader-skill-v2/trader-alerts/alerts.py). Extend before 2028.",
+    "_note": "NYSE full-day holidays and 13:00 ET early closes (source: vendor/jake-trader-skill-v2/trader-alerts/alerts.py). Years not listed in 'years' count as closed (the news engine will not trade). Extend before 2028; a test fails from October of the last listed year.",
+    "years": [2026, 2027],
     "holidays": ["2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25", "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
                  "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24"],
     "early_close": ["2026-11-27", "2026-12-24", "2027-11-26"]
@@ -221,6 +222,7 @@
     "starting_cash": 100000,
     "model": "claude-haiku-5-5",
     "trade_outside_hours": false,
-    "batch_max": 12
+    "batch_max": 12,
+    "max_quote_age_minutes": 15
   }
 }

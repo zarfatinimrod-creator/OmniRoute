@@ -104,9 +104,9 @@ def _apply_overrides(targets: dict, held: dict, ds: str, cutoff_utc: str | None 
     return t, applied
 
 
-def _eval_close(close: pd.DataFrame) -> pd.DataFrame:
+def _eval_close(close: pd.DataFrame, preds_name: str = "predictions.jsonl", grades_name: str = "grades.jsonl") -> pd.DataFrame:
     """Universe closes plus any symbol an open prediction refers to (overlay names outside the universe)."""
-    need = {p["symbol"] for p in journal.open_predictions()} - set(close.columns)
+    need = {p["symbol"] for p in journal.open_predictions(preds_name, grades_name)} - set(close.columns)
     if not need:
         return close
     extra = fetch_panel(sorted(need), "1y", 6.0)["close"]
@@ -341,7 +341,11 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
     journal.save_json("portfolio.json", main.state)
     journal.save_json("shadow_portfolio.json", shadow.state)
     card = journal.evaluate_predictions(_eval_close(close.loc[:dec_bar]), bench)  # final bars only
-    journal.evaluate_predictions(close.loc[:dec_bar], bench, "news_predictions.jsonl", "news_grades.jsonl")
+    try:  # the news book's calls; a failure here must not cost the quant book its records and alerts
+        nfiles = ("news_predictions.jsonl", "news_grades.jsonl")
+        journal.evaluate_predictions(_eval_close(close.loc[:dec_bar], *nfiles), bench, *nfiles)
+    except Exception as e:  # noqa: BLE001 - logged, not hidden
+        events.append(f"news grading failed: {type(e).__name__}: {str(e)[:120]}")
 
     equity = main.equity(prices_last)
     sh_eq = shadow.equity(prices_last)

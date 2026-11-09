@@ -169,6 +169,31 @@ class TornLineRecovery(TempState):
         self.assertEqual([r["i"] for r in journal.read("news_scores.jsonl")], [0, 1, 3, 4])
         self.assertEqual(journal.broken_chains(), [])
 
+    def test_tear_inside_a_multibyte_character_is_recovered(self):
+        journal.append("news_scores.jsonl", {"headline": "Apple’s “big” day"})
+        with (self.tmp / "news_scores.jsonl").open("ab") as f:
+            f.write('{"headline": "Nvidia’s'.encode("utf-8")[:-2])  # cut in the middle of the curly quote
+        journal.append("news_scores.jsonl", {"headline": "next"})
+        self.assertEqual([r["headline"] for r in journal.read("news_scores.jsonl")], ["Apple’s “big” day", "next"])
+        self.assertEqual(journal.broken_chains(), [])
+
+    def test_editing_the_last_record_is_still_detected(self):
+        for i in range(3):
+            journal.append("trades.jsonl", {"i": i})
+        p = self.tmp / "trades.jsonl"
+        lines = p.read_text().splitlines()
+        p.write_text("\n".join(lines[:-1] + [lines[-1][:-5] + "junk"]) + "\n")  # complete line, broken JSON
+        journal.append("trades.jsonl", {"i": 3})
+        self.assertEqual(journal.broken_chains(), ["trades.jsonl"])
+
+    def test_an_unreadable_line_in_the_middle_breaks_the_chain(self):
+        for i in range(3):
+            journal.append("trades.jsonl", {"i": i})
+        p = self.tmp / "trades.jsonl"
+        lines = p.read_text().splitlines()
+        p.write_text("\n".join(lines[:1] + ["not json"] + lines[1:]) + "\n")
+        self.assertEqual(journal.broken_chains(), ["trades.jsonl"])
+
 
 def _nyse_panel(start="2026-11-16", periods=40):
     idx = pd.bdate_range(start, periods=periods + 5)
@@ -231,9 +256,96 @@ class CalendarEdges(TempState):
         idx, close = _nyse_panel("2026-11-02")
         mon = pd.Timestamp("2026-11-09")
         close.loc[mon:, "AAA"] = 110.0  # opening gap
+        close.loc[idx[idx.get_loc(mon) + 1]:, "AAA"] = 120.0  # Tuesday differs, so the entry day is pinned
         g = self._grade_one(close, date="2026-11-09", logged_at="2026-11-09T14:30:20+00:00",  # 09:30:20 NY
                             price_at="2026-11-09T14:29:40+00:00", source="news_claude", price=100.0)
-        self.assertAlmostEqual(g["excess"], 0.0)  # entry = Monday's close, not the stale pre-open quote
+        self.assertAlmostEqual(g["ret"], 120.0 / 110.0 - 1, places=4)  # entry = Monday's close (110)
+
+    def test_in_session_call_without_price_takes_that_sessions_close(self):
+        idx, close = _nyse_panel("2026-11-02")
+        mon = pd.Timestamp("2026-11-09")
+        close.loc[mon:, "AAA"] = 110.0
+        close.loc[idx[idx.get_loc(mon) + 1]:, "AAA"] = 120.0
+        g = self._grade_one(close, date="2026-11-09", logged_at="2026-11-09T16:00:00+00:00", source="desk", price=None)
+        self.assertAlmostEqual(g["ret"], 120.0 / 110.0 - 1, places=4)  # Monday's close, not Tuesday's
+
+    def test_date_only_stamp_anchors_on_the_later_of_date_and_log_day(self):
+        idx, close = _nyse_panel("2026-11-02")
+        close.loc[pd.Timestamp("2026-11-12"):, "AAA"] = 110.0  # news priced in on the 12th
+        g = self._grade_one(close, date="2026-11-06", logged_at="2026-11-12", source="insider_cluster", price=100.0)
+        self.assertAlmostEqual(g["excess"], 0.0)  # entry after the 12th, never the 9th
+
+    def test_uncovered_calendar_year_counts_as_closed(self):
+        self.assertIsNone(journal.session_hours("2028-01-17"))  # MLK day 2028, not in the calendar
+        self.assertFalse(journal.calendar_covers("2028-06-01"))
+
+    def test_calendar_is_extended_before_it_runs_out(self):
+        from datetime import date
+        last = max(journal._calendar()["years"])
+        self.assertLess(date.today(), date(last, 10, 1),
+                        f"config.json calendar ends {last}: add the next year's NYSE holidays and early closes")
+
+
+class UniqueNewsKeys(TempState):
+    def test_two_calls_in_the_same_second_are_graded_separately(self):
+        idx, close = _nyse_panel("2026-11-02")
+        mon = pd.Timestamp("2026-11-09")
+        close.loc[idx[idx.get_loc(mon) + 1]:, "AAA"] = 110.0  # the stock rises: the up call is right
+        base = {"date": "2026-11-09", "logged_at": "2026-11-09T15:05:24+00:00", "symbol": "AAA", "horizon": 1,
+                "source": "news_claude", "price": 100.0, "bench_price": 100.0, "status": "open"}
+        journal.append("news_predictions.jsonl", {**base, "id": "h1", "direction": "down", "score": 2, "headline": "bad"})
+        journal.append("news_predictions.jsonl", {**base, "id": "h2", "direction": "up", "score": 6, "headline": "good"})
+        card = journal.evaluate_predictions(close, "SPY", "news_predictions.jsonl", "news_grades.jsonl")
+        self.assertEqual(len(journal.read("news_grades.jsonl")), 2)
+        self.assertEqual(card["news_claude_h1"]["hit_rate"], 0.5)
+
+    def test_rows_without_id_use_their_headline(self):
+        a = {"date": "d", "symbol": "S", "horizon": 1, "source": "news_claude", "logged_at": "t", "headline": "x", "direction": "up"}
+        b = {**a, "headline": "y"}
+        self.assertNotEqual(journal.pred_key(a), journal.pred_key(b))
+        q = {"date": "d", "symbol": "S", "horizon": 1, "source": "quant", "logged_at": "t"}
+        self.assertEqual(journal.pred_key(q), "d|S|1|quant|t")  # quant keys unchanged
+
+
+class StaleQuote(TempState):
+    def test_score_9_on_a_stale_quote_does_not_buy(self):
+        from aitrader import news_live
+        from test_core import CFG
+        lp, mo = news_live.live_price, news_live.market_open_now
+        news_live.live_price = lambda s: (100.0, 0.0)
+        news_live.market_open_now = lambda: True
+        try:
+            cfg = dict(CFG)
+            cfg["universe"] = {"AAA": "Tech", "SPY": "Index"}
+            nt = news_live.NewsTrader(cfg)
+            old = (pd.Timestamp.now(tz="UTC") - pd.Timedelta(hours=2)).isoformat()
+            ev = []
+            nt.handle_scored([{"key": "k1", "symbol": "AAA", "title": "AAA halted, big news", "published": old,
+                               "price": 100.0, "price_at": old}], {"k1": {"score": 9, "why": "x"}}, ev)
+        finally:
+            news_live.live_price, news_live.market_open_now = lp, mo
+        self.assertNotIn("AAA", nt.book.positions)
+        self.assertTrue(any("not live" in e for e in ev))
+        self.assertTrue(all(p["price"] is None for p in journal.read("news_predictions.jsonl")))
+
+
+class NewsLoopStops(TempState):
+    def test_run_alerts_and_stops_on_a_broken_chain(self):
+        from aitrader import news_live
+        sent, calls = [], []
+        _step, _send = news_live.NewsTrader.step, news_live.notify.send
+
+        def step(self):
+            calls.append(1)
+            raise news_live.ChainBroken("news hash chain broken: x - stops on open news positions are NOT being checked")
+        news_live.NewsTrader.step = step
+        news_live.notify.send = lambda title, body, cfg, prio="default": sent.append((prio, body)) or []
+        try:
+            news_live.run(until_ny="23:59", max_minutes=1, prime=False)
+        finally:
+            news_live.NewsTrader.step, news_live.notify.send = _step, _send
+        self.assertEqual(len(calls), 1)  # stopped after the first failing step
+        self.assertTrue(any(p == "urgent" and "NOT being checked" in b for p, b in sent))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,20 @@
 {
-  "cash": 100000.0,
-  "positions": {},
+  "cash": 95614.59898,
+  "positions": {
+    "MU": {
+      "qty": 6,
+      "avg_cost": 730.9001699999999,
+      "entry_date": "2026-11-09",
+      "peak_close": 730.17,
+      "last_price": 736.1,
+      "stop_price": 708.9732,
+      "news_entry": {
+        "score": 9,
+        "why": "Very large company-specific buyback; stock flat today, so not priced in.",
+        "at": "2026-11-09T15:44:00+00:00"
+      }
+    }
+  },
   "peak_equity": 100000.0,
   "blocked": {},
   "created": "2026-11-09",

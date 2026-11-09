@@ -42,18 +42,29 @@ def _calendar() -> dict:
         return {}
 
 
+def calendar_covers(day) -> bool:
+    """True when config.json's calendar lists the holidays and early closes for this date's year."""
+    return pd.Timestamp(day).year in set(_calendar().get("years", []))
+
+
 def session_hours(day) -> tuple[tuple[int, int], tuple[int, int]] | None:
     """NYSE regular session (open, close) in New York (hour, minute) for a date, or None when closed
-    (weekend / holiday in config.json calendar). Early-close days end at 13:00."""
+    (weekend / holiday in config.json calendar). Early-close days end at 13:00. A year the calendar does not
+    cover counts as closed (fail closed: unknown holidays must not look like sessions)."""
     d = pd.Timestamp(day).date()
     cal = _calendar()
-    if d.weekday() >= 5 or d.isoformat() in set(cal.get("holidays", [])):
+    if d.weekday() >= 5 or not calendar_covers(d) or d.isoformat() in set(cal.get("holidays", [])):
         return None
     return (9, 30), ((13, 0) if d.isoformat() in set(cal.get("early_close", [])) else (16, 0))
 
 
 def pred_key(p: dict) -> str:
-    return f"{p['date']}|{p['symbol']}|{p['horizon']}|{p.get('source', 'quant')}|{p.get('logged_at', '')}"
+    """Unique per call. News calls scored in the same second share date/symbol/logged_at, so they also carry
+    their headline id (or, for rows written before ids, a hash of headline + direction + score)."""
+    base = f"{p['date']}|{p['symbol']}|{p['horizon']}|{p.get('source', 'quant')}|{p.get('logged_at', '')}"
+    uid = p.get("id") or (hashlib.sha256(f"{p['headline']}|{p.get('direction')}|{p.get('score')}".encode()).hexdigest()[:12]
+                          if p.get("headline") else "")
+    return f"{base}|{uid}" if uid else base
 
 
 def graded(grades_name: str = "grades.jsonl") -> dict:
@@ -65,46 +76,98 @@ def open_predictions(preds_name: str = "predictions.jsonl", grades_name: str = "
     return [p for p in read(preds_name) if pred_key(p) not in g]
 
 
-def _last_hash(p: Path) -> str:
-    """Hash of the last READABLE record: a torn line left by a crash is skipped (read() skips it too), so one
-    bad write never breaks the chain for every later record."""
+def _frag_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _tail_fragment(p: Path) -> str | None:
+    """The unterminated last line a crash mid-append leaves behind (None when the file ends with a newline)."""
+    if not p.exists() or p.stat().st_size == 0:
+        return None
+    with p.open("rb") as f:
+        f.seek(-1, 2)
+        if f.read(1) == b"\n":
+            return None
+        f.seek(max(0, p.stat().st_size - 1_000_000))
+        data = f.read()
+    return data[data.rfind(b"\n") + 1:].decode("utf-8", "replace")
+
+
+def _last_hash(p: Path, frag: str | None) -> str:
+    """Hash of the last complete record. Only an unterminated final fragment (a crash mid-append) is skipped;
+    a complete line that does not parse returns 'genesis', so the chain breaks and tampering stays visible."""
     if not p.exists() or p.stat().st_size == 0:
         return "genesis"
     with p.open("rb") as f:
         f.seek(max(0, p.stat().st_size - 1_000_000))
-        tail = f.read().decode("utf-8", "replace").strip().splitlines()
-    for line in reversed(tail):
+        lines = f.read().decode("utf-8", "replace").split("\n")
+    if frag is not None:
+        lines = lines[:-1]
+    for line in reversed(lines):
+        if not line.strip():
+            continue
         try:
             return json.loads(line).get("hash", "genesis")
         except ValueError:
-            continue
+            return "genesis"
     return "genesis"
 
 
 def append(name: str, record: dict) -> None:
-    """Append one JSON line. Decision/trade/learning logs are SHA-256 chained (tamper-evident)."""
+    """Append one JSON line. Decision/trade/learning logs are SHA-256 chained (tamper-evident). After a crash
+    mid-append the torn fragment is closed off with a newline and named in the next record (after_torn), so
+    the chain continues and verify_chain can tell a crash fragment from an edited record."""
     p = _path(name)
+    frag = _tail_fragment(p)
     if name in CHAINED:
-        prev = _last_hash(p)
+        prev = _last_hash(p, frag)
+        if frag is not None:
+            record = {**record, "after_torn": _frag_hash(frag)}
         body = json.dumps(json.loads(json.dumps(record, default=str)), sort_keys=True, default=str)
         record = {**record, "prev_hash": prev, "hash": hashlib.sha256((prev + body).encode()).hexdigest()}
-    torn = p.exists() and p.stat().st_size > 0 and p.read_bytes()[-1:] != b"\n"
-    with p.open("a", encoding="utf-8") as f:  # a torn last line (no newline) must not swallow this record
-        f.write(("\n" if torn else "") + json.dumps(record, default=str, ensure_ascii=False) + "\n")
+    with p.open("a", encoding="utf-8") as f:
+        f.write(("\n" if frag is not None else "") + json.dumps(record, default=str, ensure_ascii=False) + "\n")
 
 
 def verify_chain(name: str) -> tuple[bool, int]:
-    """Re-compute the chain. Returns (ok, records_checked)."""
-    prev = "genesis"
-    rows = read(name)
-    for i, r in enumerate(rows):
+    """Re-compute the chain. Returns (ok, records_checked). An unreadable line passes only as a crash
+    fragment: the record right after it names it (after_torn), or it is the unterminated last line."""
+    p = _path(name)
+    if not p.exists():
+        return True, 0
+    lines = p.read_bytes().decode("utf-8", "replace").split("\n")
+    prev, n, pending = "genesis", 0, None
+    for i, line in enumerate(lines):
+        if not line.strip():
+            continue
+        try:
+            r = json.loads(line)
+        except ValueError:
+            if pending is not None or i < len(lines) - 1 and not _names_next(lines, i):
+                return False, n
+            pending = _frag_hash(line)
+            continue
+        if pending is not None and r.get("after_torn") != pending:
+            return False, n
+        pending = None
         h = r.pop("hash", None)
         pv = r.pop("prev_hash", None)
         body = json.dumps(r, sort_keys=True, default=str)
         if pv != prev or h != hashlib.sha256((prev + body).encode()).hexdigest():
-            return False, i
-        prev = h
-    return True, len(rows)
+            return False, n
+        prev, n = h, n + 1
+    return True, n
+
+
+def _names_next(lines: list[str], i: int) -> bool:
+    """Is the unreadable line i followed by a record that names it as a crash fragment?"""
+    for nxt in lines[i + 1:]:
+        if nxt.strip():
+            try:
+                return json.loads(nxt).get("after_torn") == _frag_hash(lines[i])
+            except ValueError:
+                return False
+    return False
 
 
 def read(name: str) -> list[dict]:
@@ -112,7 +175,7 @@ def read(name: str) -> list[dict]:
     if not p.exists():
         return []
     out = []
-    for line in p.read_text(encoding="utf-8").splitlines():
+    for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
         if not line.strip():
             continue
         try:
@@ -188,12 +251,19 @@ def _entry_bar(p: dict, idx: pd.DatetimeIndex) -> tuple[pd.Timestamp | None, int
     for "use the logged price", bar position the horizon counts from).
     - live price observed during that day's regular session -> that price; horizon counted from that day
       (the price time is `price_at` when the writer recorded it, else `logged_at`; early closes end at 13:00)
-    - logged before the open                                -> that session's close (no credit for the gap)
-    - anything else (after the close, closed day, price None = writer saw the market closed, no usable time)
-                                                            -> the next session's close"""
+    - logged before that day's close without a live price    -> that session's close (no credit for the gap;
+      covers pre-open calls, stale quotes and price None)
+    - after the close (13:00 on early-close days), on a closed day or an uncovered calendar year, or with no
+      usable time                                           -> the next session's close"""
     ny = _ny_time(p.get("logged_at"))
-    if ny is None:  # no time of day: the conservative entry is the session after the call's date
-        return _next_bar(idx, pd.Timestamp(p["date"]), inclusive=False)
+    if ny is None:  # no time of day: the session after the later of the call's date and its log date
+        anchor = pd.Timestamp(p["date"])
+        try:
+            logged = pd.Timestamp(str(p.get("logged_at"))[:10])
+            anchor = max(anchor, logged) if logged is not pd.NaT else anchor
+        except (ValueError, TypeError):
+            pass
+        return _next_bar(idx, anchor, inclusive=False)
     day, hm = pd.Timestamp(ny.date()), (ny.hour, ny.minute)
     hours = session_hours(day)
     if hours is not None and day in idx and p.get("price") is not None:
@@ -201,7 +271,7 @@ def _entry_bar(p: dict, idx: pd.DatetimeIndex) -> tuple[pd.Timestamp | None, int
         seen_hm = (seen.hour, seen.minute) if seen.date() == ny.date() else (0, 0)
         if hours[0] <= seen_hm and hm < hours[1]:
             return None, idx.get_loc(day)
-    if hours is not None and hm < hours[0]:
+    if hours is not None and hm < hours[1]:  # that session's close is still ahead of the call
         return _next_bar(idx, day, inclusive=True)
     return _next_bar(idx, day, inclusive=False)
 
@@ -215,7 +285,10 @@ def evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = "pre
     """Grade predictions whose horizon has passed (trading days). Predictions are never edited:
     each grade is a new, hash-chained record in grades.jsonl."""
     idx = close.index
+    done: set[str] = set()
     for p in open_predictions(preds_name, grades_name):
+        if pred_key(p) in done:  # one grade per key, even if a duplicate row slipped in
+            continue
         if p.get("source", "quant") == "quant":
             # quant calls are made on the decision bar's close and graded from it
             d = pd.Timestamp(p["date"])
@@ -247,6 +320,7 @@ def evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = "pre
             "key": pred_key(p), "graded_at": now_utc(), "eval_date": str(end.date()), "ret": round(ret, 4),
             "bench_ret": round(bret, 4), "excess": round(excess, 4), "hit": bool((excess > 0) == (p["direction"] == "up")),
         })
+        done.add(pred_key(p))
     return scorecard(read(preds_name), grades_name)
 
 

@@ -107,7 +107,8 @@ def build() -> list[dict]:
     peak = port.get("peak_equity") or start_cash
     now = datetime.now(timezone.utc)
     now_ny = now.astimezone(NY)
-    mkt_open = now_ny.weekday() < 5 and (now_ny.hour, now_ny.minute) >= (9, 30) and now_ny.hour < 16
+    hours = journal.session_hours(now_ny.date())
+    mkt_open = hours is not None and hours[0] <= (now_ny.hour, now_ny.minute) < hours[1]
     scores = journal.read("news_scores.jsonl")
     today_il = now.astimezone(IL).date().isoformat()
     scores_today = [s for s in scores if (s.get("logged_at") or "")[:10] == now.date().isoformat()]

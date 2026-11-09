@@ -121,10 +121,15 @@ def score_batch(items: list[dict], model: str, timeout: int = 90) -> dict[str, d
 
 
 # ---------------------------------------------------------------- prices / market
+QUOTE_TIME: dict[str, str] = {}  # symbol -> UTC time of the last quote live_price saw (Yahoo regularMarketTime)
+
+
 def live_price(sym: str) -> tuple[float | None, float | None]:
-    """(last price, today's move vs previous close)."""
+    """(last price, today's move vs previous close). Records the quote's own time in QUOTE_TIME."""
     try:
         meta = _chart(sym, "5d", "1d")["meta"]
+        if meta.get("regularMarketTime"):
+            QUOTE_TIME[sym] = datetime.fromtimestamp(int(meta["regularMarketTime"]), timezone.utc).isoformat(timespec="seconds")
         px, prev = meta.get("regularMarketPrice"), meta.get("chartPreviousClose") or meta.get("previousClose")
         return (float(px) if px else None), (round(px / prev - 1, 4) if px and prev else None)
     except Exception:  # noqa: BLE001
@@ -220,7 +225,7 @@ class NewsTrader:
             if px <= pos.get("stop_price", pos["avg_cost"] * (1 - self.n["stop_loss_pct"])):
                 reason = f"stop -{self.n['stop_loss_pct']:.0%} (entry {pos['avg_cost']:.2f}, now {px:.2f})"
             elif self.n.get("max_hold_days"):
-                held = len(pd.bdate_range(pos["entry_date"], datetime.now(NY).date())) - 1
+                held = sum(1 for d in pd.bdate_range(pos["entry_date"], datetime.now(NY).date())[1:] if journal.session_hours(d))
                 if held >= self.n["max_hold_days"]:
                     reason = f"time exit after {held} trading days"
             if reason:
@@ -232,6 +237,18 @@ class NewsTrader:
         journal.append("news_trades.jsonl", {**f, "logged_at": journal.now_utc()})
         events.append(f"{f['side']} {f['qty']} {f['symbol']} @ {f['price']} - {f['reason']}")
 
+    def _quote_is_live(self, price_at: str | None) -> bool:
+        """A quote counts as live only if it printed in today's session and is recent (a delayed opening or a
+        halt leaves Yahoo showing the previous close or the last trade before the halt)."""
+        if not price_at:  # caller gave no quote time (tests, manual scoring): trust the session clock
+            return True
+        t = datetime.fromisoformat(price_at.replace("Z", "+00:00")).astimezone(NY)
+        now = datetime.now(NY)
+        hours = journal.session_hours(now.date())
+        if hours is None or t.date() != now.date() or (t.hour, t.minute) < hours[0]:
+            return False
+        return (now - t).total_seconds() <= 60 * self.n.get("max_quote_age_minutes", 15)
+
     def handle_scored(self, items: list[dict], scores: dict, events: list):
         bench_px, _ = live_price(self.cfg.get("benchmark", "SPY"))
         is_open = market_open_now()
@@ -239,28 +256,33 @@ class NewsTrader:
             s = scores.get(x["key"])
             if not s:
                 continue
-            px = x.get("price")
-            rec = {"date": datetime.now(NY).date().isoformat(), "logged_at": journal.now_utc(), "price_at": x.get("price_at"), "symbol": x["symbol"],
+            live = is_open and self._quote_is_live(x.get("price_at"))
+            px = x.get("price") if live else None
+            if is_open and not live and s["score"] > self.n["buy_min_score"]:
+                events.append(f"{x['symbol']} score {s['score']}: quote not live (delayed open / halt) - no buy")
+            rec = {"date": datetime.now(NY).date().isoformat(), "logged_at": journal.now_utc(), "price_at": x.get("price_at"),
+                   "id": x["key"], "symbol": x["symbol"],
                    "headline": x["title"], "published": x["published"], "score": s["score"], "why": s["why"],
-                   "price": px if is_open else None, "bench_price": bench_px if is_open else None,
+                   "price": px, "bench_price": bench_px if live else None,
                    "latency_s": round((datetime.now(timezone.utc) - datetime.fromisoformat(x["published"])).total_seconds())}
             journal.append("news_scores.jsonl", rec)
             if s["score"] != 5:  # graded forward at 1 and 5 trading days (non-quant: from the logged price)
                 for h in (1, 5):
                     journal.append("news_predictions.jsonl", {
-                        **{k: rec[k] for k in ("date", "logged_at", "price_at", "symbol", "price", "bench_price")}, "horizon": h,
+                        **{k: rec[k] for k in ("date", "logged_at", "price_at", "id", "symbol", "price", "bench_price")}, "horizon": h,
                         "source": "news_claude", "direction": "up" if s["score"] > 5 else "down",
                         "prob": round(0.5 + (s["score"] - 5.5) * 0.04, 3), "score": s["score"], "headline": x["title"],
-                        "entry": "live" if is_open else "next_session_close", "status": "open"})
-            if s["score"] > self.n["buy_min_score"] and px:
-                if is_open or self.n["trade_outside_hours"]:
-                    f = self._buy(x["symbol"], px, s["why"], s["score"])
+                        "entry": "live" if live else "session_close", "status": "open"})
+            if s["score"] > self.n["buy_min_score"]:
+                buy_px = px if live else (x.get("price") if not is_open and self.n["trade_outside_hours"] else None)
+                if buy_px:
+                    f = self._buy(x["symbol"], buy_px, s["why"], s["score"])
                     if f:
                         self._log_trade(f, events)
-                elif not any(q["symbol"] == x["symbol"] for q in self.queue):
+                elif not is_open and not any(q["symbol"] == x["symbol"] for q in self.queue):
                     self.queue.append({"symbol": x["symbol"], "score": s["score"], "why": s["why"], "queued_at": journal.now_utc()})
                     events.append(f"תור לפתיחה: {x['symbol']} ציון {s['score']} - {s['why']}")
-            elif s["score"] <= self.n["sell_on_score_at_most"] and x["symbol"] in self.book.positions and px and is_open:
+            elif s["score"] <= self.n["sell_on_score_at_most"] and x["symbol"] in self.book.positions and px and live:
                 f = self._sell(x["symbol"], px, f"bad news score {s['score']}: {s['why']}")
                 if f:
                     self._log_trade(f, events)
@@ -280,14 +302,17 @@ class NewsTrader:
 
     def step(self) -> list[str]:
         events: list[str] = []
-        bad = journal.broken_chains(journal.NEWS_CHAINED)
-        if bad:  # fail closed, like the quant cycle: no trading on a corrupted journal
-            raise ChainBroken("news hash chain broken: " + ", ".join(bad) + " - news engine stopped, nothing traded")
+        if time.time() - getattr(self, "_chain_checked", 0.0) >= 300:  # full re-verify at most every 5 minutes
+            bad = journal.broken_chains(journal.NEWS_CHAINED)
+            if bad:  # fail closed, like the quant cycle: no trading on a corrupted journal
+                raise ChainBroken("news hash chain broken: " + ", ".join(bad) + " - news engine stopped, nothing traded;"
+                                  " stops on open news positions are NOT being checked until it is repaired")
+            self._chain_checked = time.time()
         self.run_queue_at_open(events)
         new = self.poll_headlines()
         for x in new:
             x["price"], x["day_move_pct"] = live_price(x["symbol"])
-            x["price_at"] = journal.now_utc()  # when the price was seen (it can predate the log by the scoring time)
+            x["price_at"] = QUOTE_TIME.get(x["symbol"]) or journal.now_utc()  # the quote's own time, not the clock
         for i in range(0, len(new), self.n["batch_max"]):
             chunk = new[i:i + self.n["batch_max"]]
             self.handle_scored(chunk, score_batch(chunk, self.n["model"]), events)
@@ -314,8 +339,12 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
         nt.poll_headlines()
         nt.save()
         print(f"[news] primed {len(nt.seen)} existing headlines")
+    if not journal.calendar_covers(datetime.now(NY).date()):
+        notify.send("AI Trader - תקלה", f"config.json calendar does not cover {datetime.now(NY).year}: the news engine"
+                    " treats every day as closed and will not trade until the NYSE holidays are added (כסף נייר)", cfg, "urgent")
     hh, mm = (int(x) for x in until_ny.split(":"))
     t0 = time.time()
+    fails = 0
     while True:
         now = datetime.now(NY)
         if (now.hour, now.minute) >= (hh, mm) or (max_minutes and (time.time() - t0) / 60 >= max_minutes):
@@ -323,6 +352,7 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
         start = time.time()
         try:
             ev = nt.step()
+            fails = 0
             if ev:
                 print(f"[news {now.strftime('%H:%M:%S')} NY] " + " | ".join(ev), flush=True)
         except ChainBroken as e:  # not survivable: stop trading and tell the owner
@@ -332,6 +362,10 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
         except Exception as e:  # noqa: BLE001 - the loop must survive a bad cycle; the error is logged, not hidden
             print(f"[news] cycle error: {type(e).__name__}: {str(e)[:200]}", flush=True)
             journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__, "detail": str(e)[:300]})
+            fails += 1
+            if fails == nt.n.get("alert_after_errors", 5):  # a step that keeps failing also skips the stop checks
+                notify.send("AI Trader - תקלה", f"news engine failed {fails} steps in a row ({type(e).__name__}): stops on"
+                            " open news positions are NOT being checked (כסף נייר)", cfg, "urgent")
         time.sleep(max(1.0, nt.n["poll_seconds"] - (time.time() - start)))
     nt.save()
     print("[news] stopped", flush=True)
