@@ -9,6 +9,7 @@ Four memory layers (taken from the Age of Blood agent setup):
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,9 +29,44 @@ def now_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+CHAINED = {"decisions.jsonl", "trades.jsonl", "learning.jsonl"}
+
+
+def _last_hash(p: Path) -> str:
+    if not p.exists() or p.stat().st_size == 0:
+        return "genesis"
+    with p.open("rb") as f:
+        f.seek(max(0, p.stat().st_size - 65536))
+        tail = f.read().decode("utf-8", "replace").strip().splitlines()
+    try:
+        return json.loads(tail[-1]).get("hash", "genesis")
+    except (ValueError, IndexError):
+        return "genesis"
+
+
 def append(name: str, record: dict) -> None:
-    with _path(name).open("a") as f:
+    """Append one JSON line. Decision/trade/learning logs are SHA-256 chained (tamper-evident)."""
+    p = _path(name)
+    if name in CHAINED:
+        prev = _last_hash(p)
+        body = json.dumps(record, sort_keys=True, default=str)
+        record = {**record, "prev_hash": prev, "hash": hashlib.sha256((prev + body).encode()).hexdigest()}
+    with p.open("a") as f:
         f.write(json.dumps(record, default=str) + "\n")
+
+
+def verify_chain(name: str) -> tuple[bool, int]:
+    """Re-compute the chain. Returns (ok, records_checked)."""
+    prev = "genesis"
+    rows = read(name)
+    for i, r in enumerate(rows):
+        h = r.pop("hash", None)
+        pv = r.pop("prev_hash", None)
+        body = json.dumps(r, sort_keys=True, default=str)
+        if pv != prev or h != hashlib.sha256((prev + body).encode()).hexdigest():
+            return False, i
+        prev = h
+    return True, len(rows)
 
 
 def read(name: str) -> list[dict]:
@@ -124,9 +160,32 @@ def scorecard(preds: list[dict] | None = None) -> dict:
             if not sub:
                 continue
             ups = [p for p in sub if p["direction"] == "up"]
-            out[f"{src}_h{h}"] = {
+            row = {
                 "n": len(sub),
                 "hit_rate": round(sum(p["hit"] for p in sub) / len(sub), 3),
                 "avg_excess_up_calls": round(sum(p["excess"] for p in ups) / len(ups), 4) if ups else None,
             }
+            probs = [p for p in sub if p.get("prob") is not None]
+            if probs:  # Brier: prob that the stock beats SPY over the horizon; 0.25 = coin flip
+                row["brier"] = round(sum((p["prob"] - (1.0 if p["excess"] > 0 else 0.0)) ** 2 for p in probs) / len(probs), 4)
+                row["n_prob"] = len(probs)
+            out[f"{src}_h{h}"] = row
     return out
+
+
+def context(symbol: str, n: int = 5) -> dict:
+    """What we said and learned about a ticker before (TradingAgents-style memory injection)."""
+    sym = symbol.upper()
+    preds = [p for p in read("predictions.jsonl") if p["symbol"] == sym]
+    trades = [t for t in read("trades.jsonl") if t["symbol"] == sym]
+    lessons_path = _path("lessons.md")
+    lessons = [ln for ln in lessons_path.read_text().splitlines() if sym in ln] if lessons_path.exists() else []
+    evaluated = [p for p in preds if p["status"] == "evaluated"]
+    return {
+        "symbol": sym,
+        "recent_predictions": preds[-n:],
+        "graded": {"n": len(evaluated), "hit_rate": round(sum(p["hit"] for p in evaluated) / len(evaluated), 3) if evaluated else None},
+        "recent_trades": trades[-n:],
+        "lessons": lessons[-n:],
+        "recent_lessons_any": (lessons_path.read_text().strip().splitlines()[-3:] if lessons_path.exists() else []),
+    }

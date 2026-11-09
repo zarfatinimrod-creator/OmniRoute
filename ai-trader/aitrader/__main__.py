@@ -7,6 +7,8 @@
   veto SYMBOL --reason TEXT               veto today's new entry in SYMBOL (Claude review)
   shrink SYMBOL MULT --reason TEXT        shrink today's target for SYMBOL (0..1)
   news SYMBOL                             recent headlines
+  context SYMBOL                          past calls, trades and lessons for a ticker (read before deciding)
+  verify                                  check the tamper-evident hash chains
   scorecard                               grade matured predictions
 """
 
@@ -42,6 +44,10 @@ def main(argv=None) -> int:
     p.add_argument("direction", choices=["up", "down"])
     p.add_argument("--horizon", type=int, default=20)
     p.add_argument("--note", default="")
+    p.add_argument("--prob", type=float, default=None, help="probability (0-1) that SYMBOL beats SPY over the horizon")
+    cx = sub.add_parser("context")
+    cx.add_argument("symbol")
+    sub.add_parser("verify")
     v = sub.add_parser("veto")
     v.add_argument("symbol")
     v.add_argument("--reason", required=True)
@@ -86,6 +92,7 @@ def main(argv=None) -> int:
         journal.append("predictions.jsonl", {
             "date": _today_market_date(), "logged_at": journal.now_utc(), "symbol": a.symbol.upper(), "horizon": a.horizon,
             "source": "claude", "score": 1.0 if a.direction == "up" else -1.0, "direction": a.direction, "note": a.note,
+            "prob": None if a.prob is None else max(0.0, min(1.0, a.prob)), "model_note": "graded forward only (post knowledge cutoff)",
             "components": {}, "price": px[a.symbol.upper()], "bench_price": px.get(bench), "status": "open"})
         print(f"logged claude call: {a.symbol.upper()} {a.direction} h={a.horizon} @ {px[a.symbol.upper()]}")
     elif a.cmd in ("veto", "shrink"):
@@ -99,6 +106,12 @@ def main(argv=None) -> int:
             ov["size_mult"][a.symbol.upper()] = [max(0.0, min(1.0, a.mult)), a.reason]
         journal.save_json("overrides.json", ov)
         print(json.dumps(ov, indent=1))
+    elif a.cmd == "context":
+        print(json.dumps(journal.context(a.symbol), indent=1, default=str))
+    elif a.cmd == "verify":
+        for name in sorted(journal.CHAINED):
+            ok, n = journal.verify_chain(name)
+            print(f"{name}: {'OK' if ok else 'BROKEN at record ' + str(n)} ({n} records)")
     elif a.cmd == "news":
         from .data import news_headlines
 

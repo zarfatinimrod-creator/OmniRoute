@@ -174,7 +174,7 @@
     ],
     "primary_horizon_days": 20,
     "ic_half_life_days": 60,
-    "min_eval_dates": 20,
+    "min_eval_dates": 30,
     "eta": 0.5,
     "weight_floor": 0.02,
     "weight_cap": 0.4,

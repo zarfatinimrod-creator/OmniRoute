@@ -62,6 +62,41 @@ def _apply_overrides(targets: dict, held: dict, ds: str) -> tuple[dict, list]:
     return t, applied
 
 
+def _eval_close(close: pd.DataFrame) -> pd.DataFrame:
+    """Universe closes plus any symbol an open prediction refers to (overlay names outside the universe)."""
+    need = {p["symbol"] for p in journal.read("predictions.jsonl") if p["status"] == "open"} - set(close.columns)
+    if not need:
+        return close
+    extra = fetch_panel(sorted(need), "1y", 6.0)["close"]
+    return close.join(extra, how="left")
+
+
+def _overlays_once_per_day(cfg: dict, ds: str, bench: str) -> dict:
+    """Insider cluster buys + Quiver congress buys, logged as forward-graded predictions (no capital yet)."""
+    prev = journal.load_json("overlays.json", {}) or {}
+    if prev.get("date") == ds:
+        return prev
+    from . import alt
+    from .data import live_prices
+
+    out = {"date": ds, "insider_cluster": [], "congress_buy": None, "logged": 0}
+    try:
+        out["insider_cluster"] = alt.openinsider_cluster_buys()[:25]
+    except Exception as e:  # noqa: BLE001 - optional source
+        out["insider_error"] = type(e).__name__
+    try:
+        cb = alt.quiver_congress_buys()
+        out["congress_buy"] = None if cb is None else [r for r in cb if r["net"] > 0][:25]
+    except Exception as e:  # noqa: BLE001
+        out["congress_error"] = type(e).__name__
+    names = {r["ticker"] for r in out["insider_cluster"]} | {r["ticker"] for r in (out["congress_buy"] or [])}
+    px = live_prices(sorted(names | {bench})) if names else {}
+    out["logged"] += alt.log_overlay_predictions(out["insider_cluster"], "insider_cluster", px, px.get(bench), ds)
+    out["logged"] += alt.log_overlay_predictions(out["congress_buy"] or [], "congress_buy", px, px.get(bench), ds)
+    journal.save_json("overlays.json", out)
+    return out
+
+
 def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours: float = 0.2) -> dict:
     cfg = load_config()
     r = cfg["risk"]
@@ -82,8 +117,8 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
     prices = _px(close.loc[date])
     state = journal.load_json("portfolio.json")
     broker = PaperBroker(cfg["account"]["starting_cash"], cfg["costs"]["slippage_bps"], cfg["costs"]["commission_per_share"], state)
-    if state is None:
-        broker.state.update({"created": ds, "last_mark": None})
+    if state is None:  # first run: remember the starting line for the shadow baselines
+        broker.state.update({"created": ds, "last_mark": None, "start_prices": prices})
     prev_regime = broker.state.get("regime")
     prev_dd_state = broker.state.get("dd_state")
     yield_today = cfg["account"]["cash_yield_annual"] if broker.state.get("last_mark") not in (None, ds) else 0.0
@@ -124,7 +159,8 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
     score = combine(signals, weights, date)
     n_pred = journal.record_predictions(ds, score, {k: v.loc[date] for k, v in signals.items()}, prices,
                                         prices.get(bench), cfg["learning"]["horizons_days"], list(broker.positions))
-    card = journal.evaluate_predictions(close, bench)
+    overlays = _overlays_once_per_day(cfg, ds, bench)
+    card = journal.evaluate_predictions(_eval_close(close), bench)
 
     gross = sum(p["qty"] * prices.get(s, p["last_price"]) for s, p in broker.positions.items()) / equity if equity else 0
     journal.append("equity.jsonl", {"date": ds, "logged_at": journal.now_utc(), "equity": round(equity, 2), "cash": round(broker.cash, 2),
@@ -133,12 +169,19 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
                 "overrides": applied, "preview": preview, "executed": executed, "predictions_logged": n_pred}
     journal.append("decisions.jsonl", decision)
 
+    sp = broker.state.get("start_prices") or {}
+    common = [k for k in sp if k in prices]
+    baselines = {
+        "spy_since_start": round(prices[bench] / sp[bench] - 1, 4) if bench in sp and bench in prices else None,
+        "equal_weight_since_start": round(sum(prices[k] / sp[k] for k in common) / len(common) - 1, 4) if common else None,
+    }
     summary = {
         "date": ds, "market": mkt, "equity": round(equity, 2), "cash": round(broker.cash, 2), "gross": round(gross, 4),
-        "return_since_start": round(equity / cfg["account"]["starting_cash"] - 1, 4), "regime": diag.get("regime"),
+        "return_since_start": round(equity / cfg["account"]["starting_cash"] - 1, 4), "baselines": baselines,
+        "started": broker.state.get("created"), "regime": diag.get("regime"),
         "dd_state": diag.get("dd_state"), "drawdown": diag.get("drawdown"), "due_rebalance": due, "weights": weights,
         "targets": diag.get("targets", {}), "top_scores": diag.get("top_scores"), "bottom_scores": diag.get("bottom_scores"),
-        "stopped": stopped, "preview_orders": preview, "executed": executed, "overrides": applied, "scorecard": card,
+        "stopped": stopped, "preview_orders": preview, "overlays": {k: overlays.get(k) for k in ("insider_cluster", "congress_buy", "logged")}, "executed": executed, "overrides": applied, "scorecard": card,
         "positions": {s: {"qty": p["qty"], "avg_cost": round(p["avg_cost"], 2), "last": round(prices.get(s, p["last_price"]), 2),
                           "pnl_pct": round(prices.get(s, p["last_price"]) / p["avg_cost"] - 1, 4), "since": p["entry_date"]}
                       for s, p in broker.positions.items()},

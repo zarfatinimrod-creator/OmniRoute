@@ -9,6 +9,10 @@ ROOT = Path(__file__).resolve().parent.parent
 DISCLAIMER = "> כסף נייר בלבד. זו לא המלצת השקעה. אף מודל לא יודע לחזות את השוק בוודאות."
 
 
+def _pct(x) -> str:
+    return "n/a" if x is None else f"{x:+.2%}"
+
+
 def _fills(rows: list[dict]) -> str:
     if not rows:
         return "- (אין)\n"
@@ -26,7 +30,8 @@ def write_daily_report(s: dict) -> Path:
         f"- שוק: {'פתוח' if mk.get('is_open') else 'סגור'} (מחיר אחרון SPY: {mk.get('price')}, עדכון: {mk.get('last_trade_utc')})",
         f"- משטר: **{s.get('regime')}** | ירידה מהשיא: {s.get('drawdown')} ({s.get('dd_state')})",
         f"- שווי תיק: **${s['equity']:,.0f}** ({s['return_since_start']:+.2%} מההתחלה) | מזומן ${s['cash']:,.0f} | חשיפה {s['gross']:.0%}",
-        f"- ריבלנס השבוע: {'כן' if s.get('due_rebalance') else 'לא (רק סטופים)'}",
+        f"- מול קווי בסיס מאז {s.get('started')}: SPY {_pct((s.get('baselines') or {}).get('spy_since_start'))} | שווה-משקל יקום {_pct((s.get('baselines') or {}).get('equal_weight_since_start'))}",
+        f"- ריבלנס היום: {'כן' if s.get('due_rebalance') else 'לא (רק סטופים)'}",
         "",
         "## פקודות שבוצעו",
         _fills(s.get("executed", [])),
@@ -62,6 +67,15 @@ def write_daily_report(s: dict) -> Path:
     for k, v in card.items():
         if isinstance(v, dict):
             lines.append(f"- {k}: n={v['n']}, אחוז פגיעה {v['hit_rate']:.0%}, תשואה עודפת ממוצעת לקריאות עלייה {v['avg_excess_up_calls']}")
+    ov = s.get("overlays") or {}
+    if ov.get("insider_cluster"):
+        lines += ["", "## קניות קבוצתיות של בעלי עניין (OpenInsider) - נרשם לבדיקה, בלי כסף עדיין"]
+        lines += [f"- {x['ticker']} ({x['company'][:30]}): {x['insiders']} בעלי עניין, ${x['value']:,.0f}, {x['trade_date']}" for x in ov["insider_cluster"][:8]]
+    if ov.get("congress_buy"):
+        lines += ["", "## קניות של חברי קונגרס (Quiver, 30 יום) - נרשם לבדיקה"]
+        lines += [f"- {x['ticker']}: קונים {x['buyers']}, מוכרים {x['sellers']}, אחרון {x['last']}" for x in ov["congress_buy"][:8]]
+    elif ov.get("congress_buy") is None:
+        lines += ["", "- Quiver: לא מחובר (צריך מפתח API)"]
     if s.get("overrides"):
         lines += ["", "## התערבויות של Claude (וטו/הקטנה)"] + [f"- {o['symbol']}: {o['action']} - {o['reason']}" for o in s["overrides"]]
     if s.get("stopped"):
