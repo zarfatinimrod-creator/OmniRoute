@@ -151,7 +151,9 @@ def evaluate_predictions(close: pd.DataFrame, bench: str) -> dict:
         if pos >= len(idx) or pos + p["horizon"] >= len(idx) or p.get("price") in (None, 0):
             continue
         end = idx[pos + p["horizon"]]
-        start = idx[pos] if idx[pos] == d else None
+        # quant calls are made on the decision bar's close; Claude/desk/overlay calls are made later at a live
+        # price, so they are graded from the price actually logged (no credit for moves already seen)
+        start = idx[pos] if idx[pos] == d and p.get("source", "quant") == "quant" else None
         sym = p["symbol"]
         if sym not in close or bench not in close:
             continue

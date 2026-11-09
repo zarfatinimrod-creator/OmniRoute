@@ -3,7 +3,8 @@
   "account": {
     "starting_cash": 100000,
     "cash_yield_annual": 0.035,
-    "paper_only": true
+    "paper_only": true,
+    "dividend_withholding": 0.25
   },
   "benchmark": "SPY",
   "universe": {
@@ -132,7 +133,8 @@
     "lowvol_exclude_top_pct": 0.2,
     "lowvol_exclude_lookback": 252,
     "earnings_max_position_pct": 0.05,
-    "regime_band_pct": 0.02
+    "regime_band_pct": 0.02,
+    "dd_reentry_days": 20
   },
   "signals": {
     "tsmom": {

@@ -253,9 +253,11 @@ def earnings_on(day: str) -> dict[str, str] | None:
 def load_market(cfg: dict, rng: str = "10y", max_age_hours: float = 6.0) -> dict:
     """Universe panel plus non-tradable regime inputs (VIX) under panel['vix']."""
     panel = fetch_panel(list(cfg["universe"]), rng, max_age_hours)
+    panel["_require_vix"] = True  # production: a missing VIX must fail closed (defensive), not silently off
     try:
-        vix = fetch_daily("^VIX", rng, max_age_hours)["close"]
-        panel["vix"] = vix.reindex(panel["close"].index).ffill()
+        vix = fetch_daily("^VIX", rng, max_age_hours)["close"].dropna()
+        idx = panel["close"].index
+        panel["vix"] = vix.reindex(idx).ffill().where(idx <= vix.index[-1])  # never carry a stale VIX past its last bar
     except Exception as e:  # noqa: BLE001 - regime input is optional
         print(f"[data] VIX unavailable: {type(e).__name__}")
     return panel

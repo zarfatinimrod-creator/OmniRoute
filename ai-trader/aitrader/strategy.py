@@ -160,9 +160,9 @@ def build_targets(
 
     # Defensive mode: VIX in the top of its own trailing-year range (percentile, not a fixed level).
     vix = panel.get("vix")
-    if vix is not None and r.get("defensive_vix_pct"):
-        hist = vix.loc[:date].tail(252).dropna()
-        missing = pd.isna(vix.get(date, np.nan)) or len(hist) <= 60  # fail closed when VIX is missing today
+    if r.get("defensive_vix_pct") and (vix is not None or panel.get("_require_vix")):
+        hist = vix.loc[:date].tail(252).dropna() if vix is not None else pd.Series(dtype=float)
+        missing = vix is None or pd.isna(vix.get(date, np.nan)) or len(hist) <= 60  # fail closed when VIX is missing
         if missing or (hist <= hist.iloc[-1]).mean() >= r["defensive_vix_pct"]:
             regime = regime + ("+defensive(no-vix)" if missing else "+defensive")
             scale *= r.get("defensive_gross_mult", 0.75)

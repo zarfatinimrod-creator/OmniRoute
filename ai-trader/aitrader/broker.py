@@ -79,6 +79,22 @@ class PaperBroker:
                 del self.positions[sym]
         return notes
 
+    def maybe_reset_peak(self, regime: str, date: str, days_required: int = 20) -> bool:
+        """Drawdown re-entry: after going flat, reset the reference peak once the market has been risk-on for
+        `days_required` consecutive decisions, so the breaker is not a permanent exit (resumes at full scale)."""
+        st = self.state
+        if st.get("dd_state") != "flat":
+            st.pop("riskon_streak", None)
+            return False
+        st["riskon_streak"] = st.get("riskon_streak", 0) + 1 if regime.startswith("risk_on") else 0
+        if st["riskon_streak"] >= days_required:
+            eq = st["cash"] + sum(p["qty"] * p["last_price"] for p in self.positions.values())
+            st["peak_equity"] = eq
+            st["riskon_streak"] = 0
+            st.setdefault("peak_resets", []).append(date)
+            return True
+        return False
+
     def peak_ratio(self, prices: dict) -> float:
         return self.equity(prices) / max(self.state.get("peak_equity", 1.0), 1e-9)
 
@@ -108,7 +124,7 @@ class PaperBroker:
                 continue
             tw, cw = targets.get(s, 0.0), cur.get(s, 0.0)
             exiting = tw == 0 and cw > 0
-            if exits_only and not exiting:
+            if exits_only and tw >= cw:  # off-cycle: never buy; exits, stops, shrinks and earnings caps still sell
                 continue
             if not exiting and abs(tw - cw) < band:
                 continue

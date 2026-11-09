@@ -124,9 +124,9 @@ def main(argv=None) -> int:
         if ov.get("date") != ds:
             ov = {"date": ds, "vetoes": {}, "size_mult": {}}
         if a.cmd == "veto":
-            ov["vetoes"][a.symbol.upper()] = a.reason
+            ov["vetoes"][a.symbol.upper()] = {"reason": a.reason, "logged_at": journal.now_utc()}
         else:
-            ov["size_mult"][a.symbol.upper()] = [max(0.0, min(1.0, a.mult)), a.reason]
+            ov["size_mult"][a.symbol.upper()] = [max(0.0, min(1.0, a.mult)), a.reason, journal.now_utc()]
         journal.save_json("overrides.json", ov)
         print(json.dumps(ov, indent=1))
     elif a.cmd == "context":
@@ -173,9 +173,9 @@ def main(argv=None) -> int:
                 ov = {"date": ds, "vetoes": {}, "size_mult": {}}
             reason = f"desk {a.rating} p={prob:.2f}: {a.thesis[:160]}"
             if action[0] == "veto":
-                ov["vetoes"][sym] = reason
+                ov["vetoes"][sym] = {"reason": reason, "logged_at": journal.now_utc()}
             else:
-                ov["size_mult"][sym] = [action[1], reason]
+                ov["size_mult"][sym] = [action[1], reason, journal.now_utc()]
             journal.save_json("overrides.json", ov)
         print(f"desk logged: {sym} {a.rating} p={prob:.2f} -> {action or 'no override (code decides size)'}")
     elif a.cmd == "news":

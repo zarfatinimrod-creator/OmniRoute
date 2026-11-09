@@ -45,6 +45,8 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
     broker = PaperBroker(cfg["account"]["starting_cash"], cfg["costs"]["slippage_bps"], cfg["costs"]["commission_per_share"])
     pending, pending_stopped = None, []
     equity, turnover, all_fills = {}, {}, []
+    prev_regime, prev_dd = None, None
+    exits_only_pending = False
     for i, d in enumerate(dates):
         ds = str(d.date())
         cpx = _px(close.loc[d])
@@ -53,20 +55,24 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
             exec_px = {**cpx, **opx}  # trade at the open; fall back to close if the open is missing
             eq_before = broker.equity(exec_px)
             cool = str(dates[min(i + r.get("stop_cooldown_days", 10), len(dates) - 1)].date())
-            fills = broker.rebalance(pending, exec_px, ds, r["rebalance_band_pct"], r["min_trade_value"], pending_stopped, cool)
+            fills = broker.rebalance(pending, exec_px, ds, r["rebalance_band_pct"], r["min_trade_value"], pending_stopped, cool, exits_only_pending)
             turnover[d] = sum(f["value"] for f in fills) / max(eq_before, 1e-9)
             all_fills.extend(fills)
             pending = None
         equity[d] = broker.mark(cpx, ds, cfg["account"]["cash_yield_annual"])
         blocked = set(broker.state.get("blocked", {}))
         on_cycle = (i + phase) % rebalance_every == 0
-        if on_cycle or broker.positions:
-            targets, diag = build_targets(d, panel, signals, wmap[d], cfg, broker.peak_ratio(cpx), broker.positions, blocked, aux)
-            if on_cycle or diag.get("dd_state") == "flat":
-                pending, pending_stopped = targets, diag.get("stopped", [])
-            elif diag.get("stopped"):  # off-cycle day: only act on stops
-                keep = {s: broker.weights(cpx).get(s, 0.0) for s in broker.positions if s not in diag["stopped"]}
-                pending, pending_stopped = keep, diag["stopped"]
+        broker.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20))
+        targets, diag = build_targets(d, panel, signals, wmap[d], cfg, broker.peak_ratio(cpx), broker.positions, blocked, aux)
+        # same trigger as live: scheduled rebalance, or any regime / drawdown-state change, or a flat breaker
+        changed = (prev_regime is not None and diag.get("regime") != prev_regime) or (prev_dd is not None and diag.get("dd_state") != prev_dd)
+        broker.state["dd_state"] = diag.get("dd_state")
+        prev_regime, prev_dd = diag.get("regime", prev_regime), diag.get("dd_state", prev_dd)
+        if on_cycle or changed or diag.get("dd_state") == "flat":
+            pending, pending_stopped, exits_only_pending = targets, diag.get("stopped", []), False
+        elif diag.get("stopped"):  # off-cycle day: act on stops only (exits-only, like live)
+            pending = {s_: 1.0 for s_ in broker.positions if s_ not in diag["stopped"]}
+            pending_stopped, exits_only_pending = diag["stopped"], True
 
     eq = pd.Series(equity)
     to = pd.Series(turnover, dtype=float)
@@ -87,12 +93,13 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
     return res
 
 
-def sweep(panel: dict, cfg: dict, start: str, end: str | None = None) -> pd.DataFrame:
-    """Re-run under several assumptions. Read the spread, not the best row."""
-    signals = compute_all(panel, cfg)
+_G: dict = {}
+
+
+def _variants(cfg: dict) -> list[tuple]:
     base_every = cfg["risk"].get("rebalance_every_days", 5)
-    variants = [
-        ("base (learned weights)", {}, "learned", base_every),
+    return [
+        ("base", {}, "learned", base_every),
         ("prior weights (no learning)", {}, "prior", base_every),
         ("costs 15bps", {"costs": {"slippage_bps": 15}}, "learned", base_every),
         ("costs 30bps", {"costs": {"slippage_bps": 30}}, "learned", base_every),
@@ -103,45 +110,69 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None) -> pd.Data
         ("no regime filter", {"risk": {"risk_off_gross_mult": 1.0}}, "learned", base_every),
         ("no VIX defensive mode", {"risk": {"defensive_gross_mult": 1.0}}, "learned", base_every),
         ("8 positions max", {"risk": {"max_positions": 8}}, "learned", base_every),
+        ("ETF-only universe (no survivorship bias)", {"_etf": True}, "learned", base_every),
     ]
-    rows = []
-    for name, override, mode, every in variants:
-        c = copy.deepcopy(cfg)
-        for sec, kv in override.items():
+
+
+def _job(args):
+    name, override, mode, every, phase = args
+    c = copy.deepcopy(_G["cfg"])
+    panel, signals = _G["panel"], _G["signals"]
+    if override.get("_etf"):
+        etf = [k for k, v in c["universe"].items() if v in ("Index", "SectorETF", "Bonds", "Gold")]
+        panel = {k: (v[etf] if isinstance(v, pd.DataFrame) else v) for k, v in panel.items()}
+        c["universe"] = {k: c["universe"][k] for k in etf}
+        c["risk"]["max_positions"] = 6
+        signals = None
+    for sec, kv in override.items():
+        if not sec.startswith("_"):
             c[sec].update(kv)
-        res = run(panel, c, start, end, mode, every, signals=signals, aux=precompute_aux(panel, c))
-        s = res["strategy"]
-        rows.append({"variant": name, **{k: s.get(k) for k in ("cagr", "vol", "sharpe", "max_drawdown", "calmar", "turnover_annual", "psr_vs_0")}, "trades": res["n_trades"]})
-    # survivorship-free check: ETFs only (no stock picked with hindsight)
-    etf = [k for k, v in cfg["universe"].items() if v in ("Index", "SectorETF", "Bonds", "Gold")]
-    pe = {k: (v[etf] if isinstance(v, pd.DataFrame) else v) for k, v in panel.items()}
-    ce = copy.deepcopy(cfg)
-    ce["universe"] = {k: cfg["universe"][k] for k in etf}
-    ce["risk"]["max_positions"] = 6
-    ree = run(pe, ce, start, end, "learned", base_every)
-    s = ree["strategy"]
-    rows.append({"variant": "ETF-only universe (no survivorship bias)", **{k: s.get(k) for k in ("cagr", "vol", "sharpe", "max_drawdown", "calmar", "turnover_annual", "psr_vs_0")}, "trades": ree["n_trades"]})
-    b = ree["benchmark_equal_weight_universe"]
-    rows.append({"variant": "Equal-weight ETFs", **{k: b.get(k) for k in ("cagr", "vol", "sharpe", "max_drawdown", "calmar", "psr_vs_0")}})
-    base = run(panel, cfg, start, end, "learned", base_every, signals=signals)
-    # The weekly rebalance day is arbitrary: re-run the base on every phase and report the spread.
-    ph = [run(panel, cfg, start, end, "learned", base_every, signals=signals, phase=k)["strategy"] for k in range(1, base_every)]
-    ph.append(base["strategy"])
-    shp = pd.Series([x["sharpe"] for x in ph])
-    rows.append({"variant": f"base over {len(ph)} rebalance phases (mean; sd={shp.std():.3f}, min={shp.min():.3f})",
-                 **{k: round(float(pd.Series([x[k] for x in ph]).mean()), 4) for k in ("cagr", "vol", "sharpe", "max_drawdown", "calmar", "turnover_annual", "psr_vs_0")}})
-    # Deflated Sharpe: deflate the base by every configuration ever tried (trials.jsonl + this sweep).
-    try:
+    res = run(panel, c, _G["start"], _G["end"], mode, every, signals=signals, aux=precompute_aux(panel, c), phase=phase)
+    out = {"variant": name, "phase": phase, "trades": res["n_trades"], **res["strategy"]}
+    if name == "base" and phase == 0:
+        out["_daily"] = (res["_equity"].pct_change().dropna()).tolist()
+        out["_bench"] = {"SPY buy&hold": res["benchmark_spy"], "Equal-weight universe": res["benchmark_equal_weight_universe"]}
+    return out
+
+
+def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: int = 4) -> pd.DataFrame:
+    """Every variant x every weekly rebalance phase, compared PAIRED with the base at the same phase.
+    Read the median and the win count, never one row: a change is real only if it wins in most phases."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    _G.update({"panel": panel, "cfg": cfg, "start": start, "end": end, "signals": compute_all(panel, cfg)})
+    base_every = cfg["risk"].get("rebalance_every_days", 5)
+    jobs = []
+    for name, ov, mode, every in _variants(cfg):
+        phases = [0] if every == 1 else list(range(base_every)) if every == base_every else [k * (every // base_every) for k in range(base_every)]
+        jobs += [(name, ov, mode, every, k) for k in phases]
+    with ProcessPoolExecutor(max_workers=workers) as ex:  # fork: workers share the panel without pickling
+        results = list(ex.map(_job, jobs))
+    df = pd.DataFrame([{k: v for k, v in r.items() if not k.startswith("_")} for r in results])
+    base = df[df.variant == "base"].set_index("phase")
+    rows = []
+    for name, g in df.groupby("variant", sort=False):
+        g = g.set_index("phase")
+        paired = [(g.at[k, "sharpe"] - base.at[k % base_every, "sharpe"]) for k in g.index if (k % base_every) in base.index]
+        rows.append({
+            "variant": name, "phases": len(g), "sharpe_med": round(g.sharpe.median(), 3), "sharpe_min": round(g.sharpe.min(), 3),
+            "sharpe_max": round(g.sharpe.max(), 3), "wins_vs_base": f"{sum(x > 0 for x in paired)}/{len(paired)}" if name != "base" else "-",
+            "d_sharpe_med": round(float(pd.Series(paired).median()), 3) if name != "base" else 0.0,
+            "cagr_med": round(g.cagr.median(), 4), "maxdd_med": round(g.max_drawdown.median(), 4), "calmar_med": round(g.calmar.median(), 3),
+            "turnover_med": round(g.turnover_annual.median(), 2), "psr_med": round(g.psr_vs_0.median(), 3)})
+    b0 = next(r for r in results if r["variant"] == "base" and r["phase"] == 0)
+    for label, bm in b0["_bench"].items():
+        rows.append({"variant": label, "sharpe_med": bm.get("sharpe"), "cagr_med": bm.get("cagr"), "maxdd_med": bm.get("max_drawdown"),
+                     "calmar_med": bm.get("calmar"), "psr_med": bm.get("psr_vs_0")})
+    try:  # Deflated Sharpe of the base: deflated by every configuration ever registered + this sweep
         from .metrics import dsr
-        n_prev = sum(len(t.get("rows", [])) for t in journal.read("trials.jsonl"))
-        srs = pd.Series([r_["sharpe"] for r_ in rows if r_.get("trades")]) / (252 ** 0.5)
-        daily = base["_equity"].pct_change().dropna() - ((1 + cfg["account"]["cash_yield_annual"]) ** (1 / 252) - 1)
-        rows.append({"variant": f"DSR of base (N={n_prev + len(srs)} trials)", "psr_vs_0": round(dsr(daily, n_prev + len(srs), float(srs.std())), 3)})
+        n_prev = sum(len(t.get("rows", [])) for t in journal.read("trials.jsonl") if "rows" in t)
+        srs = df.groupby("variant").sharpe.median() / (252 ** 0.5)
+        rf_d = (1 + cfg["account"]["cash_yield_annual"]) ** (1 / 252) - 1
+        daily = pd.Series(b0["_daily"]) - rf_d
+        rows.append({"variant": f"DSR of base (N={n_prev + len(srs)} trials)", "psr_med": round(dsr(daily, n_prev + len(srs), float(srs.std())), 3)})
     except Exception as e:  # noqa: BLE001 - informative only
         rows.append({"variant": f"DSR unavailable: {type(e).__name__}"})
-    for label, key in (("SPY buy&hold", "benchmark_spy"), ("Equal-weight universe", "benchmark_equal_weight_universe")):
-        b = base[key]
-        rows.append({"variant": label, **{k: b.get(k) for k in ("cagr", "vol", "sharpe", "max_drawdown", "calmar", "psr_vs_0")}})
     return pd.DataFrame(rows)
 
 

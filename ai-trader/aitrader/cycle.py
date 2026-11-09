@@ -62,22 +62,36 @@ def _trading_days_between(close: pd.DataFrame, a: str, b: str) -> int:
     return int(idx.searchsorted(pd.Timestamp(b)) - idx.searchsorted(pd.Timestamp(a)))
 
 
-def _apply_overrides(targets: dict, held: dict, ds: str) -> tuple[dict, list]:
-    """Claude's review may veto new entries or shrink sizes - never add names or increase risk."""
+def _open_cutoff_utc(day) -> str:
+    """09:30 New York on `day`, as a UTC ISO string (overrides logged after it must not touch that open)."""
+    d = pd.Timestamp(day).date()
+    return datetime(d.year, d.month, d.day, 9, 30, tzinfo=NY).astimezone(ZoneInfo("UTC")).replace(microsecond=0).isoformat()
+
+
+def _apply_overrides(targets: dict, held: dict, ds: str, cutoff_utc: str | None = None) -> tuple[dict, list]:
+    """Claude's review may veto new entries or shrink sizes - never add names or increase risk.
+    Entries logged after `cutoff_utc` (the open they would affect) are ignored: no look-ahead."""
     ov = journal.load_json("overrides.json", {}) or {}
     if ov.get("date") != ds:
-        return targets, []
+        return dict(targets), []
+
+    def ok(ts):
+        return cutoff_utc is None or not ts or ts <= cutoff_utc
+
     applied = []
     t = dict(targets)
-    for sym, reason in (ov.get("vetoes") or {}).items():
-        if sym in t and sym not in held:  # only new entries; exits and holds are the code's call
+    for sym, v in (ov.get("vetoes") or {}).items():
+        reason, ts = (v.get("reason"), v.get("logged_at")) if isinstance(v, dict) else (v, None)
+        if sym in t and sym not in held and ok(ts):  # only new entries; exits and holds are the code's call
             t.pop(sym)
-            applied.append({"symbol": sym, "action": "veto", "reason": reason})
-    for sym, (mult, reason) in (ov.get("size_mult") or {}).items():
-        if sym in t:
+            applied.append({"symbol": sym, "action": "veto", "reason": reason, "logged_at": ts})
+    for sym, v in (ov.get("size_mult") or {}).items():
+        mult, reason = v[0], v[1]
+        ts = v[2] if len(v) > 2 else None
+        if sym in t and ok(ts):
             m = max(0.0, min(1.0, float(mult)))
             t[sym] *= m
-            applied.append({"symbol": sym, "action": f"size x{m}", "reason": reason})
+            applied.append({"symbol": sym, "action": f"size x{m}", "reason": reason, "logged_at": ts})
     return t, applied
 
 
@@ -133,8 +147,9 @@ def _earnings_blackout(ds: str, days: int) -> dict[str, str]:
             continue
         for sym, when in got.items():
             out.setdefault(sym, f"{day} {when}")
-    if unknown:  # never cache a partial calendar; the next run retries
-        print(f"[earnings] calendar unavailable for {unknown}; blackout may be incomplete")
+    if unknown:  # never cache a partial calendar; the next run retries. Fail closed for NEW entries.
+        print(f"[earnings] calendar unavailable for {unknown}; new stock entries blocked this decision")
+        out["*"] = "calendar unavailable: " + ",".join(unknown)
     else:
         journal.save_json("earnings.json", {"date": ds, "blackout": out})
     return out
@@ -171,22 +186,23 @@ def _execute_pending(panel, cfg, main, shadow, events) -> list[dict]:
     if not len(later) or not _market_opened(later[0]):
         return []
     d_exec = later[0]
-    late_targets, late = _apply_overrides(pending["targets"], main.positions, pending["decision_date"])
-    already = {(o["symbol"], o["action"]) for o in pending.get("overrides", [])}
-    late = [o for o in late if (o["symbol"], o["action"]) not in already]
-    if late:  # a veto/shrink that arrived after the decision but before the open still counts (reduce-only)
-        pending["targets"] = {k: v for k, v in late_targets.items()}
-        pending.setdefault("overrides", []).extend(late)
+    # Overrides logged before THIS open count (reduce-only); recomputed from the raw targets so a shrink is
+    # never applied twice. Anything logged after 09:30 on the fill day is ignored (it saw the open).
+    if not pending.get("exits_only"):
+        pending["targets"], pending["overrides"] = _apply_overrides(pending["targets_raw"], main.positions, pending["decision_date"], _open_cutoff_utc(d_exec))
     opx = {**_px(close.loc[d_exec]), **_px(panel["open"].loc[d_exec])}  # official open; close only as fallback
     ds_exec = str(d_exec.date())
-    cool = str(close.index[min(close.index.get_loc(d_exec) + r.get("stop_cooldown_days", 10), len(close.index) - 1)].date())
+    cool = str((d_exec + pd.offsets.BDay(r.get("stop_cooldown_days", 10))).date())
     xo = pending.get("exits_only", False)
     fills = main.rebalance(pending["targets"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool, xo)
-    stp = set(pending.get("stopped", []))
-    sh_targets = pending["targets_raw"] if not xo else {s_: 1.0 for s_ in shadow.positions if s_ not in stp}  # exits-only: keep the rest
+    stp = set(pending.get("stopped_shadow", pending.get("stopped", [])))
+    sh_targets = pending["targets_raw"] if not xo else {s_: w for s_, w in pending.get("shadow_hold", {}).items() if s_ not in stp}
     shadow.rebalance(sh_targets, opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], list(stp), cool, xo)
     if pending.get("rebalance"):
         main.state["last_rebalance"] = shadow.state["last_rebalance"] = pending["decision_date"]
+    # crash safety: books first, then the trade log, then mark the decision executed
+    journal.save_json("portfolio.json", main.state)
+    journal.save_json("shadow_portfolio.json", shadow.state)
     for f in fills:
         journal.append("trades.jsonl", {**f, "decision_date": pending["decision_date"], "fill": "open", "logged_at": journal.now_utc()})
     pending.update({"status": "executed", "executed_on": ds_exec, "fills": fills})
@@ -200,6 +216,7 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     """Targets for decision bar `dec` (data up to its close only). persist=False = proposal, no state change."""
     r = cfg["risk"]
     bench = cfg.get("benchmark", "SPY")
+    panel = {k: v.loc[:dec] for k, v in panel.items()}  # nothing after the decision bar's close
     close = panel["close"]
     ds = str(dec.date())
     px = _px(close.loc[dec])
@@ -212,12 +229,8 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     m = main if persist else copy.deepcopy(main)
     prev_regime, prev_dd = m.state.get("regime"), m.state.get("dd_state")
     y = cfg["account"]["cash_yield_annual"]
-    held_syms = set(m.positions) | set(shadow.positions)
-    actions = {sym: corporate_actions(sym) for sym in held_syms}
-    for note in m.apply_corporate_actions(actions, ds):
-        events.append(note)
+    m.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20))  # m is a copy when proposing
     if persist:
-        shadow.apply_corporate_actions(actions, ds)
         m.mark(px, ds, y if m.state.get("last_mark") not in (None, ds) else 0.0)
         shadow.mark(px, ds, y if shadow.state.get("last_mark") not in (None, ds) else 0.0)
     blocked = set(m.state.get("blocked", {}))
@@ -231,18 +244,21 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     if exits_only:  # off-cycle: hold the book, act only on stops (exits), never re-trade overnight gaps
         targets_raw = {s: w for s, w in m.weights(px).items() if s not in stopped}
     bo = _earnings_blackout(ds, r.get("earnings_blackout_days", 4))
-    skipped = {s: bo[s] for s in list(targets_raw) if s in bo and s not in m.positions}
+    from .strategy import ETF_SECTORS
+    skipped = {s: bo.get(s, bo.get("*")) for s in list(targets_raw)
+               if s not in m.positions and (s in bo or ("*" in bo and cfg["universe"].get(s) not in ETF_SECTORS))}
     for s in skipped:
         targets_raw.pop(s)
-    etf = {"Index", "SectorETF", "Bonds", "Gold"}
     cap = r.get("earnings_max_position_pct", 1.0)
     for s in list(targets_raw):  # held through a report: cap the size (ATR stops cannot protect an earnings gap)
-        if s in bo and s in m.positions and cfg["universe"].get(s) not in etf and targets_raw[s] > cap:
+        if s in bo and s in m.positions and cfg["universe"].get(s) not in ETF_SECTORS and targets_raw[s] > cap:
             targets_raw[s] = cap
-    targets, applied = _apply_overrides(targets_raw, m.positions, ds)
+    _, sdiag = build_targets(dec, panel, signals, weights, cfg, shadow.peak_ratio(px), shadow.positions, set(shadow.state.get("blocked", {})), aux)
+    targets, applied = _apply_overrides(targets_raw, m.positions, ds, _open_cutoff_utc(dec + pd.offsets.BDay(1)))
     preview = copy.deepcopy(m).rebalance(targets, px, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped, None, exits_only)
     new_entries = [f["symbol"] for f in preview if f["side"] == "BUY" and f["symbol"] not in m.positions]
     decision = {"decision_date": ds, "status": "pending", "rebalance": due, "exits_only": exits_only, "targets": targets, "targets_raw": targets_raw,
+                "stopped_shadow": sdiag.get("stopped", []), "shadow_hold": shadow.weights(px),
                 "stopped": stopped, "overrides": applied, "earnings_blackout": skipped, "preview_at_close": preview,
                 "new_entries": new_entries, "diag": diag, "weights": weights, "logged_at": journal.now_utc()}
     if not persist:
@@ -281,13 +297,19 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
     events: list[str] = []
     prices_last = _px(close.loc[last])
     main, shadow = _brokers(cfg, _px(close.loc[dec_bar]), str(dec_bar.date()))
-
+    # Splits/dividends through the latest bar are applied BEFORE any fill: the feed is already adjusted, so a
+    # fill on a split day must see the post-split share count. Idempotent (tracked per position).
+    acts = {sym: corporate_actions(sym) for sym in set(main.positions) | set(shadow.positions)}
+    w_hold = cfg["account"].get("dividend_withholding", 0.25)
+    ca_notes = main.apply_corporate_actions(acts, str(last.date()), w_hold)
+    shadow.apply_corporate_actions(acts, str(last.date()), w_hold)
     if propose:  # what the next decision would be, for the trading desk; changes no state
         return _decide(panel, cfg, main, shadow, dec_bar, force_rebalance, False, events)
 
     executed: list[dict] = []
     diag: dict = {}
     decided_now = False
+    events.extend(ca_notes)
     if execute:
         executed += _execute_pending(panel, cfg, main, shadow, events)
         if (journal.load_json("pending.json") or {}).get("decision_date") != str(dec_bar.date()):
