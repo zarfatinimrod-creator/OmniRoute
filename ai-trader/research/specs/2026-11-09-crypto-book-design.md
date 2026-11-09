@@ -1,4 +1,4 @@
-# Crypto book v1 - design spec (2026-11-09, rev 3.1)
+# Crypto book v1 - design spec (2026-11-09, rev 3.2)
 
 Status: design approved by Nimrod in chat on 2026-11-09 (approach B, BTC + ETH, quiet nights, $100k).
 - Rev 2 adds the fixes from the adversarial review of rev 1 (two reviewers, quant-critic and feasibility; workflow
@@ -329,3 +329,23 @@ Scheduled-task prompts (stored verbatim when created):
 - coins beyond BTC/ETH;
 - desk and brief for crypto;
 - any exchange or broker connection, Liquid, and real money.
+
+## 11. Decisions made while planning (rev 3.2)
+
+A code map of the real interfaces (`research/2026-11-09-crypto-codemap.json`) showed where this spec did not fit the
+code as written. The resolutions are the "Planning decisions" section of
+`research/plans/2026-11-09-crypto-book-v1.md`; they take precedence over this spec where the two differ. The main
+ones:
+- **Re-entry reference:** the candidate uses the midpoint -0.375; crypto_base uses -0.25.
+- **Priors:** exact fractions 5/13, 4/13, 4/13.
+- **`account`:** merges key by key, with a crypto cash yield of 0.
+- **Shipping:** `books.crypto.ship_profile` picks which profile ships.
+- **`market` flags:** named for every crypto-only behaviour.
+- **Hysteresis:** an initial-state rule, and no-data handling.
+- **Stale data:** stocks freeze a stale symbol; crypto skips the run.
+- **Fills:** all-or-nothing across coins, with `expired_unfilled` records.
+- **Sweep:** a dedicated `crypto_sweep` module.
+- **Summary:** exit codes and ack.
+- **ETH:** it can be scored from about bar 200 (2018-05), on trend and breakout alone, before tsmom exists. That is
+  earlier than "late 2018".
+
