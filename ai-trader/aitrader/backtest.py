@@ -42,7 +42,8 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
         wmap = {d: prior for d in dates}
 
     r = cfg["risk"]
-    broker = PaperBroker(cfg["account"]["starting_cash"], cfg["costs"]["slippage_bps"], cfg["costs"]["commission_per_share"])
+    broker = PaperBroker(cfg["account"]["starting_cash"], cfg["costs"]["slippage_bps"], cfg["costs"]["commission_per_share"], None,
+                         cfg["costs"].get("qty_step", 1), cfg["costs"].get("fee_bps", 0.0))
     pending, pending_stopped = None, []
     equity, turnover, all_fills = {}, {}, []
     prev_regime, prev_dd = None, None
@@ -62,7 +63,7 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
         equity[d] = broker.mark(cpx, ds, cfg["account"]["cash_yield_annual"], periods_per_year(cfg))
         blocked = set(broker.state.get("blocked", {}))
         on_cycle = (i + phase) % rebalance_every == 0
-        broker.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20), r["dd_halve"], r["dd_flat"])
+        broker.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20), r["dd_halve"], r["dd_flat"], r.get("dd_reentry_ref"))
         targets, diag = build_targets(d, panel, signals, wmap[d], cfg, broker.peak_ratio(cpx), broker.positions, blocked, aux)
         # same trigger as live: scheduled rebalance, or any regime / drawdown-state change, or a flat breaker
         changed = (prev_regime is not None and diag.get("regime") != prev_regime) or (prev_dd is not None and diag.get("dd_state") != prev_dd)

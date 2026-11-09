@@ -9,9 +9,12 @@ import math
 
 
 class PaperBroker:
-    def __init__(self, cash: float, slippage_bps: float = 5.0, commission_per_share: float = 0.0, state: dict | None = None):
+    def __init__(self, cash: float, slippage_bps: float = 5.0, commission_per_share: float = 0.0, state: dict | None = None,
+                 qty_step: float = 1, fee_bps: float = 0.0):
         self.slippage = slippage_bps / 1e4
         self.commission = commission_per_share
+        self.qty_step = qty_step  # int 1 = whole units (stocks); float = fractional units (crypto)
+        self.fee = fee_bps / 1e4
         self.state = state or {"cash": float(cash), "positions": {}, "peak_equity": float(cash), "blocked": {}}
 
     # ---- views -------------------------------------------------------------------------------
@@ -79,7 +82,14 @@ class PaperBroker:
                 del self.positions[sym]
         return notes
 
-    def maybe_reset_peak(self, regime: str, date: str, days_required: int = 20, dd_halve: float = -0.10, dd_flat: float = -0.20) -> bool:
+    def _floor_qty(self, v: float) -> float:
+        """Round a raw quantity down to the lot step. Int step 1 keeps the legacy floor (int result)."""
+        if isinstance(self.qty_step, int) and self.qty_step == 1:
+            return math.floor(v)
+        return round(math.floor(v / self.qty_step + 1e-9) * self.qty_step, 8)
+
+    def maybe_reset_peak(self, regime: str, date: str, days_required: int = 20, dd_halve: float = -0.10, dd_flat: float = -0.20,
+                         reentry_ref: float | None = None) -> bool:
         """Drawdown re-entry: after going flat, reset the reference peak once the market has been risk-on for
         `days_required` consecutive decisions, so the breaker is not a permanent exit (resumes at full scale)."""
         st = self.state
@@ -90,7 +100,9 @@ class PaperBroker:
         if st["riskon_streak"] >= days_required:
             eq = st["cash"] + sum(p["qty"] * p["last_price"] for p in self.positions.values())
             # reference peak in the middle of the "halved" band, so a day of interest cannot flip it to normal
-            st["peak_equity"] = eq / (1 + (dd_halve + dd_flat) / 2)
+            if reentry_ref is None:
+                reentry_ref = (dd_halve + dd_flat) / 2 if dd_halve > dd_flat else dd_flat / 2
+            st["peak_equity"] = eq / (1 + reentry_ref)
             st["riskon_streak"] = 0
             st.setdefault("peak_resets", []).append(date)
             return True
@@ -111,6 +123,7 @@ class PaperBroker:
         cooldown_until: str | None = None,
         exits_only: bool = False,
         force: set | None = None,
+        frozen: set | None = None,
     ) -> list[dict]:
         """Move toward target weights. Sells first, then buys. exits_only: only close positions whose target
         is 0 (off-cycle days: act on stops, never re-trade gaps). Returns executed fills."""
@@ -122,7 +135,7 @@ class PaperBroker:
         orders = []
         for s in syms:
             px = prices.get(s)
-            if not px or px != px:
+            if not px or px != px or (frozen and s in frozen):
                 continue
             tw, cw = targets.get(s, 0.0), cur.get(s, 0.0)
             exiting = tw == 0 and cw > 0
@@ -138,7 +151,7 @@ class PaperBroker:
         for s, px, delta_val, exiting in sorted(orders, key=lambda o: o[2]):  # sells (negative) first
             if delta_val < 0:
                 held = self.positions.get(s, {}).get("qty", 0)
-                qty = held if exiting else min(held, math.floor(-delta_val / px))
+                qty = held if exiting else min(held, self._floor_qty(-delta_val / px))
                 if qty <= 0:
                     continue
                 f = self._fill(s, -qty, px, date)
@@ -148,7 +161,10 @@ class PaperBroker:
                     self.state.setdefault("blocked", {})[s] = cooldown_until
             else:
                 buy_px = px * (1 + self.slippage)
-                qty = math.floor(min(delta_val, self.cash) / (buy_px + self.commission))
+                unit = buy_px * (1 + self.fee) + self.commission
+                qty = self._floor_qty(min(delta_val, self.cash) / unit)
+                while qty > 0 and qty * unit > self.cash:  # float guard: never spend more than cash
+                    qty = self._floor_qty(qty - self.qty_step) if qty - self.qty_step > 0 else 0
                 if qty <= 0:
                     continue
                 f = self._fill(s, qty, px, date)
@@ -156,26 +172,31 @@ class PaperBroker:
                 fills.append(f)
         return fills
 
-    def _fill(self, sym: str, qty: int, px: float, date: str) -> dict:
+    def _fill(self, sym: str, qty: float, px: float, date: str) -> dict:
         side = "BUY" if qty > 0 else "SELL"
         fill_px = px * (1 + self.slippage) if qty > 0 else px * (1 - self.slippage)
         cost = qty * fill_px + abs(qty) * self.commission
-        self.state["cash"] -= cost
+        fee = abs(qty) * fill_px * self.fee
+        self.state["cash"] -= cost + fee
+        if fee:
+            self.state["fees_paid"] = self.state.get("fees_paid", 0.0) + fee
         pos = self.positions.get(sym)
-        realized = 0.0
+        realized = -fee if (qty > 0 and fee) else 0.0
         if qty > 0:
             if pos:
-                new_qty = pos["qty"] + qty
+                new_qty = self._floor_qty(pos["qty"] + qty) if self.qty_step != 1 else pos["qty"] + qty
                 pos["avg_cost"] = (pos["avg_cost"] * pos["qty"] + fill_px * qty) / new_qty
                 pos["qty"] = new_qty
             else:
                 self.positions[sym] = {"qty": qty, "avg_cost": fill_px, "entry_date": date, "peak_close": px, "last_price": px}
         else:
-            realized = (fill_px - pos["avg_cost"]) * (-qty)
+            realized = (fill_px - pos["avg_cost"]) * (-qty) - fee
             pos["qty"] += qty
-            if pos["qty"] <= 0:
+            if self.qty_step != 1:
+                pos["qty"] = round(pos["qty"], 8)
+            if pos["qty"] <= 0 or pos["qty"] < self.qty_step - 1e-12:  # dust below one lot is dropped
                 del self.positions[sym]
-        return {
+        out = {
             "date": date,
             "symbol": sym,
             "side": side,
@@ -184,3 +205,6 @@ class PaperBroker:
             "value": round(abs(qty) * fill_px, 2),
             "realized_pnl": round(realized, 2),
         }
+        if fee:
+            out["fee"] = round(fee, 4)
+        return out
