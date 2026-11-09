@@ -110,6 +110,7 @@ class PaperBroker:
         stopped: list | None = None,
         cooldown_until: str | None = None,
         exits_only: bool = False,
+        force: set | None = None,
     ) -> list[dict]:
         """Move toward target weights. Sells first, then buys. exits_only: only close positions whose target
         is 0 (off-cycle days: act on stops, never re-trade gaps). Returns executed fills."""
@@ -127,7 +128,8 @@ class PaperBroker:
             exiting = tw == 0 and cw > 0
             if exits_only and tw >= cw:  # off-cycle: never buy; exits, stops, shrinks and earnings caps still sell
                 continue
-            if not exiting and abs(tw - cw) < band:
+            forced = force is not None and s in force and tw < cw  # explicit risk reduction (Claude shrink) always trades
+            if not exiting and not forced and abs(tw - cw) < band:
                 continue
             delta_val = (tw - cw) * eq
             if not exiting and abs(delta_val) < min_trade_value:

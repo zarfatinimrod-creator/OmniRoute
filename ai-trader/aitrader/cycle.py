@@ -68,6 +68,14 @@ def _open_cutoff_utc(day) -> str:
     return datetime(d.year, d.month, d.day, 9, 30, tzinfo=NY).astimezone(ZoneInfo("UTC")).replace(microsecond=0).isoformat()
 
 
+def _check_reduce_only(raw: dict, final: dict) -> None:
+    """Hard invariant (fail loud): Claude can only remove names or shrink weights, never add or enlarge."""
+    extra = set(final) - set(raw)
+    bigger = {s: (raw[s], final[s]) for s in final if s in raw and final[s] > raw[s] + 1e-12}
+    if extra or bigger:
+        raise RuntimeError(f"override invariant violated: added={sorted(extra)} enlarged={bigger}")
+
+
 def _apply_overrides(targets: dict, held: dict, ds: str, cutoff_utc: str | None = None) -> tuple[dict, list]:
     """Claude's review may veto new entries or shrink sizes - never add names or increase risk.
     Entries logged after `cutoff_utc` (the open they would affect) are ignored: no look-ahead."""
@@ -92,6 +100,7 @@ def _apply_overrides(targets: dict, held: dict, ds: str, cutoff_utc: str | None 
             m = max(0.0, min(1.0, float(mult)))
             t[sym] *= m
             applied.append({"symbol": sym, "action": f"size x{m}", "reason": reason, "logged_at": ts})
+    _check_reduce_only(targets, t)
     return t, applied
 
 
@@ -194,7 +203,8 @@ def _execute_pending(panel, cfg, main, shadow, events) -> list[dict]:
     ds_exec = str(d_exec.date())
     cool = str((d_exec + pd.offsets.BDay(r.get("stop_cooldown_days", 10))).date())
     xo = pending.get("exits_only", False)
-    fills = main.rebalance(pending["targets"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool, xo)
+    forced = {o["symbol"] for o in pending.get("overrides", []) if o["action"].startswith("size")}
+    fills = main.rebalance(pending["targets"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool, xo, forced)
     stp = set(pending.get("stopped_shadow", pending.get("stopped", [])))
     sh_targets = pending["targets_raw"] if not xo else {s_: w for s_, w in pending.get("shadow_hold", {}).items() if s_ not in stp}
     shadow.rebalance(sh_targets, opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], list(stp), cool, xo)

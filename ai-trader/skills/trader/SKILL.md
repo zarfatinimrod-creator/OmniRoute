@@ -24,7 +24,8 @@ python3 -m aitrader verify   # שרשרת ההאש של היומן תקינה? �
 2. **אם יש כניסות חדשות** (BUY של מניה שלא מוחזקת) ביום ריבלנס - הפעל את `trading-desk`
    (דסק בסגנון TradingAgents: שור/דוב/סיכון/מנהל תיק, עד 5 מניות). בימים אחרים או לבדיקה מהירה - לכל אחת:
    - `python3 -m aitrader context SYMBOL` - מה אמרנו עליה בעבר, האם צדקנו, לקחים.
-   - `python3 -m aitrader news SYMBOL` - כותרות אחרונות.
+   - `python3 -m aitrader news SYMBOL` - כותרות אחרונות (או הסקיל `trader-news` - כולל 8-K מ-EDGAR).
+   - `trader-analyst` - מספרי הדוחות מ-SEC (הכנסות, מרווחים, EPS) כשהתזה תלויה בדוח.
    - שאל: יש אירוע בינארי ב-5 ימים הקרובים (דוחות, FDA, מיזוג, משפט)? הנפקה/דילול? חקירה/הונאה?
      going-concern? שינוי הנחיות חד? אם כן ->
      `python3 -m aitrader veto SYMBOL --reason "..."` או `shrink SYMBOL 0.5 --reason "..."`.

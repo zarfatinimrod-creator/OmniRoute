@@ -121,3 +121,20 @@ class SplitOnFillDay(TempState):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReduceOnlyInvariant(unittest.TestCase):
+    def test_invariant_rejects_enlarging_or_adding(self):
+        cycle._check_reduce_only({"A": 0.1}, {"A": 0.05})
+        with self.assertRaises(RuntimeError):
+            cycle._check_reduce_only({"A": 0.1}, {"A": 0.2})
+        with self.assertRaises(RuntimeError):
+            cycle._check_reduce_only({"A": 0.1}, {"A": 0.1, "B": 0.01})
+
+    def test_forced_shrink_trades_inside_the_band(self):
+        b = PaperBroker(100000, slippage_bps=0)
+        b.rebalance({"AAA": 0.08}, {"AAA": 100.0}, "2026-01-02", band=0.0, min_trade_value=0)
+        none = b.rebalance({"AAA": 0.065}, {"AAA": 100.0}, "2026-01-03", band=0.02, min_trade_value=500)
+        self.assertEqual(none, [])  # ordinary drift inside the band: no trade
+        fills = b.rebalance({"AAA": 0.065}, {"AAA": 100.0}, "2026-01-03", band=0.02, min_trade_value=500, force={"AAA"})
+        self.assertEqual(fills[0]["side"], "SELL")
