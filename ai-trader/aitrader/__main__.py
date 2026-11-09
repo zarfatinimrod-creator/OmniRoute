@@ -8,7 +8,7 @@
   shrink SYMBOL MULT --reason TEXT        shrink today's target for SYMBOL (0..1)
   news SYMBOL                             recent headlines
   context SYMBOL                          past calls, trades and lessons for a ticker (read before deciding)
-  summary [--send] [--ack [TS]]           crypto morning summary: urgent first; --send delivers (exit 0 ok, 2 ok+urgent, 3 not delivered)
+  summary [--send] [--ack TS]           crypto morning summary: urgent first; --send delivers (exit 0 ok, 2 ok+urgent, 3 not delivered)
   verify                                  check the tamper-evident hash chains
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
   news-score [--n 8]                      score recent headlines without trading (scorer check)
@@ -70,7 +70,7 @@ def main(argv=None) -> int:
     sub.add_parser("verify")
     sm = sub.add_parser("summary")
     sm.add_argument("--send", action="store_true", help="deliver through notify (bypasses quiet hours); auto-acks up to newest")
-    sm.add_argument("--ack", nargs="?", const="", default=None, metavar="TS", help="drop queued alerts with queued_at <= TS (bare: all now queued)")
+    sm.add_argument("--ack", default=None, metavar="TS", help="drop queued alerts with queued_at <= TS (TS required: the printed 'newest')")
     nl = sub.add_parser("news-live")
     nl.add_argument("--until", default="16:05", help="New York time to stop")
     nl.add_argument("--minutes", type=float, default=None)
@@ -181,7 +181,7 @@ def _run(a: argparse.Namespace) -> int:
 
         cfg = load_config()
         if a.ack is not None and not a.send:
-            n = notify.ack(a.ack or max((q["queued_at"] for q in journal.load_json("alert_queue.json", []) or []), default=None))
+            n = notify.ack(a.ack)
             print(json.dumps({"acked": n}))
             return 0
         s = notify.build_summary(cfg)

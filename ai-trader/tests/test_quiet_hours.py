@@ -114,7 +114,8 @@ class Summary(Env):
         d = self.cdir()
         with journal.use_book("crypto"):
             journal.append("decisions.jsonl", {"event": "revised_close", "x": 1})
-            journal.append("decisions.jsonl", {"decision_date": decision, "logged_at": as_of})
+            journal.append("decisions.jsonl", {"date": decision, "logged_at": as_of, "due_rebalance": False, "weights": {},
+                                               "diag": {}, "overrides": {}, "earnings_blackout": {}, "preview": []})  # cycle.py's row
         (d / "latest.json").write_text(json.dumps({"date": decision, "as_of_utc": as_of}))
 
     def test_summary_exit_codes(self):
@@ -169,6 +170,16 @@ class Summary(Env):
         joined = "\n".join(out["urgent"])
         self.assertIn("decisions.jsonl", joined)  # broken chain
         self.assertIn("2026-11-09", joined)  # the missing expected decision date
+
+    def test_decision_row_alone_satisfies_expected_decision(self):
+        self.healthy()  # no pending.json; only the real-shaped decisions row for 2026-11-09
+        self.assertFalse((self.cdir() / "pending.json").exists())
+        code, out = self.run_cli()
+        self.assertEqual((code, out["urgent"]), (0, []))
+
+    def test_bare_ack_is_refused(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            cli.main(["summary", "--book", "crypto", "--ack"])
 
     def test_stale_latest_and_repeated_skips_urgent(self):
         self.healthy(as_of="2026-11-09T00:15:00+00:00")  # 30 h before NOW > 26

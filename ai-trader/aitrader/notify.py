@@ -65,7 +65,7 @@ def _age_hours(ts: str, now: datetime) -> float:
 def build_summary(cfg: dict) -> dict:
     """The crypto morning summary (spec 6.1/6.2, planning decision 15) for the active book: {urgent, text, newest}.
     Urgent leads: urgent queued alerts, a broken chain, a missing expected decision, a stale latest.json, and
-    skips / frozen held coins on 2+ runs in the last 24 h (ruling R7). Reads state only; changes nothing."""
+    skips on 2+ runs in the last 24 h (ruling R7; crypto never freezes a held coin, a stale coin skips the run). Reads state only; changes nothing."""
     from .market import UtcDailyCalendar
 
     now = datetime.fromisoformat(journal.now_utc())
@@ -75,7 +75,7 @@ def build_summary(cfg: dict) -> dict:
     if bad:
         urgent.append("hash chain broken: " + ", ".join(bad))
     expected = str(UtcDailyCalendar.last_final_bar(now))
-    dates = [r["decision_date"] for r in journal.read("decisions.jsonl") if "event" not in r and r.get("decision_date")]
+    dates = [r["date"] for r in journal.read("decisions.jsonl") if "event" not in r and r.get("date")]
     dates.append((journal.load_json("pending.json", {}) or {}).get("decision_date") or "")
     last = max(dates)
     if last < expected:
@@ -88,9 +88,6 @@ def build_summary(cfg: dict) -> dict:
     skips = recent(journal.read("skips.jsonl"))
     if len(skips) >= 2:
         urgent.append(f"{len(skips)} skipped runs in 24 h (last: {skips[-1].get('reason', '?')})")
-    frozen = [r for r in recent(journal.read("decisions.jsonl")) if r.get("frozen")]
-    if len(frozen) >= 2:
-        urgent.append(f"frozen held symbols on {len(frozen)} runs in 24 h ({', '.join(frozen[-1]['frozen'])})")
     lines = ["URGENT"] + [f"- {u}" for u in urgent] if urgent else []
     rest = [q for q in queue if q.get("priority") != "urgent"]
     if rest:
