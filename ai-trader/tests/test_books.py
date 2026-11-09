@@ -111,7 +111,8 @@ class Profiles(unittest.TestCase):
                                       "exec_delay_bps": 10, "qty_step": 1e-6})
         self.assertEqual({k: c["learning"][k] for k in ("enabled", "default_horizon", "horizons_days")},
                          {"enabled": False, "default_horizon": 30, "horizons_days": [7, 30, 90]})
-        self.assertEqual(c["risk"]["max_position_pct_by_symbol"], {"BTC-USD": 1.0, "ETH-USD": 0.6})
+        # XRP-USD: read only by the sweep's BTC+XRP hindsight control (ruling R13); XRP is in no profile's universe
+        self.assertEqual(c["risk"]["max_position_pct_by_symbol"], {"BTC-USD": 1.0, "ETH-USD": 0.6, "XRP-USD": 0.6})
         self.assertNotIn("books", c)
         ship = raw_config()["books"]["crypto"]["ship_profile"]
         self.assertEqual(c, data.load_config("crypto", ship))  # the profile defaults to ship_profile
@@ -275,6 +276,7 @@ class Cli(TempState):
             fetch = mock.patch.object(data, "fetch_panel", lambda syms, rng="5y", age=6.0: {k: v[list(syms)] for k, v in coins3.items()})
             csweep = mock.patch.object(crypto_sweep, "run_sweep", short_sweep)  # backtest --book crypto routes here (Task 9)
             with prices, status, loader, sweep, fetch, csweep:
+                self.assertEqual(crypto_sweep.seed_script().seed(), 145)  # the sweep refuses to run without it
                 for i in range(2):
                     market(coins, FIRST_BAR + i)
                     self.assertEqual(self.cli("--book", "crypto", "cycle")[0], 0)

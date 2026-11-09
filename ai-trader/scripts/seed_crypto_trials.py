@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 from aitrader import journal  # noqa: E402
 
 SEED_ID = "2026-11-09-crypto-dsr-seed"
+SEED_ROWS = 145  # the seed document's total; aitrader.crypto_sweep refuses to run without exactly this many
 REPLAYS = ROOT / "research" / "2026-11-09-crypto-replays"
 PERIODS_PER_YEAR = 365  # the Sharpes in a4_regime.txt are annualised over 365 daily bars
 A4_VARIANTS, A4_COINS, A4_WINDOWS = 8, 3, 4
@@ -64,7 +65,7 @@ def review_rows() -> list[dict]:
 
 def seed_rows() -> list[dict]:
     rows = a4_rows() + review_rows()
-    assert len(rows) == 145, len(rows)
+    assert len(rows) == SEED_ROWS, len(rows)
     return rows
 
 

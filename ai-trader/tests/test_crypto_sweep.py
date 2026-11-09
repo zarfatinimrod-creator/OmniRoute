@@ -6,7 +6,6 @@ The unit tests use a short window and 2 phases; the CLI runs the default 7 phase
 
 import contextlib
 import copy
-import importlib.util
 import json
 import shutil
 import tempfile
@@ -43,11 +42,7 @@ def window(p: dict) -> tuple[str, str, str]:
     return str(idx[420].date()), str(idx[451].date()), str(idx[482].date())
 
 
-def seed_script():
-    spec = importlib.util.spec_from_file_location("seed_crypto_trials", ROOT / "scripts" / "seed_crypto_trials.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+seed_script = crypto_sweep.seed_script  # scripts/seed_crypto_trials.py as a module
 
 
 def trials(state: Path) -> list[dict]:
@@ -160,7 +155,7 @@ def fake_run(sharpes: dict, calls: list):
         day = pd.Series(noise + (0.0 if name.startswith("base") else 0.004), index=idx)
         return {"phases": [{"phase": k, "sharpe": s, "maxdd": -0.2, "cagr": 0.1, "n_fills": 1, "symbols": list(cfg["universe"])}
                            for k in range(phases)],
-                "daily": pd.DataFrame({k: day for k in range(phases)}),
+                "daily": pd.DataFrame({k: day + 0.001 * k for k in range(phases)}),  # phases differ
                 "bench": {"sharpe": 0.3}}
     return run
 
@@ -168,6 +163,10 @@ def fake_run(sharpes: dict, calls: list):
 class SweepLogic(TempState):
     SHARPES = {"base": 0.5, "final": 1.1, "cand@50": 1.0, "abl:no_eth": 1.1, "abl:no_atr_stop": 1.0, "abl:no_halve": 0.9,
                "final@50": 1.2}
+
+    def setUp(self):
+        super().setUp()
+        seed_script().seed()  # the sweep refuses to run without the DSR seed
 
     def sweep(self, sharpes, **patches):
         calls: list = []
@@ -194,7 +193,7 @@ class SweepLogic(TempState):
         self.assertEqual((cfg100["risk"]["atr_stop_mult"], cfg100["risk"]["dd_halve"]), (0.0, -0.25))  # halving kept
         self.assertEqual(cfg100["costs"]["fee_bps"], 100)
         self.assertEqual(calls[names.index("final:missed_night")][2], 2)
-        self.assertEqual(res["dsr"]["n"], 7 * len(names))  # the combined run counts toward N (no seed in this state)
+        self.assertEqual(res["dsr"]["n"], 145 + 7 * len(names))  # the combined run counts toward N
         self.assertEqual(res["ship"], "crypto")
         # one dropped component: the ablation run is the final candidate, no extra run
         res, calls = self.sweep({**self.SHARPES, "abl:no_eth": 0.9, "abl:no_atr_stop": 0.9, "abl:no_halve": 1.0})
@@ -218,6 +217,57 @@ class SweepLogic(TempState):
         res, _ = self.sweep({**self.SHARPES, "abl:no_eth": 0.9, "abl:no_atr_stop": 0.9},
                             bootstrap_p=lambda *a, **k: 0.95)
         self.assertEqual((res["pass_rule"]["p_boot"]["pass"], res["ship"]), (True, "crypto"))
+
+    def test_unseeded_state_refuses_to_run(self):
+        (self.tmp / "crypto" / "trials.jsonl").unlink()
+        with self.assertRaisesRegex(RuntimeError, "seed missing: run scripts/seed_crypto_trials.py"):
+            self.sweep(self.SHARPES)
+        self.assertFalse((self.tmp / "crypto" / "dsr.json").exists())
+        calls: list = []
+        with mock.patch.object(crypto_sweep, "_run", fake_run(self.SHARPES, calls)), self.assertRaises(RuntimeError):
+            crypto_sweep.run_sweep(panel3(60), "2024-01-01", "2024-02-01", None, phases=7, report_path=self.tmp / "r.md")
+        self.assertEqual(calls, [])  # it fails before the runs, not after
+        seed_script().seed()
+        with journal.use_book("crypto"):  # a doubled seed (a hand-copied record) is refused too
+            journal.append("trials.jsonl", trials(self.tmp)[0])
+        with self.assertRaisesRegex(RuntimeError, "seed missing"):
+            self.sweep(self.SHARPES)
+
+    def test_dropped_components_reported_as_config_change(self):
+        res, _ = self.sweep(self.SHARPES)  # ETH and the ATR stop dropped
+        want = {"universe": ["BTC-USD"], "risk.atr_stop_mult": 0.0}
+        saved = json.loads((self.tmp / "crypto" / "dsr.json").read_text())
+        for out in (res, saved):
+            self.assertEqual((out["config_change_needed"], out["overrides"]), (True, want))
+        self.assertEqual(res["ship"], "crypto")
+        self.assertIn("Config change needed", (self.tmp / "r.md").read_text())
+        res, _ = self.sweep({**self.SHARPES, "abl:no_eth": 0.9, "abl:no_atr_stop": 0.9})  # nothing dropped
+        saved = json.loads((self.tmp / "crypto" / "dsr.json").read_text())
+        for out in (res, saved):
+            self.assertEqual((out["config_change_needed"], out["overrides"]), (False, {}))
+
+    def test_dsr_uses_phase_0_and_config_driven_control_cap(self):
+        seen, real_load = [], data.load_config
+
+        def load(book=None, profile=None):
+            c = real_load(book, profile)
+            c["risk"]["max_position_pct_by_symbol"]["XRP-USD"] = 0.4  # the control must follow the config
+            return c
+
+        with mock.patch.object(crypto_sweep, "dsr", lambda day, n, sd: seen.append(day) or 0.5), \
+                mock.patch.object(data, "load_config", load):
+            res, calls = self.sweep({**self.SHARPES, "abl:no_eth": 0.9, "abl:no_atr_stop": 0.9})
+        daily = fake_run(self.SHARPES, [])("cand@50", data.load_config("crypto"), None, None, None, 7)["daily"]
+        pd.testing.assert_series_equal(seen[0], daily[0], check_names=False)  # phase 0, not the phase average
+        self.assertIn("phase 0", json.loads((self.tmp / "crypto" / "dsr.json").read_text())["daily_series"])
+        ctl = dict((n, c) for n, c, _ in calls)["control:btc_xrp"]
+        self.assertEqual(ctl["risk"]["max_position_pct_by_symbol"], {"BTC-USD": 1.0, "XRP-USD": 0.4})
+        self.assertEqual(res["runs"]["control:btc_xrp"]["caps"]["XRP-USD"], 0.4)
+        self.assertEqual(data.load_config("crypto")["risk"]["max_position_pct_by_symbol"]["XRP-USD"], 0.6)  # config.json
+
+    def test_fee_leg_must_match_the_profile_fee(self):
+        with mock.patch.object(crypto_sweep, "FEES_BP", (60, 100)), self.assertRaisesRegex(ValueError, "costs.fee_bps"):
+            self.sweep(self.SHARPES)
 
     def test_bootstrap_matches_power_replay_loop(self):
         rng = np.random.default_rng(5)

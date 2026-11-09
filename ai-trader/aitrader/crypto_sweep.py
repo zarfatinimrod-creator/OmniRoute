@@ -2,25 +2,30 @@
 
 Spec 2026-11-09-crypto-book-design section 7 ("Sweep", "Pass rule", "DSR") and plan 2026-11-09-crypto-book-v1
 planning decision 14. Written down before it runs:
-- Window: `start` (CLI 2018-01-01) to `end` (the last final bar); the halves split at `split` (2022-01-01).
+- Window: `start` (CLI default 2018-01-01) to `end` (the last final bar); the halves split at `split` (2022-01-01).
 - Each profile runs on its own universe panel, and its signals and aux are recomputed on that panel (crypto_base
   never sees an ETH column). Every run has `phases` paired rebalance phases (default 7: the 7-day cycle).
 - Runs: base vs candidate at 50 and at 100 bp fee per side; each half at 50 bp; leave-one-out ablations of the
   candidate (no ETH, no ATR stop, no -25% halving step; the -50% catastrophe step is never ablated); a BTC+XRP
-  hindsight control (an in-sweep universe override, never through load_config); one missed-night run (exec_lag 2).
+  hindsight control (an in-sweep universe override, never through load_config; XRP's cap is the config's
+  risk.max_position_pct_by_symbol["XRP-USD"]); one missed-night run (exec_lag 2).
 - Order: ablations first. A component is dropped when the paired median delta Sharpe (ablated - candidate) >= 0. Two
   or more dropped: the combined final candidate runs once more, and that run counts toward N. Then the pass rule on
-  the final candidate; any failed rule ships crypto_base.
-- DSR of the shipped profile: N = every look already in state/crypto/trials.jsonl (the 145 seeded by
-  scripts/seed_crypto_trials.py, plus any earlier sweep) + this sweep's per-phase runs. The Sharpe spread is the std
-  of per-period Sharpes, benchmark rows excluded.
+  the final candidate; any failed rule ships crypto_base. Dropped components are reported as the config change
+  books.crypto needs before it can ship (config_change_needed, overrides).
+- DSR of the shipped profile on its phase-0 daily returns (the one phase a live book trades; the conservative
+  choice, as in the stock sweep): N = every look already in state/crypto/trials.jsonl (the 145 seeded by
+  scripts/seed_crypto_trials.py, required, plus any earlier sweep) + this sweep's per-phase runs. The Sharpe spread
+  is the std of per-period Sharpes, benchmark rows excluded.
 The constants below are that pre-registration (spec 7), not tunable strategy assumptions: the strategy's numbers
-stay in config.json.
+stay in config.json (the 50 bp leg must equal the profiles' costs.fee_bps).
 """
 
 from __future__ import annotations
 
 import copy
+import functools
+import importlib.util
 import json
 import math
 import statistics
@@ -35,9 +40,8 @@ from .signals import compute_all
 from .strategy import periods_per_year, precompute_aux
 
 SYMBOLS = ("BTC-USD", "ETH-USD", "XRP-USD")  # XRP only for the hindsight control
-START, SPLIT = "2018-01-01", "2022-01-01"
-FEES_BP = (50, 100)  # fee per side; slippage and exec delay stay the profile's
-XRP_CAP = 0.6
+SPLIT = "2022-01-01"
+FEES_BP = (50, 100)  # fee per side; slippage and exec delay stay the profile's; the first is the profiles' own fee
 BOOT_SEED, BOOT_BLOCK, BOOT_DRAWS = 0, 30, 2000  # replays/power.py
 WINS_NEED, WINS_OF = 6, 7
 P_BOOT_MIN = 0.95
@@ -56,6 +60,21 @@ def _no_atr_stop(c: dict) -> None:
 def _no_halve(c: dict) -> None:
     c["risk"]["dd_halve"] = -1.0  # never reached; the -50% flat step stays
     c["risk"].pop("dd_reentry_ref", None)  # re-entry follows the broker default: dd_flat / 2 without a halving step
+
+
+@functools.lru_cache(maxsize=1)
+def seed_script():
+    """scripts/seed_crypto_trials.py as a module (SEED_ID, SEED_ROWS, seed())."""
+    path = Path(__file__).resolve().parent.parent / "scripts" / "seed_crypto_trials.py"
+    spec = importlib.util.spec_from_file_location("seed_crypto_trials", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _seeded(trials: list[dict]) -> int:
+    """Rows of the DSR seed record(s) in a trials log; the sweep refuses to run unless this is exactly SEED_ROWS."""
+    return sum(len(t.get("rows", [])) for t in trials if t.get("seed") == seed_script().SEED_ID)
 
 
 ABLATIONS = {  # component -> (run name, label, how to remove it from a config)
@@ -151,6 +170,12 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
     missing = (set(base["universe"]) | set(cand["universe"]) | {"XRP-USD"}) - set(panel_all["close"].columns)
     if missing:
         raise ValueError(f"crypto sweep: panel lacks {sorted(missing)}")
+    if {base["costs"]["fee_bps"], cand["costs"]["fee_bps"]} != {FEES_BP[0]}:
+        raise ValueError(f"crypto sweep: the {FEES_BP[0]} bp leg must be the profiles' costs.fee_bps, got "
+                         f"{base['costs']['fee_bps']} / {cand['costs']['fee_bps']}")
+    with journal.use_book("crypto"):  # fail before ~15 minutes of runs, not after
+        if _seeded(journal.read("trials.jsonl")) != seed_script().SEED_ROWS:
+            raise RuntimeError("seed missing: run scripts/seed_crypto_trials.py")
     ppy = periods_per_year(cand)
     h1_end = str((pd.Timestamp(split) - pd.Timedelta(days=1)).date())
     lo, hi = FEES_BP
@@ -206,9 +231,11 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
     go("final:h2", fee(final, lo), "crypto", cand, f"{label}, second half", pair="base:h2", s=split)
     ctl = fee(final, lo)
     ctl["universe"] = {"BTC-USD": "Crypto", "XRP-USD": "Crypto"}
-    by_sym = final["risk"].get("max_position_pct_by_symbol", {})
-    ctl["risk"]["max_position_pct_by_symbol"] = {**{s: v for s, v in by_sym.items() if s in ctl["universe"]}, "XRP-USD": XRP_CAP}
-    go("control:btc_xrp", ctl, "control", cand, f"hindsight control: BTC+XRP (XRP cap {XRP_CAP})", pair="base@50")
+    caps = {s: v for s, v in final["risk"]["max_position_pct_by_symbol"].items() if s in ctl["universe"]}
+    if "XRP-USD" not in caps:
+        raise ValueError("crypto sweep: books.crypto.risk.max_position_pct_by_symbol needs an XRP-USD cap (control)")
+    ctl["risk"]["max_position_pct_by_symbol"] = caps
+    go("control:btc_xrp", ctl, "control", cand, f"hindsight control: BTC+XRP (XRP cap {caps['XRP-USD']})", pair="base@50")
     go("final:missed_night", fee(final, lo), "crypto", cand, f"{label}, missed night (fill one bar later)", pair="base@50", lag=2)
 
     fin, b50 = runs[final_run], runs["base@50"]
@@ -218,7 +245,9 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
     pr = pass_rule(d50, [ph["maxdd"] for ph in fin["phases"]], [ph["maxdd"] for ph in b50["phases"]], p_boot,
                    runs["final@100"]["d_sharpe"], runs["final:h1"]["d_sharpe"], runs["final:h2"]["d_sharpe"])
     ship = "crypto" if all(v["pass"] for v in pr.values()) else "crypto_base"
-    final_candidate = {"run": final_run, "label": label, "dropped": dropped, "overrides": _diff(cand, final)}
+    overrides = _diff(cand, final)  # what books.crypto must change before the final candidate can ship
+    final_candidate = {"run": final_run, "label": label, "dropped": dropped, "overrides": overrides}
+    change = {"config_change_needed": bool(dropped), "overrides": overrides}
 
     # 3. trials and the Deflated Sharpe of the shipped profile
     rows = [{"run": name, "profile": rec["profile"], "phase": ph["phase"], "fee_bps": rec["fee_bps"],
@@ -226,11 +255,13 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
              "sharpe_pp": ph["sharpe"] / math.sqrt(ppy), "maxdd": round(ph["maxdd"], 6), "benchmark": False}
             for name, rec in runs.items() for ph in rec["phases"]]
     shipped = final_run if ship == "crypto" else "base@50"
-    day = daily[shipped].mean(axis=1) - rf
+    day = daily[shipped][0] - rf  # phase 0: the single phase a live book trades (conservative vs the phase average)
     with journal.use_book("crypto"):
         prior = journal.read("trials.jsonl")
         prior_rows = [r for t in prior for r in t.get("rows", [])]
-        n_seeded = sum(len(t.get("rows", [])) for t in prior if t.get("seed"))
+        n_seeded = _seeded(prior)
+        if n_seeded != seed_script().SEED_ROWS:  # N without the seeded looks would overstate the DSR
+            raise RuntimeError("seed missing: run scripts/seed_crypto_trials.py")
         n = len(prior_rows) + len(rows)
         pps = [r["sharpe_pp"] for r in prior_rows + rows if not r.get("benchmark") and r.get("sharpe_pp") is not None]
         spread = float(pd.Series(pps, dtype=float).std())
@@ -238,14 +269,14 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
         out = {"profile": ship, "value": round(value, 4) if math.isfinite(value) else None, "n": n}
         date = journal.now_utc()[:10]
         path = Path(report_path) if report_path else Path(report.ROOT) / "research" / f"{date}-crypto-sweep.md"
-        journal.save_json("dsr.json", {**out, "n_seeded": n_seeded, "n_prior": len(prior_rows), "n_sweep": len(rows),
-                                       "sr_std_pp": round(spread, 6), "daily_series": f"{shipped}, phase-averaged daily excess returns",
+        journal.save_json("dsr.json", {**out, **change, "n_seeded": n_seeded, "n_prior": len(prior_rows), "n_sweep": len(rows),
+                                       "sr_std_pp": round(spread, 6), "daily_series": f"{shipped}, phase 0 daily excess returns",
                                        "window": [str(day.index[0].date()), str(day.index[-1].date())],
                                        "computed_at": journal.now_utc(), "report": str(path)})
         journal.append("trials.jsonl", {"logged_at": journal.now_utc(), "kind": "crypto_sweep", "start": start, "split": split,
                                         "end": end, "phases": phases, "ship": ship, "rows": rows})
     res = {"runs": runs, "ablations": ablations, "final_candidate": final_candidate, "pass_rule": pr, "ship": ship,
-           "dsr": out, "report": str(path)}
+           **change, "dsr": out, "report": str(path)}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_report(res, base, cand, bench["base@50"], date, start, split, end, phases, n_seeded, len(prior_rows),
                             len(rows), spread, day), encoding="utf-8")
@@ -269,7 +300,7 @@ def _report(res, base, cand, btc, date, start, split, end, phases, n_seeded, n_p
         f"**Ship: {res['ship']}.** " + ("Every pass rule holds." if res["ship"] == "crypto" else "A pass rule failed, so crypto_base ships."),
         "",
         f"DSR of {d['profile']}: {_f(d['value'])} (N={d['n']} trials: {n_seeded} seeded, {n_prior - n_seeded} from earlier "
-        f"sweeps, {n_sweep} per-phase runs here; per-period Sharpe spread {_f(spread, 5)}; daily series: phase-averaged "
+        f"sweeps, {n_sweep} per-phase runs here; per-period Sharpe spread {_f(spread, 5)}; daily series: phase 0 "
         "excess returns of the shipped profile at 50 bp)."
         + (" No proven edge (DSR below 0.95)." if d["value"] is None or d["value"] < 0.95 else ""),
         "", "## Ablations (candidate at 50 bp; dropped when the paired median delta Sharpe >= 0)", "",
@@ -278,7 +309,7 @@ def _report(res, base, cand, btc, date, start, split, end, phases, n_seeded, n_p
     lines += [f"| {a['label']} | {a['run']} | {_f(a['d_sharpe_med'])} | {'yes' if a['dropped'] else 'no'} |"
               for a in res["ablations"].values()]
     lines += ["", f"Final candidate: {fc['label']} (run `{fc['run']}`)."
-              + (f" Config change needed before it can ship: `{json.dumps(fc['overrides'])}`." if fc["dropped"] else ""),
+              + (f" Config change needed before it can ship: `{json.dumps(fc['overrides'])}`." if res["config_change_needed"] else ""),
               "", "## Pass rule (final candidate vs crypto_base)", "", "| rule | value | needs | pass |", "|---|---|---|---|"]
     names = {"phases_won": "paired phases won (Sharpe, 50 bp)", "p_boot": "block-bootstrap P(dSharpe > 0)",
              "dd_gap": "median maxDD, points worse", "cost100": "median paired dSharpe at 100 bp",
