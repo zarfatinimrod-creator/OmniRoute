@@ -186,5 +186,34 @@ class Snapshot(unittest.TestCase):
         self.assertEqual(dashboard._regime_he("risk_on+defensive"), "מגמה חיובית + VIX גבוה (75%)")  # stock labels unchanged
 
 
+    def test_crypto_night_runs_in_the_schedule(self):
+        """Final review item 12: the schedule table lists the crypto night runs in Israel time, and says which clock
+        is fixed (the UTC decide/fill; the summary on Israel time)."""
+        stock_book(self.tmp)
+        slots = {r["name"]: r for r in self.of(self.build(), "slot")}
+        crypto = {n: r for n, r in slots.items() if "קריפטו" in n}
+        self.assertEqual(sorted(r["time_il"] for r in crypto.values()), ["02:12", "03:07", "08:03"])
+        what = " ".join(r["what"] for r in crypto.values())
+        for fixed in ("UTC 00:12", "UTC 01:07"):
+            self.assertIn(fixed, what)
+        self.assertIn("שעון קיץ", what)
+        self.assertEqual(len(slots), len(self.of(self.build(), "slot")))  # unique names (data-row-key="name")
+
+
+class Page(unittest.TestCase):
+    def test_claude_tile_carries_the_no_proven_edge_mark(self):
+        """Final review item 11: #ck-claude's .sub shows the no-proven-edge mark like #ck-bench (same one-writer
+        pick: a static span shown by the proven_edge pick)."""
+        html = (Path(dashboard.__file__).resolve().parent.parent / "dashboard" / "index.html").read_text(encoding="utf-8")
+
+        def sub(tile: str) -> str:
+            block = html.split(f'id="{tile}"', 1)[1].split('<div class="card', 1)[0]
+            return block.split('<div class="sub">', 1)[1].split("</div>", 1)[0]
+
+        mark = ('<span class="pick"><span class="noedge" data-when="false"> · אין יתרון מוכח</span><span data-draw="pick" '
+                'data-source="ckpi" data-field="proven_edge" data-row="0"></span></span>')
+        self.assertIn(mark, sub("ck-bench"))
+        self.assertIn(mark, sub("ck-claude"))
+
 if __name__ == "__main__":
     unittest.main()

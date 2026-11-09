@@ -174,7 +174,7 @@ def build_targets(
         if len(vl) >= r.get("lowvol_exclude_min_names", 10):
             too_hot = set(vl[vl >= vl.quantile(1 - r["lowvol_exclude_top_pct"])].index)
     new = [s for s in ranked.index if ranked[s] > r["min_score"] and s not in keep and s not in too_hot]
-    chosen = [s for s in keep + new if s not in blocked and s not in stopped][:n - len(frozen & set(held))]  # a frozen held name keeps its slot
+    chosen = [s for s in keep + new if s not in blocked and s not in stopped][:max(0, n - len(frozen & set(held)))]  # a frozen held name keeps its slot
     elig = ranked[ranked > r["min_score"]]
     picks = ranked[chosen]
 

@@ -35,7 +35,8 @@
     "latest_max_age_hours": 30,
     "state_subdir": "",
     "etf_groups": ["Index", "SectorETF", "Bonds", "Gold"],
-    "quiet_hours": null
+    "quiet_hours": null,
+    "frozen_alert_runs": 2
   },
   "benchmark": "SPY",
   "universe": {
@@ -381,7 +382,9 @@
           "from": "23:00",
           "to": "08:00"
         },
-        "revised_close_alert_bps": 5
+        "revised_close_alert_bps": 5,
+        "fill_max_wait_hours": 24,
+        "fill_urgent_after_hours": 3
       }
     },
     "crypto_base": {

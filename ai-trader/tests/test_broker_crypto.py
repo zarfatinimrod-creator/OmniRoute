@@ -19,6 +19,18 @@ class TestBrokerCrypto(unittest.TestCase):
         self.assertIsInstance(b.positions["AAA"]["qty"], int)
         json.dumps(b.state)
 
+    def test_float_whole_step_keeps_ints(self):
+        """Final review item 9: a config qty_step of 1.0 (float) is the whole-unit book, decided once in __init__;
+        buys, adds, trims and the cash guard all keep int quantities."""
+        b = PaperBroker(10000, slippage_bps=10, qty_step=1.0)
+        self.assertIs(b.whole, True)
+        self.assertIs(PaperBroker(10000, qty_step=1e-6).whole, False)
+        for targets in ({"AAA": 0.5}, {"AAA": 0.8}, {"AAA": 0.3}, {"AAA": 1.0}):  # entry, add, trim, all-in (cash guard)
+            for f in go(b, targets, {"AAA": 33.3}):
+                self.assertIsInstance(f["qty"], int, (targets, f))
+            self.assertIsInstance(b.positions["AAA"]["qty"], int, targets)
+        self.assertGreaterEqual(b.cash, 0)
+
     def test_fractional_qty_never_negative_cash(self):
         # fee 0 and slippage 0: the literal 6 dp quantity (R2)
         b = PaperBroker(100000, slippage_bps=0, qty_step=1e-6, fee_bps=0)

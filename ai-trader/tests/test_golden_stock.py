@@ -1,5 +1,5 @@
 """Golden outputs of the stock book, recorded before the crypto refactor.
-Regenerate (only on purpose): GOLDEN_WRITE=1 python3 -m unittest tests.test_golden_stock"""
+Regenerate (only on purpose, from ai-trader/): GOLDEN_WRITE=1 python3 -m unittest discover -s tests -p test_golden_stock.py"""
 
 import json
 import os

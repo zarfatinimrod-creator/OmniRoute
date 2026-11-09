@@ -24,8 +24,8 @@ import pandas as pd
 
 from . import journal, notify
 from .broker import PaperBroker
-from .data import (apply_close_source, coinbase_close, corporate_actions, earnings_on, fetch_panel, load_config, load_market,
-                   market_status, official_opens, stale_symbols)
+from .data import (Unreachable, apply_close_source, coinbase_close, corporate_actions, earnings_on, fetch_panel, load_config,
+                   load_market, market_status, official_opens, stale_symbols)
 from .learn import ic_table, signal_stats, update_weights, walk_forward_weights
 from .market import UtcDailyCalendar
 from .signals import compute_all
@@ -204,6 +204,20 @@ def _hold_frozen(targets: dict, cur: dict, frozen: set, max_gross: float) -> dic
     return {**{s: w * k for s, w in rest.items()}, **hold}
 
 
+def _frozen_runs(held_frozen: set, ds: str) -> dict[str, int]:
+    """Consecutive decisions on which each held symbol was frozen (final review item 4), in frozen_runs.json. A decision
+    without one resets it. Written only when something is counted or a count was just cleared, so a book that never
+    freezes never writes the file; a second call for the same decision date counts nothing."""
+    prev = journal.load_json("frozen_runs.json", {}) or {}
+    old = prev.get("runs", {})
+    if prev.get("date") == ds:
+        return old
+    runs = {s: old.get(s, 0) + 1 for s in sorted(held_frozen)}
+    if runs or old:
+        journal.save_json("frozen_runs.json", {"date": ds, "runs": runs})
+    return runs
+
+
 def _coinbase_guard(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict) -> dict | None:
     """Planning decision 11: the decision close of each universe symbol against Coinbase's public daily candle.
     None when market.coinbase_guard_pct is 0 (stocks). status: breach (a gap above the limit) > unreachable > ok."""
@@ -290,11 +304,13 @@ def _fill_books(pending: dict, opx: dict, ds_exec: str, cool: str, cfg: dict, ma
 
 
 def _execute_pending_utc(cfg: dict, main, shadow, events, now: datetime) -> list[dict]:
-    """Crypto fill (planning decision 12): all coins or none, at the open of the first hour from exec_ts on (up to now)
-    where every coin has its 1h bar, else its 1m bar (UtcDailyCalendar.fill_prices). Nothing priced: the order stays
-    pending and a later run retries; never the daily open (the price the signal saw). Overrides count only up to
-    exec_ts, also when the fill slips to a later hour. The panel is not read, so a dropped decision bar (next_open
-    without a D+1 row) cannot break a fill (ruling R9c)."""
+    """Crypto fill (planning decision 12): all coins or none, at the open of the first hour from exec_ts on (up to now,
+    and less than market.fill_max_wait_hours after exec_ts) where every coin has its 1h bar, else its 1m bar
+    (UtcDailyCalendar.fill_prices). Nothing priced: the order stays pending and a later run retries; past the cap it
+    waits for the next decision to expire it (its stops are then carried, see _decide). An unreachable Yahoo ends the
+    walk (never skip ahead over hours that were not answered). Never the daily open (the price the signal saw).
+    Overrides count only up to exec_ts, also when the fill slips to a later hour. The panel is not read, so a dropped
+    decision bar (next_open without a D+1 row) cannot break a fill (ruling R9c)."""
     pending = journal.load_json("pending.json")
     if not pending or pending.get("status") != "pending":
         return []
@@ -305,12 +321,19 @@ def _execute_pending_utc(cfg: dict, main, shadow, events, now: datetime) -> list
     if not pending.get("exits_only"):
         pending["targets"], pending["overrides"] = _apply_overrides(pending["targets_raw"], main.positions, pending["decision_date"], exec_ts)
     names = set(pending["targets"]) | set(pending["targets_raw"]) | set(main.positions) | set(shadow.positions)
+    max_h = cfg["market"]["fill_max_wait_hours"]
+    cap = datetime.fromisoformat(exec_ts) + timedelta(hours=max_h)
     got = None
-    while got is None and hour <= now:  # ponytail: one probe per hour, at most ~24 before the next decision expires it
-        got = UtcDailyCalendar.fill_prices(names, hour.isoformat())
-        hour = hour if got else hour + timedelta(hours=1)
+    try:  # ponytail: a fill_prices probe per started hour from exec_ts, at most max_h (each asks 1h then 1m per coin)
+        while got is None and hour <= now and hour < cap:
+            got = UtcDailyCalendar.fill_prices(names, hour.isoformat())
+            hour = hour if got else hour + timedelta(hours=1)
+    except Unreachable:
+        events.append(f"Yahoo לא זמין (1h/1m) ב-{hour.isoformat()}: הזמנות {pending['decision_date']} ממתינות - ריצה מאוחרת תנסה שוב")
+        return []
     if got is None:
-        events.append(f"הזמנות {pending['decision_date']} ממתינות: אין מחיר פתיחה (1h/1m) לכל המטבעות מאז {exec_ts} - ריצה מאוחרת תנסה שוב")
+        late = f" - עבר חלון ההמתנה ({max_h} שעות): לא יבוצעו, ההחלטה הבאה תחליף אותן" if now >= cap else " - ריצה מאוחרת תנסה שוב"
+        events.append(f"הזמנות {pending['decision_date']} ממתינות: אין מחיר פתיחה (1h/1m) לכל המטבעות מאז {exec_ts}{late}")
         return []
     opx, src = got
     ds_exec = str(hour.date())
@@ -378,6 +401,21 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     risk_changed = (prev_regime is not None and prev_regime != diag.get("regime")) or (prev_dd is not None and prev_dd != diag.get("dd_state"))
     due = force_rebalance or days_since >= r.get("rebalance_every_days", 5) or risk_changed or diag.get("dd_state") == "flat"
     stopped = diag.get("stopped", [])
+    old = (journal.load_json("pending.json") or {}) if utc else {}
+    expiring = old.get("status") == "pending" and old.get("decision_date") != ds  # decision 12: unfilled, replaced now
+    carried = sh_carried = []
+    if expiring:  # basic law, never wait out a stop: what the expiring order had to sell is sold at the next fill
+        sells = set(old.get("stopped") or [])
+        if old.get("exits_only"):  # an exits-only order sold exactly the held names it left out of its targets
+            sells |= {s for s in m.positions if not (old.get("targets") or {}).get(s)}
+        carried = sorted(sells & set(m.positions))
+        sh_carried = sorted(set(old.get("stopped_shadow", old.get("stopped")) or []) & set(shadow.positions))
+    elif old.get("decision_date") == ds:  # a proposal for an already decided date repeats what that decision carried
+        carried = sorted(set(old.get("carried_stops") or []) & set(m.positions))
+    if carried:
+        stopped = sorted(set(stopped) | set(carried))
+        targets_raw = {s: w for s, w in targets_raw.items() if s not in carried}
+        diag["carried_stops"] = carried
     exits_only = not due
     if exits_only:  # off-cycle: hold the book, act only on stops (exits), never re-trade overnight gaps
         targets_raw = {s: w for s, w in m.weights(px).items() if s not in stopped}
@@ -414,20 +452,27 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     preview = copy.deepcopy(m).rebalance(targets, px, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped, None, exits_only, frozen=frozen)
     new_entries = [f["symbol"] for f in preview if f["side"] == "BUY" and f["symbol"] not in m.positions]
     decision = {"decision_date": ds, "status": "pending", "rebalance": due, "exits_only": exits_only, "targets": targets, "targets_raw": targets_raw,
-                "stopped_shadow": sdiag.get("stopped", []), "shadow_hold": shadow.weights(px),
+                "stopped_shadow": sorted(set(sdiag.get("stopped", [])) | set(sh_carried)) if sh_carried else sdiag.get("stopped", []),
+                "shadow_hold": shadow.weights(px),
                 "stopped": stopped, "overrides": applied, "earnings_blackout": skipped, "preview_at_close": preview,
                 "new_entries": new_entries, "diag": diag, "weights": weights, "logged_at": logged_at if utc else journal.now_utc(),
                 **({"frozen": sorted(frozen)} if frozen else {}),
+                **({"carried_stops": carried} if carried else {}),
                 **({"exec_ts": exec_ts, "decision_close": px} if utc else {}),  # decision_close: the revised-close audit (R6)
                 **({"coinbase_breach": True} if guard and guard["status"] == "breach" else {})}  # R9a: the fill is exits-only
     if not persist:
         journal.save_json("proposal.json", decision)
         return decision
-    old = (journal.load_json("pending.json") or {}) if utc else {}
-    if old.get("status") == "pending":  # decision 12: an unfilled order is recorded before a new decision overwrites it
+    if expiring:  # decision 12: an unfilled order is recorded before a new decision overwrites it
         journal.append("decisions.jsonl", {"event": "expired_unfilled", "date": old.get("decision_date"), "exec_ts": old.get("exec_ts"),
-                                           "targets": old.get("targets"), "logged_at": journal.now_utc()})
+                                           "targets": old.get("targets"), **({"carried_stops": carried} if carried else {}),
+                                           "logged_at": journal.now_utc()})
         events.append(f"הזמנות {old.get('decision_date')} לא בוצעו עד ההחלטה הבאה ופג תוקפן (expired_unfilled)")
+        if carried:
+            msg = (f"stop could not fill on {(old.get('exec_ts') or '?')[:10]}: {', '.join(carried)} - forced exit at the next fill"
+                   f" ({exec_ts})")
+            events.append(msg)
+            notify.send("AI Trader - סטופ לא בוצע", msg + " (כסף נייר)", cfg, "urgent")
     journal.save_json("pending.json", {k: v for k, v in decision.items() if k not in ("diag", "weights")})
     if mk.get("delete_proposal_on_decision"):  # spec 3.3: a stale proposal must not date a later veto
         (journal.STATE / "proposal.json").unlink(missing_ok=True)
@@ -445,6 +490,10 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
         events.append("סטופ-לוס (יבוצע בפתיחה): " + ", ".join(stopped))
     if frozen & set(m.positions):
         events.append("נתונים ישנים/חסרים - מוקפא, לא נקנה ולא נמכר והסטופ לא נבדק: " + ", ".join(sorted(frozen & set(m.positions))))
+    long_frozen = {s_: k for s_, k in _frozen_runs(frozen & set(m.positions), ds).items() if k >= mk["frozen_alert_runs"]}
+    if long_frozen:  # escalate: a stale held name is a stop nobody checks
+        notify.send("AI Trader - תקלה", "\n".join(f"{s_} no data for {k} runs - stop not checked" for s_, k in long_frozen.items())
+                    + " (כסף נייר)", cfg, "urgent")
     if prev_regime and prev_regime != diag.get("regime"):
         events.append(f"שינוי משטר שוק: {prev_regime} -> {diag.get('regime')}")
     if prev_dd and prev_dd != diag.get("dd_state"):

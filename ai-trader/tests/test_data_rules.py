@@ -27,6 +27,8 @@ import numpy as np
 import pandas as pd
 
 from aitrader import cycle, data, journal
+from aitrader.signals import compute_all
+from aitrader.strategy import build_targets, precompute_aux
 from golden_util import FIRST_BAR, frozen_env, load_panel
 from test_core import cfg_for
 from test_regime import crypto_panel
@@ -222,6 +224,67 @@ class StockStaleData(unittest.TestCase):
         self.assertNotIn(x, [f["symbol"] for f in out["executed"]])
         self.assertEqual(journal_json(state, "portfolio.json")["positions"][x]["qty"], qty)
 
+
+    def test_held_symbol_frozen_on_two_decisions_alerts_urgent(self):
+        """Final review item 4: a held symbol frozen (stale or absent) on frozen_alert_runs consecutive decisions sends
+        an urgent alert (its stop is not checked). state/frozen_runs.json counts the runs; with nothing frozen it is
+        never written (the stock golden stays byte-identical), and a fresh decision resets it."""
+        self.assertEqual(self.cfg["market"]["frozen_alert_runs"], 2)
+        idx, cols = self.full["close"].index, self.full["close"].columns
+        prop = self.run_in(self.tmp(), self.panel(FIRST_BAR), propose=True)
+        x = next(s for s in prop["diag"]["bottom_scores"] if s != "SPY")
+        last = idx[FIRST_BAR - 1]
+        px = float(self.full["close"].at[last, x])
+        qty = int(5000 // px)
+        seed = {"cash": 100000.0 - qty * px, "peak_equity": 100000.0, "blocked": {},
+                "positions": {x: {"qty": qty, "avg_cost": px, "entry_date": "2021-01-04", "peak_close": px, "last_price": px}}}
+        state, sent = self.tmp(), []
+
+        def run(n: int, stale: bool) -> dict:  # rows 0..n-1; x fetched before its decision bar ended when stale
+            fetched = {s: stock_end(idx[n - 1]) + timedelta(minutes=25) for s in cols}
+            if stale:
+                fetched[x] = stock_end(idx[n - 1]) - timedelta(minutes=30)
+            with frozen_env(state, None):
+                cycle.load_config = lambda: self.cfg
+                cycle.load_market = lambda c, rng="10y", age=0.1: self.panel(n, fetched)
+                cycle.notify.send = lambda title, body, cfg, prio="default", **k: sent.append((prio, body)) or []
+                if not (state / "portfolio.json").exists():
+                    journal.save_json("portfolio.json", seed)
+                return cycle.run_cycle()
+
+        def urgent() -> list:
+            return [b for pr, b in sent if pr == "urgent"]
+
+        self.assertTrue(run(FIRST_BAR, True)["decided_now"])
+        self.assertEqual(journal_json(state, "frozen_runs.json")["runs"], {x: 1})
+        self.assertEqual(urgent(), [])  # one run: the normal event only
+        self.assertTrue(run(FIRST_BAR + 1, True)["decided_now"])
+        self.assertEqual(journal_json(state, "frozen_runs.json")["runs"], {x: 2})
+        self.assertEqual(len(urgent()), 1)
+        self.assertIn(f"{x} no data for 2 runs - stop not checked", urgent()[0])
+        self.assertTrue(run(FIRST_BAR + 2, False)["decided_now"])  # fresh again: the count resets, no alert
+        self.assertEqual(journal_json(state, "frozen_runs.json")["runs"], {})
+        self.assertEqual(len(urgent()), 1)
+        before = (state / "frozen_runs.json").read_bytes()
+        self.assertTrue(run(FIRST_BAR + 3, False)["decided_now"])
+        self.assertEqual((state / "frozen_runs.json").read_bytes(), before)  # unchanged: not rewritten
+
+        control = self.tmp()  # nothing ever frozen: no file at all
+        self.run_in(control, self.panel(FIRST_BAR), seed=seed)
+        self.assertFalse((control / "frozen_runs.json").exists())
+
+    def test_frozen_held_names_beyond_max_positions_leave_no_slot(self):
+        """Final review item 10: more frozen held names than max_positions leaves no slot for a pick (the slice
+        n - frozen held is floored at 0; a negative slice used to pick all but the last candidate)."""
+        p = load_panel()
+        cfg = cfg_for(p)
+        cfg["risk"].update({"max_positions": 1, "min_score": -1.0})
+        d = p["close"].index[FIRST_BAR - 1]
+        sig, aux = compute_all(p, cfg), precompute_aux(p, cfg)
+        held = {s: {"peak_close": float(p["close"].at[d, s])} for s in ("S01", "S02")}
+        targets, diag = build_targets(d, p, sig, cfg["prior_weights"], cfg, 1.0, held, set(), aux, frozen=set(held))
+        self.assertEqual(targets, {})  # the caller holds the two frozen names at their weights; nothing new is picked
+        self.assertEqual(diag["frozen"], ["S01", "S02"])
 
 class CryptoRun(unittest.TestCase):
     """The crypto book on a 7-day synthetic panel, through run_cycle (frozen env, temp state, no network)."""

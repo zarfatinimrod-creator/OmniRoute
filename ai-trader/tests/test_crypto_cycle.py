@@ -24,6 +24,7 @@ from unittest import mock
 
 import numpy as np
 import pandas as pd
+import requests
 
 from aitrader import cycle, data, journal
 from aitrader import report as rep
@@ -33,6 +34,7 @@ from test_core import cfg_for
 from test_regime import crypto_panel
 
 UTC = timezone.utc
+REAL_INTRADAY_OPEN = data.intraday_open  # the real function (frozen_env patches it per test)
 I = 213  # a risk-on day on the synthetic panel with both coins picked (test_data_rules.CryptoRun)
 STAMP = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00$")  # journal.now_utc()
 
@@ -69,6 +71,7 @@ class CryptoBook(unittest.TestCase):
         self.bars: dict = {}  # (sym, ts, interval) -> open; anything else is a missing bar
         self.bar_calls: list = []
         self.sent: list = []
+        self.prios: list = []  # notify priority per sent message
         self.cb = self.agree
 
     def mkdtemp(self) -> Path:
@@ -113,7 +116,7 @@ class CryptoBook(unittest.TestCase):
             cycle.load_config = lambda: self.cfg
             cycle.load_market = lambda c, rng="10y", age=0.1: pn
             cycle.coinbase_close = self.cb
-            cycle.notify.send = lambda title, body, cfg, prio="default": self.sent.append(body) or []
+            cycle.notify.send = lambda title, body, cfg, prio="default", **k: self.sent.append(body) or self.prios.append(prio) or []
             data.intraday_open = self.bar
             for k, v in (patches or {}).items():
                 setattr(cycle, k, v)
@@ -169,8 +172,8 @@ class Calendar(unittest.TestCase):
         self.assertEqual(U.cooldown_until("2026-11-10", 14), "2026-11-24")  # calendar days, not business days
 
     def test_fill_prices_chain_and_intraday_open(self):
-        """fill_prices: 1h open -> 1m open -> None, all coins or none. intraday_open: missing = no row at ts or a null
-        open; volume is ignored; an unreachable Yahoo is missing too."""
+        """fill_prices: 1h open -> 1m open -> None, all coins or none. intraday_open: missing = no row at ts, a null
+        open or Yahoo's 404/422 "no data"; volume is ignored; an unreachable Yahoo raises data.Unreachable."""
         ts = "2026-11-10T01:00:00+00:00"
         t0 = int(datetime.fromisoformat(ts).timestamp())
         opens = {("BTC-USD", "1h"): 74000.0, ("ETH-USD", "1m"): 2100.0}
@@ -198,8 +201,29 @@ class Calendar(unittest.TestCase):
         self.assertIn("BTC-USD", seen[0][0])
         with mock.patch.object(data, "_get_json", lambda *a, **k: chart([t0], [None])):
             self.assertIsNone(data.intraday_open("BTC-USD", ts, "1h"))  # null open
+        # final review item 6: an unreachable Yahoo is not a missing bar. A transport failure raises data.Unreachable;
+        # Yahoo's own "no data" answer (HTTP 404 / 422) is a missing bar (None)
         with mock.patch.object(data, "_get_json", mock.Mock(side_effect=RuntimeError("GET failed"))):
-            self.assertIsNone(data.intraday_open("BTC-USD", ts, "1h"))
+            with self.assertRaises(data.Unreachable):
+                data.intraday_open("BTC-USD", ts, "1h")
+
+        class Resp:
+            def __init__(self, code):
+                self.status_code = code
+
+            def raise_for_status(self):
+                raise requests.HTTPError(f"{self.status_code}", response=self)
+
+        with mock.patch.object(data.time, "sleep", lambda s: None):
+            with mock.patch.object(data._session, "get", mock.Mock(side_effect=requests.ConnectionError("down"))):
+                with self.assertRaises(data.Unreachable):
+                    data.intraday_open("BTC-USD", ts, "1h")
+            with mock.patch.object(data._session, "get", lambda *a, **k: Resp(503)):
+                with self.assertRaises(data.Unreachable):
+                    data.intraday_open("BTC-USD", ts, "1h")
+            for code in (404, 422):  # Yahoo's "no data" / "range not available": a missing bar
+                with mock.patch.object(data._session, "get", lambda *a, code=code, **k: Resp(code)):
+                    self.assertIsNone(data.intraday_open("BTC-USD", ts, "1h"), code)
 
 
 class DecideAndFill(CryptoBook):
@@ -535,6 +559,83 @@ class Rulings(CryptoBook):
             self.assertEqual(bool(out["executed"]), with_bars)
         self.assertEqual({t["fill_ts"] for t in self.trades()}, {self.ts(I, 1)})
         self.assertEqual(len([r for r in read_jsonl(self.state, "decisions.jsonl") if not r.get("event")]), 1)
+
+
+class FinalReview(CryptoBook):
+    """Final whole-branch review: item 3 (a stop that could not fill is carried, never waited out) and item 6 (the
+    hourly fill walk is capped at market.fill_max_wait_hours and stops on an unreachable Yahoo)."""
+
+    def old_pending(self, stopped: list, targets: dict) -> None:
+        """An unfilled order of decision I-1 (exec_ts I 01:00) as cycle.py writes it; no bar ever priced it."""
+        pend = {"decision_date": self.day(I - 1), "status": "pending", "rebalance": False, "exits_only": bool(stopped),
+                "targets": targets, "targets_raw": dict(targets), "stopped_shadow": [], "shadow_hold": {},
+                "stopped": stopped, "overrides": [], "earnings_blackout": {}, "preview_at_close": [], "new_entries": [],
+                "logged_at": self.ts(I, 0, 12), "exec_ts": self.ts(I, 1)}
+        (self.state / "pending.json").write_text(json.dumps(pend))
+
+    def test_stop_in_expired_pending_is_forced_at_next_fill(self):
+        held = {"BTC-USD": 0.3, "ETH-USD": 0.3}
+        # control: the same book with no stop in the expired order keeps ETH (its price is above the stop line now)
+        self.old_pending([], dict(held))
+        self.decide(seed=self.seed(held, I - 1))
+        self.assertIn("ETH-USD", self.pending()["targets"])
+        self.assertNotIn("ETH-USD", self.pending()["stopped"])
+
+        self.setUp()  # the I-1 decision stopped ETH; its exec_ts hour never got a price, so the stop never filled
+        self.old_pending(["ETH-USD"], {"BTC-USD": 0.3})
+        out = self.decide(seed=self.seed(held, I - 1))
+        self.assertTrue(out["decided_now"])
+        self.assertEqual([r.get("event") for r in read_jsonl(self.state, "decisions.jsonl")], ["expired_unfilled", None])
+        pend = self.pending()
+        self.assertNotIn("ETH-USD", pend["targets"])
+        self.assertNotIn("ETH-USD", pend["targets_raw"])
+        self.assertIn("ETH-USD", pend["stopped"])
+        self.assertEqual(pend["carried_stops"], ["ETH-USD"])
+        urgent = [b for b, pr in zip(self.sent, self.prios) if pr == "urgent"]
+        self.assertEqual(len(urgent), 1)
+        self.assertIn("ETH-USD", urgent[0])
+        self.assertIn(f"stop could not fill on {self.day(I)}", urgent[0])
+        self.assertTrue(any("ETH-USD" in e and "stop" in e for e in out["events"]))
+        prop = self.at(I + 1, self.ts(I + 1, 0, 30), propose=True)  # the desk's view of the same date matches it
+        self.assertEqual((prop["carried_stops"], "ETH-USD" in prop["targets"]), (["ETH-USD"], False))
+        self.assertEqual(len([b for b, pr in zip(self.sent, self.prios) if pr == "urgent"]), 1)  # alerted once
+
+        self.set_bars(I + 1, 1)  # the next fill sells it, as a stop (cooldown)
+        out = self.at(I + 1, self.ts(I + 1, 1, 7))
+        eth = [f for f in out["executed"] if f["symbol"] == "ETH-USD"]
+        self.assertEqual([(f["side"], f["reason"]) for f in eth], [("SELL", "stop")])
+        book = load(self.state, "portfolio.json")
+        self.assertNotIn("ETH-USD", book["positions"])
+        self.assertIn("ETH-USD", book["blocked"])
+
+    def test_fill_walk_capped_at_fill_max_wait_hours(self):
+        self.assertEqual(self.cfg["market"]["fill_max_wait_hours"], 24)
+        self.assertNotIn("fill_max_wait_hours", data.load_config("stocks")["market"])
+        self.decide()  # exec_ts I+1 01:00
+        self.set_bars(I + 2, 1)  # first priced 24 h after exec_ts: past the cap
+        out = self.at(I + 1, self.ts(I + 3, 5))  # a catch-up run 52 h later; no row I+2 yet, so no new decision
+        self.assertFalse(out["decided_now"])
+        self.assertEqual(out["executed"], [])
+        self.assertEqual(self.pending()["status"], "pending")
+        hours = sorted({ts for _, ts, _ in self.bar_calls})
+        self.assertEqual((len(hours), hours[0], hours[-1]), (24, self.ts(I + 1, 1), self.ts(I + 2, 0)))
+        self.assertTrue(any("24" in e and self.ts(I + 1, 1) in e for e in out["events"]))
+
+    def test_fill_walk_stops_on_unreachable_yahoo(self):
+        self.decide()
+        calls = []
+
+        def down(url, params=None, **k):
+            calls.append(params)
+            raise RuntimeError("GET failed: connection refused")
+
+        self.bar = REAL_INTRADAY_OPEN
+        with mock.patch.object(data, "_get_json", down):
+            out = self.at(I + 1, self.ts(I + 1, 5, 7))  # 01:00 .. 05:00 are due; Yahoo answers none of them
+        self.assertEqual(len(calls), 1)  # the walk stops at the first transport failure
+        self.assertEqual(out["executed"], [])
+        self.assertEqual(self.pending()["status"], "pending")
+        self.assertTrue(any("Yahoo" in e for e in out["events"]))
 
 
 if __name__ == "__main__":

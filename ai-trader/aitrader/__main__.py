@@ -8,7 +8,8 @@
   shrink SYMBOL MULT --reason TEXT        shrink today's target for SYMBOL (0..1)
   news SYMBOL                             recent headlines
   context SYMBOL                          past calls, trades and lessons for a ticker (read before deciding)
-  summary [--send] [--ack TS]           crypto morning summary: urgent first; --send delivers (exit 0 ok, 2 ok+urgent, 3 not delivered)
+  summary --book crypto [--send] [--ack TS]  crypto morning summary: urgent first; --send delivers (exit 0 ok, 2 ok+urgent,
+                                          3 not delivered); without --book crypto it refuses (exit 1)
   verify                                  check the tamper-evident hash chains
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
   news-score [--n 8]                      score recent headlines without trading (scorer check)
@@ -192,6 +193,9 @@ def _run(a: argparse.Namespace) -> int:
         from . import notify
         from .data import load_config
 
+        if a.book != "crypto":  # the expected-decision check runs on the UTC daily calendar only
+            print("summary is crypto-only in v1: run it with --book crypto", file=sys.stderr)
+            return 1
         cfg = load_config()
         if a.ack is not None and not a.send:
             n = notify.ack(a.ack)

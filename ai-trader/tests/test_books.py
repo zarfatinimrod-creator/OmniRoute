@@ -31,6 +31,7 @@ STOCK_MARKET = {  # plan, planning decision 6: the stock column = today's behavi
     "stale_skips_run": False, "close_source": "yahoo", "coinbase_guard_pct": 0, "report_dir": "reports",
     "intraday_alert_pct": 0.06, "latest_max_age_hours": 30, "state_subdir": "",
     "etf_groups": ["Index", "SectorETF", "Bonds", "Gold"], "quiet_hours": None,
+    "frozen_alert_runs": 2,  # final review item 4: urgent alert on a held symbol frozen this many decisions in a row
 }
 CRYPTO_MARKET = {
     "calendar": "utc_daily", "periods_per_year": 365, "history": "max", "vix": False, "earnings_blackout": False,
@@ -40,6 +41,8 @@ CRYPTO_MARKET = {
     "intraday_alert_pct": 0.08, "latest_max_age_hours": 26, "state_subdir": "crypto", "etf_groups": [],
     "quiet_hours": {"tz": "Asia/Jerusalem", "from": "23:00", "to": "08:00"},
     "revised_close_alert_bps": 5,  # ruling R6 (Task 6): crypto only
+    "frozen_alert_runs": 2,  # inherited from the stock block (crypto skips a stale run instead of freezing)
+    "fill_max_wait_hours": 24, "fill_urgent_after_hours": 3,  # final review items 6 and 5: crypto only
 }
 SPEC_RISK_KEYS = {  # spec 3.3: the crypto risk block lists every key it uses (nothing inherited from stocks)
     "target_vol_annual", "max_gross", "max_position_pct", "max_position_pct_by_symbol", "max_sector_pct",

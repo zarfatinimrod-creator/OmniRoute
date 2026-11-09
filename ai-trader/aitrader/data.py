@@ -35,6 +35,11 @@ _session = requests.Session()
 _session.headers.update(UA)
 
 
+class Unreachable(RuntimeError):
+    """A source did not answer (network error, timeout, 5xx, 429 or bad JSON after the retries). Not a missing bar:
+    a caller walking forward over bars must stop and retry later, never skip ahead (final review item 6)."""
+
+
 def _get_json(url: str, params: dict | None = None, retries: int = 3, headers: dict | None = None):
     last = None
     for attempt in range(retries):
@@ -48,7 +53,7 @@ def _get_json(url: str, params: dict | None = None, retries: int = 3, headers: d
         except (requests.RequestException, ValueError) as e:  # network or bad JSON
             last = e
             time.sleep(1 + attempt)
-    raise RuntimeError(f"GET failed {url}: {last}")
+    raise RuntimeError(f"GET failed {url}: {last}") from last  # __cause__: callers can tell a 404 from a dead link
 
 
 def _chart(sym: str, rng: str, interval: str) -> dict:
@@ -418,17 +423,24 @@ INTRADAY_SECONDS = {"1h": 3600, "1m": 60}
 
 def intraday_open(sym: str, ts, interval: str) -> float | None:
     """Open of the `interval` bar ("1h" | "1m") that starts exactly at `ts` (UTC, aware datetime or ISO string), from
-    Yahoo's chart API. None when the bar is missing - no row stamped ts, or a null open (volume is ignored) - or Yahoo
-    is unreachable. Yahoo keeps 1m bars for about 7 days and 1h bars for about 2 years; the live row of the current
-    bar carries the last trade time, not the bar start, so it never matches."""
+    Yahoo's chart API. None when the bar is missing: no row stamped ts, a null open (volume is ignored), or Yahoo's
+    own answer that there is no such data (HTTP 404 "no data", 422 "range not available"). Raises Unreachable when
+    Yahoo does not answer (transport failure, 5xx, 429, any other status or bad JSON after _get_json's retries). Yahoo keeps 1m bars for about 7 days and 1h bars for about 2 years; the live row of
+    the current bar carries the last trade time, not the bar start, so it never matches."""
     t0 = int(pd.Timestamp(ts).timestamp())
     params = {"period1": t0, "period2": t0 + INTRADAY_SECONDS[interval], "interval": interval}
     try:
-        res = _get_json(CHART_URL.format(sym=sym), params)["chart"]["result"][0]
+        got = _get_json(CHART_URL.format(sym=sym), params)
+    except RuntimeError as e:
+        if getattr(getattr(e.__cause__, "response", None), "status_code", None) in (404, 422):
+            return None
+        raise Unreachable(f"Yahoo {interval} {sym} {ts}: {e}") from e
+    try:
+        res = got["chart"]["result"][0]
         opens = res["indicators"]["quote"][0].get("open") or []
         for t, o in zip(res.get("timestamp") or [], opens):
             if int(t) == t0 and o is not None and o == o and float(o) > 0:
                 return float(o)
-    except (RuntimeError, KeyError, IndexError, TypeError, ValueError):
+    except (KeyError, IndexError, TypeError, ValueError):
         pass
     return None

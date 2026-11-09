@@ -62,10 +62,51 @@ def _age_hours(ts: str, now: datetime) -> float:
     return (now - datetime.fromisoformat(ts)).total_seconds() / 3600
 
 
+def _local(ts: str, cfg: dict) -> str:
+    """HH:MM and the zone abbreviation in the owner's time zone (market.quiet_hours.tz; UTC without quiet hours)."""
+    tz = ZoneInfo(((cfg.get("market") or {}).get("quiet_hours") or {}).get("tz", "UTC"))
+    return datetime.fromisoformat(ts).astimezone(tz).strftime("%H:%M %Z")
+
+
+def _unapplied(overrides: dict, cfg: dict) -> list[str]:
+    """Keys of a sweep's overrides (crypto_sweep._diff spelling: "universe", "risk.<k>", "costs.<k>"; "unset" = the key
+    is absent) whose value the config does not carry yet."""
+    left = []
+    for key, want in sorted(overrides.items()):
+        if key == "universe":
+            same = sorted(cfg["universe"]) == sorted(want)
+        else:
+            blk, k = key.split(".", 1)
+            same = (cfg.get(blk) or {}).get(k, "unset") == want
+        if not same:
+            left.append(key)
+    return left
+
+
+def _ship_check(cfg: dict) -> list[str]:
+    """Final review item 2: the profile the crypto sweep shipped (dsr.json) against the config that trades. Urgent when
+    the candidate shipped only with a config change (ablation) that books.crypto does not carry yet, or when the
+    candidate trades although the sweep shipped crypto_base."""
+    from .data import load_config
+
+    d = journal.load_json("dsr.json", {}) or {}
+    if d.get("profile") == "crypto_base" and cfg.get("profile") == "crypto":
+        return ["books.crypto.ship_profile is crypto but the sweep shipped crypto_base (dsr.json)"]
+    if not (d.get("profile") == "crypto" and d.get("config_change_needed")):
+        return []
+    try:
+        left = _unapplied(d.get("overrides") or {}, load_config("crypto", "crypto"))
+    except ValueError as e:  # e.g. the universe changed without data.PROFILE_UNIVERSE
+        return [f"books.crypto does not load: {e}"]
+    return [f"sweep shipped crypto only with a config change not applied to books.crypto: {', '.join(left)}"] if left else []
+
+
 def build_summary(cfg: dict) -> dict:
     """The crypto morning summary (spec 6.1/6.2, planning decision 15) for the active book: {urgent, text, newest}.
-    Urgent leads: urgent queued alerts, a broken chain, a missing expected decision, a stale latest.json, and
-    skips on 2+ runs in the last 24 h (ruling R7; crypto never freezes a held coin, a stale coin skips the run). Reads state only; changes nothing."""
+    Urgent leads: urgent queued alerts, a broken chain, a missing expected decision, a stale latest.json, skips on 2+
+    runs in the last 24 h (ruling R7; crypto never freezes a held coin, a stale coin skips the run), an order still
+    unfilled market.fill_urgent_after_hours after its exec_ts, and a sweep result the config does not follow
+    (_ship_check). The last fill's price source is listed. Times print in Israel time. Reads state only; changes nothing."""
     from .market import UtcDailyCalendar
 
     now = datetime.fromisoformat(journal.now_utc())
@@ -75,8 +116,9 @@ def build_summary(cfg: dict) -> dict:
     if bad:
         urgent.append("hash chain broken: " + ", ".join(bad))
     expected = str(UtcDailyCalendar.last_final_bar(now))
+    pend = journal.load_json("pending.json", {}) or {}
     dates = [r["date"] for r in journal.read("decisions.jsonl") if "event" not in r and r.get("date")]
-    dates.append((journal.load_json("pending.json", {}) or {}).get("decision_date") or "")
+    dates.append(pend.get("decision_date") or "")
     last = max(dates)
     if last < expected:
         urgent.append(f"missing decision for {expected} (last: {last or 'none'})")
@@ -88,10 +130,18 @@ def build_summary(cfg: dict) -> dict:
     skips = recent(journal.read("skips.jsonl"))
     if len(skips) >= 2:
         urgent.append(f"{len(skips)} skipped runs in 24 h (last: {skips[-1].get('reason', '?')})")
+    waiting = pend.get("status") == "pending" and pend.get("exec_ts")
+    if waiting and _age_hours(pend["exec_ts"], now) > cfg["market"]["fill_urgent_after_hours"]:
+        urgent.append(f"fill waiting since {pend['exec_ts']} (decision {pend.get('decision_date')})")
+    urgent += _ship_check(cfg)
     lines = ["URGENT"] + [f"- {u}" for u in urgent] if urgent else []
     rest = [q for q in queue if q.get("priority") != "urgent"]
     if rest:
-        lines += ["Queued overnight"] + [f"- {q['queued_at'][11:16]}Z {q['title']}: {q['body']}" for q in rest]
+        lines += ["Queued overnight"] + [f"- {_local(q['queued_at'], cfg)} {q['title']}: {q['body']}" for q in rest]
+    if pend.get("status") == "executed" and pend.get("fill_ts"):
+        lines.append(f"Fill {pend.get('decision_date')}: {pend.get('fill_source')} at {_local(pend['fill_ts'], cfg)}")
+    elif waiting:
+        lines.append(f"Fill {pend.get('decision_date')}: waiting since {_local(pend['exec_ts'], cfg)}")
     lines.append(f"Decision {last or 'none'} (expected {expected}); latest.json {latest.get('as_of_utc') or 'never'}")
     return {"urgent": urgent, "text": "\n".join(lines), "newest": max((q["queued_at"] for q in queue), default=None)}
 

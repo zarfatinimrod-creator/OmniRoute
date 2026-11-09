@@ -87,14 +87,21 @@ Code map used for this plan: workflow wf_2c7f7e08-8cd, saved as `research/2026-1
 10. **Stale data:**
     - **Stocks:** a stale benchmark makes `last` not final (`dec_bar = index[-2]`). A stale or absent symbol is
       frozen: no buy or sell, and a held one keeps its current weight. This goes through a new
-      `build_targets(..., frozen: set | None = None)` and a new `rebalance(..., frozen=...)`.
+      `build_targets(..., frozen: set | None = None)` and a new `rebalance(..., frozen=...)`. A held symbol frozen on
+      `market.frozen_alert_runs` (2) consecutive decisions sends an urgent alert ("<SYM> no data for N runs - stop
+      not checked"); `state/frozen_runs.json` counts the runs and is never written while nothing is frozen (final
+      review item 4).
     - **Crypto:** any stale or absent universe symbol ends the run early with `{"skipped": reason}`.
 11. **Coinbase guard breach:** book-wide clamp, `target = min(target, current weight)`, and non-held names are
     dropped. Regime-off and stops still sell.
 12. **Fills:**
     - All-or-nothing across coins.
     - If a new decision would overwrite an unfilled pending order, the old one is first recorded as
-      `{"event": "expired_unfilled"}` in decisions.jsonl.
+      `{"event": "expired_unfilled"}` in decisions.jsonl, and what it had to sell (its `stopped`, plus the held names an
+      exits-only order left out) is a forced exit of the new decision (`carried_stops`, an urgent alert; final review
+      item 3).
+    - The hourly walk from exec_ts stops after `market.fill_max_wait_hours` (24) hours, and at the first hour Yahoo
+      does not answer (`data.Unreachable`); a 404/422 "no data" answer is a missing bar (final review item 6).
     - `exec_ts` = the first full hour strictly after `logged_at`, and never earlier than D+1 01:00 UTC.
     - It is formatted exactly like `journal.now_utc()`, because override cutoffs are compared as strings.
 13. **Crypto grading:**
@@ -112,10 +119,14 @@ Code map used for this plan: workflow wf_2c7f7e08-8cd, saved as `research/2026-1
     `{channels, urgent, text, newest}`. Exit codes:
     - 0: delivered;
     - 2: delivered, with urgent items;
-    - 3: not delivered. The session then pushes the text with PushNotification and runs `summary --ack <newest>`.
+    - 3: not delivered. The session then pushes the text with PushNotification and runs
+      `summary --book crypto --ack <newest>`.
 
     A failed check (verify, the expected decision_date via `UtcDailyCalendar.last_final_bar(now)`, the age of
-    latest.json) counts as urgent. `--ack` removes only items with `queued_at <= newest`.
+    latest.json) counts as urgent. `--ack` removes only items with `queued_at <= newest`. Final review: also urgent
+    are an order pending more than `market.fill_urgent_after_hours` after exec_ts and a dsr.json result the config
+    does not follow; the last `fill_source` is listed, queued times print in Israel time, and `summary` refuses
+    `--book stocks` (exit 1).
 16. **No change to desk.py.** Lessons are tagged `crypto: ...` inside the observation; untagged lines are stocks.
     `journal.context` reads lessons from `journal._BASE`.
 
@@ -455,7 +466,25 @@ Code map used for this plan: workflow wf_2c7f7e08-8cd, saved as `research/2026-1
   report and state.
 - [ ] Step 3: Send the quant-critic agent the sweep report and the diff since Task 0. Only PASS continues; on HOLD,
   fix and re-run.
-- [ ] Step 4: Set `books.crypto.ship_profile` from the result, run the suite, and commit.
+- [ ] Step 4: Ship from the sweep result, `state/crypto/dsr.json` (its `profile` is the CLI's `ship`).
+  - `profile` "crypto_base": set `books.crypto.ship_profile` to "crypto_base"; books.crypto is not changed (its
+    `overrides` belong to a candidate that did not ship).
+  - `profile` "crypto" and `config_change_needed` true: apply `overrides` to `books.crypto` first, in the same commit
+    (the keys use crypto_sweep._diff's spelling):
+    - `"universe": [symbols]`: set `books.crypto.universe` to exactly those symbols (sector "Crypto") and set
+      `data.PROFILE_UNIVERSE["crypto"]` to the same set, so the load-time guard accepts the shipped universe. Never
+      ship crypto_base as a stand-in for an ETH-less candidate: their priors and risk blocks differ. Update the tests
+      that pin the two-coin candidate: `tests/test_books.py::test_crypto_universe_and_priors` (the universe) and the
+      `universe.pop("ETH-USD")` case of `test_profile_guards_reject_a_bad_config` (break the universe some other
+      way, e.g. add "XRP-USD").
+    - `"risk.<key>": value` / `"costs.<key>": value`: set that key in `books.crypto.risk` / `books.crypto.costs`; the
+      value "unset" means delete the key from books.crypto.
+    - Then `python3 -m aitrader summary --book crypto` must show no "config change not applied" urgent item: it
+      compares dsr.json `overrides` with the merged candidate (notify._ship_check).
+  - Set `books.crypto.ship_profile` to "crypto" only after the overrides are in.
+  - Run the suite. Tests built on the shipped profile (`data.load_config("crypto")`, e.g. tests/test_crypto_cycle.py
+    and test_data_rules.CryptoRun) assume the two-coin candidate; where the applied change alone breaks one, pin it to
+    an explicit fixture config instead of weakening its assertions, and investigate any other failure. Commit.
 - [ ] Step 5: Add the "crypto night" section to `skills/trader/SKILL.md` (spec 6.3). Then create the 3 scheduled
   tasks bound to session_012EDbLj2H3vpAR9xTMneEYo with the spec 6.3 prompts:
   - `12 0 * * *` (UTC);

@@ -13,7 +13,8 @@ class PaperBroker:
                  qty_step: float = 1, fee_bps: float = 0.0):
         self.slippage = slippage_bps / 1e4
         self.commission = commission_per_share
-        self.qty_step = qty_step  # int 1 = whole units (stocks); float = fractional units (crypto)
+        self.whole = qty_step == 1  # whole units (stocks), decided once: a config 1.0 must not turn share counts into floats
+        self.qty_step = 1 if self.whole else qty_step  # else fractional units (crypto)
         self.fee = fee_bps / 1e4
         self.state = state or {"cash": float(cash), "positions": {}, "peak_equity": float(cash), "blocked": {}}
 
@@ -83,8 +84,8 @@ class PaperBroker:
         return notes
 
     def _floor_qty(self, v: float) -> float:
-        """Round a raw quantity down to the lot step. Int step 1 keeps the legacy floor (int result)."""
-        if isinstance(self.qty_step, int) and self.qty_step == 1:
+        """Round a raw quantity down to the lot step. Whole units keep the legacy floor (int result)."""
+        if self.whole:
             return math.floor(v)
         return round(math.floor(v / self.qty_step + 1e-9) * self.qty_step, 8)
 
@@ -184,7 +185,7 @@ class PaperBroker:
         realized = -fee if (qty > 0 and fee) else 0.0
         if qty > 0:
             if pos:
-                new_qty = self._floor_qty(pos["qty"] + qty) if self.qty_step != 1 else pos["qty"] + qty
+                new_qty = pos["qty"] + qty if self.whole else round(pos["qty"] + qty, 8)  # both on the step already
                 pos["avg_cost"] = (pos["avg_cost"] * pos["qty"] + fill_px * qty) / new_qty
                 pos["qty"] = new_qty
             else:
@@ -192,7 +193,7 @@ class PaperBroker:
         else:
             realized = (fill_px - pos["avg_cost"]) * (-qty) - fee
             pos["qty"] += qty
-            if self.qty_step != 1:
+            if not self.whole:
                 pos["qty"] = round(pos["qty"], 8)
             if pos["qty"] <= 0 or pos["qty"] < self.qty_step - 1e-12:  # dust below one lot is dropped
                 del self.positions[sym]

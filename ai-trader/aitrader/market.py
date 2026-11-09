@@ -71,7 +71,8 @@ class UtcDailyCalendar:
     def fill_prices(cls, names, exec_ts) -> tuple[dict, str] | None:
         """Open of the bar starting at exec_ts for every name: the 1h bar, else the 1m bar. None if any name has
         neither (all or nothing: the order stays pending). The label is "1h" / "1m" when every name used the same
-        interval, else each name's source ("BTC-USD:1h,ETH-USD:1m")."""
+        interval, else each name's source ("BTC-USD:1h,ETH-USD:1m"). data.Unreachable (Yahoo did not answer) passes
+        through: the caller stops its walk instead of treating the hour as missing."""
         prices, src = {}, {}
         for s in sorted(set(names)):
             for iv in cls.INTERVALS:

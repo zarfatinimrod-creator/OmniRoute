@@ -192,16 +192,35 @@ Three scheduled tasks run in the persistent trader session (session_012EDbLj2H3v
 2. **01:07 UTC — fill.**
    - Fill the pending orders at the open of the 1-hour bar starting at exec_ts.
    - If that bar is missing, use the 1-minute bar at exec_ts.
-   - If both are missing, keep the orders pending and fill at the next available hourly open (02:00, ...). Never use the daily open: that is the price the signal saw.
+   - If both are missing, keep the orders pending and fill at the next available hourly open (02:00, ...), at most
+     `market.fill_max_wait_hours` (24) hourly opens from exec_ts. Never use the daily open: that is the price the
+     signal saw.
+   - "Missing" is no row at exec_ts, a null open, or Yahoo's own "no data" answer (HTTP 404 or 422). An unreachable
+     Yahoo (network error, timeout, 5xx, 429, any other status or bad JSON after the retries; `data.Unreachable`) is
+     not missing: the walk stops at that hour and a later run retries.
+   - An order still unfilled when the next decision runs expires (`expired_unfilled`). What it had to sell (its
+     `stopped` names, and every held name an exits-only order left out of its targets) becomes a forced exit of the
+     new decision: target 0, in `stopped` (sold as a stop, with the cooldown), listed as `carried_stops`, with an
+     urgent alert "stop could not fill on <date>". A stop is never waited out, even when the price came back.
    - Log where every fill price came from.
    - Then run the shadow book, grade predictions, commit and push.
 3. **08:03 Asia/Jerusalem (`CRON_TZ=Asia/Jerusalem`) — morning summary.**
-   - Runs `cycle --book crypto`, then `summary --book crypto`. That command prints the summary text and checks
-     verify, the expected decision_date and the age of latest.json. Urgent items lead the text. It exits non-zero
-     while any urgent item is queued.
-   - **Delivery:** `notify.send` to ntfy (AITRADER_NTFY_TOPIC, configured 2026-11-09). If ntfy is not among the
-     channels returned, the session sends the text with PushNotification.
-   - Only after a confirmed delivery: `summary --book crypto --ack` clears the queue.
+   - Runs `cycle --book crypto`, then `summary --book crypto --send`. The command prints JSON
+     `{channels, urgent, text, newest}`; urgent items lead `text`. Urgent: an urgent queued alert, a broken chain
+     (verify), a missing expected decision_date (`UtcDailyCalendar.last_final_bar(now)`), latest.json older than
+     `market.latest_max_age_hours`, 2+ skipped runs in 24 h, an order still pending more than
+     `market.fill_urgent_after_hours` (3) after its exec_ts ("fill waiting since <exec_ts>"; 3, not 6, so that the
+     08:03 summary catches a 01:00 UTC order in summer too), and a sweep result the config does not follow
+     (`state/crypto/dsr.json`: the candidate shipped with `config_change_needed` overrides that books.crypto does not
+     carry yet, or `ship_profile` is crypto while the sweep shipped crypto_base). The text also lists the last fill's
+     price source (`fill_source`); times print in Israel time. `summary` refuses `--book stocks` (exit 1).
+   - **Delivery:** `--send` delivers through `notify.send` (ntfy, AITRADER_NTFY_TOPIC, configured 2026-11-09; it
+     bypasses quiet hours) and, after a delivery, drops the queued alerts up to `newest` itself. Exit codes: 0
+     delivered; 2 delivered, with urgent items; 3 not delivered (no ntfy or telegram channel answered).
+   - On exit 3 the session sends the printed `text` with PushNotification, then runs
+     `summary --book crypto --ack <newest>` with the printed `newest` (skip it when `newest` is null). `--ack` needs
+     the timestamp and drops only items with `queued_at <= newest`, so an alert queued after the summary was built
+     survives.
    - Rebuilds and uploads the dashboard snapshot.
 
 ### 6.2 Quiet hours
@@ -228,9 +247,11 @@ Scheduled-task prompts (stored verbatim when created):
 - **summary:**
   - "Crypto morning summary (paper). cd /home/user/OmniRoute && git pull --rebase. cd ai-trader &&
     python3 -m aitrader cycle --book crypto.
-  - python3 -m aitrader summary --book crypto. It exits non-zero if urgent items are queued; deliver the text anyway.
-  - Deliver with notify.send (ntfy). If 'ntfy' is not among the returned channels, send the text with PushNotification.
-  - Only after delivery: python3 -m aitrader summary --book crypto --ack.
+  - python3 -m aitrader summary --book crypto --send. It delivers the summary through ntfy and acks the queue itself.
+    Exit 0 = delivered; 2 = delivered, with urgent items (they lead the text; record them in the night log);
+    3 = not delivered.
+  - On exit 3 only: send the printed text with PushNotification, then
+    python3 -m aitrader summary --book crypto --ack <newest>, with the printed newest (skip it when newest is null).
   - Then refresh the dashboard (see the dashboard refresh task) and commit + push with the retry loop."
 
 ## 7. Testing and the gate (rule 4)
