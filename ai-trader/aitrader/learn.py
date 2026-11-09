@@ -67,39 +67,75 @@ def signal_stats(ic: pd.DataFrame, asof_pos: int, horizon: int, half_life: float
     return pd.DataFrame(rows).T
 
 
-def update_weights(current: dict, prior: dict, stats: pd.DataFrame, cfg: dict) -> tuple[dict, dict]:
-    """Guarded multiplicative update. Returns (new_weights, explanation per signal)."""
+def shrunk_z(row, L: dict) -> float:
+    """Empirical-Bayes shrinkage of the mean IC toward 0 (prior sd tau); returns a capped z-score."""
+    n = float(row["n_eff"])
+    if not np.isfinite(row["ic"]) or n <= 0:
+        return 0.0
+    sd = max(float(row["ic_std"]) if np.isfinite(row["ic_std"]) else 0.0, L["ic_sd_floor"])
+    tau = L["tau"]
+    lam = n / (n + sd**2 / tau**2)
+    mu = lam * float(row["ic"])
+    se = (n / sd**2 + 1 / tau**2) ** -0.5
+    return float(np.clip(mu / se, -L["z_cap"], L["z_cap"]))
+
+
+def update_weights(current: dict, prior: dict, stats: pd.DataFrame, cfg: dict, gate: float | None = None) -> tuple[dict, dict]:
+    """Guarded tilt away from the prior. A signal moves only with enough data (min_n_eff) AND a shrunk z beyond
+    the placebo gate (the |z| that pure noise reaches 95% of the time). No gate computed yet = no tilt at all."""
     L = cfg["learning"]
     if stats.empty:
         return dict(current), {"note": "no matured outcomes yet"}
     target, why = {}, {}
     for name, p in prior.items():
         row = stats.loc[name] if name in stats.index else None
-        if row is None or row["n"] < L["min_eval_dates"] or not np.isfinite(row["t"]):
-            target[name] = current.get(name, p)
-            why[name] = "insufficient evidence - unchanged"
+        if row is None or row["n_eff"] < L["min_n_eff"]:
+            target[name] = p
+            why[name] = "insufficient evidence - prior"
             continue
-        t = float(np.clip(row["t"], -3, 3))
-        learned = p * np.exp(L["eta"] * t)
-        target[name] = L["shrink_to_prior"] * p + (1 - L["shrink_to_prior"]) * learned
-        why[name] = f"IC={row['ic']:+.3f} t={row['t']:+.2f} n={int(row['n'])}"
-    # floor/cap then normalise
-    tw = {k: float(np.clip(v, L["weight_floor"], L["weight_cap"])) for k, v in target.items()}
+        z = shrunk_z(row, L)
+        if gate is None or abs(z) < gate:
+            target[name] = p
+            why[name] = f"IC={row['ic']:+.3f} z={z:+.2f} below placebo gate {gate} - prior"
+            continue
+        target[name] = p * np.exp(L["eta"] * z)
+        why[name] = f"IC={row['ic']:+.3f} z={z:+.2f} n_eff={row['n_eff']:.0f} passes gate {gate:.2f}"
+    band = {k: (max(L["weight_floor"], 0.5 * p), min(L["weight_cap"], 2.0 * p)) for k, p in prior.items()}
+    tw = {k: float(np.clip(v, *band[k])) if prior[k] > 0 else 0.0 for k, v in target.items()}
     s = sum(tw.values())
     tw = {k: v / s for k, v in tw.items()}
-    # step limit toward target, then renormalise
     new = {}
     for k, v in tw.items():
         c = current.get(k, prior[k])
-        new[k] = c + float(np.clip(v - c, -L["max_step"], L["max_step"]))
+        new[k] = max(0.0, c + float(np.clip(v - c, -L["max_step"], L["max_step"])))
     s = sum(new.values())
-    new = {k: round(v / s, 4) for k, v in new.items()}
-    return new, why
+    return {k: round(v / s, 4) for k, v in new.items()}, why
 
 
-def walk_forward_weights(signals, close, prior, cfg, dates, every: int = 21) -> dict:
+def placebo_gate(signals: dict, close: pd.DataFrame, cfg: dict, k: int = 100, seed: int = 7) -> dict:
+    """Shuffle which stock each signal column belongs to and record the largest |shrunk z| noise produces.
+    The 95th percentile of that max is the gate a real signal must beat before the learner may tilt."""
+    L = cfg["learning"]
+    h = L["primary_horizon_days"]
+    rng = np.random.default_rng(seed)
+    maxes = []
+    for _ in range(k):
+        perm = rng.permutation(close.columns)
+        shuffled = {n: s.reindex(columns=close.columns).set_axis(perm, axis=1).reindex(columns=close.columns) for n, s in signals.items()}
+        ic = ic_table(shuffled, close, h)
+        st = signal_stats(ic, len(ic) - 1, h, L["ic_half_life_days"])
+        zs = [abs(shrunk_z(st.loc[n], L)) for n in st.index if st.loc[n, "n_eff"] >= L["min_n_eff"]]
+        maxes.append(max(zs) if zs else 0.0)
+    real = signal_stats(ic_table(signals, close, h), len(close) - 1, h, L["ic_half_life_days"])
+    real_z = {n: round(shrunk_z(real.loc[n], L), 3) for n in real.index}
+    return {"k": k, "gate_z95": round(float(np.quantile(maxes, 0.95)), 3), "noise_max_z_median": round(float(np.median(maxes)), 3),
+            "real_z": real_z, "passing": [n for n, z in real_z.items() if abs(z) >= float(np.quantile(maxes, 0.95))]}
+
+
+def walk_forward_weights(signals, close, prior, cfg, dates, every: int | None = None, gate: float | None = None) -> dict:
     """Weights as they would have been learned through time (for the time machine). {date: weights}."""
     L = cfg["learning"]
+    every = every or L.get("update_every_days", 21)
     h = L["primary_horizon_days"]
     ic = ic_table(signals, close, h)
     pos_of = {d: i for i, d in enumerate(close.index)}
@@ -108,6 +144,6 @@ def walk_forward_weights(signals, close, prior, cfg, dates, every: int = 21) -> 
     for j, d in enumerate(dates):
         if j % every == 0:
             st = signal_stats(ic, pos_of[d], h, L["ic_half_life_days"])
-            w, _ = update_weights(w, prior, st, cfg)
+            w, _ = update_weights(w, prior, st, cfg, gate)
         out[d] = dict(w)
     return out

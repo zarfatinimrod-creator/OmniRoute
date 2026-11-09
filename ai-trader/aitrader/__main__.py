@@ -9,6 +9,7 @@
   news SYMBOL                             recent headlines
   context SYMBOL                          past calls, trades and lessons for a ticker (read before deciding)
   verify                                  check the tamper-evident hash chains
+  placebo [--k 100]                       noise gate the learner must beat (signals shuffled across stocks)
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
   desk SYMBOL RATING --prob P --thesis T --invalidation I   record the desk's final call (Sell/Underweight=veto, Hold=shrink 0.5)
   scorecard                               grade matured predictions
@@ -55,6 +56,8 @@ def main(argv=None) -> int:
     cx = sub.add_parser("context")
     cx.add_argument("symbol")
     sub.add_parser("verify")
+    pl = sub.add_parser("placebo")
+    pl.add_argument("--k", type=int, default=100)
     br = sub.add_parser("brief")
     br.add_argument("symbol")
     dk = sub.add_parser("desk")
@@ -132,6 +135,18 @@ def main(argv=None) -> int:
         for name in sorted(journal.CHAINED):
             ok, n = journal.verify_chain(name)
             print(f"{name}: {'OK' if ok else 'BROKEN at record ' + str(n)} ({n} records)")
+    elif a.cmd == "placebo":
+        from .data import load_config, load_market
+        from .learn import placebo_gate
+        from .signals import compute_all
+
+        cfg = load_config()
+        panel = load_market(cfg, "10y")
+        res = placebo_gate(compute_all(panel, cfg), panel["close"], cfg, a.k)
+        res["computed_at"] = journal.now_utc()
+        journal.save_json("placebo.json", res)
+        journal.append("learning.jsonl", {"event": "placebo_gate", **res, "logged_at": journal.now_utc()})
+        print(json.dumps(res, indent=1))
     elif a.cmd == "brief":
         from .desk import brief
 

@@ -1,5 +1,5 @@
 ---
-name: time-machine
+name: strategy-time-machine
 description: מכונת הזמן - מריצה את הבוט על היסטוריה אמיתית יום אחרי יום (החלטה בסגירה, ביצוע בפתיחה של מחרת, עלויות אמיתיות, משקלות שנלמדו רק מהעבר) ומודדת תשואה, שארפ, ירידה מקסימלית ותחלופה מול SPY. יש להשתמש בה לפני ואחרי כל שינוי באסטרטגיה (config.json, signals.py, strategy.py, learn.py), כשבודקים רעיון חדש לאות, כשמשווים גרסאות, או כששואלים "האם השינוי הזה באמת שיפר משהו". Use before and after any change to the AI trader's signals, weights, risk rules or costs.
 ---
 

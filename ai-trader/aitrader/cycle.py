@@ -41,19 +41,25 @@ def _learn(signals, close, cfg, ds: str) -> dict:
     L = cfg["learning"]
     if ws is None:
         dates = list(close.index[300:])
-        wmap = walk_forward_weights(signals, close, prior, cfg, dates)
+        wmap = walk_forward_weights(signals, close, prior, cfg, dates, gate=(journal.load_json("placebo.json", {}) or {}).get("gate_z95"))
         w = wmap[dates[-1]]
         ws = {"asof": ds, "weights": w, "bootstrapped_from": str(dates[0].date())}
         journal.append("learning.jsonl", {"date": ds, "event": "bootstrap", "weights": w, "logged_at": journal.now_utc()})
-    elif ws["asof"] != ds:
+    elif ws["asof"] != ds and _trading_days_between(close, ws["asof"], ds) >= L.get("update_every_days", 21):
         h = L["primary_horizon_days"]
-        ic = ic_table({k: v.tail(400) for k, v in signals.items()}, close.tail(400), h)
+        ic = ic_table(signals, close, h)
         st = signal_stats(ic, len(ic) - 1, h, L["ic_half_life_days"])
-        new, why = update_weights(ws["weights"], prior, st, cfg)
+        gate = (journal.load_json("placebo.json", {}) or {}).get("gate_z95")
+        new, why = update_weights(ws["weights"], prior, st, cfg, gate)
         journal.append("learning.jsonl", {"date": ds, "event": "update", "old": ws["weights"], "new": new, "why": why, "logged_at": journal.now_utc()})
         ws = {**ws, "asof": ds, "weights": new}
     journal.save_json("weights.json", ws)
     return ws["weights"]
+
+
+def _trading_days_between(close: pd.DataFrame, a: str, b: str) -> int:
+    idx = close.index
+    return int(idx.searchsorted(pd.Timestamp(b)) - idx.searchsorted(pd.Timestamp(a)))
 
 
 def _apply_overrides(targets: dict, held: dict, ds: str) -> tuple[dict, list]:
@@ -77,7 +83,7 @@ def _apply_overrides(targets: dict, held: dict, ds: str) -> tuple[dict, list]:
 
 def _eval_close(close: pd.DataFrame) -> pd.DataFrame:
     """Universe closes plus any symbol an open prediction refers to (overlay names outside the universe)."""
-    need = {p["symbol"] for p in journal.read("predictions.jsonl") if p["status"] == "open"} - set(close.columns)
+    need = {p["symbol"] for p in journal.open_predictions()} - set(close.columns)
     if not need:
         return close
     extra = fetch_panel(sorted(need), "1y", 6.0)["close"]
@@ -204,6 +210,11 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     skipped = {s: bo[s] for s in list(targets_raw) if s in bo and s not in m.positions}
     for s in skipped:
         targets_raw.pop(s)
+    etf = {"Index", "SectorETF", "Bonds", "Gold"}
+    cap = r.get("earnings_max_position_pct", 1.0)
+    for s in list(targets_raw):  # held through a report: cap the size (ATR stops cannot protect an earnings gap)
+        if s in bo and s in m.positions and cfg["universe"].get(s) not in etf and targets_raw[s] > cap:
+            targets_raw[s] = cap
     targets, applied = _apply_overrides(targets_raw, m.positions, ds)
     preview = copy.deepcopy(m).rebalance(targets, px, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped)
     new_entries = [f["symbol"] for f in preview if f["side"] == "BUY" and f["symbol"] not in m.positions]

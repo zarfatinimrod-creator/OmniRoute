@@ -59,6 +59,7 @@ def precompute_aux(panel: dict, cfg: dict) -> dict:
     bench = cfg.get("benchmark", "SPY")
     aux = {
         "vol": realized_vol(close, r["vol_lookback_days"]),
+        "vol_long": realized_vol(close, r.get("lowvol_exclude_lookback", 252)),
         "atr": atr(panel["high"], panel["low"], close, r["atr_days"]),
         "rets": returns(close),
     }
@@ -112,7 +113,13 @@ def build_targets(
     rank = pd.Series(range(1, len(ranked) + 1), index=ranked.index)
     n = r["max_positions"]
     keep = [s for s in held if s in rank.index and ranked[s] > r.get("exit_score", 0.0) and rank[s] <= n * r.get("keep_rank_mult", 2.0)]
-    new = [s for s in ranked.index if ranked[s] > r["min_score"] and s not in keep]
+    # low-vol anomaly as a filter: no NEW entries in the most volatile names of the day
+    too_hot = set()
+    if r.get("lowvol_exclude_top_pct") and "vol_long" in aux:
+        vl = aux["vol_long"].loc[date].dropna()
+        if len(vl) >= 10:
+            too_hot = set(vl[vl >= vl.quantile(1 - r["lowvol_exclude_top_pct"])].index)
+    new = [s for s in ranked.index if ranked[s] > r["min_score"] and s not in keep and s not in too_hot]
     chosen = [s for s in keep + new if s not in blocked and s not in stopped][:n]
     elig = ranked[ranked > r["min_score"]]
     picks = ranked[chosen]
@@ -146,7 +153,8 @@ def build_targets(
     regime = "risk_on"
     if "bench_sma" in aux:
         sma = aux["bench_sma"].loc[date]
-        if pd.notna(px.get(bench)) and pd.notna(sma) and px[bench] < sma:
+        # band: only call risk-off when clearly below the 200-day average (less whipsaw around the line)
+        if pd.notna(px.get(bench)) and pd.notna(sma) and px[bench] < sma * (1 - r.get("regime_band_pct", 0.0)):
             regime = "risk_off"
             scale *= r["risk_off_gross_mult"]
 

@@ -13,6 +13,7 @@ import json
 
 import pandas as pd
 
+from . import journal
 from .broker import PaperBroker
 from .learn import walk_forward_weights
 from .metrics import summary
@@ -35,7 +36,8 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
     rebalance_every = rebalance_every or cfg["risk"].get("rebalance_every_days", 5)
     prior = cfg["prior_weights"]
     if weights_mode == "learned":
-        wmap = walk_forward_weights(signals, close, prior, cfg, list(dates))
+        gate = (journal.load_json("placebo.json", {}) or {}).get("gate_z95")  # noise level, not return direction
+        wmap = walk_forward_weights(signals, close, prior, cfg, list(dates), gate=gate)
     else:
         wmap = {d: prior for d in dates}
 

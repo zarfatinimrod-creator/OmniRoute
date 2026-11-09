@@ -16,5 +16,19 @@
 ## Age of Blood (owner's private repo)
 
 - Patterns reused with the owner's permission: the `headless-playtest` discipline (seeded, before/after,
-  never a single number) -> `skills/time-machine`; the `web-researcher` agent; the eight-heading session log;
+  never a single number) -> `skills/strategy-time-machine`; the `web-researcher` agent; the eight-heading session log;
   four-layer memory and end-of-session lesson capture; caveman/ponytail working style.
+
+## Jake Schincariol - "The Trader skill" (v1) and its sequel with "The Time Machine" (v2)
+
+- Sources: https://github.com/Jakeschincariol/trader-skill (commit 5189e79b9a480755a3733ac9713f5353981dbe18)
+  and https://github.com/Jakeschincariol/day-trader-skill (commit 3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd).
+- License: MIT (c) 2026 Jake Schincariol - kept in `vendor/*/LICENSE`.
+- Vendored unmodified (tests omitted to keep the repo light; fetch them from the pinned commits) under
+  `vendor/jake-trader-skill-v1` and `vendor/jake-trader-skill-v2`, installed by `bin/install-skills.sh`.
+- Not installed: `trader-broker` (broker order execution - this bot is paper-only).
+- Review notes (2026-11-09): standard-library Python only; the only subprocess is `pdftotext` with list args;
+  network = public GETs (Yahoo, SEC, House Clerk, Nasdaq Trader, stooq, nyse.com) plus an optional OpenFIGI
+  POST; writes only under ./trader/. The packs print external text (headlines, filings) into the context with
+  no "treat as data" rule - our skills add that rule. Their offline test suites were not executed here (the
+  session's auto-mode policy blocks running external code); run them before relying on a script.

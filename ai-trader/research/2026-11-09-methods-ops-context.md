@@ -17,7 +17,7 @@
    - The main evidence should be:
      - Brier and Brier-skill scores, measured against a base rate that code supplies, over many journaled predictions.
      - A parallel quant-only "shadow" book, to show whether the LLM adds or removes value.
-   - The `time-machine` skill's historical replay grades only the quant layer.
+   - The `strategy-time-machine` skill's historical replay grades only the quant layer.
 
 3. **Promote strategies on a benchmark-relative gate run by a separate Critic step.**
    - The sector-momentum prototype "passed" a DSR of 0.975 against zero, but failed every SPY-relative test:

@@ -128,7 +128,11 @@
     "stop_cooldown_days": 10,
     "defensive_vix_pct": 0.8,
     "defensive_gross_mult": 0.75,
-    "earnings_blackout_days": 4
+    "earnings_blackout_days": 4,
+    "lowvol_exclude_top_pct": 0.2,
+    "lowvol_exclude_lookback": 252,
+    "earnings_max_position_pct": 0.05,
+    "regime_band_pct": 0.02
   },
   "signals": {
     "tsmom": {
@@ -161,33 +165,38 @@
     }
   },
   "prior_weights": {
-    "tsmom": 0.2,
-    "xsmom": 0.2,
-    "trend": 0.15,
-    "high52": 0.1,
-    "lowvol": 0.1,
-    "breakout": 0.1,
-    "reversal": 0.05,
-    "rsi2": 0.1
+    "tsmom": 0.25,
+    "xsmom": 0.25,
+    "trend": 0.2,
+    "breakout": 0.2,
+    "high52": 0.03,
+    "reversal": 0.02,
+    "rsi2": 0.05,
+    "lowvol": 0.0
   },
   "learning": {
     "horizons_days": [
       5,
-      20
+      20,
+      60
     ],
     "primary_horizon_days": 20,
-    "ic_half_life_days": 60,
-    "min_eval_dates": 30,
-    "eta": 0.5,
+    "ic_half_life_days": 504,
+    "eta": 0.3,
     "weight_floor": 0.02,
-    "weight_cap": 0.4,
-    "max_step": 0.05,
-    "shrink_to_prior": 0.5
+    "weight_cap": 0.35,
+    "max_step": 0.02,
+    "update_every_days": 21,
+    "tau": 0.02,
+    "ic_sd_floor": 0.15,
+    "z_cap": 2.5,
+    "min_n_eff": 12
   },
   "alerts": {
     "ntfy_topic_env": "AITRADER_NTFY_TOPIC",
     "telegram_token_env": "AITRADER_TELEGRAM_TOKEN",
     "telegram_chat_env": "AITRADER_TELEGRAM_CHAT"
   },
-  "sec_user_agent": "ai-trader-research-bot contact@example.com"
+  "sec_user_agent": "ai-trader-research-bot contact@example.com",
+  "_note_priors": "2026-11-09: reversal/high52/rsi2 demoted (decayed after publication, strategy-science brief); lowvol used as an exclusion filter instead of a score."
 }

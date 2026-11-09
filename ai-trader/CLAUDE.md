@@ -3,7 +3,7 @@
 This folder is a self-contained project that lives inside the OmniRoute fork only for convenience.
 The OmniRoute rules (worktrees, release freeze, Node quality gates) do NOT apply to work inside
 `ai-trader/`; these do. Read `skills/trader/SKILL.md` before any trading session and
-`skills/time-machine/SKILL.md` before any strategy change.
+`skills/strategy-time-machine/SKILL.md` before any strategy change.
 
 ## The owner
 Nimrod - Hebrew speaker, not a programmer, approves anything involving real money. Talk to him in

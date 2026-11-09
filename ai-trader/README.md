@@ -17,7 +17,7 @@
    משטר (SPY מתחת לממוצע 200 = חצי חשיפה), מפסק ירידה (-10% חצי, -20% מזומן).
 5. **Claude כמנהל** - קורא חדשות, יכול **רק להקטין** סיכון (וטו/הקטנה), רושם תחזיות משלו שנבדקות
    אחר כך, וכותב לקחים.
-6. **מכונת הזמן** - שחזור היסטוריה יום-יום עם אותו קוד בדיוק (`skills/time-machine/SKILL.md`).
+6. **מכונת הזמן** - שחזור היסטוריה יום-יום עם אותו קוד בדיוק (`skills/strategy-time-machine/SKILL.md`).
 7. **יומן** - כל תחזית, החלטה, עסקה ולקח נשמרים ב-`state/` (גיט = הזיכרון).
 
 ## הרצה
@@ -45,7 +45,8 @@ python3 -m unittest discover -s tests -v
 | `state/` | הזיכרון: תיק, משקלות, תחזיות, החלטות, עסקאות, לקחים |
 | `reports/` | דוח יומי בעברית |
 | `logs/` | לוג סשן עם 8 כותרות (הבקשה · מה נעשה · קבצים ששונו · החלטות · כשלים בדרך · אימות · עבודה ידנית חוזרת → לאוטומציה · בזבוז טוקנים) |
-| `skills/` | `trader`, `time-machine`, `trading-desk` (תפקידי TradingAgents על סוכני Claude) |
+| `skills/` | `trader`, `strategy-time-machine`, `trading-desk` (תפקידי TradingAgents על סוכני Claude) |
+| `vendor/` | ה-Trader skill וה-Time Machine של Jake Schincariol (MIT, קומיט נעול; `trader-broker` לא מותקן) |
 | `agents/` | `web-researcher`, `quant-critic` |
 
 ## התראות לטלפון

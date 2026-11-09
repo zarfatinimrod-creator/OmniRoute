@@ -29,7 +29,20 @@ def now_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-CHAINED = {"decisions.jsonl", "trades.jsonl", "learning.jsonl"}
+CHAINED = {"decisions.jsonl", "trades.jsonl", "learning.jsonl", "predictions.jsonl", "grades.jsonl"}
+
+
+def pred_key(p: dict) -> str:
+    return f"{p['date']}|{p['symbol']}|{p['horizon']}|{p.get('source', 'quant')}|{p.get('logged_at', '')}"
+
+
+def graded() -> dict:
+    return {g["key"]: g for g in read("grades.jsonl")}
+
+
+def open_predictions() -> list[dict]:
+    g = graded()
+    return [p for p in read("predictions.jsonl") if pred_key(p) not in g and p.get("status") != "no_price"]
 
 
 def _last_hash(p: Path) -> str:
@@ -121,39 +134,34 @@ def record_predictions(date: str, score: pd.Series, components: dict[str, pd.Ser
 
 
 def evaluate_predictions(close: pd.DataFrame, bench: str) -> dict:
-    """Grade open predictions whose horizon has passed (in trading days). Returns a scorecard."""
-    preds = read("predictions.jsonl")
+    """Grade predictions whose horizon has passed (trading days). Predictions are never edited:
+    each grade is a new, hash-chained record in grades.jsonl."""
     idx = close.index
-    changed = 0
-    for p in preds:
-        if p["status"] != "open":
-            continue
+    for p in open_predictions():
         d = pd.Timestamp(p["date"])
         pos = idx.searchsorted(d)
-        if pos >= len(idx) or pos + p["horizon"] >= len(idx):
+        if pos >= len(idx) or pos + p["horizon"] >= len(idx) or p.get("price") in (None, 0):
             continue
         end = idx[pos + p["horizon"]]
         px_end = close.at[end, p["symbol"]] if p["symbol"] in close else None
         b_end = close.at[end, bench] if bench in close else None
-        if px_end is None or pd.isna(px_end) or b_end is None or pd.isna(b_end):
+        if px_end is None or pd.isna(px_end) or b_end is None or pd.isna(b_end) or not p.get("bench_price"):
             continue
         ret = px_end / p["price"] - 1
         bret = b_end / p["bench_price"] - 1
         excess = ret - bret
-        p.update({
-            "status": "evaluated", "eval_date": str(end.date()), "ret": round(ret, 4), "bench_ret": round(bret, 4),
-            "excess": round(excess, 4), "hit": bool((excess > 0) == (p["direction"] == "up")),
+        append("grades.jsonl", {
+            "key": pred_key(p), "graded_at": now_utc(), "eval_date": str(end.date()), "ret": round(ret, 4),
+            "bench_ret": round(bret, 4), "excess": round(excess, 4), "hit": bool((excess > 0) == (p["direction"] == "up")),
         })
-        changed += 1
-    if changed:
-        write_all("predictions.jsonl", preds)
-    return scorecard(preds)
+    return scorecard()
 
 
 def scorecard(preds: list[dict] | None = None) -> dict:
     preds = preds if preds is not None else read("predictions.jsonl")
-    ev = [p for p in preds if p["status"] == "evaluated"]
-    out = {"open": sum(p["status"] == "open" for p in preds), "evaluated": len(ev)}
+    g = graded()
+    ev = [{**p, **g[pred_key(p)]} for p in preds if pred_key(p) in g]
+    out = {"open": len(preds) - len(ev), "evaluated": len(ev)}
     for src in sorted({p.get("source", "quant") for p in ev}):
         for h in sorted({p["horizon"] for p in ev}):
             sub = [p for p in ev if p["horizon"] == h and p.get("source", "quant") == src]
@@ -180,7 +188,8 @@ def context(symbol: str, n: int = 5) -> dict:
     trades = [t for t in read("trades.jsonl") if t["symbol"] == sym]
     lessons_path = _path("lessons.md")
     lessons = [ln for ln in lessons_path.read_text().splitlines() if sym in ln] if lessons_path.exists() else []
-    evaluated = [p for p in preds if p["status"] == "evaluated"]
+    g = graded()
+    evaluated = [{**p, **g[pred_key(p)]} for p in preds if pred_key(p) in g]
     return {
         "symbol": sym,
         "recent_predictions": preds[-n:],
