@@ -21,6 +21,21 @@ NY = ZoneInfo("America/New_York")
 ETF = {"Index", "SectorETF", "Bonds", "Gold"}
 
 
+DD_HE = {"normal": "רגיל", "halved": "חצי חשיפה", "flat": "מזומן מלא", "reentry": "חזרה הדרגתית"}
+
+
+def _regime_he(reg: str | None) -> str:
+    if not reg:
+        return "—"
+    parts = {"risk_on": "מגמה חיובית", "risk_off": "מגמה שלילית (חצי חשיפה)", "defensive": "VIX גבוה (75%)", "defensive(no-vix)": "אין נתון VIX - הגנתי"}
+    return " + ".join(parts.get(x, x) for x in reg.split("+"))
+
+
+def _clip(s: str | None, n: int) -> str:
+    s = (s or "").strip()
+    return s if len(s) <= n else s[:n].rsplit(" ", 1)[0] + " …"
+
+
 def _r(x, n=4):
     return None if x is None else round(float(x), n)
 
@@ -109,8 +124,8 @@ def build() -> list[dict]:
         "claude_effect": _r((q_eq - s_eq) / start_cash),
         "news_equity": _r(n_eq, 0), "news_ret": _r(n_eq / n_start - 1),
         "cash_pct": _r(q_cash / q_eq if q_eq else 1), "gross_pct": _r(q_gross),
-        "drawdown": _r(q_eq / peak - 1), "dd_state": port.get("dd_state") or latest.get("dd_state") or "normal",
-        "regime": port.get("regime") or latest.get("regime") or "—", "vix": _r(prices.get("^VIX"), 2),
+        "drawdown": _r(min(0.0, q_eq / max(peak, q_eq) - 1)), "dd_state": DD_HE.get(dd := port.get("dd_state") or latest.get("dd_state") or "normal", dd),
+        "regime": _regime_he(port.get("regime") or latest.get("regime")), "vix": _r(prices.get("^VIX"), 2),
         "spy": _r(prices.get(bench), 2), "n_positions": len(pos), "n_news_positions": len(npos),
         "decision_date": pending.get("decision_date"), "pending_status": {"pending": "ממתין לפתיחה", "executed": "בוצע"}.get(pending.get("status"), pending.get("status") or "—"),
         "headlines_today": len(scores_today), "news_trades_total": len(ntrades),
@@ -120,7 +135,7 @@ def build() -> list[dict]:
     rows += pos + npos
 
     # next / last orders of the quant book (+ desk overrides)
-    ov = {o["symbol"]: o["action"] for o in pending.get("overrides", [])}
+    ov = {o["symbol"]: o["action"].replace("size x", "הקטנה ×").replace("veto", "וטו") for o in pending.get("overrides", [])}
     fills = {f["symbol"]: f for f in pending.get("fills", [])} if pending.get("status") == "executed" else {}
     for f in (pending.get("preview_at_close") or []):
         x = fills.get(f["symbol"], f)
@@ -135,7 +150,7 @@ def build() -> list[dict]:
             desk[p["symbol"]] = p
     for s, p in desk.items():
         rows.append({"t": "desk", "symbol": s, "rating": p.get("rating"), "prob": p.get("prob"), "date": p.get("date"),
-                     "thesis": (p.get("thesis") or "")[:300], "invalidation": (p.get("invalidation") or "")[:220]})
+                     "thesis": _clip(p.get("thesis"), 420), "invalidation": _clip(p.get("invalidation"), 300)})
 
     # equity curve (percent since start); one point per logged cycle
     for e in journal.read("equity.jsonl")[-400:]:
@@ -159,7 +174,7 @@ def build() -> list[dict]:
     for i, x in enumerate(tr[:40]):
         rows.append({"t": "trade", "id": i, "time": _il(x.get("logged_at")), "book": x["book"], "side": "קנייה" if x["side"] == "BUY" else "מכירה",
                      "symbol": x["symbol"], "qty": x["qty"], "price": _r(x["price"], 2), "value": _r(x["value"], 0),
-                     "pnl": _r(x.get("realized_pnl"), 0), "reason": (x.get("reason") or "")[:120]})
+                     "pnl": _r(x.get("realized_pnl"), 0), "reason": _clip(x.get("reason"), 160)})
 
     # live news feed (newest first)
     bought = {(x["symbol"], (x.get("logged_at") or "")[:16]) for x in ntrades if x["side"] == "BUY"}
@@ -189,8 +204,9 @@ def build() -> list[dict]:
     heb = {"tsmom": "מומנטום סדרתי", "xsmom": "מומנטום יחסי", "trend": "מגמה", "breakout": "פריצה", "high52": "קרבה לשיא שנתי",
            "reversal": "היפוך קצר", "rsi2": "RSI2 משיכה", "lowvol": "תנודתיות נמוכה (מסנן)"}
     for k, v in w.items():
-        rows.append({"t": "weight", "signal": k, "label": heb.get(k, k), "weight": v, "z": (pl.get("real_z") or {}).get(k),
-                     "gate": pl.get("gate_z95")})
+        z, gate = (pl.get("real_z") or {}).get(k), pl.get("gate_z95")
+        rows.append({"t": "weight", "signal": k, "label": heb.get(k, k), "weight": v, "z": z, "gate": gate,
+                     "passes": "—" if z is None or gate is None else ("כן" if z > gate else "לא")})
 
     # time machine: last logged sweep
     trials = [t for t in journal.read("trials.jsonl") if t.get("rows")]
@@ -221,7 +237,7 @@ def build() -> list[dict]:
         ("מערכת", "Claude רק מקטין סיכון", "וטו / הקטנה, אף פעם לא הגדלה"),
         ("מערכת", "יעד תנודתיות (כמותי)", f"{r['target_vol_annual']:.0%} בשנה"),
         ("מערכת", "תקרת מניה / סקטור (כמותי)", f"{r['max_position_pct']:.0%} / {r['max_sector_pct']:.0%}"),
-        ("מערכת", "מפסק ירידה", f"חצי ב-{r['dd_halve']:.0%}, מזומן ב-{r['dd_flat']:.0%}"),
+        ("מערכת", "מפסק ירידה", f"חצי חשיפה בירידה של {abs(r['dd_halve']):.0%}, מזומן מלא בירידה של {abs(r['dd_flat']):.0%}"),
         ("מערכת", "מסנן משטר", "SPY מתחת לממוצע 200 = חצי חשיפה; VIX גבוה = 75%"),
         ("מערכת", "חסימת דוחות", "לא נכנסים למניה לפני דוח רבעוני"),
     ]:
