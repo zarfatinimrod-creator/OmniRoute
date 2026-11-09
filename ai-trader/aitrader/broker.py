@@ -79,19 +79,18 @@ class PaperBroker:
                 del self.positions[sym]
         return notes
 
-    def maybe_reset_peak(self, regime: str, date: str, days_required: int = 20, dd_halve: float = -0.10) -> bool:
+    def maybe_reset_peak(self, regime: str, date: str, days_required: int = 20, dd_halve: float = -0.10, dd_flat: float = -0.20) -> bool:
         """Drawdown re-entry: after going flat, reset the reference peak once the market has been risk-on for
         `days_required` consecutive decisions, so the breaker is not a permanent exit (resumes at full scale)."""
         st = self.state
-        st["_dd_halve_level"] = dd_halve
         if st.get("dd_state") != "flat":
             st.pop("riskon_streak", None)
             return False
         st["riskon_streak"] = st.get("riskon_streak", 0) + 1 if regime.startswith("risk_on") else 0
         if st["riskon_streak"] >= days_required:
             eq = st["cash"] + sum(p["qty"] * p["last_price"] for p in self.positions.values())
-            # reference peak set so the breaker reads "halved" (re-enter at half scale, not full)
-            st["peak_equity"] = eq / (1 + st.get("_dd_halve_level", -0.10) - 1e-6)
+            # reference peak in the middle of the "halved" band, so a day of interest cannot flip it to normal
+            st["peak_equity"] = eq / (1 + (dd_halve + dd_flat) / 2)
             st["riskon_streak"] = 0
             st.setdefault("peak_resets", []).append(date)
             return True

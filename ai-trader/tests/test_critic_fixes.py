@@ -80,8 +80,9 @@ class DrawdownReentry(unittest.TestCase):
         b = PaperBroker(10000)
         b.state.update({"dd_state": "flat", "peak_equity": 20000})
         for i in range(19):
-            self.assertFalse(b.maybe_reset_peak("risk_on", f"d{i}", 20, -0.10))
-        self.assertTrue(b.maybe_reset_peak("risk_on", "d19", 20, -0.10))
+            self.assertFalse(b.maybe_reset_peak("risk_on", f"d{i}", 20, -0.10, -0.20))
+        self.assertTrue(b.maybe_reset_peak("risk_on", "d19", 20, -0.10, -0.20))
+        b.mark({}, "d20", cash_yield_annual=0.05)  # a day of interest must not flip it back to "normal"
         ratio = b.peak_ratio({})
         self.assertTrue(-0.20 < ratio - 1 <= -0.10)  # reads "halved", not "normal"
 

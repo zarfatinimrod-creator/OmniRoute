@@ -229,7 +229,7 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     m = main if persist else copy.deepcopy(main)
     prev_regime, prev_dd = m.state.get("regime"), m.state.get("dd_state")
     y = cfg["account"]["cash_yield_annual"]
-    m.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20), r["dd_halve"])  # m is a copy when proposing
+    m.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20), r["dd_halve"], r["dd_flat"])  # m is a copy when proposing
     if persist:
         m.mark(px, ds, y if m.state.get("last_mark") not in (None, ds) else 0.0)
         shadow.mark(px, ds, y if shadow.state.get("last_mark") not in (None, ds) else 0.0)

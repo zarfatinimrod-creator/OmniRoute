@@ -1,0 +1,282 @@
+{
+  "date": "2026-11-06",
+  "insider_cluster": [
+    {
+      "filing_date": "2026-11-09",
+      "trade_date": "2026-11-05",
+      "ticker": "TSM",
+      "company": "Taiwan Semiconductor Manufacturing Co Ltd",
+      "industry": "Semiconductors & Related Devices",
+      "insiders": 2,
+      "price": 130.17,
+      "value": 545393.0,
+      "delta_own": "+24%"
+    },
+    {
+      "filing_date": "2026-11-09",
+      "trade_date": "2026-11-05",
+      "ticker": "NTHI",
+      "company": "Neonc Technologies Holdings, Inc.",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 2,
+      "price": 3.49,
+      "value": 545305.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-06",
+      "trade_date": "2026-11-05",
+      "ticker": "KYN",
+      "company": "Kayne Anderson Energy Infrastructure Fund, Inc.",
+      "industry": "Closed-End Funds",
+      "insiders": 3,
+      "price": 13.39,
+      "value": 432609.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-06",
+      "trade_date": "2026-11-05",
+      "ticker": "KMT",
+      "company": "Kennametal Inc",
+      "industry": "Machine Tools, Metal Cutting Types",
+      "insiders": 2,
+      "price": 27.37,
+      "value": 520118.0,
+      "delta_own": "+7%"
+    },
+    {
+      "filing_date": "2026-11-06",
+      "trade_date": "2026-11-04",
+      "ticker": "PMN",
+      "company": "Promis Neurosciences Inc.",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 2,
+      "price": 3.55,
+      "value": 129495.0,
+      "delta_own": "+158%"
+    },
+    {
+      "filing_date": "2026-11-06",
+      "trade_date": "2026-11-05",
+      "ticker": "MTDR",
+      "company": "Matador Resources Co",
+      "industry": "Crude Petroleum & Natural Gas",
+      "insiders": 4,
+      "price": 53.31,
+      "value": 408604.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-06",
+      "trade_date": "2026-10-05",
+      "ticker": "AGMB",
+      "company": "Agomab Therapeutics Nv",
+      "industry": "Biological Products, (No Diagnostic Substances)",
+      "insiders": 3,
+      "price": 8.25,
+      "value": 503470.0,
+      "delta_own": "+135%"
+    },
+    {
+      "filing_date": "2026-11-05",
+      "trade_date": "2026-11-04",
+      "ticker": "BXMT",
+      "company": "Blackstone Mortgage Trust, Inc.",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 2,
+      "price": 11.5,
+      "value": 1149642.0,
+      "delta_own": "+13%"
+    },
+    {
+      "filing_date": "2026-11-05",
+      "trade_date": "2026-11-03",
+      "ticker": "LBRT",
+      "company": "Liberty Energy Inc.",
+      "industry": "Oil & Gas Field Services",
+      "insiders": 3,
+      "price": 15.19,
+      "value": 645635.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-05",
+      "trade_date": "2026-11-05",
+      "ticker": "GLXY",
+      "company": "Galaxy Digital Inc.",
+      "industry": "Security Brokers, Dealers & Flotation Companies",
+      "insiders": 2,
+      "price": 13.11,
+      "value": 10122778.0,
+      "delta_own": "+145%"
+    },
+    {
+      "filing_date": "2026-11-05",
+      "trade_date": "2026-11-03",
+      "ticker": "FBRT",
+      "company": "Franklin Bsp Realty Trust, Inc.",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 2,
+      "price": 6.22,
+      "value": 1024108.0,
+      "delta_own": "+28%"
+    },
+    {
+      "filing_date": "2026-11-05",
+      "trade_date": "2026-11-03",
+      "ticker": "UPBD",
+      "company": "Upbound Group, Inc.",
+      "industry": "Equipment Rental & Leasing",
+      "insiders": 7,
+      "price": 22.46,
+      "value": 1390755.0,
+      "delta_own": "+12%"
+    },
+    {
+      "filing_date": "2026-11-05",
+      "trade_date": "2026-11-05",
+      "ticker": "TTMI",
+      "company": "Ttm Technologies Inc",
+      "industry": "Printed Circuit Boards",
+      "insiders": 3,
+      "price": 90.41,
+      "value": 3616552.0,
+      "delta_own": "+23%"
+    },
+    {
+      "filing_date": "2026-11-05",
+      "trade_date": "2026-09-25",
+      "ticker": "PAM",
+      "company": "Pampa Energy Inc.",
+      "industry": "Electric Services",
+      "insiders": 3,
+      "price": 11.88,
+      "value": 54125646.0,
+      "delta_own": "+13%"
+    },
+    {
+      "filing_date": "2026-11-05",
+      "trade_date": "2026-11-04",
+      "ticker": "LBTY",
+      "company": "Liberty Global Ltd.",
+      "industry": "Cable & Other Pay Television Services",
+      "insiders": 2,
+      "price": 9.42,
+      "value": 3026150.0,
+      "delta_own": "+18%"
+    },
+    {
+      "filing_date": "2026-11-04",
+      "trade_date": "2026-11-03",
+      "ticker": "HGV",
+      "company": "Hilton Grand Vacations Inc.",
+      "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
+      "insiders": 2,
+      "price": 41.03,
+      "value": 603099.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-04",
+      "trade_date": "2026-11-02",
+      "ticker": "PRLB",
+      "company": "Proto Labs Inc",
+      "industry": "Fabricated Structural Metal Products",
+      "insiders": 2,
+      "price": 68.86,
+      "value": 101230.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-04",
+      "trade_date": "2026-11-03",
+      "ticker": "AN",
+      "company": "Autonation, Inc.",
+      "industry": "Auto Dealers & Gasoline Stations",
+      "insiders": 3,
+      "price": 183.62,
+      "value": 1431864.0,
+      "delta_own": "+4%"
+    },
+    {
+      "filing_date": "2026-11-03",
+      "trade_date": "2026-11-02",
+      "ticker": "ENPH",
+      "company": "Enphase Energy, Inc.",
+      "industry": "Semiconductors & Related Devices",
+      "insiders": 2,
+      "price": 27.1,
+      "value": 298104.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-03",
+      "trade_date": "2026-08-10",
+      "ticker": "STRZ",
+      "company": "Starz Entertainment Corp /Cn/",
+      "industry": "Motion Picture & Video Tape Production",
+      "insiders": 3,
+      "price": 22.58,
+      "value": 191930.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-02",
+      "trade_date": "2026-10-30",
+      "ticker": "ATEC",
+      "company": "Alphatec Holdings, Inc.",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 2,
+      "price": 8.12,
+      "value": 1421750.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-02",
+      "trade_date": "2026-10-30",
+      "ticker": "OCFC",
+      "company": "Oceanfirst Financial Corp",
+      "industry": "National Commercial Banks",
+      "insiders": 2,
+      "price": 17.85,
+      "value": 267777.0,
+      "delta_own": "+8%"
+    },
+    {
+      "filing_date": "2026-11-02",
+      "trade_date": "2026-10-30",
+      "ticker": "BLX",
+      "company": "Bladex, Inc.",
+      "industry": "Commercial Banks",
+      "insiders": 3,
+      "price": 53.36,
+      "value": 271903.0,
+      "delta_own": "+5%"
+    },
+    {
+      "filing_date": "2026-10-30",
+      "trade_date": "2026-10-23",
+      "ticker": "RAPP",
+      "company": "Rapport Therapeutics, Inc.",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 7,
+      "price": 21.36,
+      "value": 22023905.0,
+      "delta_own": "+42%"
+    },
+    {
+      "filing_date": "2026-10-29",
+      "trade_date": "2026-09-01",
+      "ticker": "PNFP",
+      "company": "Pinnacle Financial Partners, Inc.",
+      "industry": "National Commercial Banks",
+      "insiders": 3,
+      "price": 98.81,
+      "value": 1290941.0,
+      "delta_own": "+3%"
+    }
+  ],
+  "congress_buy": null,
+  "logged": 48
+}
