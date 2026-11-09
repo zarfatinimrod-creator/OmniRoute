@@ -360,6 +360,15 @@
 </div>
 
 <script>
+  dash.loader('snapshot', {
+    description: 'הקובץ הוא רשימה אחת של שורות מכמה טבלאות (העמודה t אומרת לאיזו טבלה שייכת כל שורה); כאן הוא נקרא כשורות כמו שהוא, עם כל העמודות',
+    fn: ({ answer }) => {
+      const rows = Array.isArray(answer) ? answer : [];
+      const columns = [];
+      rows.forEach((row) => Object.keys(row).forEach((k) => { if (!columns.includes(k)) columns.push(k); }));
+      return { columns, rows };
+    },
+  });
   dash.calc('kpi', { inputs: ['snapshot'], title: 'מדדי חשבון', description: 'השורה המסכמת: שווי, תשואות, חשיפה, משטר שוק, מצב המנועים', fn: (snapshot) => snapshot.filter((row) => row.t === 'kpi') });
   dash.calc('positions', { inputs: ['snapshot'], title: 'פוזיציות - כמותי', description: 'המניות שהתיק הכמותי מחזיק', fn: (snapshot) => snapshot.filter((row) => row.t === 'pos') });
   dash.calc('news_positions', { inputs: ['snapshot'], title: 'פוזיציות - חדשות', description: 'המניות שתיק החדשות מחזיק', fn: (snapshot) => snapshot.filter((row) => row.t === 'npos') });
