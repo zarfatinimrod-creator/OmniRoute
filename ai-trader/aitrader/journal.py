@@ -142,31 +142,60 @@ def record_predictions(date: str, score: pd.Series, components: dict[str, pd.Ser
     return n
 
 
+def _ny_time(stamp) -> pd.Timestamp | None:
+    try:
+        ts = pd.Timestamp(str(stamp))
+    except (ValueError, TypeError):
+        return None
+    return None if ts is pd.NaT or ts.tzinfo is None else ts.tz_convert("America/New_York")
+
+
+def _entry_bar(p: dict, idx: pd.DatetimeIndex) -> tuple[pd.Timestamp | None, int | None]:
+    """Entry for a Claude / desk / overlay / news call: the first price knowable when it was LOGGED, whatever
+    date it carries (a desk or overlay call can carry the earlier decision date). Returns (start bar or None
+    for "use the logged price", bar position the horizon counts from).
+    - logged during a session with a live price -> that price; horizon counted from the log day
+    - logged before the open                    -> that session's close (no credit for the opening gap)
+    - logged after the close / on a closed day  -> the next session's close (no credit for after-hours news)
+    Rows without a parseable time fall back to the logged price on their date."""
+    ny = _ny_time(p.get("logged_at"))
+    if ny is None:
+        pos = idx.searchsorted(pd.Timestamp(p["date"]))
+        if p.get("price") is not None:
+            return (None, pos) if pos < len(idx) else (None, None)
+        nxt = idx[idx > pd.Timestamp(p["date"])]
+        return (nxt[0], idx.get_loc(nxt[0])) if len(nxt) else (None, None)
+    day, hm = pd.Timestamp(ny.date()), (ny.hour, ny.minute)
+    if day in idx and (9, 30) <= hm < (16, 0) and p.get("price") is not None:
+        return None, idx.get_loc(day)
+    nxt = idx[idx >= day] if day in idx and hm < (16, 0) else idx[idx > day]
+    return (nxt[0], idx.get_loc(nxt[0])) if len(nxt) else (None, None)
+
+
+def broken_chains() -> list[str]:
+    """Names of hash-chained logs whose chain does not verify (empty = all good)."""
+    return sorted(n for n in CHAINED if not verify_chain(n)[0])
+
+
 def evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = "predictions.jsonl", grades_name: str = "grades.jsonl") -> dict:
     """Grade predictions whose horizon has passed (trading days). Predictions are never edited:
     each grade is a new, hash-chained record in grades.jsonl."""
     idx = close.index
     for p in open_predictions(preds_name, grades_name):
-        d = pd.Timestamp(p["date"])
-        pos = idx.searchsorted(d)
-        if pos >= len(idx) or pos + p["horizon"] >= len(idx):
+        if p.get("source", "quant") == "quant":
+            # quant calls are made on the decision bar's close and graded from it
+            d = pd.Timestamp(p["date"])
+            pos = idx.searchsorted(d)
+            if pos >= len(idx):
+                continue
+            start = idx[pos] if idx[pos] == d else None
+        else:
+            start, pos = _entry_bar(p, idx)
+            if pos is None:
+                continue
+        if pos + p["horizon"] >= len(idx):
             continue
         end = idx[pos + p["horizon"]]
-        # quant calls are made on the decision bar's close; Claude/desk/overlay calls are made later at a live
-        # price, so they are graded from the price actually logged (no credit for moves already seen)
-        start = idx[pos] if idx[pos] == d and p.get("source", "quant") == "quant" else None
-        if p.get("price") is None and p.get("source", "quant") != "quant":
-            # logged while the market was closed: the entry is the NEXT session's close, so a call made after
-            # seeing an overnight / after-hours move earns nothing for it
-            logged_day = pd.Timestamp(str(p.get("logged_at", p["date"]))[:10])
-            nxt = idx[idx > logged_day]
-            if not len(nxt):
-                continue
-            start = nxt[0]
-            pos = idx.get_loc(start)
-            if pos + p["horizon"] >= len(idx):
-                continue
-            end = idx[pos + p["horizon"]]
         sym = p["symbol"]
         if sym not in close or bench not in close:
             continue

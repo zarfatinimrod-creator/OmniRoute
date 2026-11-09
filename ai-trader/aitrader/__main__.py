@@ -94,6 +94,9 @@ def main(argv=None) -> int:
         from .cycle import run_cycle
 
         out = run_cycle(execute=not a.dry_run, force_rebalance=a.force_rebalance, propose=a.propose)
+        if out.get("halted"):
+            print(json.dumps({"halted": out["halted"]}, ensure_ascii=False))
+            sys.exit(1)
         if a.propose:
             print(json.dumps({k: out.get(k) for k in ("decision_date", "rebalance", "new_entries", "preview_at_close", "earnings_blackout", "stopped", "overrides")}
                              | {"regime": out["diag"].get("regime"), "top_scores": out["diag"].get("top_scores")}, indent=1, default=str))
@@ -149,9 +152,14 @@ def main(argv=None) -> int:
     elif a.cmd == "context":
         print(json.dumps(journal.context(a.symbol), indent=1, default=str))
     elif a.cmd == "verify":
+        bad = []
         for name in sorted(journal.CHAINED):
             ok, n = journal.verify_chain(name)
             print(f"{name}: {'OK' if ok else 'BROKEN at record ' + str(n)} ({n} records)")
+            bad += [] if ok else [name]
+        print("ALL CHAINS OK" if not bad else "BROKEN: " + ", ".join(bad) + " - stop and report")
+        if bad:
+            sys.exit(1)
     elif a.cmd == "news-live":
         from .news_live import run
 
