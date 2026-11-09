@@ -15,7 +15,7 @@ entries: code impact, data, evidence, repos, risk, synthesis and critic.
 | 2 | Alerts at night | א: only 08:00-23:00 Israel time. Night events go into one morning summary |
 | 3 | Coins | א: BTC and ETH only (ETH ships only if it earns its place in the sweep, section 7) |
 | 4 | Design (sections 1-3 in chat) | א: approved |
-| 5 | Book size | **asked 2026-11-09, waiting for his answer.** Options: $100k / $10k / $5k |
+| 5 | Book size | א: $100,000 paper (asked 2026-11-09 with the worst-day example: BTC -37% on 2020-03-12) |
 
 These are assumptions he has not been asked about. Each one is a config key:
 - fees 0.50% per side, with a robustness run at 1.00%;
@@ -247,7 +247,7 @@ Scheduled-task prompts (stored verbatim when created):
 
 | Step | Duration (estimate) | Earliest |
 |------|---------------------|----------|
-| Spec review by Nimrod + book-size answer | his time | 2026-11-09 evening |
+| Spec review by Nimrod | his time | 2026-11-09 evening |
 | Implementation plan (writing-plans) | ~30 min | 2026-11-09 |
 | Step 0: fixtures + golden outputs | ~30 min | 2026-11-09 |
 | Build: config/books + state isolation + market.py shims + broker + regime + grading + reports + data rules, each with tests | ~4-6 h of agent work | 2026-11-10 |
