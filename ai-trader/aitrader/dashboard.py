@@ -2,6 +2,9 @@
 
 `python3 -m aitrader dashboard` writes .cache/dashboard/snapshot.json, which is uploaded to the Dashboard artifact
 (one file -> one upload per refresh). Everything is read from state/ plus live prices for held symbols.
+
+Both books go into one snapshot (spec 8): the stock rows as before, then the crypto rows (tags prefixed "c": ckpi,
+cpos, corder, ctrade, ceq, cregime, clesson) read inside journal.use_book("crypto"). Building writes nothing.
 """
 
 from __future__ import annotations
@@ -22,12 +25,20 @@ NY = ZoneInfo("America/New_York")
 
 
 DD_HE = {"normal": "רגיל", "halved": "חצי חשיפה", "flat": "מזומן מלא", "reentry": "חזרה הדרגתית"}
+_REGIME_STOCKS = {"risk_on": "מגמה חיובית", "risk_off": "מגמה שלילית (חצי חשיפה)", "risk_off(no-data)": "אין נתון מגמה (חצי חשיפה)",
+                  "defensive": "VIX גבוה (75%)", "defensive(no-vix)": "אין נתון VIX - הגנתי"}
+REGIME_HE = {"stocks": _REGIME_STOCKS,  # stock risk-off halves exposure; crypto risk-off is cash (risk_off_gross_mult 0)
+             "crypto": {**_REGIME_STOCKS, "risk_off": "מגמה שלילית (מזומן)", "risk_off(no-data)": "אין נתון מגמה (מזומן)"}}
+STATE_HE = {"on": "מושקע", "off": "מזומן"}  # the crypto hysteresis state (strategy.regime_series)
+EDGE_DSR = 0.95  # spec 7: a Deflated Sharpe of 0.95 or more is a proven edge (pre-registered gate, like ruling R13)
+CRYPTO_TAG = re.compile(r"^\s*crypto:\s*", re.I)  # a lesson whose observation starts "crypto: ..." (planning decision 16)
+REASON_HE = {"entry": "כניסה", "add": "הוספה", "trim": "הקטנה", "exit": "יציאה", "stop": "סטופ"}
 
 
-def _regime_he(reg: str | None) -> str:
+def _regime_he(reg: str | None, book: str = "stocks") -> str:
     if not reg:
         return "—"
-    parts = {"risk_on": "מגמה חיובית", "risk_off": "מגמה שלילית (חצי חשיפה)", "defensive": "VIX גבוה (75%)", "defensive(no-vix)": "אין נתון VIX - הגנתי"}
+    parts = REGIME_HE[book]
     return " + ".join(parts.get(x, x) for x in reg.split("+"))
 
 
@@ -78,7 +89,7 @@ def _book_rows(state: dict | None, t: str, sectors: dict, prices: dict) -> tuple
     return rows, eq, state.get("cash", 0.0)
 
 
-def build() -> list[dict]:
+def _stock_rows() -> list[dict]:
     cfg = load_config()
     sectors = cfg["universe"]
     bench = cfg.get("benchmark", "SPY")
@@ -263,13 +274,131 @@ def build() -> list[dict]:
         ("Liquid", "warn", "לא מחובר - מחכה להחלטה שלך"),
     ]:
         rows.append({"t": "health", "component": comp, "status": status, "detail": detail})
-    lp = ROOT / "state" / "lessons.md"
-    if lp.exists():
-        les = [ln[2:] for ln in lp.read_text(encoding="utf-8").splitlines() if ln.startswith("- 20")]
-        for i, ln in enumerate(les[-8:][::-1]):
-            parts = [p.strip() for p in ln.split("|")]
-            rows.append({"t": "lesson", "id": i, "date": parts[0] if parts else "", "text": parts[1] if len(parts) > 1 else ln,
-                         "confidence": next((p.split(":", 1)[1].strip() for p in parts if p.startswith(("confidence", "ביטחון"))), parts[3] if len(parts) > 3 else "")})
+    rows += _lesson_rows(_lessons()[0], "lesson")
+    return rows
+
+
+def _lessons() -> tuple[list[str], list[str]]:
+    """(stock lines, crypto lines) of lessons.md, each without its "- ". It is one file in the stock state dir:
+    journal._BASE while use_book has switched books, else journal.STATE (never ROOT/state, so tests never read the real
+    file). A crypto line loses its "crypto:" tag; untagged lines are stocks (planning decision 16)."""
+    lp = (journal.STATE if journal._BASE is None else journal._BASE) / "lessons.md"
+    stock, crypto = [], []
+    for ln in (lp.read_text(encoding="utf-8").splitlines() if lp.exists() else []):
+        if not ln.startswith("- 20"):
+            continue
+        parts = ln[2:].split("|")
+        if len(parts) > 1 and CRYPTO_TAG.match(parts[1]):
+            parts[1] = CRYPTO_TAG.sub("", parts[1], count=1)
+            crypto.append("|".join(parts))
+        else:
+            stock.append(ln[2:])
+    return stock, crypto
+
+
+def _lesson_rows(les: list[str], t: str) -> list[dict]:
+    rows = []
+    for i, ln in enumerate(les[-8:][::-1]):
+        parts = [p.strip() for p in ln.split("|")]
+        rows.append({"t": t, "id": i, "date": parts[0] if parts else "", "text": parts[1] if len(parts) > 1 else ln,
+                     "confidence": next((p.split(":", 1)[1].strip() for p in parts if p.startswith(("confidence", "ביטחון"))), parts[3] if len(parts) > 3 else "")})
+    return rows
+
+
+def _crypto_rows() -> list[dict]:
+    """The crypto book (spec 8), read inside use_book("crypto"): ckpi, cpos, corder, ctrade, ceq, cregime, clesson.
+    Before the first crypto run there is no <state>/crypto, and nothing is read from it (journal._path would create
+    the dir): the summary row then shows the starting cash and live=False."""
+    cfg = load_config()
+    have = journal.STATE.is_dir()
+    load = journal.load_json if have else (lambda name, default=None: default)
+    read = journal.read if have else (lambda name: [])
+    bench = cfg["benchmark"]
+    start = cfg["account"]["starting_cash"]
+    port, shadow, pending, latest, dsr = (load(n) or {} for n in ("portfolio.json", "shadow_portfolio.json", "pending.json",
+                                                                    "latest.json", "dsr.json"))
+    held = set(port.get("positions", {})) | set(shadow.get("positions", {}))
+    prices = {s: _px(s)[0] for s in sorted(held | {bench})}  # 24/7 market: the live price is the mark
+    pos, eq, cash = _book_rows(port, "cpos", cfg["universe"], prices)
+    _, s_eq, _ = _book_rows(shadow, "cspos", cfg["universe"], prices)
+    eq, s_eq = eq or start, s_eq or start
+    sp = port.get("start_prices") or {}
+    b0 = sp.get(bench)
+    b_live = prices[bench] / b0 - 1 if prices.get(bench) and b0 else None
+    b_ret = b_live if b_live is not None else (latest.get("baselines") or {}).get("bench_since_start")  # Task 6 name
+    ret = eq / start - 1
+    dv = dsr.get("value")
+    peak = port.get("peak_equity") or start
+    now = datetime.now(timezone.utc)
+    st = pending.get("status")
+    rows: list[dict] = [{
+        "t": "ckpi", "live": bool(port), "started": port.get("created"), "equity": _r(eq, 0), "ret": _r(ret),
+        "shadow_equity": _r(s_eq, 0), "shadow_ret": _r(s_eq / start - 1), "claude_effect": _r((eq - s_eq) / start),
+        "bench_since_start": _r(b_ret), "vs_bench": _r(ret - b_ret) if b_ret is not None else None, "btc": _r(prices.get(bench), 2),
+        "cash_pct": _r(cash / eq if port else 1), "gross_pct": _r(sum(r["value"] for r in pos) / eq), "n_positions": len(pos),
+        "drawdown": _r(min(0.0, eq / max(peak, eq) - 1)), "dd_state": DD_HE.get(dd := port.get("dd_state") or latest.get("dd_state") or "normal", dd),
+        "regime": _regime_he(port.get("regime") or latest.get("regime"), "crypto"),
+        "fees_paid": _r(port.get("fees_paid", 0.0), 2), "fee_pct": cfg["costs"].get("fee_bps", 0) / 1e4,
+        "decision_date": pending.get("decision_date"), "pending_status": {"pending": "ממתין לביצוע", "executed": "בוצע"}.get(st, st or "—"),
+        "exec_il": _il(pending.get("exec_ts")), "last_run_il": _il(latest.get("as_of_utc")),
+        "dsr": _r(dv), "dsr_gate": EDGE_DSR, "proven_edge": isinstance(dv, (int, float)) and dv >= EDGE_DSR,
+    }]
+    rows += pos
+
+    # orders of the last decision; the fill is the first full hour after it (planning decision 12), all coins or none
+    ov = {o["symbol"]: o["action"].replace("size x", "הקטנה ×").replace("veto", "וטו") for o in pending.get("overrides", [])}
+    fills = {f["symbol"]: f for f in pending.get("fills", [])} if st == "executed" else {}
+    for f in (pending.get("preview_at_close") or []):
+        x = fills.get(f["symbol"], f)
+        rows.append({"t": "corder", "symbol": f["symbol"], "side": "קנייה" if f["side"] == "BUY" else "מכירה", "qty": x["qty"],
+                     "price": _r(x["price"], 2), "value": _r(x["value"], 0), "desk": ov.get(f["symbol"], ""),
+                     "status": "בוצע" if f["symbol"] in fills else ("לא בוצע" if st == "executed" else "מתוכנן"),
+                     "when": _il(pending.get("fill_ts") if f["symbol"] in fills else pending.get("exec_ts")),
+                     "decision_date": pending.get("decision_date")})
+
+    trades = sorted(read("trades.jsonl"), key=lambda x: x.get("logged_at", ""), reverse=True)
+    for i, x in enumerate(trades[:40]):
+        rows.append({"t": "ctrade", "id": i, "time": _il(x.get("fill_ts") or x.get("logged_at")),
+                     "side": "קנייה" if x["side"] == "BUY" else "מכירה", "symbol": x["symbol"], "qty": x["qty"],
+                     "price": _r(x["price"], 2), "value": _r(x["value"], 0), "fee": _r(x.get("fee"), 2),
+                     "pnl": _r(x.get("realized_pnl"), 0), "source": x.get("fill_source"),
+                     "reason": REASON_HE.get(x.get("reason"), _clip(x.get("reason"), 160))})
+
+    # equity curve: one mark per decision bar (market.equity_mark_per_bar), plus the live mark
+    for e in read("equity.jsonl")[-400:]:
+        rows.append({"t": "ceq", "ts": e.get("logged_at"), "book": "crypto", "ret": _r(e["equity"] / start - 1)})
+        if e.get("shadow_equity"):
+            rows.append({"t": "ceq", "ts": e.get("logged_at"), "book": "shadow", "ret": _r(e["shadow_equity"] / start - 1)})
+        if b0 and e.get("bench_price"):
+            rows.append({"t": "ceq", "ts": e.get("logged_at"), "book": "btc", "ret": _r(e["bench_price"] / b0 - 1)})
+    if port:
+        ts = now.isoformat(timespec="seconds")
+        rows += [{"t": "ceq", "ts": ts, "book": "crypto", "ret": _r(ret)}, {"t": "ceq", "ts": ts, "book": "shadow", "ret": _r(s_eq / start - 1)}]
+        if b_live is not None:
+            rows.append({"t": "ceq", "ts": ts, "book": "btc", "ret": _r(b_live)})
+
+    # regime gauge: the last decision (event rows skipped); off below sma*(1-band), back on only above sma*(1+band)
+    dec = next((d for d in reversed(read("decisions.jsonl")) if "event" not in d), None)
+    if dec:
+        dg, r = dec.get("diag") or {}, cfg["risk"]
+        px, sma, band = dg.get("regime_px"), dg.get("regime_sma"), r.get("regime_band_pct", 0.0)
+        lo, hi = (sma * (1 - band), sma * (1 + band)) if sma else (None, None)
+        rows.append({"t": "cregime", "date": dg.get("date") or dec.get("date"), "px": px, "sma": sma, "band": band,
+                     "sma_days": r["regime_sma_days"], "cash_line": _r(lo, 2), "back_line": _r(hi, 2),
+                     "dist_cash": _r(px / lo - 1) if px and lo else None, "dist_back": _r(px / hi - 1) if px and hi else None,
+                     "state": dg.get("regime_state"), "state_he": STATE_HE.get(dg.get("regime_state"), "—"),
+                     "regime": _regime_he(dg.get("regime"), "crypto")})
+    rows += _lesson_rows(_lessons()[1], "clesson")
+    return rows
+
+
+def build() -> list[dict]:
+    """One snapshot, both books. Each block runs inside its own book, so a build started inside the crypto book (or
+    any later book switch) still reads the stock dir for the stock rows."""
+    with journal.use_book("stocks"):
+        rows = _stock_rows()
+    with journal.use_book("crypto"):
+        rows += _crypto_rows()
     return rows
 
 

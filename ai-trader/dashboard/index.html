@@ -41,11 +41,20 @@
   .at .legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-bottom: var(--cds-gap-sm); }
   .at .legend i, .at .tip i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-inline-end: 6px; background: var(--color-fg-muted); }
   .at .chart { position: relative; direction: ltr; min-height: 260px; touch-action: pan-y; }
-  .at .chart .ax text { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); font-family: var(--font-anthropic-sans); }
+  .at .chart .ax text, .at .gauge .ax text { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); font-family: var(--font-anthropic-sans); }
   .at .chart .fail { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); padding: var(--cds-pad-md); direction: rtl; }
   .at .tip { position: absolute; top: 8px; pointer-events: none; direction: rtl; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: 6px 10px; font-size: var(--cds-font-size-caption); white-space: nowrap; opacity: 0; }
   .at .tip .tt { color: var(--cds-text-secondary); margin-bottom: 2px; }
   .at .dsr { font-size: var(--cds-font-size-body); margin: var(--cds-gap-md) 0 0; }
+  .at .part { display: grid; gap: var(--cds-gap-lg); padding-top: var(--cds-gap-lg); border-top: 1px solid var(--color-border-line); }
+  .at h2.ttl2 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; }
+  .at .noedge { color: var(--color-warn); }
+  .at .gauge { position: relative; direction: ltr; min-height: 64px; }
+  .at .gauge .trk { stroke: var(--cds-chart-grid); stroke-width: 6; stroke-linecap: round; }
+  .at .gauge .band { fill: color-mix(in srgb, var(--color-warn) 16%, transparent); }
+  .at .gauge .l-cash, .at .legend i.sw-cash { stroke: var(--color-bad); background: var(--color-bad); }
+  .at .gauge .l-sma, .at .legend i.sw-sma { stroke: var(--cds-chart-reference); background: var(--cds-chart-reference); }
+  .at .gauge .l-back, .at .legend i.sw-back { stroke: var(--color-ok); background: var(--color-ok); }
   .at [data-dash-source-state=refreshing] { opacity: .5; }
   .at .foot { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); line-height: 1.7; }
   .at .foot details { margin-top: var(--cds-gap-sm); }
@@ -126,7 +135,7 @@
       <span><i data-swatch="2"></i><span data-legend="spy">SPY</span></span>
       <span><i data-swatch="3"></i><span data-legend="news">חדשות</span></span>
     </div>
-    <div class="chart" data-draw="equity" data-source="equity" data-label="תשואה מצטברת של התיק הכמותי, תיק הצל, תיק החדשות ו-SPY לאורך זמן"></div>
+    <div class="chart" data-draw="equity" data-source="equity" data-series="quant,shadow,spy,news" data-label="תשואה מצטברת של התיק הכמותי, תיק הצל, תיק החדשות ו-SPY לאורך זמן"></div>
   </section>
 
   <div class="grid2">
@@ -340,6 +349,160 @@
     <p class="empty" data-empty-for="lessons" hidden>עוד אין לקחים.</p>
   </section>
 
+  <div class="part" id="crypto">
+    <header id="crypto-top">
+      <div class="ttl-row">
+        <h2 class="ttl2">ספר קריפטו · BTC ו-ETH</h2>
+        <span class="paper">כסף נייר</span>
+        <span class="pick"><span class="paper" data-when="false">אין יתרון מוכח</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span>
+      </div>
+      <p class="meta">
+        ספר נפרד מהמניות, מסחר 24/7. ההחלטה הבאה: כל לילה ב-02:12 שעון ישראל (00:12 UTC), על סגירת היום ב-UTC
+        · ריצה אחרונה <span class="num" data-draw="kv" data-source="ckpi" data-field="last_run_il" data-row="0">—</span>
+        · BTC עכשיו <span class="num" data-draw="kv" data-source="ckpi" data-field="btc" data-row="0" data-fmt="usd">—</span>
+        · החלטה אחרונה <span class="num" data-draw="kv" data-source="ckpi" data-field="decision_date" data-row="0" data-fmt="date">—</span>: <span data-draw="kv" data-source="ckpi" data-field="pending_status" data-row="0">—</span>
+      </p>
+      <p class="take" id="crypto-take">
+        <span data-when="true">ספר הקריפטו <b class="num" data-draw="kv" data-source="ckpi" data-field="ret" data-row="0" data-fmt="spct" data-tone="sign">—</b> מאז <span class="num" data-draw="kv" data-source="ckpi" data-field="started" data-row="0" data-fmt="date">—</span>,
+          תיק הצל בלי Claude <b class="num" data-draw="kv" data-source="ckpi" data-field="shadow_ret" data-row="0" data-fmt="spct" data-tone="sign">—</b>, ו-BTC בקנה-והחזק <b class="num" data-draw="kv" data-source="ckpi" data-field="bench_since_start" data-row="0" data-fmt="spct" data-tone="sign">—</b> באותה תקופה.</span>
+        <span data-when="false" hidden>ספר הקריפטו עוד לא התחיל לסחור. כשיתחיל, ההחלטות יתקבלו כל לילה ב-02:12 שעון ישראל.</span>
+        <span data-draw="pick" data-source="ckpi" data-field="live" data-row="0"></span>
+        <span class="pick">
+          <span class="noedge" data-when="false">אין יתרון מוכח: DSR <b class="num" data-draw="kv" data-source="ckpi" data-field="dsr" data-row="0" data-fmt="num2">—</b>, והסף הוא <span class="num" data-draw="kv" data-source="ckpi" data-field="dsr_gate" data-row="0" data-fmt="num2">—</span>. רווח או הפסד כאן עלולים להיות מזל.</span>
+          <span data-when="true" hidden>DSR <b class="num" data-draw="kv" data-source="ckpi" data-field="dsr" data-row="0" data-fmt="num2">—</b>, מעל הסף <span class="num" data-draw="kv" data-source="ckpi" data-field="dsr_gate" data-row="0" data-fmt="num2">—</span>: יתרון מוכח במכונת הזמן. עדיין כסף נייר.</span>
+          <span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span>
+        </span>
+      </p>
+    </header>
+
+    <section class="kpis" id="crypto-kpis">
+      <div class="card tile" id="ck-equity">
+        <div class="lbl">ספר קריפטו (נייר)</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="equity" data-row="0" data-fmt="usd">—</div>
+        <div class="sub"><span class="num" data-draw="kv" data-source="ckpi" data-field="ret" data-row="0" data-fmt="spct" data-tone="sign">—</span> מאז ההתחלה<span class="pick"><span class="noedge" data-when="false"> · אין יתרון מוכח</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></div>
+      </div>
+      <div class="card tile" id="ck-bench">
+        <div class="lbl">פער מול BTC (קנה והחזק)</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="vs_bench" data-row="0" data-fmt="spct" data-tone="sign">—</div>
+        <div class="sub">BTC <span class="num" data-draw="kv" data-source="ckpi" data-field="bench_since_start" data-row="0" data-fmt="spct">—</span> באותה תקופה<span class="pick"><span class="noedge" data-when="false"> · אין יתרון מוכח</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></div>
+      </div>
+      <div class="card tile" id="ck-claude">
+        <div class="lbl">השפעת Claude</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="claude_effect" data-row="0" data-fmt="spct" data-tone="sign">—</div>
+        <div class="sub">תיק צל בלי Claude: <span class="num" data-draw="kv" data-source="ckpi" data-field="shadow_ret" data-row="0" data-fmt="spct">—</span></div>
+      </div>
+      <div class="card tile" id="ck-exposure">
+        <div class="lbl">חשיפה לקריפטו</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="gross_pct" data-row="0" data-fmt="pct0">—</div>
+        <div class="sub">מזומן <span class="num" data-draw="kv" data-source="ckpi" data-field="cash_pct" data-row="0" data-fmt="pct0">—</span> · <span class="num" data-draw="kv" data-source="ckpi" data-field="n_positions" data-row="0" data-fmt="int">—</span> מטבעות</div>
+      </div>
+      <div class="card tile" id="ck-dd">
+        <div class="lbl">ירידה מהשיא</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="drawdown" data-row="0" data-fmt="pct2" data-tone="sign">—</div>
+        <div class="sub">מפסק ירידה: <span data-draw="kv" data-source="ckpi" data-field="dd_state" data-row="0">—</span> · מגמה: <span data-draw="kv" data-source="ckpi" data-field="regime" data-row="0">—</span></div>
+      </div>
+      <div class="card tile" id="ck-fees">
+        <div class="lbl">עמלות ששולמו</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="fees_paid" data-row="0" data-fmt="usd2">—</div>
+        <div class="sub">עמלה של <span class="num" data-draw="kv" data-source="ckpi" data-field="fee_pct" data-row="0" data-fmt="pct2">—</span> על כל קנייה ומכירה</div>
+      </div>
+    </section>
+
+    <section class="card" id="crypto-equity">
+      <h2>תשואה מצטברת - ספר קריפטו</h2>
+      <p class="cap">נקודה לכל החלטה לילית, בשווי של סגירת היום, ועוד נקודה במחיר הנוכחי. צל = אותו בוט בלי ההתערבויות של Claude. BTC = קנייה ביום הראשון והחזקה.<span class="pick"><span class="noedge" data-when="false"> אין יתרון מוכח: הפער בין הקווים עלול להיות מזל.</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></p>
+      <div class="legend" data-source="cequity">
+        <span><i data-swatch="0"></i><span data-legend="crypto">קריפטו</span></span>
+        <span><i data-swatch="1"></i><span data-legend="shadow">צל (בלי Claude)</span></span>
+        <span><i data-swatch="2"></i><span data-legend="btc">BTC קנה והחזק</span></span>
+      </div>
+      <div class="chart" data-draw="equity" data-source="cequity" data-series="crypto,shadow,btc" data-label="תשואה מצטברת של ספר הקריפטו, תיק הצל שלו ו-BTC בקנה-והחזק לאורך זמן"></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card" id="crypto-positions">
+        <h2>אחזקות - ספר קריפטו</h2>
+        <p class="cap">כמויות בשברי מטבע, עד 6 ספרות אחרי הנקודה. מחיר אחרון מ-Yahoo ברגע העדכון. רווח/הפסד מול מחיר הקנייה, לפני עמלת המכירה.<span class="pick"><span class="noedge" data-when="false"> אין יתרון מוכח.</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></p>
+        <div class="tw"><table class="tbl" data-source="cpositions" data-row-key="symbol">
+          <thead><tr>
+            <th data-field="symbol">מטבע</th>
+            <th class="n" data-field="qty" data-fmt="qty6">כמות</th>
+            <th class="n" data-field="avg_cost" data-fmt="usd2">קנייה</th>
+            <th class="n" data-field="last" data-fmt="usd2">אחרון</th>
+            <th class="n" data-field="value" data-fmt="usd">שווי</th>
+            <th class="n" data-field="weight" data-fmt="pct1">משקל</th>
+            <th class="n" data-field="pnl_pct" data-fmt="spct" data-tone="sign">רווח/הפסד</th>
+            <th class="n" data-field="since" data-fmt="date">מאז</th>
+          </tr></thead>
+          <tbody data-draw="rows"></tbody>
+        </table></div>
+        <p class="empty" data-empty-for="cpositions" hidden>אין אחזקות. ספר הקריפטו כולו במזומן.</p>
+      </section>
+
+      <section class="card" id="crypto-regime">
+        <h2>מסנן המגמה - כמה רחוק BTC מהמעבר למזומן</h2>
+        <p class="cap">BTC מתחת לממוצע <span class="num" data-draw="kv" data-source="cregime" data-field="sma_days" data-row="0" data-fmt="int">—</span> יום פחות <span class="num" data-draw="kv" data-source="cregime" data-field="band" data-row="0" data-fmt="pct0">—</span>: כל הספר עובר למזומן. חוזרים להשקיע רק מעל הממוצע ועוד <span class="num" data-draw="kv" data-source="cregime" data-field="band" data-row="0" data-fmt="pct0">—</span>. לפי סגירת <span class="num" data-draw="kv" data-source="cregime" data-field="date" data-row="0" data-fmt="date">—</span> (UTC).</p>
+        <p class="take">מצב: <b data-draw="kv" data-source="cregime" data-field="state_he" data-row="0">—</b> · מרחק מקו המזומן <b class="num" data-draw="kv" data-source="cregime" data-field="dist_cash" data-row="0" data-fmt="spct" data-tone="sign">—</b></p>
+        <div class="legend">
+          <span><i data-swatch="0"></i>BTC <span class="num" data-draw="kv" data-source="cregime" data-field="px" data-row="0" data-fmt="usd">—</span></span>
+          <span><i class="sw-cash"></i>קו מזומן <span class="num" data-draw="kv" data-source="cregime" data-field="cash_line" data-row="0" data-fmt="usd">—</span></span>
+          <span><i class="sw-sma"></i>ממוצע <span class="num" data-draw="kv" data-source="cregime" data-field="sma" data-row="0" data-fmt="usd">—</span></span>
+          <span><i class="sw-back"></i>קו חזרה <span class="num" data-draw="kv" data-source="cregime" data-field="back_line" data-row="0" data-fmt="usd">—</span> (<span class="num" data-draw="kv" data-source="cregime" data-field="dist_back" data-row="0" data-fmt="spct">—</span>)</span>
+        </div>
+        <div class="gauge" data-draw="gauge" data-source="cregime" data-field="px" data-row="0" data-label="מחיר BTC מול קו המעבר למזומן, הממוצע וקו החזרה להשקעה"></div>
+        <p class="empty" data-empty-for="cregime" hidden>עוד אין החלטת קריפטו. המסנן יופיע אחרי ההחלטה הראשונה.</p>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="card" id="crypto-orders">
+        <h2>פקודות קריפטו - ההחלטה האחרונה</h2>
+        <p class="cap">החלטה מ-<span class="num" data-draw="kv" data-source="ckpi" data-field="decision_date" data-row="0" data-fmt="date">—</span>, ביצוע ב-<span class="num" data-draw="kv" data-source="ckpi" data-field="exec_il" data-row="0">—</span> שעון ישראל: מחיר הפתיחה של השעה העגולה הראשונה אחרי ההחלטה, לכל המטבעות או לאף אחד. Claude יכול רק לבטל או להקטין.</p>
+        <div class="tw"><table class="tbl" data-source="corders" data-row-key="symbol">
+          <thead><tr>
+            <th data-field="symbol">מטבע</th><th data-field="side" data-fmt="side">פעולה</th>
+            <th class="n" data-field="qty" data-fmt="qty6">כמות</th>
+            <th class="n" data-field="price" data-fmt="usd2">מחיר</th>
+            <th class="n" data-field="value" data-fmt="usd">שווי</th>
+            <th data-field="desk">Claude</th><th data-field="status">סטטוס</th>
+            <th class="n" data-field="when">מתי</th>
+          </tr></thead>
+          <tbody data-draw="rows"></tbody>
+        </table></div>
+        <p class="empty" data-empty-for="corders" hidden>אין פקודות בהחלטה האחרונה.</p>
+      </section>
+
+      <section class="card" id="crypto-lessons">
+        <h2>לקחי קריפטו</h2>
+        <p class="cap">שורות ביומן הלקחים המשותף שהתצפית שלהן מתחילה ב-crypto:. שאר השורות שייכות למניות.</p>
+        <div class="tw"><table class="tbl" data-source="clessons" data-row-key="id">
+          <thead><tr><th class="n" data-field="date" data-fmt="date">תאריך</th><th class="long" data-field="text">לקח</th><th data-field="confidence">ביטחון</th></tr></thead>
+          <tbody data-draw="rows"></tbody>
+        </table></div>
+        <p class="empty" data-empty-for="clessons" hidden>עוד אין לקחי קריפטו.</p>
+      </section>
+    </div>
+
+    <section class="card" id="crypto-trades">
+      <h2>יומן עסקאות - ספר קריפטו</h2>
+      <p class="cap">40 העסקאות האחרונות, החדשה למעלה. המחיר כולל החלקה, והעמלה בנפרד; בקנייה הרווח הממומש הוא מינוס העמלה. מקור המחיר: 1h = פתיחת הנר השעתי, 1m = הדקה הראשונה.<span class="pick"><span class="noedge" data-when="false"> אין יתרון מוכח.</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></p>
+      <div class="tw"><table class="tbl" data-source="ctrades" data-row-key="id">
+        <thead><tr>
+          <th class="n" data-field="time">זמן</th>
+          <th data-field="side" data-fmt="side">פעולה</th><th data-field="symbol">מטבע</th>
+          <th class="n" data-field="qty" data-fmt="qty6">כמות</th>
+          <th class="n" data-field="price" data-fmt="usd2">מחיר</th>
+          <th class="n" data-field="value" data-fmt="usd">שווי</th>
+          <th class="n" data-field="fee" data-fmt="usd2">עמלה</th>
+          <th class="n" data-field="pnl" data-fmt="susd" data-tone="sign">רווח ממומש</th>
+          <th data-field="source">מקור מחיר</th><th data-field="reason">סיבה</th>
+        </tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+      <p class="empty" data-empty-for="ctrades" hidden>עוד אין עסקאות קריפטו.</p>
+    </section>
+  </div>
+
   <footer class="foot" id="foot">
     <p>כסף נייר בלבד. אין כאן כסף אמיתי ואין המלצת השקעה. הבוט מעריך יתרונות קטנים עם שגיאה ידועה, ולא "צופה" את השוק. מקורות: Yahoo Finance, SEC EDGAR, Nasdaq, OpenInsider.</p>
     <details>
@@ -351,6 +514,7 @@
         <dt>משטר שוק</dt><dd>SPY מעל הממוצע של 200 יום = מגמה חיובית. מתחתיו = חצי חשיפה. VIX גבוה = 75% חשיפה.</dd>
         <dt>ירידה מהשיא</dt><dd>כמה התיק ירד מהשווי הגבוה ביותר שלו. מפסק הירידה חוצה חשיפה ואז עובר למזומן.</dd>
         <dt>שארפ</dt><dd>תשואה מעל ריבית מזומן, ביחס לתנודתיות. מעל 1 = טוב מאוד.</dd>
+        <dt>ספר קריפטו</dt><dd>ספר נייר נפרד על BTC ו-ETH: החלטה כל לילה על סגירת היום ב-UTC, ביצוע בשעה העגולה הבאה, עמלה על כל קנייה ומכירה. מתחת לקו המזומן של מסנן המגמה כל הספר במזומן.</dd>
         <dt>DSR</dt><dd>הסתברות שהשארפ אמיתי ולא מזל, אחרי שמתקנים על כל הגרסאות שנוסו.</dd>
         <dt>Brier</dt><dd>מדד לדיוק הסתברויות. 0 = מושלם, 0.25 = מטבע.</dd>
         <dt>פלצבו</dt><dd>מבחן: מערבבים את האותות בין המניות. אות שלא חזק יותר מהערבוב הוא רעש.</dd>
@@ -387,6 +551,13 @@
   dash.calc('schedule', { inputs: ['snapshot'], title: 'לוח זמנים', description: 'מתי כל חלק בבוט רץ', fn: (snapshot) => snapshot.filter((row) => row.t === 'slot') });
   dash.calc('health', { inputs: ['snapshot'], title: 'בריאות המערכת', description: 'מצב כל רכיב', fn: (snapshot) => snapshot.filter((row) => row.t === 'health') });
   dash.calc('lessons', { inputs: ['snapshot'], title: 'לקחים', description: 'הלקחים האחרונים', fn: (snapshot) => snapshot.filter((row) => row.t === 'lesson') });
+  dash.calc('ckpi', { inputs: ['snapshot'], title: 'מדדי קריפטו', description: 'השורה המסכמת של ספר הקריפטו: שווי, תשואה מול הצל ומול BTC, עמלות, DSR', fn: (snapshot) => snapshot.filter((row) => row.t === 'ckpi') });
+  dash.calc('cpositions', { inputs: ['snapshot'], title: 'אחזקות - קריפטו', description: 'המטבעות שספר הקריפטו מחזיק, בכמויות שבר', fn: (snapshot) => snapshot.filter((row) => row.t === 'cpos') });
+  dash.calc('corders', { inputs: ['snapshot'], title: 'פקודות - קריפטו', description: 'הפקודות של ההחלטה הלילית האחרונה', fn: (snapshot) => snapshot.filter((row) => row.t === 'corder') });
+  dash.calc('ctrades', { inputs: ['snapshot'], title: 'עסקאות - קריפטו', description: '40 העסקאות האחרונות של ספר הקריפטו', fn: (snapshot) => snapshot.filter((row) => row.t === 'ctrade') });
+  dash.calc('cequity', { inputs: ['snapshot'], title: 'עקומת תשואה - קריפטו', description: 'תשואה מצטברת של ספר הקריפטו, הצל ו-BTC', fn: (snapshot) => snapshot.filter((row) => row.t === 'ceq') });
+  dash.calc('cregime', { inputs: ['snapshot'], title: 'מסנן המגמה - קריפטו', description: 'BTC מול הממוצע, קו המזומן וקו החזרה בהחלטה האחרונה', fn: (snapshot) => snapshot.filter((row) => row.t === 'cregime') });
+  dash.calc('clessons', { inputs: ['snapshot'], title: 'לקחי קריפטו', description: 'לקחים שסומנו crypto', fn: (snapshot) => snapshot.filter((row) => row.t === 'clesson') });
 </script>
 
 <script>
@@ -394,7 +565,7 @@
     const F = {
       usd: d3.format('$,.0f'), usd2: d3.format('$,.2f'), susd: d3.format('+$,.0f'),
       pct0: d3.format('.0%'), pct1: d3.format('.1%'), pct2: d3.format('.2%'), spct: d3.format('+.2%'),
-      int: d3.format(',d'), num2: d3.format('.2f'), num3: d3.format('.3f'),
+      int: d3.format(',d'), qty6: d3.format(',.6~f'), num2: d3.format('.2f'), num3: d3.format('.3f'),
     };
     const OWNER = 'נמרוד';
     const STATUS = { ok: 'תקין', warn: 'שים לב', bad: 'תקלה' };
@@ -495,15 +666,16 @@
     });
 
     dash.draw('equity', (el) => {
-      const d = dash.data('equity');
+      const d = dash.data(el.dataset.source || 'equity');
       el.classList.toggle('dash-skeleton', d.status === 'loading');
       if (d.status !== 'ok') {
         el.replaceChildren();
         if (d.status === 'error') { const f = document.createElement('div'); f.className = 'fail'; f.textContent = 'הטעינה נכשלה'; el.append(f); }
         return;
       }
-      const label = (b) => { const n = document.querySelector('.at [data-legend="' + b + '"]'); return n ? n.textContent : b; };
-      const series = ['quant', 'shadow', 'spy', 'news'].map((b, i) => ({
+      const box = el.closest('section') || document;
+      const label = (b) => { const n = box.querySelector('[data-legend="' + b + '"]'); return n ? n.textContent : b; };
+      const series = (el.dataset.series || 'quant,shadow,spy,news').split(',').map((b, i) => ({
         label: label(b), color: dash.colors[i % dash.colors.length],
         pts: (d.data || []).filter((r) => r.book === b && !blank(r.ret) && r.ts)
           .map((r) => ({ x: new Date(r.ts), y: +r.ret })).filter((p) => !isNaN(p.x)).sort((a, b2) => a.x - b2.x),
@@ -576,6 +748,54 @@
           tip.style('left', Math.max(0, left) + 'px').style('opacity', 1);
         })
         .on('pointerleave', () => { tip.style('opacity', 0); rule.style('opacity', 0); });
+    });
+
+    // Whole sentences chosen by a true/false field: each sentence is in the HTML with data-when="true|false", and this
+    // empty drawing sets hidden on its siblings. A failed load counts as false, the cautious sentence.
+    dash.draw('pick', (el) => {
+      const d = dash.data(el.dataset.source);
+      if (d.status === 'loading') return;
+      const row = d.status === 'ok' && Array.isArray(d.data) ? d.data[+(el.dataset.row || 0)] : null;
+      const v = String(!!row && row[el.dataset.field] === true);
+      const box = el.parentElement;
+      if (box) box.querySelectorAll(':scope > [data-when]').forEach((s) => { s.hidden = s.dataset.when !== v; });
+    });
+
+    // Regime gauge: BTC (dot) against the go-to-cash line, the moving average and the back-in line.
+    dash.draw('gauge', (el) => {
+      const d = dash.data(el.dataset.source);
+      el.classList.toggle('dash-skeleton', d.status === 'loading');
+      const row = d.status === 'ok' && Array.isArray(d.data) ? d.data[+(el.dataset.row || 0)] : null;
+      const sec = el.closest('section');
+      if (sec && d.status === 'ok') sec.querySelectorAll('[data-empty-for="' + el.dataset.source + '"]').forEach((p) => { p.hidden = !!row; });
+      el.replaceChildren();
+      const v = row ? [row.cash_line, row.sma, row.back_line, row[el.dataset.field]] : [];
+      if (!row || v.some(blank)) {
+        if (d.status === 'error') { const f = document.createElement('div'); f.className = 'fail'; f.textContent = 'הטעינה נכשלה'; el.append(f); }
+        else el.textContent = '—';
+        return;
+      }
+      const [lo, mid, hi, px] = v.map(Number);
+      const W = Math.max(280, el.clientWidth), H = 64, m = 14, ty = 18;
+      const a = Math.min(lo, px), b = Math.max(hi, px), pad = Math.max((b - a) * 0.15, mid * 0.01);
+      const x = d3.scaleLinear().domain([a - pad, b + pad]).range([m, W - m]);
+      const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', '0 0 ' + W + ' ' + H)
+        .attr('role', 'img').attr('aria-label', el.dataset.label || '');
+      svg.append('line').attr('class', 'trk').attr('x1', m).attr('x2', W - m).attr('y1', ty).attr('y2', ty);
+      svg.append('rect').attr('class', 'band').attr('x', x(lo)).attr('width', Math.max(0, x(hi) - x(lo))).attr('y', ty - 8).attr('height', 16);
+      [[lo, 'l-cash'], [mid, 'l-sma'], [hi, 'l-back']].forEach(([val, cls]) => {
+        svg.append('line').attr('class', cls).attr('x1', x(val)).attr('x2', x(val)).attr('y1', ty - 12).attr('y2', ty + 12).style('stroke-width', 2);
+      });
+      svg.append('circle').attr('cx', x(px)).attr('cy', ty).attr('r', 6).style('fill', dash.colors[0])
+        .style('stroke', 'var(--color-panel)').style('stroke-width', 2);
+      const gx = svg.append('g').attr('class', 'ax').attr('transform', 'translate(0,' + (ty + 16) + ')')
+        .call(d3.axisBottom(x).ticks(Math.max(2, Math.floor((W - 2 * m) / 110))).tickFormat(d3.format('$,.0f')).tickSize(0).tickPadding(6));
+      gx.select('.domain').remove();
+      gx.selectAll('.tick').each(function (t) {
+        const tx = d3.select(this).select('text'), half = tx.node().getComputedTextLength() / 2, p = x(t);
+        if (p + half > W) tx.attr('text-anchor', 'end');
+        else if (p - half < 0) tx.attr('text-anchor', 'start');
+      });
     });
   })();
 </script>
