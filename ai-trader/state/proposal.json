@@ -1,0 +1,262 @@
+{
+  "decision_date": "2026-11-06",
+  "status": "pending",
+  "rebalance": true,
+  "exits_only": false,
+  "targets": {
+    "TEVA": 0.03896631040113974,
+    "JNJ": 0.04035172054740919,
+    "KO": 0.06744565008209262,
+    "MRK": 0.02558369033607191,
+    "AMGN": 0.027573224118684566,
+    "ABBV": 0.04209365684827797,
+    "PM": 0.048579077143895415,
+    "LLY": 0.027768347994694485,
+    "AAPL": 0.05360899056758933,
+    "CVX": 0.050529460584388515,
+    "XLV": 0.07285453647475688,
+    "XOM": 0.04476386579662776,
+    "DE": 0.039320971413984836,
+    "UNP": 0.05123969567370899
+  },
+  "targets_raw": {
+    "TEVA": 0.03896631040113974,
+    "JNJ": 0.04035172054740919,
+    "KO": 0.06744565008209262,
+    "MRK": 0.02558369033607191,
+    "AMGN": 0.027573224118684566,
+    "ABBV": 0.04209365684827797,
+    "PM": 0.048579077143895415,
+    "LLY": 0.027768347994694485,
+    "AAPL": 0.05360899056758933,
+    "CVX": 0.050529460584388515,
+    "XLV": 0.07285453647475688,
+    "XOM": 0.04476386579662776,
+    "DE": 0.039320971413984836,
+    "UNP": 0.05123969567370899
+  },
+  "stopped_shadow": [],
+  "shadow_hold": {},
+  "stopped": [],
+  "overrides": [],
+  "earnings_blackout": {
+    "COP": "2026-11-05 time-not-supplied"
+  },
+  "preview_at_close": [
+    {
+      "date": "2026-11-06",
+      "symbol": "MRK",
+      "side": "BUY",
+      "qty": 17,
+      "price": 146.8034,
+      "value": 2495.66,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "AMGN",
+      "side": "BUY",
+      "qty": 5,
+      "price": 460.6502,
+      "value": 2303.25,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "LLY",
+      "side": "BUY",
+      "qty": 2,
+      "price": 1354.677,
+      "value": 2709.35,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "TEVA",
+      "side": "BUY",
+      "qty": 91,
+      "price": 42.6313,
+      "value": 3879.45,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "DE",
+      "side": "BUY",
+      "qty": 5,
+      "price": 671.9858,
+      "value": 3359.93,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "JNJ",
+      "side": "BUY",
+      "qty": 14,
+      "price": 276.3581,
+      "value": 3869.01,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "ABBV",
+      "side": "BUY",
+      "qty": 14,
+      "price": 291.4557,
+      "value": 4080.38,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "XOM",
+      "side": "BUY",
+      "qty": 26,
+      "price": 165.9529,
+      "value": 4314.78,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "PM",
+      "side": "BUY",
+      "qty": 24,
+      "price": 197.9789,
+      "value": 4751.49,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "CVX",
+      "side": "BUY",
+      "qty": 23,
+      "price": 212.7163,
+      "value": 4892.48,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "UNP",
+      "side": "BUY",
+      "qty": 17,
+      "price": 290.3051,
+      "value": 4935.19,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "AAPL",
+      "side": "BUY",
+      "qty": 15,
+      "price": 342.5412,
+      "value": 5138.12,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "KO",
+      "side": "BUY",
+      "qty": 70,
+      "price": 95.7178,
+      "value": 6700.25,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-06",
+      "symbol": "XLV",
+      "side": "BUY",
+      "qty": 39,
+      "price": 184.8924,
+      "value": 7210.8,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    }
+  ],
+  "new_entries": [
+    "MRK",
+    "AMGN",
+    "LLY",
+    "TEVA",
+    "DE",
+    "JNJ",
+    "ABBV",
+    "XOM",
+    "PM",
+    "CVX",
+    "UNP",
+    "AAPL",
+    "KO",
+    "XLV"
+  ],
+  "diag": {
+    "date": "2026-11-06",
+    "n_scored": 93,
+    "n_eligible": 43,
+    "stopped": [],
+    "top_scores": {
+      "TEVA": 0.701,
+      "JNJ": 0.628,
+      "KO": 0.615,
+      "MRK": 0.607,
+      "AMGN": 0.589,
+      "TXN": 0.588,
+      "ABBV": 0.569,
+      "COP": 0.562,
+      "PM": 0.54,
+      "LLY": 0.538
+    },
+    "bottom_scores": {
+      "NFLX": -0.736,
+      "ORCL": -0.702,
+      "UBER": -0.555,
+      "BKNG": -0.526,
+      "NKE": -0.499
+    },
+    "regime": "risk_on+defensive",
+    "drawdown": 0.0,
+    "dd_state": "normal",
+    "ex_ante_vol_unscaled": 0.1334,
+    "scale": 0.6745,
+    "gross": 0.6745,
+    "targets": {
+      "XLV": 0.0729,
+      "KO": 0.0674,
+      "AAPL": 0.0536,
+      "UNP": 0.0512,
+      "CVX": 0.0505,
+      "PM": 0.0486,
+      "XOM": 0.0448,
+      "COP": 0.0438,
+      "ABBV": 0.0421,
+      "JNJ": 0.0404,
+      "DE": 0.0393,
+      "TEVA": 0.039,
+      "LLY": 0.0278,
+      "AMGN": 0.0276,
+      "MRK": 0.0256
+    }
+  },
+  "weights": {
+    "tsmom": 0.25,
+    "xsmom": 0.25,
+    "trend": 0.2,
+    "breakout": 0.2,
+    "high52": 0.03,
+    "reversal": 0.02,
+    "rsi2": 0.05,
+    "lowvol": 0.0
+  },
+  "logged_at": "2026-11-09T11:22:55+00:00"
+}
