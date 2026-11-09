@@ -113,6 +113,9 @@ def _run(a: argparse.Namespace) -> int:
         if out.get("halted"):
             print(json.dumps({"halted": out["halted"]}, ensure_ascii=False))
             sys.exit(1)
+        if out.get("skipped"):  # crypto: stale or absent data, nothing decided or filled; a later run retries
+            print(json.dumps({"skipped": out["skipped"]}, ensure_ascii=False))
+            return 0
         if a.propose:
             print(json.dumps({k: out.get(k) for k in ("decision_date", "rebalance", "new_entries", "preview_at_close", "earnings_blackout", "stopped", "overrides")}
                              | {"regime": out["diag"].get("regime"), "top_scores": out["diag"].get("top_scores")}, indent=1, default=str))

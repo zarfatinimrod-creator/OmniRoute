@@ -169,6 +169,9 @@ class SameRegimeEverywhere(unittest.TestCase):
     def test_same_regime_in_main_shadow_proposal_backtest(self):
         p = crypto_panel()
         cfg = data.load_config("crypto")
+        # Same closes on both paths: next_open (Task 5) would drop each stub's newest bar (no D+1 row) and, on this
+        # synthetic panel, open[D+1] != close[D]. The close-source rule has its own tests in test_data_rules.
+        cfg["market"]["close_source"] = "yahoo"
         reg = precompute_aux(p, cfg)["regime"]
         flips = [i for i in range(300, len(reg)) if reg.iloc[i] != reg.iloc[i - 1]]
         self.assertTrue(flips)

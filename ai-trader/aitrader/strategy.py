@@ -128,12 +128,15 @@ def build_targets(
     held: dict,
     blocked: set | None = None,
     aux: dict | None = None,
+    frozen: set | None = None,
 ) -> tuple[dict[str, float], dict]:
     """Target portfolio weights for `date`.
 
     equity_peak_ratio: current equity / running peak (1.0 = at peak).
     held: {sym: {"peak_close": float, ...}} current positions for stop checks.
     blocked: symbols in stop-loss cooldown.
+    frozen: symbols whose bar is stale or absent (data.stale_symbols): never stopped, ranked or picked; a held one
+      keeps its slot (the caller holds it at its current weight, the broker does not trade it).
     Returns (targets, diagnostics).
     """
     r = cfg["risk"]
@@ -142,6 +145,7 @@ def build_targets(
     px = close.loc[date]
     bench = cfg.get("benchmark", "SPY")
     blocked = blocked or set()
+    frozen = set(frozen or ())
 
     aux = aux or precompute_aux(panel, cfg)
     score = combine(signals, weights, date).dropna()
@@ -151,14 +155,14 @@ def build_targets(
     a = aux["atr"].loc[date]
     stopped = []
     for sym, pos in held.items():
-        if r["atr_stop_mult"] > 0 and sym in px and pd.notna(px[sym]) and pd.notna(a.get(sym)):
+        if r["atr_stop_mult"] > 0 and sym not in frozen and sym in px and pd.notna(px[sym]) and pd.notna(a.get(sym)):
             stop = pos.get("peak_close", px[sym]) - r["atr_stop_mult"] * a[sym]
             if px[sym] < stop:
                 stopped.append(sym)
 
     # Hysteresis to cut turnover: new names need score > min_score and a top-N rank; names already
     # held stay while score > exit_score and rank is inside top (N * keep_rank_mult).
-    ok = px.reindex(score.index).notna() & vol.reindex(score.index).gt(0)
+    ok = px.reindex(score.index).notna() & vol.reindex(score.index).gt(0) & ~score.index.isin(list(frozen))
     ranked = score[ok].sort_values(ascending=False)
     rank = pd.Series(range(1, len(ranked) + 1), index=ranked.index)
     n = r["max_positions"]
@@ -170,7 +174,7 @@ def build_targets(
         if len(vl) >= r.get("lowvol_exclude_min_names", 10):
             too_hot = set(vl[vl >= vl.quantile(1 - r["lowvol_exclude_top_pct"])].index)
     new = [s for s in ranked.index if ranked[s] > r["min_score"] and s not in keep and s not in too_hot]
-    chosen = [s for s in keep + new if s not in blocked and s not in stopped][:n]
+    chosen = [s for s in keep + new if s not in blocked and s not in stopped][:n - len(frozen & set(held))]  # a frozen held name keeps its slot
     elig = ranked[ranked > r["min_score"]]
     picks = ranked[chosen]
 
@@ -182,6 +186,8 @@ def build_targets(
         "top_scores": {k: round(float(v), 3) for k, v in score.sort_values(ascending=False).head(10).items()},
         "bottom_scores": {k: round(float(v), 3) for k, v in score.sort_values().head(5).items()},
     }
+    if frozen:  # a new key only when something is frozen (stock diag unchanged otherwise)
+        diag["frozen"] = sorted(frozen)
     # Regime filter on the benchmark (aux["regime"], causal). Fails CLOSED: missing data counts as risk-off.
     regime = aux["regime"].loc[date]
     fill = cfg.get("market", {}).get("fill_regime_on_no_picks", False)

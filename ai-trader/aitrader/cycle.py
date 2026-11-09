@@ -13,7 +13,7 @@ LLM layer adds or removes value. Every step is idempotent: re-running the same d
 from __future__ import annotations
 
 import copy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -21,7 +21,8 @@ import pandas as pd
 
 from . import journal, notify
 from .broker import PaperBroker
-from .data import corporate_actions, earnings_on, fetch_panel, load_config, load_market, market_status, official_opens
+from .data import (apply_close_source, coinbase_close, corporate_actions, earnings_on, fetch_panel, load_config, load_market,
+                   market_status, official_opens, stale_symbols)
 from .learn import ic_table, signal_stats, update_weights, walk_forward_weights
 from .signals import compute_all
 from .strategy import build_targets, combine, etf_groups, periods_per_year, precompute_aux
@@ -167,8 +168,57 @@ def _earnings_blackout(ds: str, days: int) -> dict[str, str]:
 
 
 def _bar_is_final(d: pd.Timestamp) -> bool:
+    """The clock half of the bar-final rule (16:05 New York); the fetch-time half is data.stale_symbols."""
     now = datetime.now(NY)
     return d.date() < now.date() or (d.date() == now.date() and (now.hour, now.minute) >= (16, 5))
+
+
+def _bar_end_utc(d, cfg: dict) -> datetime:
+    """When bar d counts as final if fetched after it: stocks 16:00 New York + 5 min, also on early-close days (the
+    clock of _bar_is_final); a utc_daily bar at the next 00:00 UTC + 5 min."""
+    d = pd.Timestamp(d)
+    if cfg.get("market", {}).get("calendar") == "utc_daily":
+        return datetime(d.year, d.month, d.day, tzinfo=timezone.utc) + timedelta(days=1, minutes=5)
+    return datetime(d.year, d.month, d.day, 16, 5, tzinfo=NY).astimezone(timezone.utc)
+
+
+def _clock_final(d, cfg: dict) -> bool:
+    """Has bar d's session ended by the clock? Stocks: _bar_is_final. utc_daily: also past its UTC bar_end (the NYSE
+    clock alone calls a UTC day over at 16:05 New York). Task 6: UtcDailyCalendar replaces this on the crypto branch."""
+    ok = _bar_is_final(d)
+    if cfg.get("market", {}).get("calendar") == "utc_daily":
+        ok = ok and datetime.now(timezone.utc) >= _bar_end_utc(d, cfg)
+    return ok
+
+
+def _hold_frozen(targets: dict, cur: dict, frozen: set, max_gross: float) -> dict:
+    """Planning decision 10: a frozen (stale or absent) held name keeps its current weight; the other targets shrink
+    pro rata only if the book would pass max_gross."""
+    hold = {s: cur[s] for s in sorted(frozen) if s in cur}
+    if not hold:
+        return targets
+    rest = {s: w for s, w in targets.items() if s not in frozen}
+    room, tot = max(0.0, max_gross - sum(hold.values())), sum(rest.values())
+    k = min(1.0, room / tot) if tot > 0 else 1.0
+    return {**{s: w * k for s, w in rest.items()}, **hold}
+
+
+def _coinbase_guard(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict) -> dict | None:
+    """Planning decision 11: the decision close of each universe symbol against Coinbase's public daily candle.
+    None when market.coinbase_guard_pct is 0 (stocks). status: breach (a gap above the limit) > unreachable > ok."""
+    pct = cfg.get("market", {}).get("coinbase_guard_pct", 0)
+    if not pct:
+        return None
+    gaps, down = {}, []
+    for s in sorted(cfg["universe"]):
+        cb = coinbase_close(s, dec)
+        if cb is None:
+            down.append(s)
+        else:
+            gaps[s] = float(close.at[dec, s]) / cb - 1
+    breach = sorted(s for s, g in gaps.items() if abs(g) > pct)
+    return {"status": "breach" if breach else "unreachable" if down else "ok", "pct": pct, "gaps": gaps,
+            "breach": breach, "unreachable": down}
 
 
 def _brokers(cfg: dict, prices: dict, ds: str) -> tuple[PaperBroker, PaperBroker]:
@@ -209,10 +259,11 @@ def _execute_pending(panel, cfg, main, shadow, events) -> list[dict]:
     cool = str((d_exec + pd.offsets.BDay(r.get("stop_cooldown_days", 10))).date())
     xo = pending.get("exits_only", False)
     forced = {o["symbol"] for o in pending.get("overrides", []) if o["action"].startswith("size")}
-    fills = main.rebalance(pending["targets"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool, xo, forced)
+    frz = set(pending.get("frozen", []))  # decided on stale data: never traded by this decision
+    fills = main.rebalance(pending["targets"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool, xo, forced, frz)
     stp = set(pending.get("stopped_shadow", pending.get("stopped", [])))
     sh_targets = pending["targets_raw"] if not xo else {s_: w for s_, w in pending.get("shadow_hold", {}).items() if s_ not in stp}
-    shadow.rebalance(sh_targets, opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], list(stp), cool, xo)
+    shadow.rebalance(sh_targets, opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], list(stp), cool, xo, frozen=frz)
     if pending.get("rebalance"):
         main.state["last_rebalance"] = shadow.state["last_rebalance"] = pending["decision_date"]
     # crash safety: books first, then the trade log, then mark the decision executed
@@ -227,8 +278,10 @@ def _execute_pending(panel, cfg, main, shadow, events) -> list[dict]:
     return fills
 
 
-def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, persist: bool, events) -> dict:
-    """Targets for decision bar `dec` (data up to its close only). persist=False = proposal, no state change."""
+def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, persist: bool, events, frozen: set | None = None) -> dict:
+    """Targets for decision bar `dec` (data up to its close only). persist=False = proposal, no state change.
+    frozen: symbols with a stale or absent bar - neither bought nor sold, a held one keeps its current weight."""
+    frozen = set(frozen or ())
     r = cfg["risk"]
     bench = cfg.get("benchmark", "SPY")
     panel = {k: (v.loc[:dec] if hasattr(v, "loc") else v) for k, v in panel.items()}  # nothing after the decision bar's close
@@ -249,7 +302,7 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
         m.mark(px, ds, y if m.state.get("last_mark") not in (None, ds) else 0.0, periods_per_year(cfg))
         shadow.mark(px, ds, y if shadow.state.get("last_mark") not in (None, ds) else 0.0, periods_per_year(cfg))
     blocked = set(m.state.get("blocked", {}))
-    targets_raw, diag = build_targets(dec, panel, signals, weights, cfg, m.peak_ratio(px), m.positions, blocked, aux)
+    targets_raw, diag = build_targets(dec, panel, signals, weights, cfg, m.peak_ratio(px), m.positions, blocked, aux, frozen)
     last_reb = m.state.get("last_rebalance")
     days_since = (close.index.get_loc(dec) - close.index.get_loc(pd.Timestamp(last_reb))) if last_reb and pd.Timestamp(last_reb) in close.index else 10**6
     risk_changed = (prev_regime is not None and prev_regime != diag.get("regime")) or (prev_dd is not None and prev_dd != diag.get("dd_state"))
@@ -258,6 +311,7 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     exits_only = not due
     if exits_only:  # off-cycle: hold the book, act only on stops (exits), never re-trade overnight gaps
         targets_raw = {s: w for s, w in m.weights(px).items() if s not in stopped}
+    targets_raw = _hold_frozen(targets_raw, m.weights(px), frozen, r["max_gross"])
     bo = _earnings_blackout(ds, r.get("earnings_blackout_days", 4))
     etf = etf_groups(cfg)
     skipped = {s: bo.get(s, bo.get("*")) for s in list(targets_raw)
@@ -268,14 +322,26 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     for s in list(targets_raw):  # held through a report: cap the size (ATR stops cannot protect an earnings gap)
         if s in bo and s in m.positions and cfg["universe"].get(s) not in etf and targets_raw[s] > cap:
             targets_raw[s] = cap
-    _, sdiag = build_targets(dec, panel, signals, weights, cfg, shadow.peak_ratio(px), shadow.positions, set(shadow.state.get("blocked", {})), aux)
+    guard = _coinbase_guard(close, dec, cfg)
+    if guard:
+        diag["coinbase_guard"] = guard
+        if guard["status"] == "breach":  # exits only: nothing grows, no new names; stops and regime-off still sell
+            cur = m.weights(px)
+            targets_raw = {s: min(w, cur[s]) for s, w in targets_raw.items() if s in cur}
+            events.append(f"בדיקת Coinbase: פער מעל {guard['pct']:.0%} ב-{', '.join(guard['breach'])} - יציאות בלבד בהחלטה הזו")
+        if guard["unreachable"]:
+            events.append(f"אזהרה: Coinbase לא זמין ({', '.join(guard['unreachable'])}) - ממשיכים בלי בדיקת המחיר")
+    if panel.get("_close_source"):  # next_open: both closes of the decision bar, for the revised-close check
+        diag["close_source"] = panel["_close_source"]
+    _, sdiag = build_targets(dec, panel, signals, weights, cfg, shadow.peak_ratio(px), shadow.positions, set(shadow.state.get("blocked", {})), aux, frozen)
     targets, applied = _apply_overrides(targets_raw, m.positions, ds, _open_cutoff_utc(dec + pd.offsets.BDay(1)))
-    preview = copy.deepcopy(m).rebalance(targets, px, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped, None, exits_only)
+    preview = copy.deepcopy(m).rebalance(targets, px, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped, None, exits_only, frozen=frozen)
     new_entries = [f["symbol"] for f in preview if f["side"] == "BUY" and f["symbol"] not in m.positions]
     decision = {"decision_date": ds, "status": "pending", "rebalance": due, "exits_only": exits_only, "targets": targets, "targets_raw": targets_raw,
                 "stopped_shadow": sdiag.get("stopped", []), "shadow_hold": shadow.weights(px),
                 "stopped": stopped, "overrides": applied, "earnings_blackout": skipped, "preview_at_close": preview,
-                "new_entries": new_entries, "diag": diag, "weights": weights, "logged_at": journal.now_utc()}
+                "new_entries": new_entries, "diag": diag, "weights": weights, "logged_at": journal.now_utc(),
+                **({"frozen": sorted(frozen)} if frozen else {})}
     if not persist:
         journal.save_json("proposal.json", decision)
         return decision
@@ -291,6 +357,8 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
         events.append("מתוכנן לפתיחה הבאה: " + ", ".join(f"{f['side']} {f['qty']} {f['symbol']}" for f in preview))
     if stopped:
         events.append("סטופ-לוס (יבוצע בפתיחה): " + ", ".join(stopped))
+    if frozen & set(m.positions):
+        events.append("נתונים ישנים/חסרים - מוקפא, לא נקנה ולא נמכר והסטופ לא נבדק: " + ", ".join(sorted(frozen & set(m.positions))))
     if prev_regime and prev_regime != diag.get("regime"):
         events.append(f"שינוי משטר שוק: {prev_regime} -> {diag.get('regime')}")
     if prev_dd and prev_dd != diag.get("dd_state"):
@@ -307,15 +375,35 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
         notify.send("AI Trader - תקלה", msg + " (כסף נייר)", cfg, "urgent")
         return {"halted": msg, "executed": [], "decided_now": False, "events": [msg]}
     bench = cfg.get("benchmark", "SPY")
-    panel = load_market(cfg, "10y", max_age_hours)
+    mk = cfg.get("market", {})
+    panel = load_market(cfg, mk.get("history", "10y"), max_age_hours)
     close = panel["close"]
     last = close.index[-1]
-    dec_bar = last if _bar_is_final(last) else (close.index[-2] if len(close) > 1 else last)
+    prev = close.index[-2] if len(close) > 1 else last
+    events: list[str] = []
+    # Bar-final rule (planning decision 10): the clock says the session ended AND the data was fetched after it.
+    if mk.get("stale_skips_run"):  # crypto: any stale or absent coin skips the run before any decision or fill
+        dec_bar = last if _clock_final(last, cfg) else prev
+        stale = stale_symbols(panel, dec_bar, _bar_end_utc(dec_bar, cfg), cfg["universe"])
+        if stale:
+            msg = f"stale or absent data for {', '.join(sorted(stale))} on {dec_bar.date()}: run skipped, a later run retries"
+            return {"skipped": msg, "executed": [], "decided_now": False, "events": [msg]}
+        frozen = set()
+    else:  # stocks: a stale benchmark makes the newest bar not final; a stale or absent symbol is frozen
+        final = _clock_final(last, cfg) and bench not in stale_symbols(panel, last, _bar_end_utc(last, cfg), [bench])
+        dec_bar = last if final else prev
+        frozen = stale_symbols(panel, dec_bar, _bar_end_utc(dec_bar, cfg), cfg["universe"])
+    if mk.get("close_source", "yahoo") != "yahoo":  # next_open: close[D] = open[D+1]; no D+1 row, no decision on D
+        panel = apply_close_source(panel, mk["close_source"], dec_bar)
+        close = panel["close"]
+        if dec_bar not in close.index:
+            events.append(f"אין עדיין שורת {(dec_bar + pd.Timedelta(days=1)).date()} - אין החלטה על {dec_bar.date()}, ריצה מאוחרת תנסה שוב")
+            dec_bar = close.index[close.index < dec_bar][-1]
+            last = close.index[-1]
     try:
         mkt = market_status(bench)
     except Exception as e:  # noqa: BLE001
         mkt = {"is_open": False, "error": type(e).__name__}
-    events: list[str] = []
     prices_last = _px(close.loc[last])
     main, shadow = _brokers(cfg, _px(close.loc[dec_bar]), str(dec_bar.date()))
     # Splits/dividends through the latest bar are applied BEFORE any fill: the feed is already adjusted, so a
@@ -325,7 +413,7 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
     ca_notes = main.apply_corporate_actions(acts, str(last.date()), w_hold)
     shadow.apply_corporate_actions(acts, str(last.date()), w_hold)
     if propose:  # what the next decision would be, for the trading desk; changes no state
-        return _decide(panel, cfg, main, shadow, dec_bar, force_rebalance, False, events)
+        return _decide(panel, cfg, main, shadow, dec_bar, force_rebalance, False, events, frozen)
 
     executed: list[dict] = []
     diag: dict = {}
@@ -334,7 +422,7 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
     if execute:
         executed += _execute_pending(panel, cfg, main, shadow, events)
         if (journal.load_json("pending.json") or {}).get("decision_date") != str(dec_bar.date()):
-            diag = _decide(panel, cfg, main, shadow, dec_bar, force_rebalance, True, events).get("diag", {})
+            diag = _decide(panel, cfg, main, shadow, dec_bar, force_rebalance, True, events, frozen).get("diag", {})
             decided_now = True
             executed += _execute_pending(panel, cfg, main, shadow, events)  # a missed morning: fill at that open now
     weights = (journal.load_json("weights.json") or {}).get("weights", cfg["prior_weights"])

@@ -22,7 +22,7 @@ def frozen_env(tmp_state: Path, panel_upto):
     import aitrader.report as rep
 
     names = ["load_config", "load_market", "market_status", "earnings_on", "_overlays_once_per_day",
-             "_market_opened", "_bar_is_final", "official_opens", "corporate_actions"]
+             "_market_opened", "_bar_is_final", "official_opens", "corporate_actions", "coinbase_close"]
     saved = {k: getattr(cycle, k) for k in names}
     saved_send, saved_now = cycle.notify.send, journal.now_utc
     saved_state, saved_rep = journal.STATE, rep.ROOT
@@ -34,6 +34,7 @@ def frozen_env(tmp_state: Path, panel_upto):
         cycle.notify.send = lambda *a, **k: []
         cycle.corporate_actions = lambda sym: []
         cycle.official_opens = lambda syms, day: {}
+        cycle.coinbase_close = lambda sym, day: None  # the crypto price guard's source: unreachable, never the network
         cycle.market_status = lambda sym="SPY": {"is_open": False}
         cycle.earnings_on = lambda day: {}
         cycle._overlays_once_per_day = lambda cfg, ds, bench: {}
