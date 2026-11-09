@@ -1,4 +1,4 @@
-# Crypto book v1 - design spec (2026-11-09, rev 3)
+# Crypto book v1 - design spec (2026-11-09, rev 3.1)
 
 Status: design approved by Nimrod in chat on 2026-11-09 (approach B, BTC + ETH, quiet nights, $100k).
 - Rev 2 adds the fixes from the adversarial review of rev 1 (two reviewers, quant-critic and feasibility; workflow
@@ -105,7 +105,15 @@ approximate replays (`research/2026-11-09-crypto-replays/power.py`, `ablate.py`)
     min_score, exit_score, keep_rank_mult, regime_sma_days, regime_band_pct, regime_band_mode,
     risk_off_gross_mult, dd_halve, dd_flat, dd_reentry_days, atr_days, atr_stop_mult, rebalance_band_pct,
     min_trade_value, vol_lookback_days, rebalance_every_days, stop_cooldown_days, lowvol_exclude_top_pct` (0).
-    `atr_stop_mult = 0` means no stop and `dd_halve = -1.0` means no halving step. The sweep report prints the
+    `atr_stop_mult = 0` means no stop: strategy.py skips the stop check when `atr_stop_mult <= 0`. Today a 0 would
+    put the stop at the peak close, so every dip would fire it. `dd_halve = -1.0` means no halving step.
+    New key `risk.dd_reentry_ref`: the drawdown the re-entry peak reset implies (broker.py:93).
+    - It defaults to `(dd_halve + dd_flat) / 2`, so the stock book is byte-identical; crypto sets -0.25.
+    - Without it, `dd_halve = -1.0` resets the peak to a -75% drawdown, which is still below -50%, so after the
+      catastrophe step fires the book would stay in cash forever.
+    - Crypto values: candidate `min_score` 0.15, `exit_score` 0.0; both profiles `vol_lookback_days` 60,
+      `dd_reentry_days` 20 (the values the replays used).
+    The sweep report prints the
     merged config of each profile.
   - **Each profile's panel is limited to its own universe** (`combine()` scores every panel column). Test:
     crypto_base never holds ETH.
@@ -158,7 +166,7 @@ approximate replays (`research/2026-11-09-crypto-replays/power.py`, `ablate.py`)
 | Vol target | 30% annual (BTC 2y vol 44.1%, ETH 68.5%) | 30% |
 | Caps | max_gross 1.0 (no leverage); BTC <= 1.0, ETH <= 0.6 of the book; max_sector_pct 1.0 | BTC <= 1.0 |
 | Stop | 3x ATR14 trailing, judged at the daily close. About 9.9% for BTC and 13.9% for ETH; a fixed -3% is touched within 3 days by 37.8% / 51.4% of random entries | off (`atr_stop_mult` 0) |
-| Drawdown breaker | halve at -25% (ablatable); **catastrophe step: flat at -50%**, with today's re-entry rule | **catastrophe step only: flat at -50%** (`dd_halve` -1.0) |
+| Drawdown breaker | halve at -25% (ablatable); **catastrophe step: flat at -50%**, re-entry via `dd_reentry_ref` -0.25 | **catastrophe step only: flat at -50%** (`dd_halve` -1.0, `dd_reentry_ref` -0.25) |
 | Rebalance | every 7 days, band 0.05, min trade $100, stop cooldown 14 bars | same |
 | Costs | fee 50 bp/side, slippage 5 bp, exec delay 10 bp. About 13x stock costs. Venues: Kraken Pro taker 80 bp; Coinbase Advanced 90 bp (secondary source); Alpaca 25 bp; Binance 10 bp; eToro publishes 1% | same |
 | Cash yield / learning | 0 / off | 0 / off |
@@ -217,7 +225,13 @@ Scheduled-task prompts (stored verbatim when created):
   - If new entries are pending: read BTC/ETH headlines (trader-news skill). Veto or shrink only with a concrete reason from the checklist, before exec_ts.
   - Commit + push with the retry loop. No PushNotification at night."
 - **fill:** the same, minus the headline step.
-- **summary:** "cycle --book crypto, then summary --book crypto, then refresh the dashboard (see the dashboard refresh task)."
+- **summary:**
+  - "Crypto morning summary (paper). cd /home/user/OmniRoute && git pull --rebase. cd ai-trader &&
+    python3 -m aitrader cycle --book crypto.
+  - python3 -m aitrader summary --book crypto. It exits non-zero if urgent items are queued; deliver the text anyway.
+  - Deliver with notify.send (ntfy). If 'ntfy' is not among the returned channels, send the text with PushNotification.
+  - Only after delivery: python3 -m aitrader summary --book crypto --ack.
+  - Then refresh the dashboard (see the dashboard refresh task) and commit + push with the retry loop."
 
 ## 7. Testing and the gate (rule 4)
 
@@ -237,6 +251,9 @@ Scheduled-task prompts (stored verbatim when created):
 - the fill source chain and the exec_ts / override cutoff. "Missing" means no row or a null open; volume is ignored,
   because 54% of 01:00 UTC hourly bars report volume 0 but carry real prices;
 - the stale-symbol freeze (a held stale coin is not sold);
+- `atr_stop_mult <= 0` means no stop check;
+- drawdown re-entry: the -50% step fires, and after `dd_reentry_days` risk-on decisions the book trades again, in
+  both profiles;
 - the cache-mtime bar-final rule (both books);
 - the Coinbase guard: exits only on a breach, proceed when unreachable;
 - the quiet-hours queue and the summary command;
@@ -256,7 +273,7 @@ Scheduled-task prompts (stored verbatim when created):
 - **Runs:**
   - base vs candidate at 50 bp and at 100 bp;
   - each half separately;
-  - leave-one-out ablations: no ETH, no ATR stop, no breaker;
+  - leave-one-out ablations: no ETH, no ATR stop, no -25% halving step;
   - a BTC+XRP hindsight control;
   - one missed-night robustness run, with execution at t+1.
 - **Order:** ablations first, then the pass rule on the final candidate.
@@ -288,8 +305,9 @@ Scheduled-task prompts (stored verbatim when created):
   - fees paid;
   - the next decision time.
 - The 08:03 Israel task rebuilds the snapshot on weekends too.
-- `lessons.md` stays one shared file in the root state directory, and each lesson names its book. `journal.context`
-  reads lessons from the root state directory even inside `use_book("crypto")`.
+- `lessons.md` stays one shared file in the stock-book state directory, and each lesson names its book.
+  `journal.context` reads lessons from the `STATE` that `use_book` captured on entry, not from `ROOT/"state"`, so tests
+  never touch the real file. A nested `use_book("crypto")` is a no-op, so the path never becomes `crypto/crypto`.
 
 ## 9. Rollout and timeline (estimates; review rounds can add time)
 
