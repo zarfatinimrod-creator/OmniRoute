@@ -439,7 +439,8 @@
         td.append(d, document.createTextNode(fmt(kind, v)));
         return;
       }
-      td.textContent = fmt(kind, v);
+      // an empty text cell (no desk action, no news action) stays blank instead of showing a dash
+      td.textContent = kind === 'text' && blank(v) ? '' : fmt(kind, v);
       if (kind === 'side') td.classList.add(v === 'קנייה' ? 'buy' : 'sell');
       tone(td, kind, toneKind, v);
     }
