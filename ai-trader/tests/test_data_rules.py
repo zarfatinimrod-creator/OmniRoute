@@ -285,7 +285,8 @@ class CryptoRun(unittest.TestCase):
                 self.assertEqual(set(out), {"skipped", "executed", "decided_now", "events"}, name)
                 self.assertEqual((out["executed"], out["decided_now"], out["events"]), ([], False, [out["skipped"]]), name)
                 self.assertIn(str(d.date()), out["skipped"], name)
-            self.assertEqual([f.name for f in state.iterdir()], [], name)  # nothing decided, filled or written
+            self.assertEqual([f.name for f in state.iterdir()], ["skips.jsonl"], name)  # nothing decided or filled; the skip is logged once (R7)
+            self.assertEqual(len((state / "skips.jsonl").read_text().splitlines()), 1, name)
 
         from aitrader.__main__ import main  # the CLI reports a skip instead of crashing on the missing diag
         with frozen_env(self.tmp(), None), contextlib.redirect_stdout(io.StringIO()) as buf:

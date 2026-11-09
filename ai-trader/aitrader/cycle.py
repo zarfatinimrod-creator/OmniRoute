@@ -477,6 +477,8 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
         stale = stale_symbols(panel, dec_bar, _bar_end_utc(dec_bar, cfg), set(cfg["universe"]) | {bench})
         if stale:
             msg = f"stale or absent data for {', '.join(sorted(stale))} on {dec_bar.date()}: run skipped, a later run retries"
+            if not propose:  # plain JSON-lines (not chained); ruling R7: the morning summary counts repeats
+                journal.append("skips.jsonl", {"logged_at": journal.now_utc(), "reason": msg})
             return {"skipped": msg, "executed": [], "decided_now": False, "events": [msg]}
         frozen = set()
     else:  # stocks: a stale benchmark makes the newest bar not final; a stale or absent symbol is frozen

@@ -8,6 +8,7 @@
   shrink SYMBOL MULT --reason TEXT        shrink today's target for SYMBOL (0..1)
   news SYMBOL                             recent headlines
   context SYMBOL                          past calls, trades and lessons for a ticker (read before deciding)
+  summary [--send] [--ack [TS]]           crypto morning summary: urgent first; --send delivers (exit 0 ok, 2 ok+urgent, 3 not delivered)
   verify                                  check the tamper-evident hash chains
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
   news-score [--n 8]                      score recent headlines without trading (scorer check)
@@ -19,7 +20,7 @@
   scorecard                               grade matured predictions
 
   --book stocks|crypto (before or after the command; default stocks) picks the paper book. crypto runs in
-  state/crypto/ and is accepted by cycle, status, scorecard, backtest, verify, predict, context, veto, shrink;
+  state/crypto/ and is accepted by cycle, status, scorecard, backtest, verify, predict, context, veto, shrink, summary;
   every other command is stock-only in v1 and refuses it.
 """
 
@@ -32,7 +33,7 @@ from datetime import datetime, timezone
 
 from . import journal
 
-BOOK_CMDS = {"cycle", "status", "scorecard", "backtest", "verify", "predict", "context", "veto", "shrink"}  # take --book crypto
+BOOK_CMDS = {"cycle", "status", "scorecard", "backtest", "verify", "predict", "context", "veto", "shrink", "summary"}  # take --book crypto
 
 
 def _today_market_date() -> str:
@@ -67,6 +68,9 @@ def main(argv=None) -> int:
     cx = sub.add_parser("context")
     cx.add_argument("symbol")
     sub.add_parser("verify")
+    sm = sub.add_parser("summary")
+    sm.add_argument("--send", action="store_true", help="deliver through notify (bypasses quiet hours); auto-acks up to newest")
+    sm.add_argument("--ack", nargs="?", const="", default=None, metavar="TS", help="drop queued alerts with queued_at <= TS (bare: all now queued)")
     nl = sub.add_parser("news-live")
     nl.add_argument("--until", default="16:05", help="New York time to stop")
     nl.add_argument("--minutes", type=float, default=None)
@@ -171,6 +175,26 @@ def _run(a: argparse.Namespace) -> int:
         print(json.dumps(ov, indent=1))
     elif a.cmd == "context":
         print(json.dumps(journal.context(a.symbol), indent=1, default=str))
+    elif a.cmd == "summary":
+        from . import notify
+        from .data import load_config
+
+        cfg = load_config()
+        if a.ack is not None and not a.send:
+            n = notify.ack(a.ack or max((q["queued_at"] for q in journal.load_json("alert_queue.json", []) or []), default=None))
+            print(json.dumps({"acked": n}))
+            return 0
+        s = notify.build_summary(cfg)
+        channels: list[str] = []
+        if a.send:
+            channels = notify.send("AI Trader - crypto morning summary", s["text"], cfg, "urgent" if s["urgent"] else "default", force=True)
+        delivered = any(c in ("ntfy", "telegram") for c in channels)
+        if delivered:
+            notify.ack(a.ack or s["newest"])
+        print(json.dumps({"channels": channels, **s}, indent=1, ensure_ascii=False))
+        if a.send and not delivered:
+            return 3
+        return 2 if s["urgent"] else 0
     elif a.cmd == "verify":
         bad = []
         for name in sorted(journal.CHAINED if journal.BOOK == "stocks" else journal.MAIN_CHAINED):  # news: stock-only
