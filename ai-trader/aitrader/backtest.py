@@ -1,6 +1,7 @@
 """The Time Machine: replay history day by day with the exact live decision code.
 
-Decisions use data up to the close of day t and execute at the open of day t+1, with slippage.
+Decisions use data up to the close of day t and execute at the open of day t+exec_lag (default 1), with slippage
+(plus costs.exec_delay_bps, a backtest-only cost of the delay between the close and the fill).
 Signal weights are learned walk-forward (only from outcomes matured before each date).
 Never trust one run: `sweep()` re-runs under different cost/parameter assumptions; if the
 conclusion flips between reasonable assumptions there is no conclusion, only sensitivity.
@@ -26,7 +27,12 @@ def _px(row: pd.Series) -> dict:
 
 
 def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode: str = "learned",
-        rebalance_every: int | None = None, signals: dict | None = None, aux: dict | None = None, phase: int = 0) -> dict:
+        rebalance_every: int | None = None, signals: dict | None = None, aux: dict | None = None, phase: int = 0,
+        exec_lag: int = 1) -> dict:
+    """exec_lag: bars from the decision close to the fill open. 1 = the next open (live); 2 = one bar later (the
+    crypto sweep's missed-night run). Every decision fills exactly exec_lag bars after it, in order."""
+    if exec_lag < 1:
+        raise ValueError(f"exec_lag must be >= 1, got {exec_lag}")
     close = panel["close"]
     dates = close.loc[start:end].index if end else close.loc[start:].index
     if len(dates) < 30:
@@ -42,24 +48,27 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
         wmap = {d: prior for d in dates}
 
     r = cfg["risk"]
-    broker = PaperBroker(cfg["account"]["starting_cash"], cfg["costs"]["slippage_bps"], cfg["costs"]["commission_per_share"], None,
-                         cfg["costs"].get("qty_step", 1), cfg["costs"].get("fee_bps", 0.0))
-    pending, pending_stopped = None, []
+    costs = cfg["costs"]
+    broker = PaperBroker(cfg["account"]["starting_cash"], costs["slippage_bps"] + costs.get("exec_delay_bps", 0),
+                         costs["commission_per_share"], None, costs.get("qty_step", 1), costs.get("fee_bps", 0.0))
+    queue = []  # (fill bar index, targets or None = exits only, stopped symbols)
     equity, turnover, all_fills = {}, {}, []
     prev_regime, prev_dd = None, None
-    exits_only_pending = False
     for i, d in enumerate(dates):
         ds = str(d.date())
         cpx = _px(close.loc[d])
-        if pending is not None:
+        while queue and queue[0][0] <= i:
+            _, pending, pending_stopped = queue.pop(0)
+            exits_only = pending is None
+            if exits_only:  # built at fill time: positions bought after the decision (exec_lag > 1) are kept
+                pending = {s_: 1.0 for s_ in broker.positions if s_ not in pending_stopped}
             opx = _px(panel["open"].loc[d])
             exec_px = {**cpx, **opx}  # trade at the open; fall back to close if the open is missing
             eq_before = broker.equity(exec_px)
             cool = str(dates[min(i + r.get("stop_cooldown_days", 10), len(dates) - 1)].date())
-            fills = broker.rebalance(pending, exec_px, ds, r["rebalance_band_pct"], r["min_trade_value"], pending_stopped, cool, exits_only_pending)
+            fills = broker.rebalance(pending, exec_px, ds, r["rebalance_band_pct"], r["min_trade_value"], pending_stopped, cool, exits_only)
             turnover[d] = sum(f["value"] for f in fills) / max(eq_before, 1e-9)
             all_fills.extend(fills)
-            pending = None
         equity[d] = broker.mark(cpx, ds, cfg["account"]["cash_yield_annual"], periods_per_year(cfg))
         blocked = set(broker.state.get("blocked", {}))
         on_cycle = (i + phase) % rebalance_every == 0
@@ -70,10 +79,9 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
         broker.state["dd_state"] = diag.get("dd_state")
         prev_regime, prev_dd = diag.get("regime", prev_regime), diag.get("dd_state", prev_dd)
         if on_cycle or changed or diag.get("dd_state") == "flat":
-            pending, pending_stopped, exits_only_pending = targets, diag.get("stopped", []), False
+            queue.append((i + exec_lag, targets, diag.get("stopped", [])))
         elif diag.get("stopped"):  # off-cycle day: act on stops only (exits-only, like live)
-            pending = {s_: 1.0 for s_ in broker.positions if s_ not in diag["stopped"]}
-            pending_stopped, exits_only_pending = diag["stopped"], True
+            queue.append((i + exec_lag, None, diag["stopped"]))
 
     eq = pd.Series(equity)
     to = pd.Series(turnover, dtype=float)

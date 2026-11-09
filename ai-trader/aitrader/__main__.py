@@ -2,7 +2,7 @@
 
   cycle [--dry-run] [--force-rebalance]   one live paper cycle (execute only when the market is open)
   status                                  print the latest summary
-  backtest [--start 2018-01-01] [--sweep] the time machine (historical replay)
+  backtest [--start 2018-01-01] [--sweep] the time machine (historical replay); --book crypto: the crypto sweep (spec 7)
   predict SYMBOL up|down [--horizon N] [--note TEXT]   log Claude's own call for later grading
   veto SYMBOL --reason TEXT               veto today's new entry in SYMBOL (Claude review)
   shrink SYMBOL MULT --reason TEXT        shrink today's target for SYMBOL (0..1)
@@ -129,6 +129,19 @@ def _run(a: argparse.Namespace) -> int:
         print(json.dumps(journal.load_json("latest.json", {}), indent=1, default=str))
     elif a.cmd == "scorecard":
         print(json.dumps(journal.scorecard(), indent=1))
+    elif a.cmd == "backtest" and a.book == "crypto":  # spec 7: the paired-phase sweep decides crypto_base vs candidate
+        from . import crypto_sweep
+        from .data import fetch_panel, load_config
+        from .market import UtcDailyCalendar
+
+        panel = fetch_panel(list(crypto_sweep.SYMBOLS), load_config()["market"]["history"])
+        fetched = panel.get("_fetched_at") or {}  # the last bar that was final when the data was fetched
+        end = a.end or str(UtcDailyCalendar.last_final_bar(min(fetched.values()) if fetched else journal.now_utc()))
+        res = crypto_sweep.run_sweep(panel, a.start, crypto_sweep.SPLIT, end)
+        print(json.dumps({"ship": res["ship"], "final_candidate": res["final_candidate"], "pass_rule": res["pass_rule"],
+                          "dsr": res["dsr"], "report": res["report"],
+                          "runs": {k: {"sharpe_med": round(r["sharpe_med"], 3), "d_sharpe_med": r.get("d_sharpe_med"), "wins": r.get("wins")}
+                                   for k, r in res["runs"].items()}}, indent=1, default=str))
     elif a.cmd == "backtest":
         from . import backtest
         from .data import load_config, load_market

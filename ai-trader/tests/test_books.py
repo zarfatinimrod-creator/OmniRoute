@@ -17,7 +17,7 @@ from unittest import mock
 import pandas as pd
 
 from aitrader import __main__ as cli
-from aitrader import backtest, cycle, data, journal
+from aitrader import backtest, crypto_sweep, cycle, data, journal
 from aitrader.signals import REGISTRY
 from golden_util import FIRST_BAR, frozen_env, load_panel
 from test_core import cfg_for
@@ -240,7 +240,13 @@ class Cli(TempState):
         stock_cfg = cfg_for(full)
         stock_cfg["risk"]["min_score"] = -1.0
         coins = {k: v[["SPY", "S00"]].set_axis(["BTC-USD", "ETH-USD"], axis=1) for k, v in full.items()}
-        start = str(full["close"].index[FIRST_BAR].date())
+        coins3 = {k: v[["SPY", "S00", "S01"]].set_axis(list(crypto_sweep.SYMBOLS), axis=1) for k, v in full.items()}
+        idx = full["close"].index
+        start = str(idx[FIRST_BAR].date())
+        real_sweep = crypto_sweep.run_sweep
+
+        def short_sweep(panel, start, split, end=None, phases=7, **kw):  # the real sweep, 1 phase on 63 bars
+            return real_sweep(panel, start, str(idx[FIRST_BAR + 31].date()), str(idx[FIRST_BAR + 62].date()), phases=1, **kw)
 
         def market(panel, n):
             cycle.load_market = lambda c, rng="10y", age=0.1: {k: v.iloc[:n] for k, v in panel.items()}
@@ -266,7 +272,9 @@ class Cli(TempState):
             status = mock.patch.object(data, "market_status", lambda sym="SPY": {"is_open": True})
             loader = mock.patch.object(data, "load_market", lambda cfg, rng="10y", age=6.0: coins)
             sweep = mock.patch.object(backtest, "sweep", lambda *a, **k: pd.DataFrame([{"variant": "stub", "sharpe_med": 0.1}]))
-            with prices, status, loader, sweep:
+            fetch = mock.patch.object(data, "fetch_panel", lambda syms, rng="5y", age=6.0: {k: v[list(syms)] for k, v in coins3.items()})
+            csweep = mock.patch.object(crypto_sweep, "run_sweep", short_sweep)  # backtest --book crypto routes here (Task 9)
+            with prices, status, loader, sweep, fetch, csweep:
                 for i in range(2):
                     market(coins, FIRST_BAR + i)
                     self.assertEqual(self.cli("--book", "crypto", "cycle")[0], 0)
@@ -280,9 +288,10 @@ class Cli(TempState):
                     self.assertEqual(code, 0, (argv, err[-500:]))
             self.assertEqual(report_files(reports), stock_reports)  # a crypto run never writes reports/<date>.md
             self.assertTrue(list((reports / "reports" / "crypto").glob("*.md")))  # market.report_dir
+            self.assertTrue(list((reports / "research").glob("*-crypto-sweep.md")))  # the sweep report: the report root
         self.assertEqual(self.files(exclude="crypto"), before)
         crypto = set(self.files()) - set(before)
-        for name in ("portfolio.json", "decisions.jsonl", "predictions.jsonl", "overrides.json", "trials.jsonl"):
+        for name in ("portfolio.json", "decisions.jsonl", "predictions.jsonl", "overrides.json", "trials.jsonl", "dsr.json"):
             self.assertIn(f"crypto/{name}", crypto)
         self.assertEqual(json.loads((self.tmp / "crypto" / "overrides.json").read_text())["vetoes"].keys(), {"ETH-USD"})
 

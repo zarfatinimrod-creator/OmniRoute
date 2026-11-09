@@ -332,8 +332,8 @@ def _merge(base: dict, over: dict) -> dict:
 def load_config(book: str | None = None, profile: str | None = None) -> dict:
     """The config of a book (default: the active one, journal.BOOK). Stocks: config.json without 'books'.
     Crypto: books.crypto merged over that, then books.<profile> over it when the profile is not 'crypto'; the
-    profile defaults to books.crypto.ship_profile. A crypto profile with the wrong universe, or priors that do not
-    name every registered signal or do not sum to 1, raises ValueError."""
+    profile defaults to books.crypto.ship_profile, and cfg["profile"] names it. A crypto profile with the wrong
+    universe, or priors that do not name every registered signal or do not sum to 1, raises ValueError."""
     from . import journal
     from .signals import REGISTRY
 
@@ -350,6 +350,8 @@ def load_config(book: str | None = None, profile: str | None = None) -> dict:
     cfg = _merge(raw, books["crypto"])
     if profile != "crypto":
         cfg = _merge(cfg, books[profile])
+    cfg.pop("ship_profile", None)  # a books.crypto setting, not part of a profile's config
+    cfg["profile"] = profile
     if set(cfg["universe"]) != PROFILE_UNIVERSE[profile]:
         raise ValueError(f"{profile}: universe {sorted(cfg['universe'])} != {sorted(PROFILE_UNIVERSE[profile])}")
     pw = cfg["prior_weights"]
