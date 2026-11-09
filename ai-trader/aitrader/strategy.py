@@ -94,7 +94,11 @@ def precompute_aux(panel: dict, cfg: dict) -> dict:
         "rets": returns(close),
     }
     if bench in close:
-        aux["bench_sma"] = close[bench].rolling(r["regime_sma_days"], min_periods=r["regime_sma_days"]).mean()
+        n = r["regime_sma_days"]
+        if r.get("regime_band_mode", "offset") == "hysteresis":  # a NaN close is one no-data day, not n
+            aux["bench_sma"] = close[bench].dropna().rolling(n, min_periods=n).mean().reindex(close.index)
+        else:
+            aux["bench_sma"] = close[bench].rolling(n, min_periods=n).mean()
         bpx, sma = close[bench], aux["bench_sma"]
     else:  # no benchmark column: every day is no-data (fails closed)
         bpx = sma = pd.Series(np.nan, index=close.index)

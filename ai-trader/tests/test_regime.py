@@ -111,6 +111,29 @@ class RegimeSeries(unittest.TestCase):
         with self.assertRaises(ValueError):
             regime_series(px, sma, 0.02, "bogus")
 
+    def test_one_missing_close_is_one_no_data_day(self):
+        """Hysteresis: one NaN BTC close after the warm-up (ETH still has its close, so fetch_panel keeps the row)
+        is no-data on that day only. The SMA runs over valid closes, the carried state shows on that day, and every
+        bar after it has a regime again."""
+        p = crypto_panel()
+        close = p["close"].copy()
+        k = 300
+        close.iloc[k, close.columns.get_loc("BTC-USD")] = np.nan
+        p = {**p, "close": close}
+        cfg = data.load_config("crypto")
+        aux = precompute_aux(p, cfg)
+        reg, state = aux["regime"], aux["regime_state"]
+        self.assertEqual([i for i in range(len(reg)) if reg.iloc[i] == ND], [*range(199), k])  # warm-up + that day
+        self.assertIn(state.iloc[k - 1], ("on", "off"))
+        self.assertEqual(state.iloc[k], state.iloc[k - 1])
+        self.assertFalse((reg.iloc[k + 1:] == ND).any())
+        valid = close["BTC-USD"].dropna()
+        self.assertAlmostEqual(aux["bench_sma"].iloc[k + 1], valid.loc[:close.index[k + 1]].tail(200).mean(), places=6)
+        d = close.index[k + 5]  # still causal: nothing after d changes the series up to d
+        aux_t = precompute_aux({key: v.loc[:d] for key, v in p.items()}, cfg)
+        pd.testing.assert_series_equal(reg.loc[:d], aux_t["regime"])
+        pd.testing.assert_series_equal(aux["bench_sma"].loc[:d], aux_t["bench_sma"])
+
     def test_truncation_invariance(self):
         """Regime, regime state, targets and diag at t are identical when all data after t is dropped."""
         stock, coins = load_panel(), crypto_panel()
