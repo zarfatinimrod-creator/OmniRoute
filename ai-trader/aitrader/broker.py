@@ -51,6 +51,34 @@ class PaperBroker:
         self.state["blocked"] = {s: d for s, d in self.state.get("blocked", {}).items() if d > date}
         return eq
 
+    def apply_corporate_actions(self, actions: dict, upto: str, withholding: float = 0.25) -> list[str]:
+        """Apply splits and cash dividends with ex-date in (last applied, upto] to held positions.
+        Prices are split/dividend-adjusted by the data feed, so without this a 4:1 split would look like
+        a 75% loss and trigger the stop. Dividends are credited net of US withholding (W-8BEN 25%)."""
+        notes = []
+        for sym, pos in list(self.positions.items()):
+            ca = actions.get(sym) or {}
+            since = pos.get("ca_applied_through") or pos.get("entry_date", "")
+            for sp in ca.get("splits", []):
+                if since < sp["date"] <= upto and sp["ratio"] > 0:
+                    new_qty = pos["qty"] * sp["ratio"]
+                    whole = math.floor(new_qty + 1e-9)
+                    px = pos["last_price"] / sp["ratio"]
+                    self.state["cash"] += (new_qty - whole) * px  # cash in lieu of a fractional share
+                    pos["qty"] = whole
+                    for k in ("avg_cost", "peak_close", "last_price"):
+                        pos[k] = pos[k] / sp["ratio"]
+                    notes.append(f"split {sym} {sp['ratio']:g}:1 on {sp['date']}")
+            for dv in ca.get("dividends", []):
+                if since < dv["date"] <= upto:
+                    cash = pos["qty"] * dv["amount"] * (1 - withholding)
+                    self.state["cash"] += cash
+                    notes.append(f"dividend {sym} {dv['amount']}/sh -> ${cash:,.2f} net on {dv['date']}")
+            pos["ca_applied_through"] = max(since, upto)
+            if pos["qty"] <= 0:
+                del self.positions[sym]
+        return notes
+
     def peak_ratio(self, prices: dict) -> float:
         return self.equity(prices) / max(self.state.get("peak_equity", 1.0), 1e-9)
 
@@ -64,8 +92,10 @@ class PaperBroker:
         min_trade_value: float = 500.0,
         stopped: list | None = None,
         cooldown_until: str | None = None,
+        exits_only: bool = False,
     ) -> list[dict]:
-        """Move toward target weights. Sells first, then buys. Returns executed fills."""
+        """Move toward target weights. Sells first, then buys. exits_only: only close positions whose target
+        is 0 (off-cycle days: act on stops, never re-trade gaps). Returns executed fills."""
         eq = self.equity(prices)
         cur = self.weights(prices)
         fills = []
@@ -78,6 +108,8 @@ class PaperBroker:
                 continue
             tw, cw = targets.get(s, 0.0), cur.get(s, 0.0)
             exiting = tw == 0 and cw > 0
+            if exits_only and not exiting:
+                continue
             if not exiting and abs(tw - cw) < band:
                 continue
             delta_val = (tw - cw) * eq

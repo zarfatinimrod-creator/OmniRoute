@@ -149,21 +149,22 @@ def build_targets(
     port_vol = float(np.sqrt(max(w.values @ cov @ w.values, 1e-12)))
     scale = min(r["max_gross"] / max(w.sum(), 1e-9), r["target_vol_annual"] / port_vol)
 
-    # Regime filter on the benchmark.
+    # Regime filter on the benchmark. Fails CLOSED: missing benchmark data counts as risk-off.
     regime = "risk_on"
-    if "bench_sma" in aux:
-        sma = aux["bench_sma"].loc[date]
-        # band: only call risk-off when clearly below the 200-day average (less whipsaw around the line)
-        if pd.notna(px.get(bench)) and pd.notna(sma) and px[bench] < sma * (1 - r.get("regime_band_pct", 0.0)):
-            regime = "risk_off"
-            scale *= r["risk_off_gross_mult"]
+    sma = aux["bench_sma"].loc[date] if "bench_sma" in aux else np.nan
+    bpx = px.get(bench, np.nan)
+    # band: only call risk-off when clearly below the 200-day average (less whipsaw around the line)
+    if pd.isna(sma) or pd.isna(bpx) or bpx < sma * (1 - r.get("regime_band_pct", 0.0)):
+        regime = "risk_off" if pd.notna(sma) and pd.notna(bpx) else "risk_off(no-data)"
+        scale *= r["risk_off_gross_mult"]
 
     # Defensive mode: VIX in the top of its own trailing-year range (percentile, not a fixed level).
     vix = panel.get("vix")
     if vix is not None and r.get("defensive_vix_pct"):
         hist = vix.loc[:date].tail(252).dropna()
-        if len(hist) > 60 and (hist <= hist.iloc[-1]).mean() >= r["defensive_vix_pct"]:
-            regime = regime + "+defensive"
+        missing = pd.isna(vix.get(date, np.nan)) or len(hist) <= 60  # fail closed when VIX is missing today
+        if missing or (hist <= hist.iloc[-1]).mean() >= r["defensive_vix_pct"]:
+            regime = regime + ("+defensive(no-vix)" if missing else "+defensive")
             scale *= r.get("defensive_gross_mult", 0.75)
 
     # Drawdown circuit breaker.
@@ -175,7 +176,11 @@ def build_targets(
         scale *= 0.5
         dd_state = "halved"
 
-    w = (w * scale).clip(lower=0)
+    # Scale, then re-apply per-name and sector caps WITHOUT redistribution (scaling up must never breach caps).
+    w = np.minimum((w * scale).clip(lower=0), caps)
+    for sec, tot in w.groupby(secs).sum().items():
+        if tot > r["max_sector_pct"]:
+            w[secs == sec] *= r["max_sector_pct"] / tot
     targets = {s: float(v) for s, v in w.items() if v > 1e-4}
     diag.update(
         {

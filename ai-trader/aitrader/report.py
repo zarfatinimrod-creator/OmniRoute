@@ -88,5 +88,5 @@ def write_daily_report(s: dict) -> Path:
         lines += ["", "## סטופים", ", ".join(s["stopped"])]
     path = ROOT / "reports" / f"{s['date']}.md"
     path.parent.mkdir(exist_ok=True)
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path

@@ -18,5 +18,5 @@ for d in "$here/skills"/*/; do
   rm -rf "${dst:?}/$name" && cp -r "$d" "$dst/$name"
 done
 cp "$here/agents/"*.md "$HOME/.claude/agents/"
-pip install -q -r "$here/requirements.txt" 2>/dev/null || true
+python3 -m pip install -q -r "$here/requirements.txt" 2>/dev/null || pip install -q -r "$here/requirements.txt" 2>/dev/null || true
 echo "installed skills: $(ls "$dst" | tr '\n' ' ')"

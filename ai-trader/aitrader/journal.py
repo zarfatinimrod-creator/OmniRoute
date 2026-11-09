@@ -49,7 +49,7 @@ def _last_hash(p: Path) -> str:
     if not p.exists() or p.stat().st_size == 0:
         return "genesis"
     with p.open("rb") as f:
-        f.seek(max(0, p.stat().st_size - 65536))
+        f.seek(max(0, p.stat().st_size - 1_000_000))
         tail = f.read().decode("utf-8", "replace").strip().splitlines()
     try:
         return json.loads(tail[-1]).get("hash", "genesis")
@@ -62,10 +62,10 @@ def append(name: str, record: dict) -> None:
     p = _path(name)
     if name in CHAINED:
         prev = _last_hash(p)
-        body = json.dumps(record, sort_keys=True, default=str)
+        body = json.dumps(json.loads(json.dumps(record, default=str)), sort_keys=True, default=str)
         record = {**record, "prev_hash": prev, "hash": hashlib.sha256((prev + body).encode()).hexdigest()}
-    with p.open("a") as f:
-        f.write(json.dumps(record, default=str) + "\n")
+    with p.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
 
 
 def verify_chain(name: str) -> tuple[bool, int]:
@@ -86,25 +86,33 @@ def read(name: str) -> list[dict]:
     p = _path(name)
     if not p.exists():
         return []
-    return [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
+    out = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            out.append(json.loads(line))
+        except ValueError:  # a torn last line from a crash must not brick every later cycle
+            print(f"[journal] skipped unreadable line in {name}")
+    return out
 
 
 def write_all(name: str, records: list[dict]) -> None:
     p = _path(name)
     tmp = p.with_suffix(".tmp")
-    tmp.write_text("".join(json.dumps(r, default=str) + "\n" for r in records))
+    tmp.write_text("".join(json.dumps(r, default=str, ensure_ascii=False) + "\n" for r in records), encoding="utf-8")
     tmp.replace(p)
 
 
 def load_json(name: str, default=None):
     p = _path(name)
-    return json.loads(p.read_text()) if p.exists() else default
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
 
 
 def save_json(name: str, obj) -> None:
     p = _path(name)
     tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(obj, indent=2, default=str) + "\n")
+    tmp.write_text(json.dumps(obj, indent=2, default=str, ensure_ascii=False) + "\n", encoding="utf-8")
     tmp.replace(p)
 
 
@@ -143,12 +151,19 @@ def evaluate_predictions(close: pd.DataFrame, bench: str) -> dict:
         if pos >= len(idx) or pos + p["horizon"] >= len(idx) or p.get("price") in (None, 0):
             continue
         end = idx[pos + p["horizon"]]
-        px_end = close.at[end, p["symbol"]] if p["symbol"] in close else None
-        b_end = close.at[end, bench] if bench in close else None
-        if px_end is None or pd.isna(px_end) or b_end is None or pd.isna(b_end) or not p.get("bench_price"):
+        start = idx[pos] if idx[pos] == d else None
+        sym = p["symbol"]
+        if sym not in close or bench not in close:
             continue
-        ret = px_end / p["price"] - 1
-        bret = b_end / p["bench_price"] - 1
+        # Prefer the split/dividend-adjusted series at both ends (immune to later splits); fall back to the
+        # logged price only when the prediction date is not a bar in the series (e.g. logged on a holiday).
+        p0 = close.at[start, sym] if start is not None else p.get("price")
+        b0 = close.at[start, bench] if start is not None else p.get("bench_price")
+        px_end, b_end = close.at[end, sym], close.at[end, bench]
+        if any(v is None or pd.isna(v) or v == 0 for v in (p0, b0, px_end, b_end)):
+            continue
+        ret = px_end / p0 - 1
+        bret = b_end / b0 - 1
         excess = ret - bret
         append("grades.jsonl", {
             "key": pred_key(p), "graded_at": now_utc(), "eval_date": str(end.date()), "ret": round(ret, 4),

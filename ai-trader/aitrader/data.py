@@ -82,15 +82,47 @@ def _bars_from_chart(res: dict) -> pd.DataFrame:
     return df.drop(columns=["adjclose"])
 
 
+def _events_from_chart(res: dict) -> dict:
+    ev = res.get("events") or {}
+    tz = res["meta"].get("exchangeTimezoneName", "America/New_York")
+
+    def day(ts):
+        return str(pd.Timestamp(int(ts), unit="s", tz="UTC").tz_convert(tz).date())
+
+    splits = [{"date": day(v["date"]), "ratio": float(v["numerator"]) / float(v["denominator"])}
+              for v in (ev.get("splits") or {}).values() if v.get("denominator")]
+    divs = [{"date": day(v["date"]), "amount": float(v["amount"])} for v in (ev.get("dividends") or {}).values()]
+    return {"splits": sorted(splits, key=lambda x: x["date"]), "dividends": sorted(divs, key=lambda x: x["date"])}
+
+
 def fetch_daily(sym: str, rng: str = "5y", max_age_hours: float = 6.0) -> pd.DataFrame:
-    """Daily adjusted OHLCV for one symbol, cached on disk."""
+    """Daily adjusted OHLCV for one symbol, cached on disk (atomic write; events saved alongside)."""
     CACHE.mkdir(exist_ok=True)
     path = CACHE / f"{sym.replace('^', '_')}_{rng}.csv"
     if path.exists() and (time.time() - path.stat().st_mtime) < max_age_hours * 3600:
         return pd.read_csv(path, index_col=0, parse_dates=True)
-    df = _bars_from_chart(_chart(sym, rng, "1d"))
-    df.to_csv(path)
+    try:
+        res = _chart(sym, rng, "1d")
+    except RuntimeError:
+        if path.exists():  # outage: a stale cache beats a crash; the cycle still sees the last known bars
+            print(f"[data] {sym}: fetch failed, using stale cache")
+            return pd.read_csv(path, index_col=0, parse_dates=True)
+        raise
+    df = _bars_from_chart(res)
+    tmp = path.with_suffix(".tmp")
+    df.to_csv(tmp)
+    tmp.replace(path)
+    (CACHE / f"{sym.replace('^', '_')}_events.json").write_text(json.dumps(_events_from_chart(res)))
     return df
+
+
+def corporate_actions(sym: str) -> dict:
+    """Splits and dividends seen in the last daily fetch of `sym` (empty if unknown)."""
+    p = CACHE / f"{sym.replace('^', '_')}_events.json"
+    try:
+        return json.loads(p.read_text()) if p.exists() else {"splits": [], "dividends": []}
+    except ValueError:
+        return {"splits": [], "dividends": []}
 
 
 def fetch_panel(symbols: list[str], rng: str = "5y", max_age_hours: float = 6.0) -> dict[str, pd.DataFrame]:
@@ -205,15 +237,17 @@ def load_config() -> dict:
     return json.loads((ROOT / "config.json").read_text())
 
 
-def earnings_on(day: str) -> dict[str, str]:
-    """{symbol: time} for companies reporting on a calendar day (Nasdaq public calendar, unofficial)."""
+def earnings_on(day: str) -> dict[str, str] | None:
+    """{symbol: time} for companies reporting on a calendar day (Nasdaq public calendar, unofficial).
+    Returns None when the calendar could not be read (callers must not treat that as 'no earnings')."""
     h = {**UA, "Accept": "application/json, text/plain, */*", "Origin": "https://www.nasdaq.com", "Referer": "https://www.nasdaq.com/"}
     try:
         r = _session.get("https://api.nasdaq.com/api/calendar/earnings", params={"date": day}, headers=h, timeout=20)
+        r.raise_for_status()
         rows = ((r.json().get("data") or {}).get("rows")) or []
         return {x["symbol"].replace(".", "-"): x.get("time", "") for x in rows if x.get("symbol")}
     except (requests.RequestException, ValueError, KeyError, AttributeError):
-        return {}
+        return None
 
 
 def load_market(cfg: dict, rng: str = "10y", max_age_hours: float = 6.0) -> dict:

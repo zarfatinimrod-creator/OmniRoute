@@ -21,7 +21,7 @@ import pandas as pd
 
 from . import journal, notify
 from .broker import PaperBroker
-from .data import earnings_on, fetch_panel, load_config, load_market, market_status
+from .data import corporate_actions, earnings_on, fetch_panel, load_config, load_market, market_status
 from .learn import ic_table, signal_stats, update_weights, walk_forward_weights
 from .signals import compute_all
 from .strategy import build_targets, combine, precompute_aux
@@ -124,11 +124,19 @@ def _earnings_blackout(ds: str, days: int) -> dict[str, str]:
         return cache["blackout"]
     d0 = datetime.strptime(ds, "%Y-%m-%d").date()
     out: dict[str, str] = {}
+    unknown = []
     for k in range(-1, days + 1):
         day = (d0 + timedelta(days=k)).isoformat()
-        for sym, when in earnings_on(day).items():
+        got = earnings_on(day)
+        if got is None:
+            unknown.append(day)
+            continue
+        for sym, when in got.items():
             out.setdefault(sym, f"{day} {when}")
-    journal.save_json("earnings.json", {"date": ds, "blackout": out})
+    if unknown:  # never cache a partial calendar; the next run retries
+        print(f"[earnings] calendar unavailable for {unknown}; blackout may be incomplete")
+    else:
+        journal.save_json("earnings.json", {"date": ds, "blackout": out})
     return out
 
 
@@ -163,11 +171,20 @@ def _execute_pending(panel, cfg, main, shadow, events) -> list[dict]:
     if not len(later) or not _market_opened(later[0]):
         return []
     d_exec = later[0]
+    late_targets, late = _apply_overrides(pending["targets"], main.positions, pending["decision_date"])
+    already = {(o["symbol"], o["action"]) for o in pending.get("overrides", [])}
+    late = [o for o in late if (o["symbol"], o["action"]) not in already]
+    if late:  # a veto/shrink that arrived after the decision but before the open still counts (reduce-only)
+        pending["targets"] = {k: v for k, v in late_targets.items()}
+        pending.setdefault("overrides", []).extend(late)
     opx = {**_px(close.loc[d_exec]), **_px(panel["open"].loc[d_exec])}  # official open; close only as fallback
     ds_exec = str(d_exec.date())
     cool = str(close.index[min(close.index.get_loc(d_exec) + r.get("stop_cooldown_days", 10), len(close.index) - 1)].date())
-    fills = main.rebalance(pending["targets"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool)
-    shadow.rebalance(pending["targets_raw"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool)
+    xo = pending.get("exits_only", False)
+    fills = main.rebalance(pending["targets"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool, xo)
+    stp = set(pending.get("stopped", []))
+    sh_targets = pending["targets_raw"] if not xo else {s_: 1.0 for s_ in shadow.positions if s_ not in stp}  # exits-only: keep the rest
+    shadow.rebalance(sh_targets, opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], list(stp), cool, xo)
     if pending.get("rebalance"):
         main.state["last_rebalance"] = shadow.state["last_rebalance"] = pending["decision_date"]
     for f in fills:
@@ -195,16 +212,23 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     m = main if persist else copy.deepcopy(main)
     prev_regime, prev_dd = m.state.get("regime"), m.state.get("dd_state")
     y = cfg["account"]["cash_yield_annual"]
+    held_syms = set(m.positions) | set(shadow.positions)
+    actions = {sym: corporate_actions(sym) for sym in held_syms}
+    for note in m.apply_corporate_actions(actions, ds):
+        events.append(note)
     if persist:
+        shadow.apply_corporate_actions(actions, ds)
         m.mark(px, ds, y if m.state.get("last_mark") not in (None, ds) else 0.0)
         shadow.mark(px, ds, y if shadow.state.get("last_mark") not in (None, ds) else 0.0)
     blocked = set(m.state.get("blocked", {}))
     targets_raw, diag = build_targets(dec, panel, signals, weights, cfg, m.peak_ratio(px), m.positions, blocked, aux)
     last_reb = m.state.get("last_rebalance")
     days_since = (close.index.get_loc(dec) - close.index.get_loc(pd.Timestamp(last_reb))) if last_reb and pd.Timestamp(last_reb) in close.index else 10**6
-    due = force_rebalance or days_since >= r.get("rebalance_every_days", 5)
+    risk_changed = (prev_regime is not None and prev_regime != diag.get("regime")) or (prev_dd is not None and prev_dd != diag.get("dd_state"))
+    due = force_rebalance or days_since >= r.get("rebalance_every_days", 5) or risk_changed or diag.get("dd_state") == "flat"
     stopped = diag.get("stopped", [])
-    if not due:  # off-cycle: hold the book, act only on stops
+    exits_only = not due
+    if exits_only:  # off-cycle: hold the book, act only on stops (exits), never re-trade overnight gaps
         targets_raw = {s: w for s, w in m.weights(px).items() if s not in stopped}
     bo = _earnings_blackout(ds, r.get("earnings_blackout_days", 4))
     skipped = {s: bo[s] for s in list(targets_raw) if s in bo and s not in m.positions}
@@ -216,9 +240,9 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
         if s in bo and s in m.positions and cfg["universe"].get(s) not in etf and targets_raw[s] > cap:
             targets_raw[s] = cap
     targets, applied = _apply_overrides(targets_raw, m.positions, ds)
-    preview = copy.deepcopy(m).rebalance(targets, px, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped)
+    preview = copy.deepcopy(m).rebalance(targets, px, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped, None, exits_only)
     new_entries = [f["symbol"] for f in preview if f["side"] == "BUY" and f["symbol"] not in m.positions]
-    decision = {"decision_date": ds, "status": "pending", "rebalance": due, "targets": targets, "targets_raw": targets_raw,
+    decision = {"decision_date": ds, "status": "pending", "rebalance": due, "exits_only": exits_only, "targets": targets, "targets_raw": targets_raw,
                 "stopped": stopped, "overrides": applied, "earnings_blackout": skipped, "preview_at_close": preview,
                 "new_entries": new_entries, "diag": diag, "weights": weights, "logged_at": journal.now_utc()}
     if not persist:
@@ -275,7 +299,7 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
 
     journal.save_json("portfolio.json", main.state)
     journal.save_json("shadow_portfolio.json", shadow.state)
-    card = journal.evaluate_predictions(_eval_close(close), bench)
+    card = journal.evaluate_predictions(_eval_close(close.loc[:dec_bar]), bench)  # final bars only
 
     equity = main.equity(prices_last)
     sh_eq = shadow.equity(prices_last)

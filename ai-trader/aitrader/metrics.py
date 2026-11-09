@@ -57,7 +57,9 @@ def dsr(daily: pd.Series, n_trials: int, sr_trials_std: float) -> float:
     return psr(daily, sr0)
 
 
-def summary(equity: pd.Series, turnover: pd.Series | None = None) -> dict:
+def summary(equity: pd.Series, turnover: pd.Series | None = None, rf_annual: float = 0.0) -> dict:
+    """Sharpe/Sortino/PSR use returns in EXCESS of the cash rate, so earning interest on idle cash
+    does not flatter a low-exposure strategy against SPY."""
     eq = equity.dropna()
     r = eq.pct_change().dropna()
     if len(r) < 2:
@@ -65,9 +67,10 @@ def summary(equity: pd.Series, turnover: pd.Series | None = None) -> dict:
     years = len(r) / TD
     cagr = (eq.iloc[-1] / eq.iloc[0]) ** (1 / years) - 1 if years > 0 else float("nan")
     vol = r.std() * math.sqrt(TD)
-    sharpe = r.mean() / r.std() * math.sqrt(TD) if r.std() > 0 else float("nan")
-    down = r[r < 0].std() * math.sqrt(TD)
-    sortino = r.mean() * TD / down if down > 0 else float("nan")
+    ex = r - ((1 + rf_annual) ** (1 / TD) - 1)
+    sharpe = ex.mean() / ex.std() * math.sqrt(TD) if ex.std() > 0 else float("nan")
+    down = math.sqrt(float((ex.clip(upper=0) ** 2).mean())) * math.sqrt(TD)
+    sortino = ex.mean() * TD / down if down > 0 else float("nan")
     dd = eq / eq.cummax() - 1
     mdd = dd.min()
     out = {
@@ -82,7 +85,7 @@ def summary(equity: pd.Series, turnover: pd.Series | None = None) -> dict:
         "max_drawdown": round(mdd, 4),
         "calmar": round(cagr / abs(mdd), 3) if mdd < 0 else float("nan"),
         "hit_rate_days": round(float((r > 0).mean()), 3),
-        "psr_vs_0": round(psr(r), 3),
+        "psr_vs_0": round(psr(ex), 3),
     }
     if turnover is not None and len(turnover):
         out["turnover_annual"] = round(float(turnover.sum() / years), 2)
