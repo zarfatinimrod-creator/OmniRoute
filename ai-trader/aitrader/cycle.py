@@ -24,7 +24,7 @@ from .broker import PaperBroker
 from .data import corporate_actions, earnings_on, fetch_panel, load_config, load_market, market_status, official_opens
 from .learn import ic_table, signal_stats, update_weights, walk_forward_weights
 from .signals import compute_all
-from .strategy import build_targets, combine, precompute_aux
+from .strategy import build_targets, combine, etf_groups, periods_per_year, precompute_aux
 
 ROOT = Path(__file__).resolve().parent.parent
 NY = ZoneInfo("America/New_York")
@@ -37,8 +37,10 @@ def _px(row: pd.Series) -> dict:
 def _learn(signals, close, cfg, ds: str) -> dict:
     """Load weights; update at most once per decision date. Bootstraps walk-forward from history on first run."""
     prior = cfg["prior_weights"]
-    ws = journal.load_json("weights.json")
     L = cfg["learning"]
+    if not L.get("enabled", True):
+        return dict(prior)
+    ws = journal.load_json("weights.json")
     if ws is None:
         dates = list(close.index[300:])
         wmap = walk_forward_weights(signals, close, prior, cfg, dates, gate=(journal.load_json("placebo.json", {}) or {}).get("gate_z95"))
@@ -47,7 +49,7 @@ def _learn(signals, close, cfg, ds: str) -> dict:
         journal.append("learning.jsonl", {"date": ds, "event": "bootstrap", "weights": w, "logged_at": journal.now_utc()})
     elif ws["asof"] != ds and _trading_days_between(close, ws["asof"], ds) >= L.get("update_every_days", 21):
         h = L["primary_horizon_days"]
-        ic = ic_table(signals, close, h)
+        ic = ic_table(signals, close, h, L.get("ic_min_names", 10))
         st = signal_stats(ic, len(ic) - 1, h, L["ic_half_life_days"])
         gate = (journal.load_json("placebo.json", {}) or {}).get("gate_z95")
         new, why = update_weights(ws["weights"], prior, st, cfg, gate)
@@ -244,8 +246,8 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     y = cfg["account"]["cash_yield_annual"]
     m.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20), r["dd_halve"], r["dd_flat"])  # m is a copy when proposing
     if persist:
-        m.mark(px, ds, y if m.state.get("last_mark") not in (None, ds) else 0.0)
-        shadow.mark(px, ds, y if shadow.state.get("last_mark") not in (None, ds) else 0.0)
+        m.mark(px, ds, y if m.state.get("last_mark") not in (None, ds) else 0.0, periods_per_year(cfg))
+        shadow.mark(px, ds, y if shadow.state.get("last_mark") not in (None, ds) else 0.0, periods_per_year(cfg))
     blocked = set(m.state.get("blocked", {}))
     targets_raw, diag = build_targets(dec, panel, signals, weights, cfg, m.peak_ratio(px), m.positions, blocked, aux)
     last_reb = m.state.get("last_rebalance")
@@ -257,14 +259,14 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     if exits_only:  # off-cycle: hold the book, act only on stops (exits), never re-trade overnight gaps
         targets_raw = {s: w for s, w in m.weights(px).items() if s not in stopped}
     bo = _earnings_blackout(ds, r.get("earnings_blackout_days", 4))
-    from .strategy import ETF_SECTORS
+    etf = etf_groups(cfg)
     skipped = {s: bo.get(s, bo.get("*")) for s in list(targets_raw)
-               if s not in m.positions and (s in bo or ("*" in bo and cfg["universe"].get(s) not in ETF_SECTORS))}
+               if s not in m.positions and (s in bo or ("*" in bo and cfg["universe"].get(s) not in etf))}
     for s in skipped:
         targets_raw.pop(s)
     cap = r.get("earnings_max_position_pct", 1.0)
     for s in list(targets_raw):  # held through a report: cap the size (ATR stops cannot protect an earnings gap)
-        if s in bo and s in m.positions and cfg["universe"].get(s) not in ETF_SECTORS and targets_raw[s] > cap:
+        if s in bo and s in m.positions and cfg["universe"].get(s) not in etf and targets_raw[s] > cap:
             targets_raw[s] = cap
     _, sdiag = build_targets(dec, panel, signals, weights, cfg, shadow.peak_ratio(px), shadow.positions, set(shadow.state.get("blocked", {})), aux)
     targets, applied = _apply_overrides(targets_raw, m.positions, ds, _open_cutoff_utc(dec + pd.offsets.BDay(1)))
@@ -379,7 +381,7 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
         movers = {s: v["pnl_pct"] for s, v in summary["positions"].items()}
         prev_close = _px(close.iloc[-2]) if len(close) > 1 else {}
         day_moves = {s: prices_last[s] / prev_close[s] - 1 for s in main.positions if s in prices_last and s in prev_close}
-        big = {s: m for s, m in day_moves.items() if m <= -0.06}
+        big = {s: m for s, m in day_moves.items() if m <= -cfg.get("market", {}).get("intraday_alert_pct", 0.06)}
         if big:
             events.append("ירידה חדה היום: " + ", ".join(f"{s} {m:+.1%}" for s, m in big.items()) + " (הסטופ ייבדק בסגירה)")
         summary["day_moves"] = {s: round(m, 4) for s, m in day_moves.items()}

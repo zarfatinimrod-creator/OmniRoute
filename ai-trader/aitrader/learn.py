@@ -29,14 +29,14 @@ def _row_spearman(a: np.ndarray, b: np.ndarray, min_n: int = 10) -> float:
     return float(np.corrcoef(ra, rb)[0, 1])
 
 
-def ic_table(signals: dict[str, pd.DataFrame], close: pd.DataFrame, horizon: int) -> pd.DataFrame:
+def ic_table(signals: dict[str, pd.DataFrame], close: pd.DataFrame, horizon: int, min_n: int = 10) -> pd.DataFrame:
     """Dates x signals of rank IC. Row d is only *knowable* at trading day d+horizon."""
     fwd = forward_excess(close, horizon)
     out = {}
     for name, sig in signals.items():
         s = sig.reindex(index=fwd.index, columns=fwd.columns).values
         f = fwd.values
-        out[name] = [_row_spearman(s[i], f[i]) for i in range(len(fwd.index))]
+        out[name] = [_row_spearman(s[i], f[i], min_n) for i in range(len(fwd.index))]
     return pd.DataFrame(out, index=fwd.index)
 
 
@@ -122,11 +122,11 @@ def placebo_gate(signals: dict, close: pd.DataFrame, cfg: dict, k: int = 100, se
     for _ in range(k):
         perm = rng.permutation(close.columns)
         shuffled = {n: s.reindex(columns=close.columns).set_axis(perm, axis=1).reindex(columns=close.columns) for n, s in signals.items()}
-        ic = ic_table(shuffled, close, h)
+        ic = ic_table(shuffled, close, h, L.get("ic_min_names", 10))
         st = signal_stats(ic, len(ic) - 1, h, L["ic_half_life_days"])
         zs = [abs(shrunk_z(st.loc[n], L)) for n in st.index if st.loc[n, "n_eff"] >= L["min_n_eff"]]
         maxes.append(max(zs) if zs else 0.0)
-    real = signal_stats(ic_table(signals, close, h), len(close) - 1, h, L["ic_half_life_days"])
+    real = signal_stats(ic_table(signals, close, h, L.get("ic_min_names", 10)), len(close) - 1, h, L["ic_half_life_days"])
     real_z = {n: round(shrunk_z(real.loc[n], L), 3) for n in real.index}
     return {"k": k, "gate_z95": round(float(np.quantile(maxes, 0.95)), 3), "noise_max_z_median": round(float(np.median(maxes)), 3),
             "real_z": real_z, "passing": [n for n, z in real_z.items() if abs(z) >= float(np.quantile(maxes, 0.95))]}
@@ -137,7 +137,7 @@ def walk_forward_weights(signals, close, prior, cfg, dates, every: int | None = 
     L = cfg["learning"]
     every = every or L.get("update_every_days", 21)
     h = L["primary_horizon_days"]
-    ic = ic_table(signals, close, h)
+    ic = ic_table(signals, close, h, L.get("ic_min_names", 10))
     pos_of = {d: i for i, d in enumerate(close.index)}
     w = dict(prior)
     out = {}

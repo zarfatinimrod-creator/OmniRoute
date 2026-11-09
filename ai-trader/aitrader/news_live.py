@@ -29,9 +29,9 @@ import requests
 from . import journal, notify
 from .broker import PaperBroker
 from .data import UA, _chart, load_config, official_opens
+from .strategy import etf_groups
 
 NY = ZoneInfo("America/New_York")
-ETF = {"Index", "SectorETF", "Bonds", "Gold"}
 DEFAULTS = {
     "poll_seconds": 20, "fresh_minutes": 30, "buy_min_score": 8, "max_position_pct": 0.05, "stop_loss_pct": 0.03,
     "sell_on_score_at_most": 2, "max_hold_days": 5, "max_gross": 1.0, "slippage_bps": 10, "starting_cash": 100000,
@@ -153,7 +153,7 @@ class NewsTrader:
         self.n = ncfg(cfg)
         self.session = requests.Session()
         self.session.headers.update(UA)
-        self.universe = [s for s, sec in cfg["universe"].items() if sec not in ETF]
+        self.universe = [s for s, sec in cfg["universe"].items() if sec not in etf_groups(cfg)]
         st = journal.load_json("news_book.json")
         self.book = PaperBroker(self.n["starting_cash"], self.n["slippage_bps"], 0.0, st)
         if st is None:

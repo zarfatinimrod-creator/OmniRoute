@@ -18,7 +18,7 @@ from .broker import PaperBroker
 from .learn import walk_forward_weights
 from .metrics import summary
 from .signals import compute_all
-from .strategy import build_targets, precompute_aux
+from .strategy import build_targets, periods_per_year, precompute_aux
 
 
 def _px(row: pd.Series) -> dict:
@@ -35,7 +35,7 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
     aux = aux or precompute_aux(panel, cfg)
     rebalance_every = rebalance_every or cfg["risk"].get("rebalance_every_days", 5)
     prior = cfg["prior_weights"]
-    if weights_mode == "learned":
+    if weights_mode == "learned" and cfg["learning"].get("enabled", True):
         gate = (journal.load_json("placebo.json", {}) or {}).get("gate_z95")  # noise level, not return direction
         wmap = walk_forward_weights(signals, close, prior, cfg, list(dates), gate=gate)
     else:
@@ -59,7 +59,7 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
             turnover[d] = sum(f["value"] for f in fills) / max(eq_before, 1e-9)
             all_fills.extend(fills)
             pending = None
-        equity[d] = broker.mark(cpx, ds, cfg["account"]["cash_yield_annual"])
+        equity[d] = broker.mark(cpx, ds, cfg["account"]["cash_yield_annual"], periods_per_year(cfg))
         blocked = set(broker.state.get("blocked", {}))
         on_cycle = (i + phase) % rebalance_every == 0
         broker.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20), r["dd_halve"], r["dd_flat"])
@@ -81,9 +81,9 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
     ew = close.loc[dates].pct_change(fill_method=None).mean(axis=1).fillna(0).add(1).cumprod() * cfg["account"]["starting_cash"]
     rf = cfg["account"]["cash_yield_annual"]
     res = {
-        "strategy": summary(eq, to, rf),
-        "benchmark_spy": summary(spy / spy.iloc[0] * cfg["account"]["starting_cash"], rf_annual=rf) if spy is not None else {},
-        "benchmark_equal_weight_universe": summary(ew, rf_annual=rf),
+        "strategy": summary(eq, to, rf, periods_per_year(cfg)),
+        "benchmark_spy": summary(spy / spy.iloc[0] * cfg["account"]["starting_cash"], rf_annual=rf, periods_per_year=periods_per_year(cfg)) if spy is not None else {},
+        "benchmark_equal_weight_universe": summary(ew, rf_annual=rf, periods_per_year=periods_per_year(cfg)),
         "n_trades": len(all_fills),
         "final_weights": wmap[dates[-1]],
         "final_positions": {k: v["qty"] for k, v in broker.positions.items()},
@@ -167,8 +167,8 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: i
     try:  # Deflated Sharpe of the base: deflated by every configuration ever registered + this sweep
         from .metrics import dsr
         n_prev = sum(len(t.get("rows", [])) for t in journal.read("trials.jsonl") if "rows" in t)
-        srs = df.groupby("variant").sharpe.median() / (252 ** 0.5)
-        rf_d = (1 + cfg["account"]["cash_yield_annual"]) ** (1 / 252) - 1
+        srs = df.groupby("variant").sharpe.median() / (periods_per_year(cfg) ** 0.5)
+        rf_d = (1 + cfg["account"]["cash_yield_annual"]) ** (1 / periods_per_year(cfg)) - 1
         daily = pd.Series(b0["_daily"]) - rf_d
         rows.append({"variant": f"DSR of base (N={n_prev + len(srs)} trials)", "psr_med": round(dsr(daily, n_prev + len(srs), float(srs.std())), 3)})
     except Exception as e:  # noqa: BLE001 - informative only

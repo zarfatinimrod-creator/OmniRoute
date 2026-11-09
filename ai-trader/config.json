@@ -165,7 +165,8 @@
     "lowvol_exclude_lookback": 252,
     "earnings_max_position_pct": 0.05,
     "regime_band_pct": 0.02,
-    "dd_reentry_days": 20
+    "dd_reentry_days": 20,
+    "lowvol_exclude_min_names": 10
   },
   "signals": {
     "tsmom": {
@@ -223,7 +224,9 @@
     "tau": 0.02,
     "ic_sd_floor": 0.15,
     "z_cap": 2.5,
-    "min_n_eff": 12
+    "min_n_eff": 12,
+    "enabled": true,
+    "ic_min_names": 10
   },
   "alerts": {
     "ntfy_topic_env": "AITRADER_NTFY_TOPIC",
@@ -297,7 +300,8 @@
         "vol_lookback_days": 60,
         "rebalance_every_days": 7,
         "stop_cooldown_days": 14,
-        "lowvol_exclude_top_pct": 0.0
+        "lowvol_exclude_top_pct": 0.0,
+        "defensive_vix_pct": 0
       },
       "signals": {
         "tsmom": {
@@ -395,7 +399,8 @@
         "exit_score": -1.01,
         "atr_stop_mult": 0.0,
         "dd_halve": -1.0,
-        "dd_reentry_ref": -0.25
+        "dd_reentry_ref": -0.25,
+        "defensive_vix_pct": 0
       }
     }
   }

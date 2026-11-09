@@ -57,20 +57,20 @@ def dsr(daily: pd.Series, n_trials: int, sr_trials_std: float) -> float:
     return psr(daily, sr0)
 
 
-def summary(equity: pd.Series, turnover: pd.Series | None = None, rf_annual: float = 0.0) -> dict:
+def summary(equity: pd.Series, turnover: pd.Series | None = None, rf_annual: float = 0.0, periods_per_year: int = TD) -> dict:
     """Sharpe/Sortino/PSR use returns in EXCESS of the cash rate, so earning interest on idle cash
     does not flatter a low-exposure strategy against SPY."""
     eq = equity.dropna()
     r = eq.pct_change().dropna()
     if len(r) < 2:
         return {}
-    years = len(r) / TD
+    years = len(r) / periods_per_year
     cagr = (eq.iloc[-1] / eq.iloc[0]) ** (1 / years) - 1 if years > 0 else float("nan")
-    vol = r.std() * math.sqrt(TD)
-    ex = r - ((1 + rf_annual) ** (1 / TD) - 1)
-    sharpe = ex.mean() / ex.std() * math.sqrt(TD) if ex.std() > 0 else float("nan")
-    down = math.sqrt(float((ex.clip(upper=0) ** 2).mean())) * math.sqrt(TD)
-    sortino = ex.mean() * TD / down if down > 0 else float("nan")
+    vol = r.std() * math.sqrt(periods_per_year)
+    ex = r - ((1 + rf_annual) ** (1 / periods_per_year) - 1)
+    sharpe = ex.mean() / ex.std() * math.sqrt(periods_per_year) if ex.std() > 0 else float("nan")
+    down = math.sqrt(float((ex.clip(upper=0) ** 2).mean())) * math.sqrt(periods_per_year)
+    sortino = ex.mean() * periods_per_year / down if down > 0 else float("nan")
     dd = eq / eq.cummax() - 1
     mdd = dd.min()
     out = {

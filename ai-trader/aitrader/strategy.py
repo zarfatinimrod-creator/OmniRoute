@@ -7,7 +7,15 @@ import pandas as pd
 
 from .signals import TRADING_DAYS, atr, realized_vol, returns
 
-ETF_SECTORS = {"Index", "SectorETF", "Bonds", "Gold"}
+ETF_SECTORS = {"Index", "SectorETF", "Bonds", "Gold"}  # stock default; the live value is market.etf_groups
+
+
+def etf_groups(cfg: dict) -> set[str]:
+    return set(cfg.get("market", {}).get("etf_groups", ETF_SECTORS))
+
+
+def periods_per_year(cfg: dict) -> int:
+    return cfg.get("market", {}).get("periods_per_year", TRADING_DAYS)
 
 
 def combine(signals: dict[str, pd.DataFrame], weights: dict[str, float], date) -> pd.Series:
@@ -101,7 +109,7 @@ def build_targets(
     a = aux["atr"].loc[date]
     stopped = []
     for sym, pos in held.items():
-        if sym in px and pd.notna(px[sym]) and pd.notna(a.get(sym)):
+        if r["atr_stop_mult"] > 0 and sym in px and pd.notna(px[sym]) and pd.notna(a.get(sym)):
             stop = pos.get("peak_close", px[sym]) - r["atr_stop_mult"] * a[sym]
             if px[sym] < stop:
                 stopped.append(sym)
@@ -117,7 +125,7 @@ def build_targets(
     too_hot = set()
     if r.get("lowvol_exclude_top_pct") and "vol_long" in aux:
         vl = aux["vol_long"].loc[date].dropna()
-        if len(vl) >= 10:
+        if len(vl) >= r.get("lowvol_exclude_min_names", 10):
             too_hot = set(vl[vl >= vl.quantile(1 - r["lowvol_exclude_top_pct"])].index)
     new = [s for s in ranked.index if ranked[s] > r["min_score"] and s not in keep and s not in too_hot]
     chosen = [s for s in keep + new if s not in blocked and s not in stopped][:n]
@@ -139,13 +147,15 @@ def build_targets(
     raw = picks / vol[picks.index]
     w = raw / raw.sum()
     secs = pd.Series({s: sectors_map.get(s, "Other") for s in w.index})
-    caps = pd.Series({s: (r["max_etf_position_pct"] if secs[s] in ETF_SECTORS else r["max_position_pct"]) for s in w.index})
+    etf = etf_groups(cfg)
+    by_sym = r.get("max_position_pct_by_symbol", {})
+    caps = pd.Series({s: by_sym.get(s, r["max_etf_position_pct"] if secs[s] in etf else r["max_position_pct"]) for s in w.index})
     # Allow the whole book only if it can be filled under caps; otherwise the rest stays cash.
     w = _cap_weights(w, caps, secs, r["max_sector_pct"])
 
     # Volatility targeting on ex-ante covariance.
     rets = aux["rets"].loc[:date].tail(r["vol_lookback_days"])[w.index].fillna(0.0)
-    cov = rets.cov().values * TRADING_DAYS
+    cov = rets.cov().values * periods_per_year(cfg)
     port_vol = float(np.sqrt(max(w.values @ cov @ w.values, 1e-12)))
     scale = min(r["max_gross"] / max(w.sum(), 1e-9), r["target_vol_annual"] / port_vol)
 

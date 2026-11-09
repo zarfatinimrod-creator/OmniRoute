@@ -117,6 +117,12 @@ class Profiles(unittest.TestCase):
         self.assertEqual((r["target_vol_annual"], r["dd_halve"], r["dd_flat"], r["atr_stop_mult"],
                           r["regime_band_mode"], r["risk_off_gross_mult"], r["min_trade_value"]),
                          (0.30, -0.25, -0.5, 3.0, "hysteresis", 0, 100))
+        self.assertEqual(r["defensive_vix_pct"], 0)  # falsy: the VIX defensive block never runs for crypto
+        self.assertEqual(data.load_config("crypto", "crypto_base")["risk"]["defensive_vix_pct"], 0)
+        # the stock-only keys the crypto risk block still inherits (all unused by crypto); a new leak shows up here
+        self.assertEqual(set(r) - SPEC_RISK_KEYS - {"defensive_vix_pct"},
+                         {"defensive_gross_mult", "earnings_blackout_days", "earnings_max_position_pct",
+                          "lowvol_exclude_lookback", "lowvol_exclude_min_names", "max_etf_position_pct"})
         self.assertNotIn("dd_reentry_ref", r)  # planning decision 1: the candidate inherits the default -0.375
 
     def test_crypto_base_universe(self):

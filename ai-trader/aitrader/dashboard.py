@@ -14,11 +14,11 @@ from zoneinfo import ZoneInfo
 
 from . import journal
 from .data import _chart, load_config
+from .strategy import etf_groups
 
 ROOT = Path(__file__).resolve().parent.parent
 IL = ZoneInfo("Asia/Jerusalem")
 NY = ZoneInfo("America/New_York")
-ETF = {"Index", "SectorETF", "Bonds", "Gold"}
 
 
 DD_HE = {"normal": "רגיל", "halved": "חצי חשיפה", "flat": "מזומן מלא", "reentry": "חזרה הדרגתית"}
@@ -222,7 +222,7 @@ def build() -> list[dict]:
 
     # blackout
     for s, when in sorted(((journal.load_json("earnings.json") or {}).get("blackout") or {}).items()):
-        if s in sectors and sectors[s] not in ETF:
+        if s in sectors and sectors[s] not in etf_groups(cfg):
             rows.append({"t": "block", "symbol": s, "when": when})
 
     # rules (owner first), schedule, health, lessons
