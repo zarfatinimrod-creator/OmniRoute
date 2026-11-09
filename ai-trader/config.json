@@ -216,6 +216,7 @@
       60
     ],
     "primary_horizon_days": 20,
+    "default_horizon": 20,
     "ic_half_life_days": 504,
     "eta": 0.3,
     "weight_floor": 0.02,

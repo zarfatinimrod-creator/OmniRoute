@@ -3,7 +3,7 @@
   cycle [--dry-run] [--force-rebalance]   one live paper cycle (execute only when the market is open)
   status                                  print the latest summary
   backtest [--start 2018-01-01] [--sweep] the time machine (historical replay)
-  predict SYMBOL up|down [--horizon 20] [--note TEXT]   log Claude's own call for later grading
+  predict SYMBOL up|down [--horizon N] [--note TEXT]   log Claude's own call for later grading
   veto SYMBOL --reason TEXT               veto today's new entry in SYMBOL (Claude review)
   shrink SYMBOL MULT --reason TEXT        shrink today's target for SYMBOL (0..1)
   news SYMBOL                             recent headlines
@@ -61,9 +61,9 @@ def main(argv=None) -> int:
     p = sub.add_parser("predict")
     p.add_argument("symbol")
     p.add_argument("direction", choices=["up", "down"])
-    p.add_argument("--horizon", type=int, default=20)
+    p.add_argument("--horizon", type=int, default=None, help="trading days (default: learning.default_horizon)")
     p.add_argument("--note", default="")
-    p.add_argument("--prob", type=float, default=None, help="probability (0-1) that SYMBOL beats SPY over the horizon")
+    p.add_argument("--prob", type=float, default=None, help="probability (0-1) that SYMBOL beats the benchmark (stocks) or rises (crypto)")
     cx = sub.add_parser("context")
     cx.add_argument("symbol")
     sub.add_parser("verify")
@@ -141,6 +141,7 @@ def _run(a: argparse.Namespace) -> int:
         from .data import live_prices, load_config, market_status
 
         cfg = load_config()
+        horizon = a.horizon if a.horizon is not None else cfg["learning"]["default_horizon"]
         bench = cfg.get("benchmark", "SPY")
         px = live_prices([a.symbol.upper(), bench])
         if a.symbol.upper() not in px:
@@ -151,12 +152,12 @@ def _run(a: argparse.Namespace) -> int:
         except Exception:  # noqa: BLE001
             is_open = False
         journal.append("predictions.jsonl", {
-            "date": _today_market_date(), "logged_at": journal.now_utc(), "symbol": a.symbol.upper(), "horizon": a.horizon,
+            "date": _today_market_date(), "logged_at": journal.now_utc(), "symbol": a.symbol.upper(), "horizon": horizon,
             "source": "claude", "score": 1.0 if a.direction == "up" else -1.0, "direction": a.direction, "note": a.note,
             "prob": None if a.prob is None else max(0.0, min(1.0, a.prob)), "model_note": "graded forward only (post knowledge cutoff)",
             "components": {}, "price": px[a.symbol.upper()] if is_open else None, "bench_price": px.get(bench) if is_open else None,
             "entry": "live" if is_open else "next_session_close", "status": "open"})
-        print(f"logged claude call: {a.symbol.upper()} {a.direction} h={a.horizon} @ {px[a.symbol.upper()]}")
+        print(f"logged claude call: {a.symbol.upper()} {a.direction} h={horizon} @ {px[a.symbol.upper()]}")
     elif a.cmd in ("veto", "shrink"):
         ds = _today_market_date()
         ov = journal.load_json("overrides.json", {}) or {}

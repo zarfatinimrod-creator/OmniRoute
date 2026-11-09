@@ -280,7 +280,7 @@ def _next_bar(idx: pd.DatetimeIndex, after: pd.Timestamp, inclusive: bool) -> tu
     return (nxt[0], idx.get_loc(nxt[0])) if len(nxt) else (None, None)
 
 
-def _entry_bar(p: dict, idx: pd.DatetimeIndex) -> tuple[pd.Timestamp | None, int | None]:
+def _entry_bar(p: dict, idx: pd.DatetimeIndex, market: dict | None = None) -> tuple[pd.Timestamp | None, int | None]:
     """Entry for a Claude / desk / overlay / news call: the first price knowable when it was LOGGED, whatever
     date it carries (a desk or overlay call can carry the earlier decision date). Returns (start bar or None
     for "use the logged price", bar position the horizon counts from).
@@ -289,7 +289,17 @@ def _entry_bar(p: dict, idx: pd.DatetimeIndex) -> tuple[pd.Timestamp | None, int
     - logged before that day's close without a live price    -> that session's close (no credit for the gap;
       covers pre-open calls, stale quotes and price None)
     - after the close (13:00 on early-close days), on a closed day or an uncovered calendar year, or with no
-      usable time                                           -> the next session's close"""
+      usable time                                           -> the next session's close
+    market with calendar "utc_daily" (crypto): every day is a session, 00:00-24:00 UTC, weekends included. A call
+    with a price uses it (horizon from the log day); with price None it takes that day's close (None until that
+    bar exists, so nothing is graded from a bar that has not closed)."""
+    if (market or {}).get("calendar") == "utc_daily":
+        ts = _ny_time(p.get("logged_at"))
+        if ts is not None:
+            day = pd.Timestamp(ts.tz_convert("UTC").date())
+            if day in idx and p.get("price") is not None:
+                return None, idx.get_loc(day)
+            return _next_bar(idx, day, inclusive=True)
     ny = _ny_time(p.get("logged_at"))
     if ny is None:  # no time of day: the session after the later of the call's date and its log date
         anchor = pd.Timestamp(p["date"])
@@ -316,9 +326,12 @@ def broken_chains(names=None) -> list[str]:
     return sorted(n for n in (CHAINED if names is None else names) if not verify_chain(n)[0])
 
 
-def evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = "predictions.jsonl", grades_name: str = "grades.jsonl") -> dict:
+def evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = "predictions.jsonl", grades_name: str = "grades.jsonl",
+                         market: dict | None = None) -> dict:
     """Grade predictions whose horizon has passed (trading days). Predictions are never edited:
-    each grade is a new, hash-chained record in grades.jsonl."""
+    each grade is a new, hash-chained record in grades.jsonl. market["grading"] == "absolute" (crypto) grades
+    against cash (benchmark return 0), so excess is the coin's own return; None / stock grades against `bench`."""
+    absolute = (market or {}).get("grading") == "absolute"
     idx = close.index
     done: set[str] = set()
     for p in open_predictions(preds_name, grades_name):
@@ -332,24 +345,29 @@ def evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = "pre
                 continue
             start = idx[pos] if idx[pos] == d else None
         else:
-            start, pos = _entry_bar(p, idx)
+            start, pos = _entry_bar(p, idx, market)
             if pos is None:
                 continue
         if pos + p["horizon"] >= len(idx):
             continue
         end = idx[pos + p["horizon"]]
         sym = p["symbol"]
-        if sym not in close or bench not in close:
+        if sym not in close or (not absolute and bench not in close):
             continue
         # Prefer the split/dividend-adjusted series at both ends (immune to later splits); fall back to the
         # logged price only when the prediction date is not a bar in the series (e.g. logged on a holiday).
         p0 = close.at[start, sym] if start is not None else p.get("price")
-        b0 = close.at[start, bench] if start is not None else p.get("bench_price")
-        px_end, b_end = close.at[end, sym], close.at[end, bench]
-        if any(v is None or pd.isna(v) or v == 0 for v in (p0, b0, px_end, b_end)):
-            continue
-        ret = px_end / p0 - 1
-        bret = b_end / b0 - 1
+        if absolute:
+            if any(v is None or pd.isna(v) or v == 0 for v in (p0, close.at[end, sym])):
+                continue
+            ret, bret = close.at[end, sym] / p0 - 1, 0.0
+        else:
+            b0 = close.at[start, bench] if start is not None else p.get("bench_price")
+            px_end, b_end = close.at[end, sym], close.at[end, bench]
+            if any(v is None or pd.isna(v) or v == 0 for v in (p0, b0, px_end, b_end)):
+                continue
+            ret = px_end / p0 - 1
+            bret = b_end / b0 - 1
         excess = ret - bret
         append(grades_name, {
             "key": pred_key(p), "graded_at": now_utc(), "eval_date": str(end.date()), "ret": round(ret, 4),

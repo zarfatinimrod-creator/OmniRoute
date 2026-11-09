@@ -536,7 +536,7 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
 
     journal.save_json("portfolio.json", main.state)
     journal.save_json("shadow_portfolio.json", shadow.state)
-    card = journal.evaluate_predictions(_eval_close(close.loc[:dec_bar]), bench)  # final bars only
+    card = journal.evaluate_predictions(_eval_close(close.loc[:dec_bar]), bench, market=cfg.get("market"))  # final bars only
     try:  # the news book's calls; a failure here must not cost the quant book its records and alerts
         nfiles = ("news_predictions.jsonl", "news_grades.jsonl")
         journal.evaluate_predictions(_eval_close(close.loc[:dec_bar], *nfiles), bench, *nfiles)
