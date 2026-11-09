@@ -261,3 +261,27 @@ def load_market(cfg: dict, rng: str = "10y", max_age_hours: float = 6.0) -> dict
     except Exception as e:  # noqa: BLE001 - regime input is optional
         print(f"[data] VIX unavailable: {type(e).__name__}")
     return panel
+
+
+def official_opens(symbols: list[str], day) -> dict[str, float]:
+    """Opening price of the 09:30 New York 1-minute bar on `day` (the real opening trade).
+
+    Yahoo's DAILY bar 'open' can be wrong early in the session (seen 2026-11-09: SPY daily open 734.82 vs the
+    09:30 trade at 741.93; JNJ 267.56 vs 278.16), so paper fills must not use it. 1-minute data is only kept
+    for a few days; symbols without it are left out and the caller falls back to the daily open."""
+    d = pd.Timestamp(day).date()
+
+    def one(sym):
+        try:
+            res = _chart(sym, "5d", "1m")
+            q = res["indicators"]["quote"][0]
+            ts = pd.to_datetime(res.get("timestamp") or [], unit="s", utc=True).tz_convert("America/New_York")
+            for t, o in zip(ts, q.get("open") or []):
+                if t.date() == d and (t.hour, t.minute) == (9, 30) and o:
+                    return sym, float(o)
+        except Exception:  # noqa: BLE001 - caller falls back
+            pass
+        return sym, None
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        return {s: p for s, p in ex.map(one, sorted(set(symbols))) if p}

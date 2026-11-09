@@ -21,7 +21,7 @@ import pandas as pd
 
 from . import journal, notify
 from .broker import PaperBroker
-from .data import corporate_actions, earnings_on, fetch_panel, load_config, load_market, market_status
+from .data import corporate_actions, earnings_on, fetch_panel, load_config, load_market, market_status, official_opens
 from .learn import ic_table, signal_stats, update_weights, walk_forward_weights
 from .signals import compute_all
 from .strategy import build_targets, combine, precompute_aux
@@ -199,7 +199,10 @@ def _execute_pending(panel, cfg, main, shadow, events) -> list[dict]:
     # never applied twice. Anything logged after 09:30 on the fill day is ignored (it saw the open).
     if not pending.get("exits_only"):
         pending["targets"], pending["overrides"] = _apply_overrides(pending["targets_raw"], main.positions, pending["decision_date"], _open_cutoff_utc(d_exec))
-    opx = {**_px(close.loc[d_exec]), **_px(panel["open"].loc[d_exec])}  # official open; close only as fallback
+    names = set(pending["targets"]) | set(pending["targets_raw"]) | set(main.positions) | set(shadow.positions)
+    real = official_opens(sorted(names), d_exec)  # 09:30 1-minute bar: the true opening trade
+    opx = {**_px(close.loc[d_exec]), **_px(panel["open"].loc[d_exec]), **real}  # 1m open > daily open > close
+    pending["open_source"] = {"one_minute": sorted(real), "daily_fallback": sorted(n for n in names if n not in real)}
     ds_exec = str(d_exec.date())
     cool = str((d_exec + pd.offsets.BDay(r.get("stop_cooldown_days", 10))).date())
     xo = pending.get("exits_only", False)

@@ -20,7 +20,9 @@ class CycleFlow(unittest.TestCase):
             "load_config": cycle.load_config, "load_market": cycle.load_market, "market_status": cycle.market_status,
             "earnings_on": cycle.earnings_on, "_overlays_once_per_day": cycle._overlays_once_per_day,
             "_market_opened": cycle._market_opened, "_bar_is_final": cycle._bar_is_final,
+            "official_opens": cycle.official_opens,
         }
+        cycle.official_opens = lambda syms, day: {}  # no network in tests; daily open is the fallback
         cycle.load_config = lambda: self.cfg
         cycle.market_status = lambda sym="SPY": {"is_open": False}
         cycle.earnings_on = lambda day: {}
@@ -75,6 +77,17 @@ class CycleFlow(unittest.TestCase):
         self.assertEqual(len(journal.read("trades.jsonl")), trades)
         self.assertEqual(journal.verify_chain("trades.jsonl")[0], True)
         self.assertEqual(journal.verify_chain("decisions.jsonl")[0], True)
+
+    def test_one_minute_open_beats_daily_open(self):
+        self._upto(400)
+        cycle.run_cycle()
+        p2 = self._upto(401)
+        name = list(journal.load_json("pending.json")["targets"])[0]
+        cycle.official_opens = lambda syms, day: {name: 123.45}
+        out = cycle.run_cycle()
+        f = [x for x in out["executed"] if x["symbol"] == name][0]
+        self.assertAlmostEqual(f["price"], round(123.45 * (1 + self.cfg["costs"]["slippage_bps"] / 1e4), 4), places=3)
+        del p2
 
     def test_production_shaped_panel_does_not_crash(self):
         # load_market adds non-frame keys (_require_vix flag, vix Series): decide() must slice only frames/series
