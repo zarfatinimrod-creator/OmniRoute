@@ -200,5 +200,21 @@
     "telegram_chat_env": "AITRADER_TELEGRAM_CHAT"
   },
   "sec_user_agent": "ai-trader-research-bot contact@example.com",
-  "_note_priors": "2026-11-09: reversal/high52/rsi2 demoted (decayed after publication, strategy-science brief); lowvol used as an exclusion filter instead of a score."
+  "_note_priors": "2026-11-09: reversal/high52/rsi2 demoted (decayed after publication, strategy-science brief); lowvol used as an exclusion filter instead of a score.",
+  "news": {
+    "_note": "Owner's rules 2026-11-09: buy only if Claude's headline score > 8; max 5% of the account per trade; sell at -3% from entry, no exceptions. sell_on_score_at_most and max_hold_days are Claude's additions (set to 0 to disable).",
+    "poll_seconds": 20,
+    "fresh_minutes": 30,
+    "buy_min_score": 8,
+    "max_position_pct": 0.05,
+    "stop_loss_pct": 0.03,
+    "sell_on_score_at_most": 2,
+    "max_hold_days": 5,
+    "max_gross": 1.0,
+    "slippage_bps": 10,
+    "starting_cash": 100000,
+    "model": "claude-haiku-5-5",
+    "trade_outside_hours": false,
+    "batch_max": 12
+  }
 }

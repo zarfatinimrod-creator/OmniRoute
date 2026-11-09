@@ -29,20 +29,21 @@ def now_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-CHAINED = {"decisions.jsonl", "trades.jsonl", "learning.jsonl", "predictions.jsonl", "grades.jsonl"}
+CHAINED = {"decisions.jsonl", "trades.jsonl", "learning.jsonl", "predictions.jsonl", "grades.jsonl",
+           "news_trades.jsonl", "news_scores.jsonl", "news_predictions.jsonl", "news_grades.jsonl"}
 
 
 def pred_key(p: dict) -> str:
     return f"{p['date']}|{p['symbol']}|{p['horizon']}|{p.get('source', 'quant')}|{p.get('logged_at', '')}"
 
 
-def graded() -> dict:
-    return {g["key"]: g for g in read("grades.jsonl")}
+def graded(grades_name: str = "grades.jsonl") -> dict:
+    return {g["key"]: g for g in read(grades_name)}
 
 
-def open_predictions() -> list[dict]:
-    g = graded()
-    return [p for p in read("predictions.jsonl") if pred_key(p) not in g]
+def open_predictions(preds_name: str = "predictions.jsonl", grades_name: str = "grades.jsonl") -> list[dict]:
+    g = graded(grades_name)
+    return [p for p in read(preds_name) if pred_key(p) not in g]
 
 
 def _last_hash(p: Path) -> str:
@@ -141,11 +142,11 @@ def record_predictions(date: str, score: pd.Series, components: dict[str, pd.Ser
     return n
 
 
-def evaluate_predictions(close: pd.DataFrame, bench: str) -> dict:
+def evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = "predictions.jsonl", grades_name: str = "grades.jsonl") -> dict:
     """Grade predictions whose horizon has passed (trading days). Predictions are never edited:
     each grade is a new, hash-chained record in grades.jsonl."""
     idx = close.index
-    for p in open_predictions():
+    for p in open_predictions(preds_name, grades_name):
         d = pd.Timestamp(p["date"])
         pos = idx.searchsorted(d)
         if pos >= len(idx) or pos + p["horizon"] >= len(idx):
@@ -179,16 +180,16 @@ def evaluate_predictions(close: pd.DataFrame, bench: str) -> dict:
         ret = px_end / p0 - 1
         bret = b_end / b0 - 1
         excess = ret - bret
-        append("grades.jsonl", {
+        append(grades_name, {
             "key": pred_key(p), "graded_at": now_utc(), "eval_date": str(end.date()), "ret": round(ret, 4),
             "bench_ret": round(bret, 4), "excess": round(excess, 4), "hit": bool((excess > 0) == (p["direction"] == "up")),
         })
-    return scorecard()
+    return scorecard(read(preds_name), grades_name)
 
 
-def scorecard(preds: list[dict] | None = None) -> dict:
+def scorecard(preds: list[dict] | None = None, grades_name: str = "grades.jsonl") -> dict:
     preds = preds if preds is not None else read("predictions.jsonl")
-    g = graded()
+    g = graded(grades_name)
     ev = [{**p, **g[pred_key(p)]} for p in preds if pred_key(p) in g]
     out = {"open": len(preds) - len(ev), "evaluated": len(ev)}
     for src in sorted({p.get("source", "quant") for p in ev}):

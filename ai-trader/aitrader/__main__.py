@@ -9,6 +9,9 @@
   news SYMBOL                             recent headlines
   context SYMBOL                          past calls, trades and lessons for a ticker (read before deciding)
   verify                                  check the tamper-evident hash chains
+  news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
+  news-score [--n 8]                      score recent headlines without trading (scorer check)
+  news-status                             news book, last trades, news scorecard
   placebo [--k 100]                       noise gate the learner must beat (signals shuffled across stocks)
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
   desk SYMBOL RATING --prob P --thesis T --invalidation I   record the desk's final call (Sell/Underweight=veto, Hold=shrink 0.5)
@@ -56,6 +59,13 @@ def main(argv=None) -> int:
     cx = sub.add_parser("context")
     cx.add_argument("symbol")
     sub.add_parser("verify")
+    nl = sub.add_parser("news-live")
+    nl.add_argument("--until", default="16:05", help="New York time to stop")
+    nl.add_argument("--minutes", type=float, default=None)
+    ns = sub.add_parser("news-score")
+    ns.add_argument("--n", type=int, default=8)
+    ns.add_argument("--minutes", type=int, default=120)
+    sub.add_parser("news-status")
     pl = sub.add_parser("placebo")
     pl.add_argument("--k", type=int, default=100)
     br = sub.add_parser("brief")
@@ -140,6 +150,36 @@ def main(argv=None) -> int:
         for name in sorted(journal.CHAINED):
             ok, n = journal.verify_chain(name)
             print(f"{name}: {'OK' if ok else 'BROKEN at record ' + str(n)} ({n} records)")
+    elif a.cmd == "news-live":
+        from .news_live import run
+
+        run(a.until, a.minutes)
+    elif a.cmd == "news-score":  # score recent headlines without trading (a check of the scorer)
+        from datetime import datetime, timedelta, timezone
+
+        from .data import load_config
+        from .news_live import NewsTrader, live_price, ncfg, score_batch
+
+        cfg = load_config()
+        nt = NewsTrader(cfg)
+        from concurrent.futures import ThreadPoolExecutor
+        from .news_live import fetch_headlines
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            items = [x for b in ex.map(lambda s_: fetch_headlines(s_, nt.session), nt.universe) for x in b]
+        after = datetime.now(timezone.utc) - timedelta(minutes=a.minutes)
+        items = sorted([x for x in items if datetime.fromisoformat(x["published"]) >= after], key=lambda x: x["published"], reverse=True)[: a.n]
+        for x in items:
+            x["price"], x["day_move_pct"] = live_price(x["symbol"])
+        sc = score_batch(items, ncfg(cfg)["model"])
+        for x in items:
+            s_ = sc.get(x["key"], {})
+            print(f"{s_.get('score', '?'):>2} | {x['symbol']:<5} | {x['published'][11:16]}Z | move {x['day_move_pct']} | {x['title'][:90]} | {s_.get('why', '')}")
+    elif a.cmd == "news-status":
+        b = journal.load_json("news_book.json", {}) or {}
+        print(json.dumps({"cash": round(b.get("cash", 0), 2), "positions": b.get("positions", {}),
+                          "trades": journal.read("news_trades.jsonl")[-10:],
+                          "scorecard": journal.scorecard(journal.read("news_predictions.jsonl"), "news_grades.jsonl")}, indent=1, default=str, ensure_ascii=False))
     elif a.cmd == "placebo":
         from .data import load_config, load_market
         from .learn import placebo_gate
