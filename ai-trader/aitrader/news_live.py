@@ -133,10 +133,15 @@ def live_price(sym: str) -> tuple[float | None, float | None]:
 
 def market_open_now() -> bool:
     now = datetime.now(NY)
-    return now.weekday() < 5 and (now.hour, now.minute) >= (9, 30) and now.hour < 16
+    hours = journal.session_hours(now.date())  # holidays and 13:00 early closes from config.json
+    return hours is not None and hours[0] <= (now.hour, now.minute) < hours[1]
 
 
 # ---------------------------------------------------------------- the loop
+class ChainBroken(RuntimeError):
+    pass
+
+
 class NewsTrader:
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -235,7 +240,7 @@ class NewsTrader:
             if not s:
                 continue
             px = x.get("price")
-            rec = {"date": datetime.now(NY).date().isoformat(), "logged_at": journal.now_utc(), "symbol": x["symbol"],
+            rec = {"date": datetime.now(NY).date().isoformat(), "logged_at": journal.now_utc(), "price_at": x.get("price_at"), "symbol": x["symbol"],
                    "headline": x["title"], "published": x["published"], "score": s["score"], "why": s["why"],
                    "price": px if is_open else None, "bench_price": bench_px if is_open else None,
                    "latency_s": round((datetime.now(timezone.utc) - datetime.fromisoformat(x["published"])).total_seconds())}
@@ -243,7 +248,7 @@ class NewsTrader:
             if s["score"] != 5:  # graded forward at 1 and 5 trading days (non-quant: from the logged price)
                 for h in (1, 5):
                     journal.append("news_predictions.jsonl", {
-                        **{k: rec[k] for k in ("date", "logged_at", "symbol", "price", "bench_price")}, "horizon": h,
+                        **{k: rec[k] for k in ("date", "logged_at", "price_at", "symbol", "price", "bench_price")}, "horizon": h,
                         "source": "news_claude", "direction": "up" if s["score"] > 5 else "down",
                         "prob": round(0.5 + (s["score"] - 5.5) * 0.04, 3), "score": s["score"], "headline": x["title"],
                         "entry": "live" if is_open else "next_session_close", "status": "open"})
@@ -275,10 +280,14 @@ class NewsTrader:
 
     def step(self) -> list[str]:
         events: list[str] = []
+        bad = journal.broken_chains(journal.NEWS_CHAINED)
+        if bad:  # fail closed, like the quant cycle: no trading on a corrupted journal
+            raise ChainBroken("news hash chain broken: " + ", ".join(bad) + " - news engine stopped, nothing traded")
         self.run_queue_at_open(events)
         new = self.poll_headlines()
         for x in new:
             x["price"], x["day_move_pct"] = live_price(x["symbol"])
+            x["price_at"] = journal.now_utc()  # when the price was seen (it can predate the log by the scoring time)
         for i in range(0, len(new), self.n["batch_max"]):
             chunk = new[i:i + self.n["batch_max"]]
             self.handle_scored(chunk, score_batch(chunk, self.n["model"]), events)
@@ -316,6 +325,10 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
             ev = nt.step()
             if ev:
                 print(f"[news {now.strftime('%H:%M:%S')} NY] " + " | ".join(ev), flush=True)
+        except ChainBroken as e:  # not survivable: stop trading and tell the owner
+            print(f"[news] {e}", flush=True)
+            notify.send("AI Trader - תקלה", f"{e} (כסף נייר)", cfg, "urgent")
+            break
         except Exception as e:  # noqa: BLE001 - the loop must survive a bad cycle; the error is logged, not hidden
             print(f"[news] cycle error: {type(e).__name__}: {str(e)[:200]}", flush=True)
             journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__, "detail": str(e)[:300]})

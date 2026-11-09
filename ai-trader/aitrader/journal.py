@@ -31,6 +31,25 @@ def now_utc() -> str:
 
 CHAINED = {"decisions.jsonl", "trades.jsonl", "learning.jsonl", "predictions.jsonl", "grades.jsonl",
            "news_trades.jsonl", "news_scores.jsonl", "news_predictions.jsonl", "news_grades.jsonl"}
+NEWS_CHAINED = {n for n in CHAINED if n.startswith("news_")}  # owned by the news engine
+MAIN_CHAINED = CHAINED - NEWS_CHAINED  # owned by the quant cycle
+
+
+def _calendar() -> dict:
+    try:
+        return json.loads((ROOT / "config.json").read_text(encoding="utf-8")).get("calendar", {})
+    except (OSError, ValueError):
+        return {}
+
+
+def session_hours(day) -> tuple[tuple[int, int], tuple[int, int]] | None:
+    """NYSE regular session (open, close) in New York (hour, minute) for a date, or None when closed
+    (weekend / holiday in config.json calendar). Early-close days end at 13:00."""
+    d = pd.Timestamp(day).date()
+    cal = _calendar()
+    if d.weekday() >= 5 or d.isoformat() in set(cal.get("holidays", [])):
+        return None
+    return (9, 30), ((13, 0) if d.isoformat() in set(cal.get("early_close", [])) else (16, 0))
 
 
 def pred_key(p: dict) -> str:
@@ -47,15 +66,19 @@ def open_predictions(preds_name: str = "predictions.jsonl", grades_name: str = "
 
 
 def _last_hash(p: Path) -> str:
+    """Hash of the last READABLE record: a torn line left by a crash is skipped (read() skips it too), so one
+    bad write never breaks the chain for every later record."""
     if not p.exists() or p.stat().st_size == 0:
         return "genesis"
     with p.open("rb") as f:
         f.seek(max(0, p.stat().st_size - 1_000_000))
         tail = f.read().decode("utf-8", "replace").strip().splitlines()
-    try:
-        return json.loads(tail[-1]).get("hash", "genesis")
-    except (ValueError, IndexError):
-        return "genesis"
+    for line in reversed(tail):
+        try:
+            return json.loads(line).get("hash", "genesis")
+        except ValueError:
+            continue
+    return "genesis"
 
 
 def append(name: str, record: dict) -> None:
@@ -65,8 +88,9 @@ def append(name: str, record: dict) -> None:
         prev = _last_hash(p)
         body = json.dumps(json.loads(json.dumps(record, default=str)), sort_keys=True, default=str)
         record = {**record, "prev_hash": prev, "hash": hashlib.sha256((prev + body).encode()).hexdigest()}
-    with p.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
+    torn = p.exists() and p.stat().st_size > 0 and p.read_bytes()[-1:] != b"\n"
+    with p.open("a", encoding="utf-8") as f:  # a torn last line (no newline) must not swallow this record
+        f.write(("\n" if torn else "") + json.dumps(record, default=str, ensure_ascii=False) + "\n")
 
 
 def verify_chain(name: str) -> tuple[bool, int]:
@@ -143,38 +167,48 @@ def record_predictions(date: str, score: pd.Series, components: dict[str, pd.Ser
 
 
 def _ny_time(stamp) -> pd.Timestamp | None:
+    """A logged UTC stamp in New York time (naive stamps are UTC: every writer uses now_utc())."""
     try:
         ts = pd.Timestamp(str(stamp))
     except (ValueError, TypeError):
         return None
-    return None if ts is pd.NaT or ts.tzinfo is None else ts.tz_convert("America/New_York")
+    if ts is pd.NaT or len(str(stamp)) < 16:  # a bare date has no time of day
+        return None
+    return (ts.tz_localize("UTC") if ts.tzinfo is None else ts).tz_convert("America/New_York")
+
+
+def _next_bar(idx: pd.DatetimeIndex, after: pd.Timestamp, inclusive: bool) -> tuple[pd.Timestamp | None, int | None]:
+    nxt = idx[idx >= after] if inclusive else idx[idx > after]
+    return (nxt[0], idx.get_loc(nxt[0])) if len(nxt) else (None, None)
 
 
 def _entry_bar(p: dict, idx: pd.DatetimeIndex) -> tuple[pd.Timestamp | None, int | None]:
     """Entry for a Claude / desk / overlay / news call: the first price knowable when it was LOGGED, whatever
     date it carries (a desk or overlay call can carry the earlier decision date). Returns (start bar or None
     for "use the logged price", bar position the horizon counts from).
-    - logged during a session with a live price -> that price; horizon counted from the log day
-    - logged before the open                    -> that session's close (no credit for the opening gap)
-    - logged after the close / on a closed day  -> the next session's close (no credit for after-hours news)
-    Rows without a parseable time fall back to the logged price on their date."""
+    - live price observed during that day's regular session -> that price; horizon counted from that day
+      (the price time is `price_at` when the writer recorded it, else `logged_at`; early closes end at 13:00)
+    - logged before the open                                -> that session's close (no credit for the gap)
+    - anything else (after the close, closed day, price None = writer saw the market closed, no usable time)
+                                                            -> the next session's close"""
     ny = _ny_time(p.get("logged_at"))
-    if ny is None:
-        pos = idx.searchsorted(pd.Timestamp(p["date"]))
-        if p.get("price") is not None:
-            return (None, pos) if pos < len(idx) else (None, None)
-        nxt = idx[idx > pd.Timestamp(p["date"])]
-        return (nxt[0], idx.get_loc(nxt[0])) if len(nxt) else (None, None)
+    if ny is None:  # no time of day: the conservative entry is the session after the call's date
+        return _next_bar(idx, pd.Timestamp(p["date"]), inclusive=False)
     day, hm = pd.Timestamp(ny.date()), (ny.hour, ny.minute)
-    if day in idx and (9, 30) <= hm < (16, 0) and p.get("price") is not None:
-        return None, idx.get_loc(day)
-    nxt = idx[idx >= day] if day in idx and hm < (16, 0) else idx[idx > day]
-    return (nxt[0], idx.get_loc(nxt[0])) if len(nxt) else (None, None)
+    hours = session_hours(day)
+    if hours is not None and day in idx and p.get("price") is not None:
+        seen = _ny_time(p.get("price_at")) or ny
+        seen_hm = (seen.hour, seen.minute) if seen.date() == ny.date() else (0, 0)
+        if hours[0] <= seen_hm and hm < hours[1]:
+            return None, idx.get_loc(day)
+    if hours is not None and hm < hours[0]:
+        return _next_bar(idx, day, inclusive=True)
+    return _next_bar(idx, day, inclusive=False)
 
 
-def broken_chains() -> list[str]:
-    """Names of hash-chained logs whose chain does not verify (empty = all good)."""
-    return sorted(n for n in CHAINED if not verify_chain(n)[0])
+def broken_chains(names=None) -> list[str]:
+    """Names of hash-chained logs (all, or the given set) whose chain does not verify (empty = all good)."""
+    return sorted(n for n in (CHAINED if names is None else names) if not verify_chain(n)[0])
 
 
 def evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = "predictions.jsonl", grades_name: str = "grades.jsonl") -> dict:

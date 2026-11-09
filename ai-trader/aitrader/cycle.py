@@ -298,9 +298,10 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
 
 def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours: float = 0.1, propose: bool = False) -> dict:
     cfg = load_config()
-    bad = journal.broken_chains()
+    bad = journal.broken_chains(journal.MAIN_CHAINED)  # the news engine checks its own chains
     if bad:  # fail closed: never decide or trade on top of a tampered / corrupted journal
-        msg = "hash chain broken: " + ", ".join(bad) + " - cycle halted, nothing traded"
+        msg = ("hash chain broken: " + ", ".join(bad) + " - cycle halted, nothing traded; positions are frozen"
+               " and stops are NOT being checked until the chain is repaired")
         notify.send("AI Trader - תקלה", msg + " (כסף נייר)", cfg, "urgent")
         return {"halted": msg, "executed": [], "decided_now": False, "events": [msg]}
     bench = cfg.get("benchmark", "SPY")
@@ -340,6 +341,7 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
     journal.save_json("portfolio.json", main.state)
     journal.save_json("shadow_portfolio.json", shadow.state)
     card = journal.evaluate_predictions(_eval_close(close.loc[:dec_bar]), bench)  # final bars only
+    journal.evaluate_predictions(close.loc[:dec_bar], bench, "news_predictions.jsonl", "news_grades.jsonl")
 
     equity = main.equity(prices_last)
     sh_eq = shadow.equity(prices_last)
