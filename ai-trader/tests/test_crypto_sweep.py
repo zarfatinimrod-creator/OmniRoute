@@ -263,6 +263,23 @@ class ExecLag(unittest.TestCase):
         with self.assertRaises(ValueError):
             backtest.run(p, cfg, start, end, "prior", 7, exec_lag=0)
 
+    def test_lagged_exits_only_keeps_a_buy_made_after_the_decision(self):
+        """Day 0 buys BTC (fills day 2); day 1 stops ETH off-cycle (exits only, fills day 3). The exits-only order must
+        see the BTC bought on day 2, not the empty book of day 1, or it would sell it."""
+        p = {k: v[["BTC-USD", "ETH-USD"]] for k, v in panel3().items()}
+        cfg = data.load_config("crypto", "crypto")
+        idx = p["close"].index
+        quiet = {"regime": "risk_on", "dd_state": "normal", "stopped": []}
+
+        def targets(d, *a, **k):
+            if d == idx[420]:
+                return {"BTC-USD": 0.5}, dict(quiet)
+            return {}, {**quiet, "stopped": ["ETH-USD"] if d == idx[421] else []}
+
+        with mock.patch.object(backtest, "build_targets", targets):
+            fills = backtest.run(p, cfg, str(idx[420].date()), str(idx[460].date()), "prior", 100, exec_lag=2)["_fills"]
+        self.assertEqual([(f["date"], f["symbol"], f["side"]) for f in fills], [(str(idx[422].date()), "BTC-USD", "BUY")])
+
 
 if __name__ == "__main__":
     unittest.main()
