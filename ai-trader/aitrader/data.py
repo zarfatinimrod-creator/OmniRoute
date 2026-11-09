@@ -373,8 +373,10 @@ def earnings_on(day: str) -> dict[str, str] | None:
 
 def load_market(cfg: dict, rng: str = "10y", max_age_hours: float = 6.0) -> dict:
     """Universe panel plus non-tradable regime inputs (VIX) under panel['vix']; panel['_fetched_at'] holds each
-    universe symbol's fetch time (the bar-final rule reads it)."""
+    universe symbol's fetch time (the bar-final rule reads it). market.vix false (crypto): no VIX at all."""
     panel = fetch_panel(list(cfg["universe"]), rng, max_age_hours)
+    if not cfg.get("market", {}).get("vix", True):
+        return panel
     panel["_require_vix"] = True  # production: a missing VIX must fail closed (defensive), not silently off
     try:
         vix = fetch_daily("^VIX", rng, max_age_hours)["close"].dropna()
@@ -407,3 +409,24 @@ def official_opens(symbols: list[str], day) -> dict[str, float]:
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         return {s: p for s, p in ex.map(one, sorted(set(symbols))) if p}
+
+
+INTRADAY_SECONDS = {"1h": 3600, "1m": 60}
+
+
+def intraday_open(sym: str, ts, interval: str) -> float | None:
+    """Open of the `interval` bar ("1h" | "1m") that starts exactly at `ts` (UTC, aware datetime or ISO string), from
+    Yahoo's chart API. None when the bar is missing - no row stamped ts, or a null open (volume is ignored) - or Yahoo
+    is unreachable. Yahoo keeps 1m bars for about 7 days and 1h bars for about 2 years; the live row of the current
+    bar carries the last trade time, not the bar start, so it never matches."""
+    t0 = int(pd.Timestamp(ts).timestamp())
+    params = {"period1": t0, "period2": t0 + INTRADAY_SECONDS[interval], "interval": interval}
+    try:
+        res = _get_json(CHART_URL.format(sym=sym), params)["chart"]["result"][0]
+        opens = res["indicators"]["quote"][0].get("open") or []
+        for t, o in zip(res.get("timestamp") or [], opens):
+            if int(t) == t0 and o is not None and o == o and float(o) > 0:
+                return float(o)
+    except (RuntimeError, KeyError, IndexError, TypeError, ValueError):
+        pass
+    return None

@@ -378,7 +378,8 @@
           "tz": "Asia/Jerusalem",
           "from": "23:00",
           "to": "08:00"
-        }
+        },
+        "revised_close_alert_bps": 5
       }
     },
     "crypto_base": {

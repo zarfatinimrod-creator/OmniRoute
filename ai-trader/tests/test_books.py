@@ -39,6 +39,7 @@ CRYPTO_MARKET = {
     "stale_skips_run": True, "close_source": "next_open", "coinbase_guard_pct": 0.01, "report_dir": "reports/crypto",
     "intraday_alert_pct": 0.08, "latest_max_age_hours": 26, "state_subdir": "crypto", "etf_groups": [],
     "quiet_hours": {"tz": "Asia/Jerusalem", "from": "23:00", "to": "08:00"},
+    "revised_close_alert_bps": 5,  # ruling R6 (Task 6): crypto only
 }
 SPEC_RISK_KEYS = {  # spec 3.3: the crypto risk block lists every key it uses (nothing inherited from stocks)
     "target_vol_annual", "max_gross", "max_position_pct", "max_position_pct_by_symbol", "max_sector_pct",
@@ -52,6 +53,11 @@ STOCK_ONLY = ("desk", "brief", "news", "news-live", "news-score", "news-status")
 
 def raw_config() -> dict:
     return json.loads((ROOT / "config.json").read_text())
+
+
+def report_files(root: Path) -> dict:
+    """The stock reports under a report root (reports/<date>.md), not the crypto ones in reports/crypto/."""
+    return {p.name: p.read_bytes() for p in sorted((root / "reports").glob("*.md"))}
 
 
 class TempState(unittest.TestCase):
@@ -248,6 +254,12 @@ class Cli(TempState):
             (self.tmp / "lessons.md").write_text("2026-11-02 S01 lesson (trades.jsonl)\n")
             before = self.files()
             self.assertIn("portfolio.json", before)
+            import aitrader.report as rep  # frozen_env points the report root at its own temp dir
+
+            reports = Path(rep.ROOT)
+            stock_reports = report_files(reports)
+            self.assertTrue(stock_reports)
+            self.assertFalse((reports / "reports" / "crypto").exists())
 
             cycle.load_config = data.load_config  # the active book's real profile
             prices = mock.patch.object(data, "live_prices", lambda syms: {s: 100.0 for s in syms})
@@ -266,6 +278,8 @@ class Cli(TempState):
                 for argv in runs:
                     code, out, err = self.cli(argv[0], "--book", "crypto", *argv[1:])
                     self.assertEqual(code, 0, (argv, err[-500:]))
+            self.assertEqual(report_files(reports), stock_reports)  # a crypto run never writes reports/<date>.md
+            self.assertTrue(list((reports / "reports" / "crypto").glob("*.md")))  # market.report_dir
         self.assertEqual(self.files(exclude="crypto"), before)
         crypto = set(self.files()) - set(before)
         for name in ("portfolio.json", "decisions.jsonl", "predictions.jsonl", "overrides.json", "trials.jsonl"):

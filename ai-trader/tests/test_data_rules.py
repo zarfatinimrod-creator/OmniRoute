@@ -252,12 +252,15 @@ class CryptoRun(unittest.TestCase):
         return p
 
     def run_in(self, state: Path, panel: dict, final_upto=None, cb=None, propose: bool = False, seed: dict | None = None):
-        """final_upto: the newest bar the clock calls final (default: every bar). cb: the Coinbase stub."""
+        """final_upto: the newest bar the clock calls final (default: every bar). The crypto clock is journal.now_utc
+        (Task 6, UtcDailyCalendar): 01:07 UTC the day after final_upto, else an hour after the newest bar ended.
+        cb: the Coinbase stub."""
+        newest = final_upto if final_upto is not None else panel["close"].index[-1]
+        clock = (crypto_end(newest) + timedelta(hours=1, minutes=2 if final_upto is not None else 0)).isoformat()
         with frozen_env(state, None):
+            journal.now_utc = lambda: clock
             cycle.load_config = lambda: self.cfg
             cycle.load_market = lambda c, rng="10y", age=0.1: panel
-            if final_upto is not None:
-                cycle._bar_is_final = lambda d: d <= final_upto
             if seed is not None and not (state / "portfolio.json").exists():
                 journal.save_json("portfolio.json", seed)
             with mock.patch.object(cycle, "coinbase_close", cb or (lambda sym, day: None)):
@@ -324,7 +327,8 @@ class CryptoRun(unittest.TestCase):
         self.assertEqual(journal_json(state, "pending.json")["decision_date"], str(prev.date()))
         out = self.run_in(state, self.panel(self.I))
         self.assertFalse(out["decided_now"])
-        self.assertEqual(len(read_jsonl(state, "decisions.jsonl")), 1)
+        # decision records only: this synthetic panel's open[D+1] != close[D], so the R6 audit (Task 6) adds an event row
+        self.assertEqual(len([r for r in read_jsonl(state, "decisions.jsonl") if "event" not in r]), 1)
         out = self.run_in(state, self.panel(self.I + 1), final_upto=d)
         self.assertTrue(out["decided_now"])
         dec = read_jsonl(state, "decisions.jsonl")[-1]

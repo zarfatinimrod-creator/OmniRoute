@@ -200,8 +200,9 @@ class SameRegimeEverywhere(unittest.TestCase):
                 cycle.load_market = lambda c, rng="10y", age=0.1, sl=sl: sl
                 ds = str(p["close"].index[i].date())
                 proposal = cycle.run_cycle(propose=True)
+                saved = journal.load_json("proposal.json")["diag"]["regime"]  # read now: a crypto decision deletes it (Task 6)
                 cycle.run_cycle()
-                live[ds] = [proposal["diag"]["regime"], journal.load_json("proposal.json")["diag"]["regime"],
+                live[ds] = [proposal["diag"]["regime"], saved,
                             journal.load_json("portfolio.json")["regime"], journal.read("decisions.jsonl")[-1]["diag"]["regime"]]
         self.assertEqual(len({reg.iloc[i] for i in days}), 2)  # the window really holds a switch
         for i in days:

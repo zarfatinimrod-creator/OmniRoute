@@ -5,7 +5,7 @@ import pickle
 import tempfile
 from pathlib import Path
 
-from aitrader import cycle, journal
+from aitrader import cycle, data, journal
 from test_core import cfg_for
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -24,7 +24,7 @@ def frozen_env(tmp_state: Path, panel_upto):
     names = ["load_config", "load_market", "market_status", "earnings_on", "_overlays_once_per_day",
              "_market_opened", "_bar_is_final", "official_opens", "corporate_actions", "coinbase_close"]
     saved = {k: getattr(cycle, k) for k in names}
-    saved_send, saved_now = cycle.notify.send, journal.now_utc
+    saved_send, saved_now, saved_intraday = cycle.notify.send, journal.now_utc, data.intraday_open
     saved_state, saved_rep = journal.STATE, rep.ROOT
     tick = iter(range(10**9))
     try:
@@ -35,6 +35,7 @@ def frozen_env(tmp_state: Path, panel_upto):
         cycle.corporate_actions = lambda sym: []
         cycle.official_opens = lambda syms, day: {}
         cycle.coinbase_close = lambda sym, day: None  # the crypto price guard's source: unreachable, never the network
+        data.intraday_open = lambda sym, ts, interval: None  # crypto fill prices (1h/1m bars): missing, never the network
         cycle.market_status = lambda sym="SPY": {"is_open": False}
         cycle.earnings_on = lambda day: {}
         cycle._overlays_once_per_day = lambda cfg, ds, bench: {}
@@ -44,7 +45,7 @@ def frozen_env(tmp_state: Path, panel_upto):
     finally:
         for k, v in saved.items():
             setattr(cycle, k, v)
-        cycle.notify.send, journal.now_utc = saved_send, saved_now
+        cycle.notify.send, journal.now_utc, data.intraday_open = saved_send, saved_now, saved_intraday
         journal.STATE, rep.ROOT = saved_state, saved_rep
 
 
