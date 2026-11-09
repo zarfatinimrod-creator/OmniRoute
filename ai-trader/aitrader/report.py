@@ -30,13 +30,14 @@ def write_daily_report(s: dict) -> Path:
         f"- שוק: {'פתוח' if mk.get('is_open') else 'סגור'} (מחיר אחרון SPY: {mk.get('price')}, עדכון: {mk.get('last_trade_utc')})",
         f"- משטר: **{s.get('regime')}** | ירידה מהשיא: {s.get('drawdown')} ({s.get('dd_state')})",
         f"- שווי תיק: **${s['equity']:,.0f}** ({s['return_since_start']:+.2%} מההתחלה) | מזומן ${s['cash']:,.0f} | חשיפה {s['gross']:.0%}",
+        f"- ספר צל (אותו בוט בלי התערבויות Claude): {_pct(s.get('shadow_return_since_start'))}",
         f"- מול קווי בסיס מאז {s.get('started')}: SPY {_pct((s.get('baselines') or {}).get('spy_since_start'))} | שווה-משקל יקום {_pct((s.get('baselines') or {}).get('equal_weight_since_start'))}",
-        f"- ריבלנס היום: {'כן' if s.get('due_rebalance') else 'לא (רק סטופים)'}",
         "",
-        "## פקודות שבוצעו",
+        "## בוצע עכשיו (במחיר הפתיחה)",
         _fills(s.get("executed", [])),
-        "## פקודות מוצעות (אם השוק סגור, יבוצעו בפתיחה)",
-        _fills([] if s.get("executed") else s.get("preview_orders", [])),
+        f"## החלטה אחרונה ({(s.get('pending') or {}).get('decision_date')}) - סטטוס: {(s.get('pending') or {}).get('status')}"
+        + (" | ריבלנס" if (s.get('pending') or {}).get('rebalance') else " | רק סטופים"),
+        _fills((s.get("pending") or {}).get("preview_at_close") or []),
         "## החזקות",
     ]
     pos = s.get("positions", {})
@@ -47,10 +48,11 @@ def write_daily_report(s: dict) -> Path:
             lines.append(f"| {sym} | {p['qty']} | {p['avg_cost']} | {p['last']} | {p['pnl_pct']:+.1%} | {p['since']} |")
     else:
         lines.append("- (אין - הכל במזומן)")
+    pend = s.get("pending") or {}
     lines += [
         "",
         "## יעדים (משקל בתיק)",
-        ", ".join(f"{k} {v:.1%}" for k, v in (s.get("targets") or {}).items()) or "(אין)",
+        ", ".join(f"{k} {v:.1%}" for k, v in sorted((pend.get("targets") or {}).items(), key=lambda kv: -kv[1])) or "(אין)",
         "",
         "## הדירוג הגבוה / הנמוך היום",
         "חזקות: " + ", ".join(f"{k} {v:+.2f}" for k, v in (s.get("top_scores") or {}).items()),
@@ -76,8 +78,12 @@ def write_daily_report(s: dict) -> Path:
         lines += [f"- {x['ticker']}: קונים {x['buyers']}, מוכרים {x['sellers']}, אחרון {x['last']}" for x in ov["congress_buy"][:8]]
     elif ov.get("congress_buy") is None:
         lines += ["", "- Quiver: לא מחובר (צריך מפתח API)"]
-    if s.get("overrides"):
-        lines += ["", "## התערבויות של Claude (וטו/הקטנה)"] + [f"- {o['symbol']}: {o['action']} - {o['reason']}" for o in s["overrides"]]
+    if pend.get("overrides"):
+        lines += ["", "## התערבויות של Claude (וטו/הקטנה)"] + [f"- {o['symbol']}: {o['action']} - {o['reason']}" for o in pend["overrides"]]
+    if pend.get("earnings_blackout"):
+        lines += ["", "## חסימת דוחות (לא נכנסים לפני דוח רבעוני)"] + [f"- {k}: {v}" for k, v in pend["earnings_blackout"].items()]
+    if s.get("day_moves"):
+        lines += ["", "## תנועה היום (החזקות)", ", ".join(f"{k} {v:+.1%}" for k, v in sorted(s["day_moves"].items(), key=lambda kv: kv[1]))]
     if s.get("stopped"):
         lines += ["", "## סטופים", ", ".join(s["stopped"])]
     path = ROOT / "reports" / f"{s['date']}.md"

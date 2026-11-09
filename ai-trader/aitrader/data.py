@@ -203,3 +203,25 @@ def sec_recent_form4(user_agent: str, count: int = 100) -> list[dict]:
 
 def load_config() -> dict:
     return json.loads((ROOT / "config.json").read_text())
+
+
+def earnings_on(day: str) -> dict[str, str]:
+    """{symbol: time} for companies reporting on a calendar day (Nasdaq public calendar, unofficial)."""
+    h = {**UA, "Accept": "application/json, text/plain, */*", "Origin": "https://www.nasdaq.com", "Referer": "https://www.nasdaq.com/"}
+    try:
+        r = _session.get("https://api.nasdaq.com/api/calendar/earnings", params={"date": day}, headers=h, timeout=20)
+        rows = ((r.json().get("data") or {}).get("rows")) or []
+        return {x["symbol"].replace(".", "-"): x.get("time", "") for x in rows if x.get("symbol")}
+    except (requests.RequestException, ValueError, KeyError, AttributeError):
+        return {}
+
+
+def load_market(cfg: dict, rng: str = "10y", max_age_hours: float = 6.0) -> dict:
+    """Universe panel plus non-tradable regime inputs (VIX) under panel['vix']."""
+    panel = fetch_panel(list(cfg["universe"]), rng, max_age_hours)
+    try:
+        vix = fetch_daily("^VIX", rng, max_age_hours)["close"]
+        panel["vix"] = vix.reindex(panel["close"].index).ffill()
+    except Exception as e:  # noqa: BLE001 - regime input is optional
+        print(f"[data] VIX unavailable: {type(e).__name__}")
+    return panel

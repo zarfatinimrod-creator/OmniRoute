@@ -125,7 +125,10 @@
     "exit_score": 0.0,
     "keep_rank_mult": 2.0,
     "rebalance_every_days": 5,
-    "stop_cooldown_days": 10
+    "stop_cooldown_days": 10,
+    "defensive_vix_pct": 0.8,
+    "defensive_gross_mult": 0.75,
+    "earnings_blackout_days": 4
   },
   "signals": {
     "tsmom": {

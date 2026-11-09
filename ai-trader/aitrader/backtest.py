@@ -97,6 +97,8 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None) -> pd.Data
         ("target vol 10%", {"risk": {"target_vol_annual": 0.10}}, "learned", base_every),
         ("target vol 16%", {"risk": {"target_vol_annual": 0.16}}, "learned", base_every),
         ("no regime filter", {"risk": {"risk_off_gross_mult": 1.0}}, "learned", base_every),
+        ("no VIX defensive mode", {"risk": {"defensive_gross_mult": 1.0}}, "learned", base_every),
+        ("8 positions max", {"risk": {"max_positions": 8}}, "learned", base_every),
     ]
     rows = []
     for name, override, mode, every in variants:
@@ -106,6 +108,17 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None) -> pd.Data
         res = run(panel, c, start, end, mode, every, signals=signals, aux=precompute_aux(panel, c))
         s = res["strategy"]
         rows.append({"variant": name, **{k: s.get(k) for k in ("cagr", "vol", "sharpe", "max_drawdown", "calmar", "turnover_annual", "psr_vs_0")}, "trades": res["n_trades"]})
+    # survivorship-free check: ETFs only (no stock picked with hindsight)
+    etf = [k for k, v in cfg["universe"].items() if v in ("Index", "SectorETF", "Bonds", "Gold")]
+    pe = {k: (v[etf] if isinstance(v, pd.DataFrame) else v) for k, v in panel.items()}
+    ce = copy.deepcopy(cfg)
+    ce["universe"] = {k: cfg["universe"][k] for k in etf}
+    ce["risk"]["max_positions"] = 6
+    ree = run(pe, ce, start, end, "learned", base_every)
+    s = ree["strategy"]
+    rows.append({"variant": "ETF-only universe (no survivorship bias)", **{k: s.get(k) for k in ("cagr", "vol", "sharpe", "max_drawdown", "calmar", "turnover_annual", "psr_vs_0")}, "trades": ree["n_trades"]})
+    b = ree["benchmark_equal_weight_universe"]
+    rows.append({"variant": "Equal-weight ETFs", **{k: b.get(k) for k in ("cagr", "vol", "sharpe", "max_drawdown", "calmar", "psr_vs_0")}})
     base = run(panel, cfg, start, end, "learned", base_every, signals=signals)
     for label, key in (("SPY buy&hold", "benchmark_spy"), ("Equal-weight universe", "benchmark_equal_weight_universe")):
         b = base[key]

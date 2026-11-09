@@ -150,6 +150,14 @@ def build_targets(
             regime = "risk_off"
             scale *= r["risk_off_gross_mult"]
 
+    # Defensive mode: VIX in the top of its own trailing-year range (percentile, not a fixed level).
+    vix = panel.get("vix")
+    if vix is not None and r.get("defensive_vix_pct"):
+        hist = vix.loc[:date].tail(252).dropna()
+        if len(hist) > 60 and (hist <= hist.iloc[-1]).mean() >= r["defensive_vix_pct"]:
+            regime = regime + "+defensive"
+            scale *= r.get("defensive_gross_mult", 0.75)
+
     # Drawdown circuit breaker.
     dd = equity_peak_ratio - 1.0
     dd_state = "normal"

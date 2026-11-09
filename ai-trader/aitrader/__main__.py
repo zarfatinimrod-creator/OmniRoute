@@ -25,8 +25,12 @@ from . import journal
 
 
 def _today_market_date() -> str:
-    s = journal.load_json("latest.json", {}) or {}
-    return s.get("date") or datetime.now(timezone.utc).date().isoformat()
+    """The decision date overrides/desk calls apply to: the open proposal, else the latest decision."""
+    for name, key in (("proposal.json", "decision_date"), ("pending.json", "decision_date"), ("latest.json", "date")):
+        v = (journal.load_json(name, {}) or {}).get(key)
+        if v:
+            return v
+    return datetime.now(timezone.utc).date().isoformat()
 
 
 def main(argv=None) -> int:
@@ -35,6 +39,7 @@ def main(argv=None) -> int:
     c = sub.add_parser("cycle")
     c.add_argument("--dry-run", action="store_true")
     c.add_argument("--force-rebalance", action="store_true")
+    c.add_argument("--propose", action="store_true", help="show the next decision (for the trading desk) without changing state")
     sub.add_parser("status")
     sub.add_parser("scorecard")
     b = sub.add_parser("backtest")
@@ -73,18 +78,22 @@ def main(argv=None) -> int:
     if a.cmd == "cycle":
         from .cycle import run_cycle
 
-        out = run_cycle(execute=not a.dry_run, force_rebalance=a.force_rebalance)
-        print(json.dumps({k: out[k] for k in ("date", "market", "equity", "return_since_start", "regime", "dd_state", "due_rebalance", "executed", "preview_orders", "events") if k in out}, indent=1, default=str))
+        out = run_cycle(execute=not a.dry_run, force_rebalance=a.force_rebalance, propose=a.propose)
+        if a.propose:
+            print(json.dumps({k: out.get(k) for k in ("decision_date", "rebalance", "new_entries", "preview_at_close", "earnings_blackout", "stopped", "overrides")}
+                             | {"regime": out["diag"].get("regime"), "top_scores": out["diag"].get("top_scores")}, indent=1, default=str))
+        else:
+            print(json.dumps({k: out[k] for k in ("date", "market", "equity", "return_since_start", "shadow_return_since_start", "regime", "dd_state", "decided_now", "executed", "pending", "events") if k in out}, indent=1, default=str))
     elif a.cmd == "status":
         print(json.dumps(journal.load_json("latest.json", {}), indent=1, default=str))
     elif a.cmd == "scorecard":
         print(json.dumps(journal.scorecard(), indent=1))
     elif a.cmd == "backtest":
         from . import backtest
-        from .data import fetch_panel, load_config
+        from .data import load_config, load_market
 
         cfg = load_config()
-        panel = fetch_panel(list(cfg["universe"]), "10y")
+        panel = load_market(cfg, "10y")
         if a.sweep:
             df = backtest.sweep(panel, cfg, a.start, a.end)
             print(df.to_string(index=False))

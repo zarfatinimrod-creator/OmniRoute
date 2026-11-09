@@ -1,20 +1,33 @@
-"""One live paper-trading cycle: data -> learn -> decide -> (Claude overrides) -> execute -> journal -> report -> alert."""
+"""Live paper-trading cycle with the same timing as the time machine.
+
+  * DECIDE after the close of session D (final bar): mark, learn, grade, build targets, apply Claude's
+    veto/shrink overrides, store them as pending orders (like market-on-open orders placed overnight).
+  * EXECUTE the pending orders at the OPEN price of the next session D+1, whenever the next run happens
+    (morning, midday or even the next evening - the fill is always the official open, never later info).
+  * MONITOR intraday: mark-to-market and alert on big moves; never trade intraday.
+
+A shadow book executes the quant targets WITHOUT Claude's overrides, so the report shows whether the
+LLM layer adds or removes value. Every step is idempotent: re-running the same day changes nothing.
+"""
 
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from . import journal, notify
 from .broker import PaperBroker
-from .data import fetch_panel, load_config, market_status
+from .data import earnings_on, fetch_panel, load_config, load_market, market_status
 from .learn import ic_table, signal_stats, update_weights, walk_forward_weights
 from .signals import compute_all
 from .strategy import build_targets, combine, precompute_aux
 
 ROOT = Path(__file__).resolve().parent.parent
+NY = ZoneInfo("America/New_York")
 
 
 def _px(row: pd.Series) -> dict:
@@ -22,7 +35,7 @@ def _px(row: pd.Series) -> dict:
 
 
 def _learn(signals, close, cfg, ds: str) -> dict:
-    """Load weights; update at most once per trading day. Bootstraps walk-forward from history on first run."""
+    """Load weights; update at most once per decision date. Bootstraps walk-forward from history on first run."""
     prior = cfg["prior_weights"]
     ws = journal.load_json("weights.json")
     L = cfg["learning"]
@@ -44,14 +57,14 @@ def _learn(signals, close, cfg, ds: str) -> dict:
 
 
 def _apply_overrides(targets: dict, held: dict, ds: str) -> tuple[dict, list]:
-    """Claude's review may veto entries/adds or shrink sizes - never add names or increase risk."""
+    """Claude's review may veto new entries or shrink sizes - never add names or increase risk."""
     ov = journal.load_json("overrides.json", {}) or {}
     if ov.get("date") != ds:
         return targets, []
     applied = []
     t = dict(targets)
     for sym, reason in (ov.get("vetoes") or {}).items():
-        if sym in t and sym not in held:  # cannot veto an exit or a hold; only new entries
+        if sym in t and sym not in held:  # only new entries; exits and holds are the code's call
             t.pop(sym)
             applied.append({"symbol": sym, "action": "veto", "reason": reason})
     for sym, (mult, reason) in (ov.get("size_mult") or {}).items():
@@ -97,113 +110,206 @@ def _overlays_once_per_day(cfg: dict, ds: str, bench: str) -> dict:
     return out
 
 
-def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours: float = 0.2) -> dict:
-    cfg = load_config()
+def _earnings_blackout(ds: str, days: int) -> dict[str, str]:
+    """Symbols reporting from the decision day through the next `days` calendar days, plus the day before
+    (no entries from ~2 sessions before earnings to 1 session after). Cached per decision date."""
+    cache = journal.load_json("earnings.json", {}) or {}
+    if cache.get("date") == ds:
+        return cache["blackout"]
+    d0 = datetime.strptime(ds, "%Y-%m-%d").date()
+    out: dict[str, str] = {}
+    for k in range(-1, days + 1):
+        day = (d0 + timedelta(days=k)).isoformat()
+        for sym, when in earnings_on(day).items():
+            out.setdefault(sym, f"{day} {when}")
+    journal.save_json("earnings.json", {"date": ds, "blackout": out})
+    return out
+
+
+def _bar_is_final(d: pd.Timestamp) -> bool:
+    now = datetime.now(NY)
+    return d.date() < now.date() or (d.date() == now.date() and (now.hour, now.minute) >= (16, 5))
+
+
+def _brokers(cfg: dict, prices: dict, ds: str) -> tuple[PaperBroker, PaperBroker]:
+    c = cfg["costs"]
+    main_state = journal.load_json("portfolio.json")
+    main = PaperBroker(cfg["account"]["starting_cash"], c["slippage_bps"], c["commission_per_share"], main_state)
+    if main_state is None:  # first run: remember the starting line for the baselines
+        main.state.update({"created": ds, "last_mark": None, "start_prices": prices})
+    shadow = PaperBroker(cfg["account"]["starting_cash"], c["slippage_bps"], c["commission_per_share"], journal.load_json("shadow_portfolio.json"))
+    return main, shadow
+
+
+def _market_opened(d: pd.Timestamp) -> bool:
+    now = datetime.now(NY)
+    return d.date() < now.date() or (d.date() == now.date() and (now.hour, now.minute) >= (9, 31))
+
+
+def _execute_pending(panel, cfg, main, shadow, events) -> list[dict]:
+    """Fill pending targets at the official open of the first session after the decision date."""
+    r = cfg["risk"]
+    close = panel["close"]
+    pending = journal.load_json("pending.json")
+    if not pending or pending.get("status") != "pending":
+        return []
+    later = close.index[close.index > pd.Timestamp(pending["decision_date"])]
+    if not len(later) or not _market_opened(later[0]):
+        return []
+    d_exec = later[0]
+    opx = {**_px(close.loc[d_exec]), **_px(panel["open"].loc[d_exec])}  # official open; close only as fallback
+    ds_exec = str(d_exec.date())
+    cool = str(close.index[min(close.index.get_loc(d_exec) + r.get("stop_cooldown_days", 10), len(close.index) - 1)].date())
+    fills = main.rebalance(pending["targets"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool)
+    shadow.rebalance(pending["targets_raw"], opx, ds_exec, r["rebalance_band_pct"], r["min_trade_value"], pending.get("stopped", []), cool)
+    if pending.get("rebalance"):
+        main.state["last_rebalance"] = shadow.state["last_rebalance"] = pending["decision_date"]
+    for f in fills:
+        journal.append("trades.jsonl", {**f, "decision_date": pending["decision_date"], "fill": "open", "logged_at": journal.now_utc()})
+    pending.update({"status": "executed", "executed_on": ds_exec, "fills": fills})
+    journal.save_json("pending.json", pending)
+    if fills:
+        events.append(f"בוצע בפתיחה {ds_exec}: " + ", ".join(f"{f['side']} {f['qty']} {f['symbol']} @ {f['price']}" for f in fills))
+    return fills
+
+
+def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, persist: bool, events) -> dict:
+    """Targets for decision bar `dec` (data up to its close only). persist=False = proposal, no state change."""
     r = cfg["risk"]
     bench = cfg.get("benchmark", "SPY")
-    panel = fetch_panel(list(cfg["universe"]), "10y", max_age_hours)
     close = panel["close"]
-    date = close.index[-1]
-    ds = str(date.date())
+    ds = str(dec.date())
+    px = _px(close.loc[dec])
+    signals = compute_all(panel, cfg)
+    aux = precompute_aux(panel, cfg)
+    if persist:
+        weights = _learn(signals, close, cfg, ds)
+    else:
+        weights = (journal.load_json("weights.json") or {}).get("weights") or cfg["prior_weights"]
+    m = main if persist else copy.deepcopy(main)
+    prev_regime, prev_dd = m.state.get("regime"), m.state.get("dd_state")
+    y = cfg["account"]["cash_yield_annual"]
+    if persist:
+        m.mark(px, ds, y if m.state.get("last_mark") not in (None, ds) else 0.0)
+        shadow.mark(px, ds, y if shadow.state.get("last_mark") not in (None, ds) else 0.0)
+    blocked = set(m.state.get("blocked", {}))
+    targets_raw, diag = build_targets(dec, panel, signals, weights, cfg, m.peak_ratio(px), m.positions, blocked, aux)
+    last_reb = m.state.get("last_rebalance")
+    days_since = (close.index.get_loc(dec) - close.index.get_loc(pd.Timestamp(last_reb))) if last_reb and pd.Timestamp(last_reb) in close.index else 10**6
+    due = force_rebalance or days_since >= r.get("rebalance_every_days", 5)
+    stopped = diag.get("stopped", [])
+    if not due:  # off-cycle: hold the book, act only on stops
+        targets_raw = {s: w for s, w in m.weights(px).items() if s not in stopped}
+    bo = _earnings_blackout(ds, r.get("earnings_blackout_days", 4))
+    skipped = {s: bo[s] for s in list(targets_raw) if s in bo and s not in m.positions}
+    for s in skipped:
+        targets_raw.pop(s)
+    targets, applied = _apply_overrides(targets_raw, m.positions, ds)
+    preview = copy.deepcopy(m).rebalance(targets, px, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped)
+    new_entries = [f["symbol"] for f in preview if f["side"] == "BUY" and f["symbol"] not in m.positions]
+    decision = {"decision_date": ds, "status": "pending", "rebalance": due, "targets": targets, "targets_raw": targets_raw,
+                "stopped": stopped, "overrides": applied, "earnings_blackout": skipped, "preview_at_close": preview,
+                "new_entries": new_entries, "diag": diag, "weights": weights, "logged_at": journal.now_utc()}
+    if not persist:
+        journal.save_json("proposal.json", decision)
+        return decision
+    journal.save_json("pending.json", {k: v for k, v in decision.items() if k not in ("diag", "weights")})
+    m.state["regime"], m.state["dd_state"] = diag.get("regime"), diag.get("dd_state")
+    journal.append("decisions.jsonl", {"date": ds, "logged_at": journal.now_utc(), "due_rebalance": due, "weights": weights, "diag": diag,
+                                       "overrides": applied, "earnings_blackout": skipped, "preview": preview})
+    score = combine(signals, weights, dec)
+    journal.record_predictions(ds, score, {k: v.loc[dec] for k, v in signals.items()}, px, px.get(bench),
+                               cfg["learning"]["horizons_days"], list(m.positions))
+    _overlays_once_per_day(cfg, ds, bench)
+    if preview:
+        events.append("מתוכנן לפתיחה הבאה: " + ", ".join(f"{f['side']} {f['qty']} {f['symbol']}" for f in preview))
+    if stopped:
+        events.append("סטופ-לוס (יבוצע בפתיחה): " + ", ".join(stopped))
+    if prev_regime and prev_regime != diag.get("regime"):
+        events.append(f"שינוי משטר שוק: {prev_regime} -> {diag.get('regime')}")
+    if prev_dd and prev_dd != diag.get("dd_state"):
+        events.append(f"מצב ירידה מהשיא: {prev_dd} -> {diag.get('dd_state')}")
+    return decision
+
+
+def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours: float = 0.1, propose: bool = False) -> dict:
+    cfg = load_config()
+    bench = cfg.get("benchmark", "SPY")
+    panel = load_market(cfg, "10y", max_age_hours)
+    close = panel["close"]
+    last = close.index[-1]
+    dec_bar = last if _bar_is_final(last) else (close.index[-2] if len(close) > 1 else last)
     try:
         mkt = market_status(bench)
     except Exception as e:  # noqa: BLE001
         mkt = {"is_open": False, "error": type(e).__name__}
+    events: list[str] = []
+    prices_last = _px(close.loc[last])
+    main, shadow = _brokers(cfg, _px(close.loc[dec_bar]), str(dec_bar.date()))
 
-    signals = compute_all(panel, cfg)
-    aux = precompute_aux(panel, cfg)
-    weights = _learn(signals, close, cfg, ds)
+    if propose:  # what the next decision would be, for the trading desk; changes no state
+        return _decide(panel, cfg, main, shadow, dec_bar, force_rebalance, False, events)
 
-    prices = _px(close.loc[date])
-    state = journal.load_json("portfolio.json")
-    broker = PaperBroker(cfg["account"]["starting_cash"], cfg["costs"]["slippage_bps"], cfg["costs"]["commission_per_share"], state)
-    if state is None:  # first run: remember the starting line for the shadow baselines
-        broker.state.update({"created": ds, "last_mark": None, "start_prices": prices})
-    prev_regime = broker.state.get("regime")
-    prev_dd_state = broker.state.get("dd_state")
-    yield_today = cfg["account"]["cash_yield_annual"] if broker.state.get("last_mark") not in (None, ds) else 0.0
-    equity = broker.mark(prices, ds, yield_today)
+    executed: list[dict] = []
+    diag: dict = {}
+    decided_now = False
+    if execute:
+        executed += _execute_pending(panel, cfg, main, shadow, events)
+        if (journal.load_json("pending.json") or {}).get("decision_date") != str(dec_bar.date()):
+            diag = _decide(panel, cfg, main, shadow, dec_bar, force_rebalance, True, events).get("diag", {})
+            decided_now = True
+            executed += _execute_pending(panel, cfg, main, shadow, events)  # a missed morning: fill at that open now
+    weights = (journal.load_json("weights.json") or {}).get("weights", cfg["prior_weights"])
+    ds = str(last.date())
 
-    blocked = set(broker.state.get("blocked", {}))
-    targets, diag = build_targets(date, panel, signals, weights, cfg, broker.peak_ratio(prices), broker.positions, blocked, aux)
-
-    last_reb = broker.state.get("last_rebalance")
-    pos_of = {d: i for i, d in enumerate(close.index)}
-    days_since = (pos_of[date] - pos_of.get(pd.Timestamp(last_reb), -10**6)) if last_reb else 10**6
-    due = force_rebalance or days_since >= r.get("rebalance_every_days", 5)
-    stopped = diag.get("stopped", [])
-    if not due:  # off-cycle: hold current book, only act on stops
-        cur = broker.weights(prices)
-        targets = {s: w for s, w in cur.items() if s not in stopped}
-    targets, applied = _apply_overrides(targets, broker.positions, ds)
-
-    cool_pos = min(pos_of[date] + r.get("stop_cooldown_days", 10), len(close.index) - 1)
-    cooldown_until = str((date + pd.tseries.offsets.BDay(r.get("stop_cooldown_days", 10))).date()) if cool_pos == pos_of[date] else str(close.index[cool_pos].date())
-    preview = copy.deepcopy(broker).rebalance(targets, prices, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped, cooldown_until)
-
-    executed = []
-    if execute and mkt.get("is_open") and preview:
-        executed = broker.rebalance(targets, prices, ds, r["rebalance_band_pct"], r["min_trade_value"], stopped, cooldown_until)
-        if due:
-            broker.state["last_rebalance"] = ds
-        for f in executed:
-            journal.append("trades.jsonl", {**f, "logged_at": journal.now_utc()})
-    elif execute and due and not preview and mkt.get("is_open"):
-        broker.state["last_rebalance"] = ds  # nothing to trade, but the rebalance happened
-
-    broker.state["regime"] = diag.get("regime")
-    broker.state["dd_state"] = diag.get("dd_state")
-    equity = broker.equity(prices)
-    journal.save_json("portfolio.json", broker.state)
-
-    score = combine(signals, weights, date)
-    n_pred = journal.record_predictions(ds, score, {k: v.loc[date] for k, v in signals.items()}, prices,
-                                        prices.get(bench), cfg["learning"]["horizons_days"], list(broker.positions))
-    overlays = _overlays_once_per_day(cfg, ds, bench)
+    journal.save_json("portfolio.json", main.state)
+    journal.save_json("shadow_portfolio.json", shadow.state)
     card = journal.evaluate_predictions(_eval_close(close), bench)
 
-    gross = sum(p["qty"] * prices.get(s, p["last_price"]) for s, p in broker.positions.items()) / equity if equity else 0
-    journal.append("equity.jsonl", {"date": ds, "logged_at": journal.now_utc(), "equity": round(equity, 2), "cash": round(broker.cash, 2),
-                                    "gross": round(gross, 4), "bench_price": prices.get(bench), "market_open": mkt.get("is_open")})
-    decision = {"date": ds, "logged_at": journal.now_utc(), "market": mkt, "due_rebalance": due, "weights": weights, "diag": diag,
-                "overrides": applied, "preview": preview, "executed": executed, "predictions_logged": n_pred}
-    journal.append("decisions.jsonl", decision)
-
-    sp = broker.state.get("start_prices") or {}
-    common = [k for k in sp if k in prices]
-    baselines = {
-        "spy_since_start": round(prices[bench] / sp[bench] - 1, 4) if bench in sp and bench in prices else None,
-        "equal_weight_since_start": round(sum(prices[k] / sp[k] for k in common) / len(common) - 1, 4) if common else None,
-    }
+    equity = main.equity(prices_last)
+    sh_eq = shadow.equity(prices_last)
+    gross = sum(p["qty"] * prices_last.get(s, p["last_price"]) for s, p in main.positions.items()) / equity if equity else 0
+    journal.append("equity.jsonl", {"date": ds, "logged_at": journal.now_utc(), "equity": round(equity, 2), "shadow_equity": round(sh_eq, 2),
+                                    "cash": round(main.cash, 2), "gross": round(gross, 4), "bench_price": prices_last.get(bench),
+                                    "market_open": mkt.get("is_open"), "decided": decided_now})
+    sp = main.state.get("start_prices") or {}
+    common = [k for k in sp if k in prices_last]
+    pend = journal.load_json("pending.json") or {}
     summary = {
-        "date": ds, "market": mkt, "equity": round(equity, 2), "cash": round(broker.cash, 2), "gross": round(gross, 4),
-        "return_since_start": round(equity / cfg["account"]["starting_cash"] - 1, 4), "baselines": baselines,
-        "started": broker.state.get("created"), "regime": diag.get("regime"),
-        "dd_state": diag.get("dd_state"), "drawdown": diag.get("drawdown"), "due_rebalance": due, "weights": weights,
-        "targets": diag.get("targets", {}), "top_scores": diag.get("top_scores"), "bottom_scores": diag.get("bottom_scores"),
-        "stopped": stopped, "preview_orders": preview, "overlays": {k: overlays.get(k) for k in ("insider_cluster", "congress_buy", "logged")}, "executed": executed, "overrides": applied, "scorecard": card,
-        "positions": {s: {"qty": p["qty"], "avg_cost": round(p["avg_cost"], 2), "last": round(prices.get(s, p["last_price"]), 2),
-                          "pnl_pct": round(prices.get(s, p["last_price"]) / p["avg_cost"] - 1, 4), "since": p["entry_date"]}
-                      for s, p in broker.positions.items()},
+        "date": ds, "as_of_utc": journal.now_utc(), "market": mkt, "equity": round(equity, 2), "cash": round(main.cash, 2),
+        "gross": round(gross, 4), "return_since_start": round(equity / cfg["account"]["starting_cash"] - 1, 4),
+        "shadow_return_since_start": round(sh_eq / cfg["account"]["starting_cash"] - 1, 4),
+        "baselines": {
+            "spy_since_start": round(prices_last[bench] / sp[bench] - 1, 4) if bench in sp and bench in prices_last else None,
+            "equal_weight_since_start": round(sum(prices_last[k] / sp[k] for k in common) / len(common) - 1, 4) if common else None,
+        },
+        "started": main.state.get("created"), "regime": main.state.get("regime"), "dd_state": main.state.get("dd_state"),
+        "drawdown": round(main.peak_ratio(prices_last) - 1, 4), "decided_now": decided_now, "weights": weights,
+        "pending": {k: pend.get(k) for k in ("decision_date", "status", "rebalance", "targets", "overrides", "earnings_blackout", "preview_at_close")},
+        "executed": executed, "top_scores": diag.get("top_scores"), "bottom_scores": diag.get("bottom_scores"),
+        "stopped": diag.get("stopped", []), "scorecard": card,
+        "overlays": {k: (journal.load_json("overlays.json", {}) or {}).get(k) for k in ("insider_cluster", "congress_buy", "logged")},
+        "positions": {s: {"qty": p["qty"], "avg_cost": round(p["avg_cost"], 2), "last": round(prices_last.get(s, p["last_price"]), 2),
+                          "pnl_pct": round(prices_last.get(s, p["last_price"]) / p["avg_cost"] - 1, 4), "since": p["entry_date"]}
+                      for s, p in main.positions.items()},
     }
+    # intraday watch: alert on a big adverse move in a holding (no trading)
+    if mkt.get("is_open"):
+        movers = {s: v["pnl_pct"] for s, v in summary["positions"].items()}
+        prev_close = _px(close.iloc[-2]) if len(close) > 1 else {}
+        day_moves = {s: prices_last[s] / prev_close[s] - 1 for s in main.positions if s in prices_last and s in prev_close}
+        big = {s: m for s, m in day_moves.items() if m <= -0.06}
+        if big:
+            events.append("ירידה חדה היום: " + ", ".join(f"{s} {m:+.1%}" for s, m in big.items()) + " (הסטופ ייבדק בסגירה)")
+        summary["day_moves"] = {s: round(m, 4) for s, m in day_moves.items()}
+        del movers
     journal.save_json("latest.json", summary)
-    from .report import write_daily_report  # local import keeps module graph flat
+    from .report import write_daily_report  # local import keeps the module graph flat
 
     write_daily_report(summary)
-
-    events = []
-    if executed:
-        events.append("בוצעו פקודות: " + ", ".join(f"{f['side']} {f['qty']} {f['symbol']} @ {f['price']}" for f in executed))
-    elif preview and not mkt.get("is_open"):
-        events.append("פקודות ממתינות לפתיחת השוק: " + ", ".join(f"{f['side']} {f['qty']} {f['symbol']}" for f in preview))
-    if stopped:
-        events.append("סטופ-לוס הופעל: " + ", ".join(stopped))
-    if prev_regime and prev_regime != diag.get("regime"):
-        events.append(f"שינוי משטר שוק: {prev_regime} -> {diag.get('regime')}")
-    if prev_dd_state and prev_dd_state != diag.get("dd_state"):
-        events.append(f"מצב ירידה מהשיא: {prev_dd_state} -> {diag.get('dd_state')}")
     if events:
-        body = "\n".join(events) + f"\nשווי תיק (נייר): ${equity:,.0f} ({summary['return_since_start']:+.2%})"
-        summary["alert_channels"] = notify.send("AI Trader - פעולה בתיק הנייר", body, cfg, "high" if executed or stopped else "default")
+        body = "\n".join(events) + f"\nשווי תיק (נייר): ${equity:,.0f} ({summary['return_since_start']:+.2%}) | בלי Claude: {summary['shadow_return_since_start']:+.2%}"
+        summary["alert_channels"] = notify.send("AI Trader - תיק נייר", body, cfg, "high" if executed or diag.get("stopped") else "default")
     summary["events"] = events
+    journal.save_json("latest.json", summary)
     return summary
