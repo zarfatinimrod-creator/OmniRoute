@@ -375,6 +375,24 @@ class QueueWaitsForARealPrice(TempState):
         self.assertEqual([q["symbol"] for q in nt.queue], ["AAA"])
 
 
+class NewsBookSaveThrottle(TempState):
+    def test_marks_alone_do_not_rewrite_the_book_but_trades_do(self):
+        from aitrader import news_live
+        from test_core import CFG
+        cfg = dict(CFG)
+        cfg["universe"] = {"AAA": "Tech", "SPY": "Index"}
+        nt = news_live.NewsTrader(cfg)
+        nt.book.state["positions"] = {"AAA": {"qty": 5, "avg_cost": 100.0, "last_price": 100.0}}
+        nt.save()
+        nt.book.state["positions"]["AAA"]["last_price"] = 101.0  # a live mark only
+        nt.save()
+        self.assertEqual(journal.load_json("news_book.json")["positions"]["AAA"]["last_price"], 100.0)
+        nt.book.state["positions"]["AAA"]["qty"] = 0  # a real change
+        nt.save()
+        saved = journal.load_json("news_book.json")["positions"]["AAA"]
+        self.assertEqual((saved["qty"], saved["last_price"]), (0, 101.0))
+
+
 class StaleQuote(TempState):
     def test_score_9_on_a_stale_quote_does_not_buy(self):
         from aitrader import news_live
