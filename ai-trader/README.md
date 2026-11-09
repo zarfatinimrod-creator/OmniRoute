@@ -31,6 +31,8 @@ python3 -m aitrader status           # מצב אחרון
 python3 -m aitrader backtest --start 2018-01-01 --sweep   # מכונת הזמן
 python3 -m aitrader predict NVDA up --horizon 20 --note "..."   # תחזית של Claude לבדיקה
 python3 -m aitrader scorecard        # כרטיס ציונים
+python3 -m aitrader brief NVDA       # חבילת נתונים לדסק המסחר
+python3 -m aitrader desk NVDA Hold --prob 0.52 --thesis "..." --invalidation "..."
 python3 -m unittest discover -s tests -v
 ```
 
@@ -43,7 +45,7 @@ python3 -m unittest discover -s tests -v
 | `state/` | הזיכרון: תיק, משקלות, תחזיות, החלטות, עסקאות, לקחים |
 | `reports/` | דוח יומי בעברית |
 | `logs/` | לוג סשן עם 8 כותרות (הבקשה · מה נעשה · קבצים ששונו · החלטות · כשלים בדרך · אימות · עבודה ידנית חוזרת → לאוטומציה · בזבוז טוקנים) |
-| `skills/` | `trader`, `time-machine` |
+| `skills/` | `trader`, `time-machine`, `trading-desk` (תפקידי TradingAgents על סוכני Claude) |
 | `agents/` | `web-researcher`, `quant-critic` |
 
 ## התראות לטלפון

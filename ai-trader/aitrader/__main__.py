@@ -9,6 +9,8 @@
   news SYMBOL                             recent headlines
   context SYMBOL                          past calls, trades and lessons for a ticker (read before deciding)
   verify                                  check the tamper-evident hash chains
+  brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
+  desk SYMBOL RATING --prob P --thesis T --invalidation I   record the desk's final call (Sell/Underweight=veto, Hold=shrink 0.5)
   scorecard                               grade matured predictions
 """
 
@@ -48,6 +50,15 @@ def main(argv=None) -> int:
     cx = sub.add_parser("context")
     cx.add_argument("symbol")
     sub.add_parser("verify")
+    br = sub.add_parser("brief")
+    br.add_argument("symbol")
+    dk = sub.add_parser("desk")
+    dk.add_argument("symbol")
+    dk.add_argument("rating", choices=["Buy", "Overweight", "Hold", "Underweight", "Sell"])
+    dk.add_argument("--prob", type=float, required=True, help="P(SYMBOL beats SPY over horizon)")
+    dk.add_argument("--horizon", type=int, default=20)
+    dk.add_argument("--thesis", required=True)
+    dk.add_argument("--invalidation", required=True)
     v = sub.add_parser("veto")
     v.add_argument("symbol")
     v.add_argument("--reason", required=True)
@@ -112,6 +123,37 @@ def main(argv=None) -> int:
         for name in sorted(journal.CHAINED):
             ok, n = journal.verify_chain(name)
             print(f"{name}: {'OK' if ok else 'BROKEN at record ' + str(n)} ({n} records)")
+    elif a.cmd == "brief":
+        from .desk import brief
+
+        print(json.dumps(brief(a.symbol), indent=1, default=str))
+    elif a.cmd == "desk":
+        from .data import live_prices, load_config
+        from .desk import RATING_TO_ACTION
+
+        cfg = load_config()
+        sym = a.symbol.upper()
+        bench = cfg.get("benchmark", "SPY")
+        px = live_prices([sym, bench])
+        ds = _today_market_date()
+        prob = max(0.0, min(1.0, a.prob))
+        journal.append("predictions.jsonl", {
+            "date": ds, "logged_at": journal.now_utc(), "symbol": sym, "horizon": a.horizon, "source": "desk",
+            "rating": a.rating, "prob": prob, "score": round(2 * prob - 1, 3), "direction": "up" if prob >= 0.5 else "down",
+            "thesis": a.thesis, "invalidation": a.invalidation, "components": {},
+            "price": px.get(sym), "bench_price": px.get(bench), "status": "open" if sym in px else "no_price"})
+        action = RATING_TO_ACTION[a.rating]
+        if action:
+            ov = journal.load_json("overrides.json", {}) or {}
+            if ov.get("date") != ds:
+                ov = {"date": ds, "vetoes": {}, "size_mult": {}}
+            reason = f"desk {a.rating} p={prob:.2f}: {a.thesis[:160]}"
+            if action[0] == "veto":
+                ov["vetoes"][sym] = reason
+            else:
+                ov["size_mult"][sym] = [action[1], reason]
+            journal.save_json("overrides.json", ov)
+        print(f"desk logged: {sym} {a.rating} p={prob:.2f} -> {action or 'no override (code decides size)'}")
     elif a.cmd == "news":
         from .data import news_headlines
 
