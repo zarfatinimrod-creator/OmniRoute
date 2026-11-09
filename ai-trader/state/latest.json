@@ -1,27 +1,27 @@
 {
-  "date": "2026-11-06",
-  "as_of_utc": "2026-11-09T11:37:39+00:00",
+  "date": "2026-11-09",
+  "as_of_utc": "2026-11-09T14:52:53+00:00",
   "market": {
-    "is_open": false,
+    "is_open": true,
     "regular_start_utc": "2026-11-09T14:30:00+00:00",
     "regular_end_utc": "2026-11-09T21:00:00+00:00",
-    "last_trade_utc": "2026-11-06T21:00:00+00:00",
-    "price": 735.29
+    "last_trade_utc": "2026-11-09T14:52:52+00:00",
+    "price": 747.865
   },
-  "equity": 100000.0,
-  "cash": 100000.0,
-  "gross": 0.0,
-  "return_since_start": 0.0,
-  "shadow_return_since_start": 0.0,
+  "equity": 99925.81,
+  "cash": 49831.37,
+  "gross": 0.5013,
+  "return_since_start": -0.0007,
+  "shadow_return_since_start": -0.0013,
   "baselines": {
-    "spy_since_start": 0.0,
-    "equal_weight_since_start": 0.0
+    "spy_since_start": 0.017,
+    "equal_weight_since_start": 0.0152
   },
   "started": "2026-11-06",
   "regime": "risk_on+defensive",
   "dd_state": "normal",
-  "drawdown": 0.0,
-  "decided_now": true,
+  "drawdown": -0.0007,
+  "decided_now": false,
   "weights": {
     "tsmom": 0.25,
     "xsmom": 0.25,
@@ -34,7 +34,7 @@
   },
   "pending": {
     "decision_date": "2026-11-06",
-    "status": "pending",
+    "status": "executed",
     "rebalance": true,
     "targets": {
       "TEVA": 0.03896630885301293,
@@ -224,26 +224,150 @@
       }
     ]
   },
-  "executed": [],
-  "top_scores": {
-    "TEVA": 0.701,
-    "JNJ": 0.628,
-    "KO": 0.615,
-    "MRK": 0.607,
-    "AMGN": 0.589,
-    "TXN": 0.588,
-    "ABBV": 0.569,
-    "COP": 0.562,
-    "PM": 0.54,
-    "LLY": 0.538
-  },
-  "bottom_scores": {
-    "NFLX": -0.736,
-    "ORCL": -0.702,
-    "UBER": -0.555,
-    "BKNG": -0.526,
-    "NKE": -0.499
-  },
+  "executed": [
+    {
+      "date": "2026-11-09",
+      "symbol": "PM",
+      "side": "BUY",
+      "qty": 12,
+      "price": 198.2991,
+      "value": 2379.59,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "CVX",
+      "side": "BUY",
+      "qty": 11,
+      "price": 210.9554,
+      "value": 2320.51,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "MRK",
+      "side": "BUY",
+      "qty": 17,
+      "price": 148.4442,
+      "value": 2523.55,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "UNP",
+      "side": "BUY",
+      "qty": 8,
+      "price": 292.5562,
+      "value": 2340.45,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "AMGN",
+      "side": "BUY",
+      "qty": 5,
+      "price": 465.3676,
+      "value": 2326.84,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "LLY",
+      "side": "BUY",
+      "qty": 2,
+      "price": 1366.0777,
+      "value": 2732.16,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "KO",
+      "side": "BUY",
+      "qty": 35,
+      "price": 95.9379,
+      "value": 3357.83,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "TEVA",
+      "side": "BUY",
+      "qty": 90,
+      "price": 43.0315,
+      "value": 3872.84,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "DE",
+      "side": "BUY",
+      "qty": 5,
+      "price": 685.8528,
+      "value": 3429.26,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "JNJ",
+      "side": "BUY",
+      "qty": 14,
+      "price": 278.139,
+      "value": 3893.95,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "ABBV",
+      "side": "BUY",
+      "qty": 14,
+      "price": 293.9869,
+      "value": 4115.82,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "XOM",
+      "side": "BUY",
+      "qty": 27,
+      "price": 163.8969,
+      "value": 4425.22,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "AAPL",
+      "side": "BUY",
+      "qty": 15,
+      "price": 345.1075,
+      "value": 5176.61,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-09",
+      "symbol": "XLV",
+      "side": "BUY",
+      "qty": 39,
+      "price": 186.5132,
+      "value": 7274.02,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    }
+  ],
+  "top_scores": null,
+  "bottom_scores": null,
   "stopped": [],
   "scorecard": {
     "open": 98,
@@ -530,9 +654,124 @@
     "congress_buy": null,
     "logged": 48
   },
-  "positions": {},
+  "positions": {
+    "PM": {
+      "qty": 12,
+      "avg_cost": 198.3,
+      "last": 195.18,
+      "pnl_pct": -0.0157,
+      "since": "2026-11-09"
+    },
+    "CVX": {
+      "qty": 11,
+      "avg_cost": 210.96,
+      "last": 211.2,
+      "pnl_pct": 0.0011,
+      "since": "2026-11-09"
+    },
+    "MRK": {
+      "qty": 17,
+      "avg_cost": 148.44,
+      "last": 146.86,
+      "pnl_pct": -0.0107,
+      "since": "2026-11-09"
+    },
+    "UNP": {
+      "qty": 8,
+      "avg_cost": 292.56,
+      "last": 293.88,
+      "pnl_pct": 0.0045,
+      "since": "2026-11-09"
+    },
+    "AMGN": {
+      "qty": 5,
+      "avg_cost": 465.37,
+      "last": 457.79,
+      "pnl_pct": -0.0163,
+      "since": "2026-11-09"
+    },
+    "LLY": {
+      "qty": 2,
+      "avg_cost": 1366.08,
+      "last": 1387.19,
+      "pnl_pct": 0.0155,
+      "since": "2026-11-09"
+    },
+    "KO": {
+      "qty": 35,
+      "avg_cost": 95.94,
+      "last": 94.9,
+      "pnl_pct": -0.0108,
+      "since": "2026-11-09"
+    },
+    "TEVA": {
+      "qty": 90,
+      "avg_cost": 43.03,
+      "last": 42.81,
+      "pnl_pct": -0.0051,
+      "since": "2026-11-09"
+    },
+    "DE": {
+      "qty": 5,
+      "avg_cost": 685.85,
+      "last": 688.14,
+      "pnl_pct": 0.0033,
+      "since": "2026-11-09"
+    },
+    "JNJ": {
+      "qty": 14,
+      "avg_cost": 278.14,
+      "last": 278.27,
+      "pnl_pct": 0.0005,
+      "since": "2026-11-09"
+    },
+    "ABBV": {
+      "qty": 14,
+      "avg_cost": 293.99,
+      "last": 290.95,
+      "pnl_pct": -0.0103,
+      "since": "2026-11-09"
+    },
+    "XOM": {
+      "qty": 27,
+      "avg_cost": 163.9,
+      "last": 164.99,
+      "pnl_pct": 0.0067,
+      "since": "2026-11-09"
+    },
+    "AAPL": {
+      "qty": 15,
+      "avg_cost": 345.11,
+      "last": 348.11,
+      "pnl_pct": 0.0087,
+      "since": "2026-11-09"
+    },
+    "XLV": {
+      "qty": 39,
+      "avg_cost": 186.51,
+      "last": 186.09,
+      "pnl_pct": -0.0023,
+      "since": "2026-11-09"
+    }
+  },
+  "day_moves": {
+    "PM": -0.0136,
+    "CVX": -0.0067,
+    "MRK": 0.0009,
+    "UNP": 0.0128,
+    "AMGN": -0.0057,
+    "LLY": 0.0245,
+    "KO": -0.008,
+    "TEVA": 0.0047,
+    "DE": 0.0246,
+    "JNJ": 0.0074,
+    "ABBV": -0.0012,
+    "XOM": -0.0053,
+    "AAPL": 0.0168,
+    "XLV": 0.007
+  },
   "alert_channels": [],
   "events": [
-    "מתוכנן לפתיחה הבאה: BUY 12 PM, BUY 11 CVX, BUY 17 MRK, BUY 8 UNP, BUY 5 AMGN, BUY 2 LLY, BUY 35 KO, BUY 91 TEVA, BUY 5 DE, BUY 14 JNJ, BUY 14 ABBV, BUY 26 XOM, BUY 15 AAPL, BUY 39 XLV"
+    "בוצע בפתיחה 2026-11-09: BUY 12 PM @ 198.2991, BUY 11 CVX @ 210.9554, BUY 17 MRK @ 148.4442, BUY 8 UNP @ 292.5562, BUY 5 AMGN @ 465.3676, BUY 2 LLY @ 1366.0777, BUY 35 KO @ 95.9379, BUY 90 TEVA @ 43.0315, BUY 5 DE @ 685.8528, BUY 14 JNJ @ 278.139, BUY 14 ABBV @ 293.9869, BUY 27 XOM @ 163.8969, BUY 15 AAPL @ 345.1075, BUY 39 XLV @ 186.5132"
   ]
 }
