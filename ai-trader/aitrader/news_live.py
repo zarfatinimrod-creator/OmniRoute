@@ -150,6 +150,7 @@ class NewsTrader:
             self.book.state.update({"created": datetime.now(timezone.utc).date().isoformat(), "kind": "news"})
         self.seen = journal.load_json("news_seen.json", {}) or {}
         self.queue = journal.load_json("news_queue.json", []) or []
+        self._eq_logged = 0.0
 
     def save(self):
         cutoff = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
@@ -286,6 +287,10 @@ class NewsTrader:
         self.save()
         journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "headlines_seen": len(self.seen),
                                                   "positions": len(self.book.positions), "queue": len(self.queue)})
+        if market_open_now() and time.time() - self._eq_logged >= self.n.get("equity_log_seconds", 300):
+            self._eq_logged = time.time()  # equity curve for the dashboard, one point per 5 minutes in session
+            journal.write_all("news_equity.jsonl", journal.read("news_equity.jsonl")[-5000:] + [
+                {"at": journal.now_utc(), "equity": round(self.book.equity(self._marks()), 2), "positions": len(self.book.positions)}])
         if events:
             eq = self.book.equity(self._marks())
             body = "\n".join(events) + f"\nתיק חדשות (נייר): ${eq:,.0f} ({eq / self.n['starting_cash'] - 1:+.2%})"

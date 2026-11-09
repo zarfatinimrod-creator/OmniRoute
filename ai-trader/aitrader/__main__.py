@@ -12,6 +12,7 @@
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
   news-score [--n 8]                      score recent headlines without trading (scorer check)
   news-status                             news book, last trades, news scorecard
+  dashboard                               build .cache/dashboard/snapshot.json for the Dashboard artifact
   placebo [--k 100]                       noise gate the learner must beat (signals shuffled across stocks)
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
   desk SYMBOL RATING --prob P --thesis T --invalidation I   record the desk's final call (Sell/Underweight=veto, Hold=shrink 0.5)
@@ -66,6 +67,7 @@ def main(argv=None) -> int:
     ns.add_argument("--n", type=int, default=8)
     ns.add_argument("--minutes", type=int, default=120)
     sub.add_parser("news-status")
+    sub.add_parser("dashboard")
     pl = sub.add_parser("placebo")
     pl.add_argument("--k", type=int, default=100)
     br = sub.add_parser("brief")
@@ -175,6 +177,10 @@ def main(argv=None) -> int:
         for x in items:
             s_ = sc.get(x["key"], {})
             print(f"{s_.get('score', '?'):>2} | {x['symbol']:<5} | {x['published'][11:16]}Z | move {x['day_move_pct']} | {x['title'][:90]} | {s_.get('why', '')}")
+    elif a.cmd == "dashboard":
+        from .dashboard import write
+
+        print(write())
     elif a.cmd == "news-status":
         b = journal.load_json("news_book.json", {}) or {}
         print(json.dumps({"cash": round(b.get("cash", 0), 2), "positions": b.get("positions", {}),
