@@ -1,0 +1,76 @@
+== P(random daily-open entry touches -d within N days), window 2024-11-09 .. 2026-11-08 (crypto: calendar days; stocks: trading days) ==
+         N1_d3  N1_d5  N1_d7  N1_d10  N1_d12  N1_d15  N3_d3  N3_d5  N3_d7  N3_d10  N3_d12  N3_d15  N5_d3  N5_d5  N5_d7  N5_d10  N5_d12  N5_d15
+BTC-USD   17.8    4.8    1.8     0.3     0.3     0.0   38.6   17.6    8.5     4.1     1.8     0.5   48.8   26.6   14.5     7.4     4.7     1.9
+ETH-USD   32.1   14.5    6.4     2.2     1.4     0.7   53.0   33.4   20.7    10.2     6.3     4.1   62.3   42.4   30.0    18.6    12.0     7.2
+SOL-USD   35.6   16.6    8.5     1.9     1.1     0.5   60.2   39.1   25.7    12.2     8.0     4.0   68.6   50.4   37.5    22.0    15.8     8.1
+SPY        1.0    0.2    0.0     0.0     0.0     0.0    6.2    0.8    0.6     0.2     0.0     0.0   11.3    2.0    1.0     0.6     0.4     0.0
+AAPL       4.0    0.6    0.2     0.0     0.0     0.0   19.7    7.2    3.4     0.8     0.6     0.4   30.1   15.6    6.3     2.2     1.0     0.6
+MSFT       5.6    0.0    0.0     0.0     0.0     0.0   22.7    7.2    1.2     0.4     0.2     0.0   34.7   14.7    5.5     1.0     0.2     0.2
+JPM        4.6    0.2    0.0     0.0     0.0     0.0   19.7    5.2    1.2     0.4     0.4     0.0   29.1    9.7    3.2     1.0     0.8     0.4
+NVDA      15.0    4.0    1.4     0.2     0.0     0.0   41.9   22.7   11.9     3.0     1.6     0.8   53.1   35.4   20.0     7.3     5.1     2.2
+TSLA      24.8    8.4    2.8     0.6     0.4     0.2   53.9   30.0   16.7     6.6     3.4     2.0   62.2   44.4   29.3    13.1     8.3     5.5
+AMD       22.4    7.4    2.6     1.0     0.4     0.0   52.3   33.2   17.3     7.2     4.4     2.6   62.0   44.6   28.9    15.2     9.1     5.3
+PLTR      27.7   12.2    4.6     1.2     0.4     0.0   53.5   33.2   20.3    11.5     5.6     2.4   63.6   44.2   28.9    20.0    13.5     6.9
+
+stock baseline P(touch -3% in 3 trading days): median of ['SPY', 'AAPL', 'MSFT', 'JPM', 'NVDA', 'TSLA', 'AMD', 'PLTR'] = 32.3% (range 6.2..53.9)
+  N=3: BTC-USD equal-noise stop = -4.0% (= 1.3x median ATR14 3.05%) to match stock median P=32.3%
+  N=3: ETH-USD equal-noise stop = -5.5% (= 1.1x median ATR14 4.88%) to match stock median P=32.3%
+  N=3: SOL-USD equal-noise stop = -6.0% (= 1.1x median ATR14 5.44%) to match stock median P=32.3%
+  N=5: BTC-USD equal-noise stop = -3.5% (= 1.1x median ATR14 3.05%) to match stock median P=43.9%
+  N=5: ETH-USD equal-noise stop = -5.0% (= 1.0x median ATR14 4.88%) to match stock median P=43.9%
+  N=5: SOL-USD equal-noise stop = -6.0% (= 1.1x median ATR14 5.44%) to match stock median P=43.9%
+
+== ATR-multiple stop with 2R target (hourly bars, entry each 00:00 UTC open, last 730d) ==
+   coin  k_ATR  days   n  median_stop_dist  stop_first  target_first  neither  mean_ret  breakeven_winrate_2R
+BTC-USD    1.0     3 727             0.031       0.345         0.087    0.568    -0.000                 0.333
+BTC-USD    1.0     5 725             0.031       0.448         0.143    0.408    -0.001                 0.333
+BTC-USD    1.0    10 720             0.031       0.572         0.239    0.189    -0.000                 0.333
+BTC-USD    1.5     3 727             0.046       0.197         0.025    0.779    -0.001                 0.333
+BTC-USD    1.5     5 725             0.046       0.292         0.058    0.650    -0.002                 0.333
+BTC-USD    1.5    10 720             0.046       0.436         0.128    0.436    -0.001                 0.333
+BTC-USD    2.0     3 727             0.061       0.094         0.012    0.894    -0.000                 0.333
+BTC-USD    2.0     5 725             0.062       0.178         0.030    0.792    -0.001                 0.333
+BTC-USD    2.0    10 720             0.062       0.312         0.065    0.622    -0.001                 0.333
+BTC-USD    3.0     3 727             0.092       0.036         0.006    0.959    -0.000                 0.333
+BTC-USD    3.0     5 725             0.092       0.063         0.010    0.927    -0.000                 0.333
+BTC-USD    3.0    10 720             0.093       0.153         0.028    0.819    -0.000                 0.333
+ETH-USD    1.0     3 727             0.049       0.323         0.092    0.585     0.000                 0.333
+ETH-USD    1.0     5 725             0.049       0.430         0.160    0.410    -0.001                 0.333
+ETH-USD    1.0    10 720             0.049       0.536         0.247    0.217     0.002                 0.333
+ETH-USD    1.5     3 727             0.073       0.191         0.028    0.781    -0.001                 0.333
+ETH-USD    1.5     5 725             0.074       0.287         0.062    0.651    -0.003                 0.333
+ETH-USD    1.5    10 720             0.074       0.429         0.128    0.443    -0.002                 0.333
+ETH-USD    2.0     3 727             0.098       0.113         0.017    0.871    -0.001                 0.333
+ETH-USD    2.0     5 725             0.098       0.178         0.032    0.790    -0.002                 0.333
+ETH-USD    2.0    10 720             0.099       0.314         0.069    0.617    -0.004                 0.333
+ETH-USD    3.0     3 727             0.147       0.044         0.007    0.949    -0.001                 0.333
+ETH-USD    3.0     5 725             0.147       0.081         0.012    0.906    -0.001                 0.333
+ETH-USD    3.0    10 720             0.148       0.197         0.044    0.758    -0.003                 0.333
+SOL-USD    1.0     3 727             0.055       0.352         0.096    0.552    -0.002                 0.333
+SOL-USD    1.0     5 725             0.055       0.484         0.167    0.349    -0.004                 0.333
+SOL-USD    1.0    10 720             0.055       0.599         0.257    0.144    -0.003                 0.333
+SOL-USD    1.5     3 727             0.082       0.188         0.030    0.781    -0.002                 0.333
+SOL-USD    1.5     5 725             0.082       0.294         0.074    0.632    -0.003                 0.333
+SOL-USD    1.5    10 720             0.083       0.447         0.167    0.386    -0.004                 0.333
+SOL-USD    2.0     3 727             0.110       0.091         0.015    0.894    -0.001                 0.333
+SOL-USD    2.0     5 725             0.110       0.175         0.037    0.788    -0.003                 0.333
+SOL-USD    2.0    10 720             0.110       0.332         0.090    0.578    -0.005                 0.333
+SOL-USD    3.0     3 727             0.165       0.036         0.010    0.955    -0.001                 0.333
+SOL-USD    3.0     5 725             0.165       0.070         0.018    0.912    -0.002                 0.333
+SOL-USD    3.0    10 720             0.165       0.175         0.047    0.778    -0.004                 0.333
+
+== weekend exposure if crypto is only acted on in NYSE hours (Fri 20:00 UTC -> Mon 14:00 UTC, hourly, last 730d) ==
+BTC-USD: n=103 weekends; Fri->Mon return sd 2.78%, worst -9.3%; path low touched -3% on 22%, -5% on 9%, -10% on 4% ; worst path low -11.4%
+ETH-USD: n=103 weekends; Fri->Mon return sd 4.59%, worst -21.4%; path low touched -3% on 41%, -5% on 23%, -10% on 7% ; worst path low -34.3%
+SOL-USD: n=103 weekends; Fri->Mon return sd 5.62%, worst -17.4%; path low touched -3% on 55%, -5% on 31%, -10% on 7% ; worst path low -21.2%
+
+== worst single-hour moves (open -> low inside one hourly bar) and hourly-bar open gaps, last 730d ==
+BTC-USD  worst open->low in one hour: -8.1% (2025-10-10 21:00Z), -5.5% (2025-03-07 00:00Z), -5.4% (2025-01-20 17:00Z) | hours with open->low <= -3%: 24 of 17479 | worst bar-to-bar open gap -0.8%
+ETH-USD  worst open->low in one hour: -13.8% (2025-02-03 02:00Z), -11.7% (2025-02-03 01:00Z), -9.4% (2025-10-10 21:00Z) | hours with open->low <= -3%: 119 of 17476 | worst bar-to-bar open gap -2.3%
+SOL-USD  worst open->low in one hour: -13.2% (2025-10-10 21:00Z), -11.6% (2026-02-06 00:00Z), -11.1% (2026-08-22 05:00Z) | hours with open->low <= -3%: 141 of 17478 | worst bar-to-bar open gap -1.6%
+SPY      worst open->low in one hour: -2.7% (2025-04-10 15:30Z), -2.7% (2026-11-05 14:30Z), -2.3% (2025-04-08 16:30Z) | hours with open->low <= -3%: 0 of 5077 | worst bar-to-bar open gap -4.0%
+
+== hourly return sd by session (last 730d, UTC hours) ==
+BTC-USD: US-session hours (14-21 UTC Mon-Fri) sd 0.649%  other hours sd 0.416%  ratio 1.56
+ETH-USD: US-session hours (14-21 UTC Mon-Fri) sd 0.920%  other hours sd 0.638%  ratio 1.44
+SOL-USD: US-session hours (14-21 UTC Mon-Fri) sd 1.003%  other hours sd 0.760%  ratio 1.32

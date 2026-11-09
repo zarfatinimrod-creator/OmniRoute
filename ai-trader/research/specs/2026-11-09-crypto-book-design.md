@@ -1,7 +1,10 @@
-# Crypto book v1 - design spec (2026-11-09, rev 2)
+# Crypto book v1 - design spec (2026-11-09, rev 3)
 
-Status: design approved by Nimrod in chat on 2026-11-09 (approach B, BTC + ETH, quiet nights). Rev 2 adds the
-fixes from the adversarial review of rev 1 (two reviewers: quant-critic and feasibility; workflow wf_1dd43fdd-358).
+Status: design approved by Nimrod in chat on 2026-11-09 (approach B, BTC + ETH, quiet nights, $100k).
+- Rev 2 adds the fixes from the adversarial review of rev 1 (two reviewers, quant-critic and feasibility; workflow
+  wf_1dd43fdd-358).
+- Rev 3 adds the fixes from the quant-critic's review of rev 2. Their replay scripts are in
+  `research/2026-11-09-crypto-replays/`.
 This written spec still waits for his review. Paper money only.
 
 Research behind every number: `research/2026-11-09-crypto-research.json` (workflow wf_123167eb-028). It has 7
@@ -29,7 +32,9 @@ The real-money gate stays CLAUDE.md rule 1: 3 months of paper results that beat 
 Goal: a paper crypto book that runs every night unattended. It uses the same engine as the stock book: the journal, the shadow book, reduce-only overrides and forward grading. Nimrod gets a morning summary of what happened.
 
 v1 is done when all of these hold:
-1. **The stock book is unchanged, except for the bar-final fix in section 4.**
+1. **The stock book is unchanged, except for the bar-final fix in section 4.** Every other behaviour change listed
+   here (regime always filled, one equity mark per bar, deleting proposal.json) is gated to the crypto book by its
+   `market` flags.
    - All existing tests pass.
    - Golden outputs recorded on the code before the refactor (section 7, step 0) still match byte for byte: a backtest equity curve and a scripted live-cycle run.
 2. **The sweep has run and the gate is passed.**
@@ -41,12 +46,9 @@ v1 is done when all of these hold:
    - The morning summary arrives at 08:00 Israel time, winter and summer.
    - The dashboard shows the crypto book.
 
-Expectation to set with Nimrod: "calmer, not richer". No performance number is shown to him before the sweep runs. A rough replay by the reviewer (2018+, BTC-only base, approximate costs) gave:
-- Sharpe 0.77-0.82;
-- maxDD -31% to -33%;
-- CAGR 16-18%.
-
-That is an approximation, not a result.
+Expectation to set with Nimrod: "calmer, not richer". No performance number is shown to him before the sweep runs.
+Where crypto P&L reaches him (morning summary, dashboard), "no proven edge" appears until DSR >= 0.95. The reviewers'
+approximate replays (`research/2026-11-09-crypto-replays/power.py`, `ablate.py`) are design inputs, not results.
 
 ## 3. Architecture: one engine, two books
 
@@ -57,7 +59,10 @@ That is an approximation, not a result.
 - At load time, assert that the crypto universe is exactly {BTC-USD, ETH-USD}, or {BTC-USD} for crypto_base. Also assert that the priors name every registered signal (zeros explicit) and sum to 1.
 - The stock book gets an explicit `"market"` block with today's constants, so its defaults reproduce current behaviour (rule 5).
 - **One switch.** `journal.use_book(book)` is a context manager.
-  - It sets `STATE = BASE / subdir`: `BASE` is the module global the tests already swap; subdir is "" for stocks and "crypto" for crypto.
+  - On entry it captures the current `journal.STATE`. For stocks it leaves STATE as is; for crypto it sets
+    `STATE = captured / "crypto"`. On exit it restores the captured value.
+  - Tests keep swapping `journal.STATE` exactly as today (test_cycle, test_audit_fixes, test_critic_fixes,
+    test_news_rules, and the subprocess in test_audit_fixes), and a book switch stays inside the temp dir.
   - `load_config()` with no argument returns the active book's merged config. Config and state cannot be mismatched.
   - Test: the whole suite writes nothing under the real `state/`.
 - CLI: `--book crypto` on `cycle, status, scorecard, backtest, verify, predict, context, veto, shrink, summary`. The default is stocks.
@@ -77,9 +82,12 @@ That is an approximation, not a result.
   - `is_open(now)`
 
 ### 3.3 Engine changes
-- **periods_per_year** (252 stocks, 365 crypto) goes into strategy.py:148 (cov), metrics.py:10, backtest.py:170-171, broker.mark and desk.py:45-74. signals.py does not annualize, so it is left alone. Using 252 understates crypto vol by 1.2035x (BTC, measured), so positions come out about 20% too big.
+- **periods_per_year** (252 stocks, 365 crypto) goes into strategy.py:148 (cov), metrics.py:10, backtest.py:170-171
+  and broker.mark. signals.py:29 annualizes with 252, but every use is scale-invariant, so it is left alone. desk.py
+  is stock-only in v1. Using 252 understates crypto vol by 1.2035x (BTC, measured), so positions come out about 20% too big.
 - **PaperBroker** gets two new config keys, `costs.qty_step` (stocks 1, crypto 1e-6) and `costs.fee_bps` (stocks 0, crypto 50). Rules:
-  - **qty** = floor to qty_step of `min(delta_value, cash) / (px * (1+slip) * (1+fee))`. Cash never goes negative.
+  - **qty** = floor to qty_step of `min(delta_value, cash) / (px * (1+slip) * (1+fee) + commission_per_share)`.
+    Cash never goes negative.
   - **Fees** are charged to cash and to realized P&L, and added to a running `fees_paid`.
   - **Dust:** sells round to the step, and a remainder below qty_step is deleted.
   - **Same costs everywhere:** the main, shadow and backtest brokers use the same settings. Stocks keep integer quantities, so their JSON is unchanged.
@@ -90,7 +98,17 @@ That is an approximation, not a result.
   - With VIX on, every live weekend goes defensive(no-vix).
 - **Moved to config:** the group/ETF lists (strategy.py:10, news_live.py:34, dashboard.py:21, backtest.py:122) and the 10-name minimums (learn.py:21, strategy.py:120).
   - Learning gets an explicit `learning.enabled` flag, checked in backtest.run and cycle._learn. It is false for crypto.
-  - Per-coin caps: `risk.max_position_pct_by_symbol` (BTC 1.0, ETH 0.6), applied where strategy.py:142 builds caps.
+  - Per-coin caps: `risk.max_position_pct_by_symbol` (BTC 1.0, ETH 0.6, XRP 0.6 for the hindsight control), applied
+    where strategy.py:142 builds caps.
+  - **The crypto `risk` block lists every key it uses**, so nothing is silently inherited from the stock values:
+    `target_vol_annual, max_gross, max_position_pct, max_position_pct_by_symbol, max_sector_pct, max_positions,
+    min_score, exit_score, keep_rank_mult, regime_sma_days, regime_band_pct, regime_band_mode,
+    risk_off_gross_mult, dd_halve, dd_flat, dd_reentry_days, atr_days, atr_stop_mult, rebalance_band_pct,
+    min_trade_value, vol_lookback_days, rebalance_every_days, stop_cooldown_days, lowvol_exclude_top_pct` (0).
+    `atr_stop_mult = 0` means no stop and `dd_halve = -1.0` means no halving step. The sweep report prints the
+    merged config of each profile.
+  - **Each profile's panel is limited to its own universe** (`combine()` scores every panel column). Test:
+    crypto_base never holds ETH.
 - **Regime.** A new key, `risk.regime_band_mode`:
   - **"offset"** (stocks, today): risk-off while px < SMA x 0.98.
   - **"hysteresis"** (crypto): goes off below SMA x 0.98 and comes back on only above SMA x 1.02.
@@ -101,7 +119,10 @@ That is an approximation, not a result.
   - Reports go under `market.report_dir` (crypto: `reports/crypto/<date>.md`).
   - Benchmark labels are book-aware in report.py, dashboard.py and desk.py.
   - `proposal.json` is deleted when a decision is saved, so a stale proposal cannot misdate a veto.
-- **Equity log:** one mark per decision bar D, written at decision time. Runs that do nothing write nothing, so Sharpe and the rule-1 measurement are not distorted by 2-3 rows a day.
+- **Equity log (crypto):** one mark per decision bar D, written at decision time. Runs that do nothing write nothing,
+  so Sharpe and the rule-1 measurement are not distorted by 2-3 rows a day. The stock book keeps writing every run.
+- **Hard-coded alert numbers move to config:** the intraday -6% alert (cycle.py:382) becomes `market.intraday_alert_pct`
+  (crypto 0.08). The dashboard's risk-off label is book-aware (crypto risk-off = cash).
 
 ## 4. Data
 - **Source:** Yahoo chart API, which data.py already reads. Daily bars in UTC, weekends included, no gaps, adjclose == close, no corporate actions (data lens).
@@ -109,12 +130,16 @@ That is an approximation, not a result.
 - **Revised last close.** Yahoo rewrites the latest completed close.
   - On older bars close equals the next open exactly. The latest bar differed by 15.8-18.1 bp (BTC/ETH; critic and spec-reviewer re-fetches).
   - **Precondition to going live:** on or after 2026-11-11 16:00 UTC, re-fetch and record which value moved. Did the 11-08 close become 74,719.82 (the 11-09 open), or did the 11-09 open become 74,584.65? The answer goes in the config note.
-  - The live rule follows the answer. The expected rule is close_D = open of the D+1 row, applied once, right after loading.
+  - The live rule follows the answer:
+    - if the close moved, close_D = the open of the D+1 row, applied once, right after loading;
+    - if the open moved, use Yahoo's close_D as fetched, and the look-ahead exception falls away.
   - If the D+1 row is missing at decision time, there is no decision; a later run retries.
   - Live logs both values. An alert fires if a stored decision close later differs from history by more than `market.revised_close_alert_bps` (config).
 - **Partial bars from a stale cache.** A bar counts as final only if its symbol's data was fetched after the bar's end plus 5 minutes (cache file mtime).
-  - A stale symbol's unfinished bar is set to NaN.
-  - The run skips only if the benchmark itself is stale.
+  - A stale benchmark skips the run; a later run retries.
+  - A stale symbol is frozen for that run. It is neither bought nor sold, and a held one keeps its current weight.
+    Setting its bar to NaN would unscore it, and on a rebalance day that sells it (strategy.py:115, broker.py:128-137).
+  - In the crypto book, any stale universe symbol skips the run (a later run retries).
   - The stock book has the same latent bug after intraday runs, and it is fixed there too. That is the one intended change to stock behaviour.
 - **Live sanity guard:** Yahoo's decision close is compared with Coinbase's public candle (no key).
   - Gap above `market.coinbase_guard_pct` (1%): exits only. Stops and regime-off still run; no new entries.
@@ -132,13 +157,17 @@ That is an approximation, not a result.
 | Signals / priors | tsmom 365/30, trend 50/200, breakout 80. Priors are the stock priors renormalised: 0.385 / 0.308 / 0.308. xsmom, high52, reversal, rsi2, lowvol all 0 | trend 1.0 (all others 0), min_score -1 and exit_score -1.01: hold BTC whenever the regime is on |
 | Vol target | 30% annual (BTC 2y vol 44.1%, ETH 68.5%) | 30% |
 | Caps | max_gross 1.0 (no leverage); BTC <= 1.0, ETH <= 0.6 of the book; max_sector_pct 1.0 | BTC <= 1.0 |
-| Stop | 3x ATR14 trailing, judged at the daily close. About 9.9% for BTC and 13.9% for ETH; a fixed -3% is touched within 3 days by 37.8% / 51.4% of random entries | off |
-| Drawdown breaker | halve at -25%, flat at -50% | off |
+| Stop | 3x ATR14 trailing, judged at the daily close. About 9.9% for BTC and 13.9% for ETH; a fixed -3% is touched within 3 days by 37.8% / 51.4% of random entries | off (`atr_stop_mult` 0) |
+| Drawdown breaker | halve at -25% (ablatable); **catastrophe step: flat at -50%**, with today's re-entry rule | **catastrophe step only: flat at -50%** (`dd_halve` -1.0) |
 | Rebalance | every 7 days, band 0.05, min trade $100, stop cooldown 14 bars | same |
 | Costs | fee 50 bp/side, slippage 5 bp, exec delay 10 bp. About 13x stock costs. Venues: Kraken Pro taker 80 bp; Coinbase Advanced 90 bp (secondary source); Alpaca 25 bp; Binance 10 bp; eToro publishes 1% | same |
 | Cash yield / learning | 0 / off | 0 / off |
 
-Book size (owner Q5) is set in `account.starting_cash`. Caps are fractions of the book, so they do not depend on its size.
+Book size (owner Q5: $100k) is set in `account.starting_cash`. Caps are fractions of the book, so they do not depend
+on its size.
+
+The catastrophe step (flat at -50%) is in both profiles and outside every comparison and ablation. Replays put maxDD
+near -32%, so it costs nothing in-sample; it exists for the tail. Removing it needs Nimrod's explicit decision.
 
 ## 6. Live operation
 
@@ -159,10 +188,13 @@ Three scheduled tasks run in the persistent trader session (session_012EDbLj2H3v
    - Log where every fill price came from.
    - Then run the shadow book, grade predictions, commit and push.
 3. **08:03 Asia/Jerusalem (`CRON_TZ=Asia/Jerusalem`) — morning summary.**
-   - Runs `cycle --book crypto`, then `summary --book crypto`.
-   - The summary sends the queued messages and clears the queue only after a successful send.
-   - It checks the expected decision_date, the age of latest.json, and verify.
-   - It rebuilds and uploads the dashboard snapshot.
+   - Runs `cycle --book crypto`, then `summary --book crypto`. That command prints the summary text and checks
+     verify, the expected decision_date and the age of latest.json. Urgent items lead the text. It exits non-zero
+     while any urgent item is queued.
+   - **Delivery:** `notify.send` to ntfy (AITRADER_NTFY_TOPIC, configured 2026-11-09). If ntfy is not among the
+     channels returned, the session sends the text with PushNotification.
+   - Only after a confirmed delivery: `summary --book crypto --ack` clears the queue.
+   - Rebuilds and uploads the dashboard snapshot.
 
 ### 6.2 Quiet hours
 - `books.crypto.alerts.quiet_hours = {"tz": "Asia/Jerusalem", "from": "23:00", "to": "08:00"}`. Crypto only.
@@ -172,13 +204,15 @@ Three scheduled tasks run in the persistent trader session (session_012EDbLj2H3v
 ### 6.3 Trader skill: new "crypto night" section
 - The `--book crypto` commands.
 - The crypto veto checklist: exchange or protocol hack, stablecoin depeg, regulatory action, chain halt. Reduce-only, with a concrete reason.
-- **No PushNotification between 23:00 and 08:00 Israel time.**
+- **No PushNotification between 23:00 and 08:00 Israel time.** This crypto-night rule wins over the general "push
+  Nimrod when a question or approval is needed" rule (SKILL.md section 5). A question that comes up at night goes into
+  the morning summary.
 - One log per night: `logs/YYYY-MM-DD-crypto-night.md`.
 - Pushes use the corrected retry loop. `verify` is never piped.
 
 Scheduled-task prompts (stored verbatim when created):
 - **decide:**
-  - "Crypto decide (paper). cd /home/user/OmniRoute && git pull --rebase. cd ai-trader && python3 -m aitrader verify --book crypto (stop and queue a message if it exits 1).
+  - "Crypto decide (paper). cd /home/user/OmniRoute && git pull --rebase. cd ai-trader && python3 -m aitrader verify --book crypto (if it exits 1, stop: cycle halts itself and the morning summary reports it).
   - python3 -m aitrader cycle --book crypto.
   - If new entries are pending: read BTC/ETH headlines (trader-news skill). Veto or shrink only with a concrete reason from the checklist, before exec_ts.
   - Commit + push with the retry loop. No PushNotification at night."
@@ -191,13 +225,18 @@ Scheduled-task prompts (stored verbatim when created):
 - Freeze small fixtures under `tests/fixtures/`: a stock panel, and BTC/ETH daily + 1h.
 - Record golden outputs on the current code:
   - (a) the stock backtest equity curve;
-  - (b) a scripted stock live-cycle run (synthetic panel, N days, pinned priors, tmp STATE), comparing the final state files byte for byte.
+  - (b) a scripted stock live-cycle run (synthetic panel, N days, pinned priors, tmp STATE), comparing the final
+    state files byte for byte. `journal.now_utc` is frozen and the network is stubbed as tests/test_cycle.py:19-31
+    does, because `logged_at` is inside every hashed record.
 
 **Unit tests:**
 - UtcDailyCalendar (bar final per symbol, exec_ts, cooldown in bars);
 - the fractional broker with fees: no negative cash, fees in realized P&L, dust removed;
 - the hysteresis series: switch counts on a synthetic series, and the same regime on the same date in main, shadow, proposal and backtest;
-- the revised-close substitution, and no decision without the D+1 row;
+- the revised-close substitution (both branches), and no decision without the D+1 row;
+- the fill source chain and the exec_ts / override cutoff. "Missing" means no row or a null open; volume is ignored,
+  because 54% of 01:00 UTC hourly bars report volume 0 but carry real prices;
+- the stale-symbol freeze (a held stale coin is not sold);
 - the cache-mtime bar-final rule (both books);
 - the Coinbase guard: exits only on a breach, proceed when unreachable;
 - the quiet-hours queue and the summary command;
@@ -220,15 +259,23 @@ Scheduled-task prompts (stored verbatim when created):
   - leave-one-out ablations: no ETH, no ATR stop, no breaker;
   - a BTC+XRP hindsight control;
   - one missed-night robustness run, with execution at t+1.
-- **Pass rule.** The candidate ships only if **all** of these hold. Otherwise crypto_base ships.
+- **Order:** ablations first, then the pass rule on the final candidate.
+  - Ablations: any component (ETH, ATR stop, -25% halving step) whose removal does not lower the median Sharpe is
+    dropped from the candidate. The catastrophe step is never ablated.
+- **Pass rule.** The final candidate ships only if **all** of these hold. Otherwise crypto_base ships.
   1. It beats the base on Sharpe (excess over cash) in at least 6 of 7 paired phases.
-  2. The paired daily-return difference has PSR >= 0.95, or block-bootstrap P(d > 0) >= 0.95. This is needed because the phases correlate 0.95-0.995 (spec reviewer).
+  2. One significance test: block-bootstrap P(Sharpe_candidate - Sharpe_base > 0) >= 0.95, on the phase-averaged
+     daily returns, with 30-day blocks, 2,000 resamples and seed 0 (as in replays/power.py). A single test is
+     needed because the phases correlate 0.95-0.995.
   3. Its median maxDD is no more than 2 points worse.
-  4. The sign holds at 100 bp and in both halves.
-  - Ablations: any component whose removal does not lower the median Sharpe is dropped from the shipped profile.
+  4. The median paired Sharpe difference is > 0 at 100 bp per side, and > 0 in each half.
 - **DSR**
   - The shipped profile's DSR is computed with N = the seeded trials plus this sweep's rows.
-  - `state/crypto/trials.jsonl` is seeded conservatively with N >= 30 prior looks (risk lens a4_regime: 8 variants x 3 coins x windows) and their Sharpes where known.
+  - `state/crypto/trials.jsonl` is seeded with every look already taken, N = 145:
+    - risk lens a4_regime: 8 variants x 3 coins x 4 windows = 96;
+    - spec review 1 (power.py): 2 profiles x 7 phases = 14;
+    - spec review 2 (ablate.py, ablate2.py): 35.
+    The list goes in `research/2026-11-09-crypto-dsr-seed.md`, with Sharpes where known.
   - For paper trading DSR is reported, as it is for the stock book (DSR 0.57 today). A DSR below 0.95 means the report says "no proven edge". DSR is a requirement only for any real-money discussion.
 - **Final check:** the quant-critic returns PASS or HOLD, and only PASS goes to paper.
 
@@ -241,7 +288,8 @@ Scheduled-task prompts (stored verbatim when created):
   - fees paid;
   - the next decision time.
 - The 08:03 Israel task rebuilds the snapshot on weekends too.
-- `lessons.md` stays one shared file; each lesson names its book.
+- `lessons.md` stays one shared file in the root state directory, and each lesson names its book. `journal.context`
+  reads lessons from the root state directory even inside `use_book("crypto")`.
 
 ## 9. Rollout and timeline (estimates; review rounds can add time)
 
