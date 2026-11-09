@@ -165,6 +165,7 @@
     "lowvol_exclude_lookback": 252,
     "earnings_max_position_pct": 0.05,
     "regime_band_pct": 0.02,
+    "regime_band_mode": "offset",
     "dd_reentry_days": 20,
     "lowvol_exclude_min_names": 10
   },

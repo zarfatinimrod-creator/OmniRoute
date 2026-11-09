@@ -60,8 +60,30 @@ def _cap_weights(w: pd.Series, caps: pd.Series, sectors: pd.Series, sector_cap: 
     return w
 
 
+def regime_series(px: pd.Series, sma: pd.Series, band: float, mode: str) -> tuple[pd.Series, pd.Series]:
+    """Causal regime per bar from the benchmark close and its SMA: ("risk_on" | "risk_off" | "risk_off(no-data)",
+    carried state "on" | "off" | None). A NaN close or SMA is no-data that day (fails closed).
+    offset: risk-off while px < sma*(1-band), bar by bar.
+    hysteresis: the first valid bar starts the state like offset; then off below sma*(1-band) and back on only above
+    sma*(1+band). A no-data bar leaves the carried state unchanged. Nothing is persisted: the value at t depends only
+    on bars up to t and on where the history starts."""
+    if mode not in ("offset", "hysteresis"):
+        raise ValueError(f"unknown risk.regime_band_mode {mode!r} (offset | hysteresis)")
+    p, lo, hi = px.to_numpy(float), (sma * (1 - band)).to_numpy(float), (sma * (1 + band)).to_numpy(float)
+    valid = (px.notna() & sma.notna()).to_numpy()
+    regime, state, on = [], [], None
+    for i in range(len(p)):
+        if not valid[i]:
+            regime.append("risk_off(no-data)")
+        else:
+            on = bool(p[i] > hi[i]) if (mode == "hysteresis" and on is False) else not p[i] < lo[i]
+            regime.append("risk_on" if on else "risk_off")
+        state.append(None if on is None else "on" if on else "off")
+    return pd.Series(regime, index=px.index, dtype=object), pd.Series(state, index=px.index, dtype=object)
+
+
 def precompute_aux(panel: dict, cfg: dict) -> dict:
-    """Panels reused every day (vol, ATR, benchmark SMA). Backward-looking only."""
+    """Panels reused every day (vol, ATR, benchmark SMA, regime). Backward-looking only."""
     r = cfg["risk"]
     close = panel["close"]
     bench = cfg.get("benchmark", "SPY")
@@ -73,7 +95,23 @@ def precompute_aux(panel: dict, cfg: dict) -> dict:
     }
     if bench in close:
         aux["bench_sma"] = close[bench].rolling(r["regime_sma_days"], min_periods=r["regime_sma_days"]).mean()
+        bpx, sma = close[bench], aux["bench_sma"]
+    else:  # no benchmark column: every day is no-data (fails closed)
+        bpx = sma = pd.Series(np.nan, index=close.index)
+    aux["regime"], aux["regime_state"] = regime_series(bpx, sma, r.get("regime_band_pct", 0.0), r.get("regime_band_mode", "offset"))
     return aux
+
+
+def _dd_state(dd: float, r: dict) -> str:
+    return "flat" if dd <= r["dd_flat"] else "halved" if dd <= r["dd_halve"] else "normal"
+
+
+def _regime_detail(aux: dict, date, bpx) -> dict:
+    """The inputs behind the regime on `date`, for books that report them (market.fill_regime_on_no_picks)."""
+    sma = aux["bench_sma"].loc[date] if "bench_sma" in aux else np.nan
+    return {"regime_px": round(float(bpx), 4) if pd.notna(bpx) else None,
+            "regime_sma": round(float(sma), 4) if pd.notna(sma) else None,
+            "regime_state": aux["regime_state"].loc[date]}
 
 
 def build_targets(
@@ -140,8 +178,17 @@ def build_targets(
         "top_scores": {k: round(float(v), 3) for k, v in score.sort_values(ascending=False).head(10).items()},
         "bottom_scores": {k: round(float(v), 3) for k, v in score.sort_values().head(5).items()},
     }
+    # Regime filter on the benchmark (aux["regime"], causal). Fails CLOSED: missing data counts as risk-off.
+    regime = aux["regime"].loc[date]
+    fill = cfg.get("market", {}).get("fill_regime_on_no_picks", False)
+    detail = _regime_detail(aux, date, px.get(bench, np.nan)) if fill else {}
     if picks.empty:
-        diag.update({"regime": "n/a", "gross": 0.0})
+        if not fill:  # stocks: as before, no regime and no drawdown state on a day with no picks
+            diag.update({"regime": "n/a", "gross": 0.0})
+            return {}, diag
+        # crypto: the regime and the drawdown state every day, or a flat book's re-entry streak breaks (decision 8)
+        dd = equity_peak_ratio - 1.0
+        diag.update({"regime": regime, **detail, "drawdown": round(dd, 4), "dd_state": _dd_state(dd, r), "gross": 0.0})
         return {}, diag
 
     raw = picks / vol[picks.index]
@@ -159,13 +206,7 @@ def build_targets(
     port_vol = float(np.sqrt(max(w.values @ cov @ w.values, 1e-12)))
     scale = min(r["max_gross"] / max(w.sum(), 1e-9), r["target_vol_annual"] / port_vol)
 
-    # Regime filter on the benchmark. Fails CLOSED: missing benchmark data counts as risk-off.
-    regime = "risk_on"
-    sma = aux["bench_sma"].loc[date] if "bench_sma" in aux else np.nan
-    bpx = px.get(bench, np.nan)
-    # band: only call risk-off when clearly below the 200-day average (less whipsaw around the line)
-    if pd.isna(sma) or pd.isna(bpx) or bpx < sma * (1 - r.get("regime_band_pct", 0.0)):
-        regime = "risk_off" if pd.notna(sma) and pd.notna(bpx) else "risk_off(no-data)"
+    if regime != "risk_on":
         scale *= r["risk_off_gross_mult"]
 
     # Defensive mode: VIX in the top of its own trailing-year range (percentile, not a fixed level).
@@ -179,12 +220,11 @@ def build_targets(
 
     # Drawdown circuit breaker.
     dd = equity_peak_ratio - 1.0
-    dd_state = "normal"
-    if dd <= r["dd_flat"]:
-        scale, dd_state = 0.0, "flat"
-    elif dd <= r["dd_halve"]:
+    dd_state = _dd_state(dd, r)
+    if dd_state == "flat":
+        scale = 0.0
+    elif dd_state == "halved":
         scale *= 0.5
-        dd_state = "halved"
 
     # Scale, then re-apply per-name and sector caps WITHOUT redistribution (scaling up must never breach caps).
     w = np.minimum((w * scale).clip(lower=0), caps)
@@ -195,6 +235,7 @@ def build_targets(
     diag.update(
         {
             "regime": regime,
+            **detail,
             "drawdown": round(dd, 4),
             "dd_state": dd_state,
             "ex_ante_vol_unscaled": round(port_vol, 4),
