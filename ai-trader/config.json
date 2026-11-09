@@ -223,6 +223,8 @@
     "model": "claude-haiku-5-5",
     "trade_outside_hours": false,
     "batch_max": 12,
-    "max_quote_age_minutes": 15
+    "max_quote_age_minutes": 3,
+    "chain_check_seconds": 300,
+    "alert_after_errors": 5
   }
 }

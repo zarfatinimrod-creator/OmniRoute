@@ -54,3 +54,16 @@ python3 -m unittest discover -s tests -v
 הכי פשוט: אפליקציית **ntfy** (חינם, בלי חשבון). בוחרים שם נושא אקראי ומגדירים
 `AITRADER_NTFY_TOPIC` בסביבה. אפשר גם טלגרם (`AITRADER_TELEGRAM_TOKEN` + `AITRADER_TELEGRAM_CHAT`).
 בנוסף, משימות מתוזמנות של Claude שולחות push כשיש פעולה.
+
+## When a hash chain breaks
+
+`python3 -m aitrader verify` prints `BROKEN at record N` and exits 1. When that happens, `cycle` (for the main
+book's logs) or `news-live` (for the `news_*` logs) stops trading and sends an urgent alert. Stops on open positions are
+**not** checked until the chain is repaired. A single crash in the middle of a write repairs itself: the torn fragment
+is named in the next record (`after_torn`). Anything else needs a person:
+
+1. `git log -p -- state/<file>` - find the last commit in which `verify` passed (state is committed every slot).
+2. Compare that commit with the current file. Records that were added since and are intact stay. A damaged or edited
+   record means the history was changed: write down what changed in `logs/` and tell Nimrod.
+3. Restore the file from that commit (`git checkout <sha> -- state/<file>`), re-append the intact newer records in
+   order with `journal.append`, and run `verify` again. Never edit hashes by hand, and never use `git stash`.

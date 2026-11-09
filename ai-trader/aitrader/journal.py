@@ -119,10 +119,19 @@ def append(name: str, record: dict) -> None:
     the chain continues and verify_chain can tell a crash fragment from an edited record."""
     p = _path(name)
     frag = _tail_fragment(p)
+    whole = None
+    if frag is not None:  # a complete record that only lost its newline is a record, not a fragment
+        try:
+            whole = json.loads(frag)
+        except ValueError:
+            whole = None
     if name in CHAINED:
-        prev = _last_hash(p, frag)
-        if frag is not None:
-            record = {**record, "after_torn": _frag_hash(frag)}
+        if isinstance(whole, dict):
+            prev = whole.get("hash", "genesis")
+        else:
+            prev = _last_hash(p, frag)
+            if frag is not None:
+                record = {**record, "after_torn": _frag_hash(frag)}
         body = json.dumps(json.loads(json.dumps(record, default=str)), sort_keys=True, default=str)
         record = {**record, "prev_hash": prev, "hash": hashlib.sha256((prev + body).encode()).hexdigest()}
     with p.open("a", encoding="utf-8") as f:
@@ -175,7 +184,7 @@ def read(name: str) -> list[dict]:
     if not p.exists():
         return []
     out = []
-    for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in p.read_text(encoding="utf-8", errors="replace").split("\n"):  # same split as verify_chain
         if not line.strip():
             continue
         try:

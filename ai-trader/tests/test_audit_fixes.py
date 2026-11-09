@@ -145,6 +145,7 @@ class BrokenChainFailsClosed(TempState):
         rec = json.loads(lines[0]); rec["qty"] = 5
         p.write_text("\n".join([json.dumps(rec)] + lines[1:]) + "\n")
         nt = news_live.NewsTrader.__new__(news_live.NewsTrader)
+        nt.n = {"chain_check_seconds": 300}
         with self.assertRaises(news_live.ChainBroken):
             nt.step()
 
@@ -167,6 +168,21 @@ class TornLineRecovery(TempState):
         journal.append("news_scores.jsonl", {"i": 3})
         journal.append("news_scores.jsonl", {"i": 4})
         self.assertEqual([r["i"] for r in journal.read("news_scores.jsonl")], [0, 1, 3, 4])
+        self.assertEqual(journal.broken_chains(), [])
+
+    def test_record_missing_only_its_newline_stays_in_the_chain(self):
+        journal.append("trades.jsonl", {"i": 0})
+        journal.append("trades.jsonl", {"i": 1})
+        p = self.tmp / "trades.jsonl"
+        p.write_bytes(p.read_bytes()[:-1])  # torn at exactly the last byte
+        journal.append("trades.jsonl", {"i": 2})
+        self.assertEqual([r["i"] for r in journal.read("trades.jsonl")], [0, 1, 2])
+        self.assertEqual(journal.broken_chains(), [])
+
+    def test_line_separator_characters_inside_a_record_are_kept(self):
+        journal.append("predictions.jsonl", {"i": 0, "evidence": "a\u2028b\u0085c"})
+        journal.append("predictions.jsonl", {"i": 1})
+        self.assertEqual([r["i"] for r in journal.read("predictions.jsonl")], [0, 1])
         self.assertEqual(journal.broken_chains(), [])
 
     def test_tear_inside_a_multibyte_character_is_recovered(self):
@@ -307,6 +323,58 @@ class UniqueNewsKeys(TempState):
         self.assertEqual(journal.pred_key(q), "d|S|1|quant|t")  # quant keys unchanged
 
 
+class QuoteRules(TempState):
+    """_quote_is_live on a fixed clock (Tuesday 2026-11-10, 11:00 New York)."""
+
+    def setUp(self):
+        super().setUp()
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from aitrader import news_live
+        from test_core import CFG
+        self.now = datetime(2026, 11, 10, 11, 0, tzinfo=ZoneInfo("America/New_York"))
+        self.nt = news_live.NewsTrader.__new__(news_live.NewsTrader)
+        self.nt.n = {**CFG.get("news", {}), "max_quote_age_minutes": 3}
+
+    def _live(self, quote_ny, published_ny=None):
+        q = f"2026-11-10T{quote_ny}-05:00"
+        pub = f"2026-11-10T{published_ny}-05:00" if published_ny else None
+        return self.nt._quote_is_live(q, pub, self.now)
+
+    def test_fresh_quote_is_live(self):
+        self.assertTrue(self._live("10:59:30"))
+
+    def test_quote_older_than_the_limit_is_not_live(self):
+        self.assertFalse(self._live("10:56:00"))  # 4 minutes old, limit 3
+
+    def test_quote_from_before_the_headline_is_not_live(self):
+        self.assertFalse(self._live("10:59:30", published_ny="10:59:45"))  # nothing traded since the news
+
+    def test_missing_quote_time_is_not_live(self):
+        self.assertFalse(self.nt._quote_is_live(None, None, self.now))
+
+
+class QueueWaitsForARealPrice(TempState):
+    def test_queued_buy_without_open_bar_or_live_quote_stays_queued(self):
+        from aitrader import news_live
+        from test_core import CFG
+        lp, mo, oo = news_live.live_price, news_live.market_open_now, news_live.official_opens
+        news_live.live_price = lambda s: (100.0, 0.0)  # Yahoo still shows yesterday's close, no quote time
+        news_live.market_open_now = lambda: True
+        news_live.official_opens = lambda syms, day: {}  # delayed opening: no 09:30 bar
+        news_live.QUOTE_TIME.pop("AAA", None)
+        try:
+            cfg = dict(CFG)
+            cfg["universe"] = {"AAA": "Tech", "SPY": "Index"}
+            nt = news_live.NewsTrader(cfg)
+            nt.queue = [{"symbol": "AAA", "score": 9, "why": "x", "queued_at": "2026-11-10T01:00:00+00:00"}]
+            nt.run_queue_at_open([])
+        finally:
+            news_live.live_price, news_live.market_open_now, news_live.official_opens = lp, mo, oo
+        self.assertNotIn("AAA", nt.book.positions)
+        self.assertEqual([q["symbol"] for q in nt.queue], ["AAA"])
+
+
 class StaleQuote(TempState):
     def test_score_9_on_a_stale_quote_does_not_buy(self):
         from aitrader import news_live
@@ -341,7 +409,7 @@ class NewsLoopStops(TempState):
         news_live.NewsTrader.step = step
         news_live.notify.send = lambda title, body, cfg, prio="default": sent.append((prio, body)) or []
         try:
-            news_live.run(until_ny="23:59", max_minutes=1, prime=False)
+            news_live.run(until_ny="24:00", max_minutes=1, prime=False)  # never reached: only the break stops it
         finally:
             news_live.NewsTrader.step, news_live.notify.send = _step, _send
         self.assertEqual(len(calls), 1)  # stopped after the first failing step

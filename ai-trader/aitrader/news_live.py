@@ -237,17 +237,20 @@ class NewsTrader:
         journal.append("news_trades.jsonl", {**f, "logged_at": journal.now_utc()})
         events.append(f"{f['side']} {f['qty']} {f['symbol']} @ {f['price']} - {f['reason']}")
 
-    def _quote_is_live(self, price_at: str | None) -> bool:
-        """A quote counts as live only if it printed in today's session and is recent (a delayed opening or a
-        halt leaves Yahoo showing the previous close or the last trade before the halt)."""
-        if not price_at:  # caller gave no quote time (tests, manual scoring): trust the session clock
-            return True
+    def _quote_is_live(self, price_at: str | None, published: str | None = None, now: datetime | None = None) -> bool:
+        """A quote counts as live only if it printed in today's session, after the headline came out, and is
+        recent (a delayed opening, a halt or a pause leaves Yahoo showing a price from before the news).
+        No quote time = not live."""
+        if not price_at:
+            return False
         t = datetime.fromisoformat(price_at.replace("Z", "+00:00")).astimezone(NY)
-        now = datetime.now(NY)
+        now = now or datetime.now(NY)
         hours = journal.session_hours(now.date())
         if hours is None or t.date() != now.date() or (t.hour, t.minute) < hours[0]:
             return False
-        return (now - t).total_seconds() <= 60 * self.n.get("max_quote_age_minutes", 15)
+        if published and t < datetime.fromisoformat(published.replace("Z", "+00:00")):
+            return False
+        return (now - t).total_seconds() <= 60 * self.n.get("max_quote_age_minutes", 3)
 
     def handle_scored(self, items: list[dict], scores: dict, events: list):
         bench_px, _ = live_price(self.cfg.get("benchmark", "SPY"))
@@ -256,7 +259,9 @@ class NewsTrader:
             s = scores.get(x["key"])
             if not s:
                 continue
-            live = is_open and self._quote_is_live(x.get("price_at"))
+            # rows from the live loop always carry price_at (None when Yahoo gave no quote time); direct callers
+            # (tests, manual scoring) that pass no price_at are trusted on the session clock
+            live = is_open and (self._quote_is_live(x["price_at"], x.get("published")) if "price_at" in x else True)
             px = x.get("price") if live else None
             if is_open and not live and s["score"] > self.n["buy_min_score"]:
                 events.append(f"{x['symbol']} score {s['score']}: quote not live (delayed open / halt) - no buy")
@@ -293,16 +298,21 @@ class NewsTrader:
         today = datetime.now(NY).date()
         opens = official_opens([q["symbol"] for q in self.queue], today)
         for q in list(self.queue):
-            px = opens.get(q["symbol"]) or live_price(q["symbol"])[0]
+            px, how = opens.get(q["symbol"]), "the 09:30 open"
+            if not px:  # no 09:30 bar yet (delayed opening / lagging minute data): only a live quote will do
+                lp = live_price(q["symbol"])[0]
+                px, how = (lp, "the first live quote") if lp and self._quote_is_live(QUOTE_TIME.get(q["symbol"])) else (None, "")
+            if not px:
+                continue  # stays queued; tried again next step
             if px:
-                f = self._buy(q["symbol"], px, q["why"] + " (queued, filled at the 09:30 open)", q["score"])
+                f = self._buy(q["symbol"], px, q["why"] + f" (queued, filled at {how})", q["score"])
                 if f:
                     self._log_trade(f, events)
             self.queue.remove(q)
 
     def step(self) -> list[str]:
         events: list[str] = []
-        if time.time() - getattr(self, "_chain_checked", 0.0) >= 300:  # full re-verify at most every 5 minutes
+        if time.time() - getattr(self, "_chain_checked", 0.0) >= self.n.get("chain_check_seconds", 300):
             bad = journal.broken_chains(journal.NEWS_CHAINED)
             if bad:  # fail closed, like the quant cycle: no trading on a corrupted journal
                 raise ChainBroken("news hash chain broken: " + ", ".join(bad) + " - news engine stopped, nothing traded;"
@@ -312,7 +322,7 @@ class NewsTrader:
         new = self.poll_headlines()
         for x in new:
             x["price"], x["day_move_pct"] = live_price(x["symbol"])
-            x["price_at"] = QUOTE_TIME.get(x["symbol"]) or journal.now_utc()  # the quote's own time, not the clock
+            x["price_at"] = QUOTE_TIME.get(x["symbol"])  # the quote's own time (None = unknown = not live)
         for i in range(0, len(new), self.n["batch_max"]):
             chunk = new[i:i + self.n["batch_max"]]
             self.handle_scored(chunk, score_batch(chunk, self.n["model"]), events)
@@ -341,7 +351,8 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
         print(f"[news] primed {len(nt.seen)} existing headlines")
     if not journal.calendar_covers(datetime.now(NY).date()):
         notify.send("AI Trader - תקלה", f"config.json calendar does not cover {datetime.now(NY).year}: the news engine"
-                    " treats every day as closed and will not trade until the NYSE holidays are added (כסף נייר)", cfg, "urgent")
+                    " treats every day as closed: it will not trade and will NOT check stops on open news positions until the"
+                    " NYSE holidays are added (כסף נייר)", cfg, "urgent")
     hh, mm = (int(x) for x in until_ny.split(":"))
     t0 = time.time()
     fails = 0
