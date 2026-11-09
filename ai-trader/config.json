@@ -1,0 +1,190 @@
+{
+  "_note": "Every assumption lives here (ASSUME). Change numbers here, never inside the logic. Run the time machine before and after any change.",
+  "account": {
+    "starting_cash": 100000,
+    "cash_yield_annual": 0.035,
+    "paper_only": true
+  },
+  "benchmark": "SPY",
+  "universe": {
+    "SPY": "Index",
+    "QQQ": "Index",
+    "IWM": "Index",
+    "DIA": "Index",
+    "XLK": "SectorETF",
+    "XLF": "SectorETF",
+    "XLE": "SectorETF",
+    "XLV": "SectorETF",
+    "XLY": "SectorETF",
+    "XLP": "SectorETF",
+    "XLI": "SectorETF",
+    "XLB": "SectorETF",
+    "XLU": "SectorETF",
+    "XLRE": "SectorETF",
+    "XLC": "SectorETF",
+    "SMH": "SectorETF",
+    "TLT": "Bonds",
+    "IEF": "Bonds",
+    "GLD": "Gold",
+    "AAPL": "Tech",
+    "MSFT": "Tech",
+    "NVDA": "Tech",
+    "AVGO": "Tech",
+    "ORCL": "Tech",
+    "CRM": "Tech",
+    "ADBE": "Tech",
+    "AMD": "Tech",
+    "CSCO": "Tech",
+    "QCOM": "Tech",
+    "TXN": "Tech",
+    "IBM": "Tech",
+    "INTC": "Tech",
+    "MU": "Tech",
+    "PLTR": "Tech",
+    "NOW": "Tech",
+    "AMAT": "Tech",
+    "PANW": "Tech",
+    "GOOGL": "Comm",
+    "META": "Comm",
+    "NFLX": "Comm",
+    "DIS": "Comm",
+    "TMUS": "Comm",
+    "AMZN": "ConsDisc",
+    "TSLA": "ConsDisc",
+    "HD": "ConsDisc",
+    "MCD": "ConsDisc",
+    "NKE": "ConsDisc",
+    "BKNG": "ConsDisc",
+    "LOW": "ConsDisc",
+    "SBUX": "ConsDisc",
+    "WMT": "Staples",
+    "COST": "Staples",
+    "PG": "Staples",
+    "KO": "Staples",
+    "PEP": "Staples",
+    "PM": "Staples",
+    "BRK-B": "Financials",
+    "JPM": "Financials",
+    "V": "Financials",
+    "MA": "Financials",
+    "BAC": "Financials",
+    "GS": "Financials",
+    "MS": "Financials",
+    "AXP": "Financials",
+    "BLK": "Financials",
+    "LLY": "Health",
+    "UNH": "Health",
+    "JNJ": "Health",
+    "ABBV": "Health",
+    "MRK": "Health",
+    "TMO": "Health",
+    "ABT": "Health",
+    "ISRG": "Health",
+    "AMGN": "Health",
+    "TEVA": "Health",
+    "XOM": "Energy",
+    "CVX": "Energy",
+    "COP": "Energy",
+    "CAT": "Industrials",
+    "GE": "Industrials",
+    "RTX": "Industrials",
+    "HON": "Industrials",
+    "UBER": "Industrials",
+    "DE": "Industrials",
+    "LMT": "Industrials",
+    "UNP": "Industrials",
+    "LIN": "Materials",
+    "NEE": "Utilities",
+    "PLD": "RealEstate",
+    "CHKP": "Tech",
+    "NICE": "Tech",
+    "WIX": "Tech",
+    "MNDY": "Tech"
+  },
+  "costs": {
+    "slippage_bps": 5,
+    "commission_per_share": 0.0
+  },
+  "risk": {
+    "target_vol_annual": 0.12,
+    "max_gross": 1.0,
+    "max_position_pct": 0.1,
+    "max_etf_position_pct": 0.2,
+    "max_sector_pct": 0.3,
+    "max_positions": 15,
+    "min_score": 0.15,
+    "regime_sma_days": 200,
+    "risk_off_gross_mult": 0.5,
+    "dd_halve": -0.1,
+    "dd_flat": -0.2,
+    "atr_days": 14,
+    "atr_stop_mult": 3.0,
+    "rebalance_band_pct": 0.02,
+    "min_trade_value": 500,
+    "vol_lookback_days": 60,
+    "exit_score": 0.0,
+    "keep_rank_mult": 2.0,
+    "rebalance_every_days": 5,
+    "stop_cooldown_days": 10
+  },
+  "signals": {
+    "tsmom": {
+      "lookback": 252,
+      "skip": 21
+    },
+    "xsmom": {
+      "lookback": 252,
+      "skip": 21
+    },
+    "trend": {
+      "fast": 50,
+      "slow": 200
+    },
+    "reversal": {
+      "lookback": 5
+    },
+    "lowvol": {
+      "lookback": 60
+    },
+    "high52": {
+      "lookback": 252
+    },
+    "breakout": {
+      "lookback": 55
+    },
+    "rsi2": {
+      "period": 2,
+      "trend_sma": 200
+    }
+  },
+  "prior_weights": {
+    "tsmom": 0.2,
+    "xsmom": 0.2,
+    "trend": 0.15,
+    "high52": 0.1,
+    "lowvol": 0.1,
+    "breakout": 0.1,
+    "reversal": 0.05,
+    "rsi2": 0.1
+  },
+  "learning": {
+    "horizons_days": [
+      5,
+      20
+    ],
+    "primary_horizon_days": 20,
+    "ic_half_life_days": 60,
+    "min_eval_dates": 20,
+    "eta": 0.5,
+    "weight_floor": 0.02,
+    "weight_cap": 0.4,
+    "max_step": 0.05,
+    "shrink_to_prior": 0.5
+  },
+  "alerts": {
+    "ntfy_topic_env": "AITRADER_NTFY_TOPIC",
+    "telegram_token_env": "AITRADER_TELEGRAM_TOKEN",
+    "telegram_chat_env": "AITRADER_TELEGRAM_CHAT"
+  },
+  "sec_user_agent": "ai-trader-research-bot contact@example.com"
+}
