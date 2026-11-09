@@ -9,6 +9,7 @@ Four memory layers (taken from the Age of Blood agent setup):
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -18,11 +19,36 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE = ROOT / "state"
+BOOK = "stocks"  # the active book (use_book); data.load_config() with no argument follows it
+_BASE: Path | None = None  # the stock state dir while use_book has switched books; None: STATE is the stock dir
 
 
 def _path(name: str) -> Path:
-    STATE.mkdir(exist_ok=True)
+    STATE.mkdir(parents=True, exist_ok=True)
     return STATE / name
+
+
+@contextlib.contextmanager
+def use_book(book: str):
+    """Make `book` the active book for the block: STATE and BOOK switch, and both come back on exit (also on an
+    exception). The stock state dir is whatever STATE is on entry (tests point it at a temp dir), so every book
+    stays inside it: stocks -> that dir, crypto -> that dir / market.state_subdir. Entering the active book again
+    is a no-op."""
+    global STATE, BOOK, _BASE
+    if book not in ("stocks", "crypto"):
+        raise ValueError(f"unknown book {book!r} (stocks | crypto)")
+    if book == BOOK:
+        yield
+        return
+    from .data import load_config
+
+    saved = STATE, BOOK, _BASE
+    base = STATE if _BASE is None else _BASE
+    STATE, BOOK, _BASE = base / load_config(book)["market"]["state_subdir"], book, base
+    try:
+        yield
+    finally:
+        STATE, BOOK, _BASE = saved
 
 
 def now_utc() -> str:
@@ -358,11 +384,13 @@ def scorecard(preds: list[dict] | None = None, grades_name: str = "grades.jsonl"
 
 
 def context(symbol: str, n: int = 5) -> dict:
-    """What we said and learned about a ticker before (TradingAgents-style memory injection)."""
+    """What we said and learned about a ticker before (TradingAgents-style memory injection). Calls and trades
+    come from the active book; lessons.md is one file for every book, in the stock state dir (crypto lines are
+    tagged 'crypto: ...')."""
     sym = symbol.upper()
     preds = [p for p in read("predictions.jsonl") if p["symbol"] == sym]
     trades = [t for t in read("trades.jsonl") if t["symbol"] == sym]
-    lessons_path = _path("lessons.md")
+    lessons_path = (STATE if _BASE is None else _BASE) / "lessons.md"
     lessons = [ln for ln in lessons_path.read_text().splitlines() if sym in ln] if lessons_path.exists() else []
     g = graded()
     evaluated = [{**p, **g[pred_key(p)]} for p in preds if pred_key(p) in g]

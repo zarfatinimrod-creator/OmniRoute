@@ -13,6 +13,30 @@
                  "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24"],
     "early_close": ["2026-11-27", "2026-12-24", "2027-11-26"]
   },
+  "_note_market": "Per-book behaviour flags (crypto plan, planning decision 6). The 'market' values below are the stock book's and reproduce today's code; a book under 'books' overrides them key by key.",
+  "market": {
+    "calendar": "nyse",
+    "periods_per_year": 252,
+    "history": "10y",
+    "vix": true,
+    "earnings_blackout": true,
+    "overlays": true,
+    "corporate_actions": true,
+    "news_engine": true,
+    "fill_regime_on_no_picks": false,
+    "equity_mark_per_bar": false,
+    "delete_proposal_on_decision": false,
+    "grading": "excess",
+    "stale_skips_run": false,
+    "close_source": "yahoo",
+    "coinbase_guard_pct": 0,
+    "report_dir": "reports",
+    "intraday_alert_pct": 0.06,
+    "latest_max_age_hours": 30,
+    "state_subdir": "",
+    "etf_groups": ["Index", "SectorETF", "Bonds", "Gold"],
+    "quiet_hours": null
+  },
   "benchmark": "SPY",
   "universe": {
     "SPY": "Index",
@@ -226,5 +250,153 @@
     "max_quote_age_minutes": 3,
     "chain_check_seconds": 300,
     "alert_after_errors": 5
+  },
+  "books": {
+    "_note": "Book profiles (spec 2026-11-09-crypto-book-design, sections 3.1 and 5; plan planning decisions). load_config('crypto') = this file without 'books', then books.crypto merged over it, then books.<ship_profile> over that when it is not 'crypto'. universe, prior_weights, signals and benchmark are replaced whole; every other block merges key by key. crypto_base lists only what differs from the candidate. Zero-weight signals keep the stock parameters (the values the replays used); max_positions 2 = the whole two-coin universe (the replays' 15 behaves the same). The candidate leaves risk.dd_reentry_ref to its default (dd_halve + dd_flat) / 2 = -0.375 (planning decision 1).",
+    "crypto": {
+      "ship_profile": "crypto",
+      "benchmark": "BTC-USD",
+      "universe": {
+        "BTC-USD": "Crypto",
+        "ETH-USD": "Crypto"
+      },
+      "account": {
+        "starting_cash": 100000,
+        "cash_yield_annual": 0
+      },
+      "costs": {
+        "slippage_bps": 5,
+        "fee_bps": 50,
+        "exec_delay_bps": 10,
+        "qty_step": 1e-6
+      },
+      "risk": {
+        "target_vol_annual": 0.30,
+        "max_gross": 1.0,
+        "max_position_pct": 1.0,
+        "max_position_pct_by_symbol": {
+          "BTC-USD": 1.0,
+          "ETH-USD": 0.6
+        },
+        "max_sector_pct": 1.0,
+        "max_positions": 2,
+        "min_score": 0.15,
+        "exit_score": 0.0,
+        "keep_rank_mult": 2.0,
+        "regime_sma_days": 200,
+        "regime_band_pct": 0.02,
+        "regime_band_mode": "hysteresis",
+        "risk_off_gross_mult": 0.0,
+        "dd_halve": -0.25,
+        "dd_flat": -0.5,
+        "dd_reentry_days": 20,
+        "atr_days": 14,
+        "atr_stop_mult": 3.0,
+        "rebalance_band_pct": 0.05,
+        "min_trade_value": 100,
+        "vol_lookback_days": 60,
+        "rebalance_every_days": 7,
+        "stop_cooldown_days": 14,
+        "lowvol_exclude_top_pct": 0.0
+      },
+      "signals": {
+        "tsmom": {
+          "lookback": 365,
+          "skip": 30
+        },
+        "xsmom": {
+          "lookback": 252,
+          "skip": 21
+        },
+        "trend": {
+          "fast": 50,
+          "slow": 200
+        },
+        "reversal": {
+          "lookback": 5
+        },
+        "lowvol": {
+          "lookback": 60
+        },
+        "high52": {
+          "lookback": 252
+        },
+        "breakout": {
+          "lookback": 80
+        },
+        "rsi2": {
+          "period": 2,
+          "trend_sma": 200
+        }
+      },
+      "prior_weights": {
+        "tsmom": 0.3846,
+        "xsmom": 0.0,
+        "trend": 0.3077,
+        "breakout": 0.3077,
+        "high52": 0.0,
+        "reversal": 0.0,
+        "rsi2": 0.0,
+        "lowvol": 0.0
+      },
+      "learning": {
+        "enabled": false,
+        "default_horizon": 30,
+        "horizons_days": [
+          7,
+          30,
+          90
+        ]
+      },
+      "market": {
+        "calendar": "utc_daily",
+        "periods_per_year": 365,
+        "history": "max",
+        "vix": false,
+        "earnings_blackout": false,
+        "overlays": false,
+        "corporate_actions": false,
+        "news_engine": false,
+        "fill_regime_on_no_picks": true,
+        "equity_mark_per_bar": true,
+        "delete_proposal_on_decision": true,
+        "grading": "absolute",
+        "stale_skips_run": true,
+        "close_source": "next_open",
+        "coinbase_guard_pct": 0.01,
+        "report_dir": "reports/crypto",
+        "intraday_alert_pct": 0.08,
+        "latest_max_age_hours": 26,
+        "state_subdir": "crypto",
+        "etf_groups": [],
+        "quiet_hours": {
+          "tz": "Asia/Jerusalem",
+          "from": "23:00",
+          "to": "08:00"
+        }
+      }
+    },
+    "crypto_base": {
+      "universe": {
+        "BTC-USD": "Crypto"
+      },
+      "prior_weights": {
+        "tsmom": 0.0,
+        "xsmom": 0.0,
+        "trend": 1.0,
+        "breakout": 0.0,
+        "high52": 0.0,
+        "reversal": 0.0,
+        "rsi2": 0.0,
+        "lowvol": 0.0
+      },
+      "risk": {
+        "min_score": -1.0,
+        "exit_score": -1.01,
+        "atr_stop_mult": 0.0,
+        "dd_halve": -1.0,
+        "dd_reentry_ref": -0.25
+      }
+    }
   }
 }

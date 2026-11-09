@@ -233,8 +233,46 @@ def sec_recent_form4(user_agent: str, count: int = 100) -> list[dict]:
     return out
 
 
-def load_config() -> dict:
-    return json.loads((ROOT / "config.json").read_text())
+REPLACED = ("universe", "prior_weights", "signals", "benchmark")  # a book block replaces these whole
+PROFILE_UNIVERSE = {"crypto": {"BTC-USD", "ETH-USD"}, "crypto_base": {"BTC-USD"}}  # load-time guard (spec 3.1)
+
+
+def _merge(base: dict, over: dict) -> dict:
+    """A book block over a config: REPLACED keys and plain values replace; every other block merges key by key."""
+    out = dict(base)
+    for k, v in over.items():
+        merge = k not in REPLACED and isinstance(v, dict) and isinstance(out.get(k), dict)
+        out[k] = {**out[k], **v} if merge else v
+    return out
+
+
+def load_config(book: str | None = None, profile: str | None = None) -> dict:
+    """The config of a book (default: the active one, journal.BOOK). Stocks: config.json without 'books'.
+    Crypto: books.crypto merged over that, then books.<profile> over it when the profile is not 'crypto'; the
+    profile defaults to books.crypto.ship_profile. A crypto profile with the wrong universe, or priors that do not
+    name every registered signal or do not sum to 1, raises ValueError."""
+    from . import journal
+    from .signals import REGISTRY
+
+    raw = json.loads((ROOT / "config.json").read_text())
+    books = raw.pop("books", {})
+    book = book or journal.BOOK
+    if book == "stocks":
+        return raw
+    if book != "crypto":
+        raise ValueError(f"unknown book {book!r} (stocks | crypto)")
+    profile = profile or books["crypto"]["ship_profile"]
+    if profile not in PROFILE_UNIVERSE:
+        raise ValueError(f"unknown crypto profile {profile!r} ({' | '.join(PROFILE_UNIVERSE)})")
+    cfg = _merge(raw, books["crypto"])
+    if profile != "crypto":
+        cfg = _merge(cfg, books[profile])
+    if set(cfg["universe"]) != PROFILE_UNIVERSE[profile]:
+        raise ValueError(f"{profile}: universe {sorted(cfg['universe'])} != {sorted(PROFILE_UNIVERSE[profile])}")
+    pw = cfg["prior_weights"]
+    if set(pw) != set(REGISTRY) or abs(sum(pw.values()) - 1.0) > 1e-3:
+        raise ValueError(f"{profile}: prior_weights must name every signal in {sorted(REGISTRY)} and sum to 1, got {pw}")
+    return cfg
 
 
 def earnings_on(day: str) -> dict[str, str] | None:

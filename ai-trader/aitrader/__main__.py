@@ -17,6 +17,10 @@
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
   desk SYMBOL RATING --prob P --thesis T --invalidation I   record the desk's final call (Sell/Underweight=veto, Hold=shrink 0.5)
   scorecard                               grade matured predictions
+
+  --book stocks|crypto (before or after the command; default stocks) picks the paper book. crypto runs in
+  state/crypto/ and is accepted by cycle, status, scorecard, backtest, verify, predict, context, veto, shrink;
+  every other command is stock-only in v1 and refuses it.
 """
 
 from __future__ import annotations
@@ -27,6 +31,8 @@ import sys
 from datetime import datetime, timezone
 
 from . import journal
+
+BOOK_CMDS = {"cycle", "status", "scorecard", "backtest", "verify", "predict", "context", "veto", "shrink"}  # take --book crypto
 
 
 def _today_market_date() -> str:
@@ -40,6 +46,7 @@ def _today_market_date() -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="aitrader")
+    ap.add_argument("--book", choices=["stocks", "crypto"], default="stocks")
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("cycle")
     c.add_argument("--dry-run", action="store_true")
@@ -88,8 +95,17 @@ def main(argv=None) -> int:
     s.add_argument("--reason", required=True)
     n = sub.add_parser("news")
     n.add_argument("symbol")
+    for sp in sub.choices.values():  # --book also after the command; SUPPRESS keeps the top-level value when absent
+        sp.add_argument("--book", choices=["stocks", "crypto"], default=argparse.SUPPRESS)
     a = ap.parse_args(argv)
+    if a.book != "stocks" and a.cmd not in BOOK_CMDS:
+        print(f"{a.cmd} is stock-only in v1: it does not take --book {a.book}", file=sys.stderr)
+        return 2
+    with journal.use_book(a.book):
+        return _run(a)
 
+
+def _run(a: argparse.Namespace) -> int:
     if a.cmd == "cycle":
         from .cycle import run_cycle
 
@@ -153,7 +169,7 @@ def main(argv=None) -> int:
         print(json.dumps(journal.context(a.symbol), indent=1, default=str))
     elif a.cmd == "verify":
         bad = []
-        for name in sorted(journal.CHAINED):
+        for name in sorted(journal.CHAINED if journal.BOOK == "stocks" else journal.MAIN_CHAINED):  # news: stock-only
             ok, n = journal.verify_chain(name)
             print(f"{name}: {'OK' if ok else 'BROKEN at record ' + str(n)} ({n} records)")
             bad += [] if ok else [name]
