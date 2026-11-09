@@ -62,7 +62,7 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
         equity[d] = broker.mark(cpx, ds, cfg["account"]["cash_yield_annual"])
         blocked = set(broker.state.get("blocked", {}))
         on_cycle = (i + phase) % rebalance_every == 0
-        broker.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20))
+        broker.maybe_reset_peak(prev_regime or "", ds, r.get("dd_reentry_days", 20), r["dd_halve"])
         targets, diag = build_targets(d, panel, signals, wmap[d], cfg, broker.peak_ratio(cpx), broker.positions, blocked, aux)
         # same trigger as live: scheduled rebalance, or any regime / drawdown-state change, or a flat breaker
         changed = (prev_regime is not None and diag.get("regime") != prev_regime) or (prev_dd is not None and diag.get("dd_state") != prev_dd)

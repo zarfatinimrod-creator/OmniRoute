@@ -76,6 +76,16 @@ class CycleFlow(unittest.TestCase):
         self.assertEqual(journal.verify_chain("trades.jsonl")[0], True)
         self.assertEqual(journal.verify_chain("decisions.jsonl")[0], True)
 
+    def test_production_shaped_panel_does_not_crash(self):
+        # load_market adds non-frame keys (_require_vix flag, vix Series): decide() must slice only frames/series
+        p = self._upto(400)
+        p["_require_vix"] = True
+        p["vix"] = p["close"]["S00"] * 0 + 18.0
+        out = cycle.run_cycle()
+        self.assertTrue(out["decided_now"])
+        prop = cycle.run_cycle(propose=True)
+        self.assertIn("decision_date", prop)
+
     def test_propose_changes_no_state(self):
         self._upto(400)
         before = sorted(x.name for x in self.tmp.iterdir())

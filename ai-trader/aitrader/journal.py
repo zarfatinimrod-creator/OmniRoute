@@ -42,7 +42,7 @@ def graded() -> dict:
 
 def open_predictions() -> list[dict]:
     g = graded()
-    return [p for p in read("predictions.jsonl") if pred_key(p) not in g and p.get("status") != "no_price"]
+    return [p for p in read("predictions.jsonl") if pred_key(p) not in g]
 
 
 def _last_hash(p: Path) -> str:
@@ -148,12 +148,24 @@ def evaluate_predictions(close: pd.DataFrame, bench: str) -> dict:
     for p in open_predictions():
         d = pd.Timestamp(p["date"])
         pos = idx.searchsorted(d)
-        if pos >= len(idx) or pos + p["horizon"] >= len(idx) or p.get("price") in (None, 0):
+        if pos >= len(idx) or pos + p["horizon"] >= len(idx):
             continue
         end = idx[pos + p["horizon"]]
         # quant calls are made on the decision bar's close; Claude/desk/overlay calls are made later at a live
         # price, so they are graded from the price actually logged (no credit for moves already seen)
         start = idx[pos] if idx[pos] == d and p.get("source", "quant") == "quant" else None
+        if p.get("price") is None and p.get("source", "quant") != "quant":
+            # logged while the market was closed: the entry is the NEXT session's close, so a call made after
+            # seeing an overnight / after-hours move earns nothing for it
+            logged_day = pd.Timestamp(str(p.get("logged_at", p["date"]))[:10])
+            nxt = idx[idx > logged_day]
+            if not len(nxt):
+                continue
+            start = nxt[0]
+            pos = idx.get_loc(start)
+            if pos + p["horizon"] >= len(idx):
+                continue
+            end = idx[pos + p["horizon"]]
         sym = p["symbol"]
         if sym not in close or bench not in close:
             continue

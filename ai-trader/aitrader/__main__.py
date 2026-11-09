@@ -104,7 +104,7 @@ def main(argv=None) -> int:
         else:
             print(backtest.to_json(backtest.run(panel, cfg, a.start, a.end)))
     elif a.cmd == "predict":
-        from .data import live_prices, load_config
+        from .data import live_prices, load_config, market_status
 
         cfg = load_config()
         bench = cfg.get("benchmark", "SPY")
@@ -112,11 +112,16 @@ def main(argv=None) -> int:
         if a.symbol.upper() not in px:
             print("no price for symbol", file=sys.stderr)
             return 1
+        try:
+            is_open = market_status(bench).get("is_open", False)
+        except Exception:  # noqa: BLE001
+            is_open = False
         journal.append("predictions.jsonl", {
             "date": _today_market_date(), "logged_at": journal.now_utc(), "symbol": a.symbol.upper(), "horizon": a.horizon,
             "source": "claude", "score": 1.0 if a.direction == "up" else -1.0, "direction": a.direction, "note": a.note,
             "prob": None if a.prob is None else max(0.0, min(1.0, a.prob)), "model_note": "graded forward only (post knowledge cutoff)",
-            "components": {}, "price": px[a.symbol.upper()], "bench_price": px.get(bench), "status": "open"})
+            "components": {}, "price": px[a.symbol.upper()] if is_open else None, "bench_price": px.get(bench) if is_open else None,
+            "entry": "live" if is_open else "next_session_close", "status": "open"})
         print(f"logged claude call: {a.symbol.upper()} {a.direction} h={a.horizon} @ {px[a.symbol.upper()]}")
     elif a.cmd in ("veto", "shrink"):
         ds = _today_market_date()
@@ -152,7 +157,7 @@ def main(argv=None) -> int:
 
         print(json.dumps(brief(a.symbol), indent=1, default=str))
     elif a.cmd == "desk":
-        from .data import live_prices, load_config
+        from .data import live_prices, load_config, market_status
         from .desk import RATING_TO_ACTION
 
         cfg = load_config()
@@ -161,11 +166,16 @@ def main(argv=None) -> int:
         px = live_prices([sym, bench])
         ds = _today_market_date()
         prob = max(0.0, min(1.0, a.prob))
+        try:
+            is_open = market_status(bench).get("is_open", False)
+        except Exception:  # noqa: BLE001
+            is_open = False
         journal.append("predictions.jsonl", {
             "date": ds, "logged_at": journal.now_utc(), "symbol": sym, "horizon": a.horizon, "source": "desk",
             "rating": a.rating, "prob": prob, "score": round(2 * prob - 1, 3), "direction": "up" if prob >= 0.5 else "down",
             "thesis": a.thesis, "invalidation": a.invalidation, "components": {},
-            "price": px.get(sym), "bench_price": px.get(bench), "status": "open" if sym in px else "no_price"})
+            "price": px.get(sym) if is_open else None, "bench_price": px.get(bench) if is_open else None,
+            "entry": "live" if is_open else "next_session_close", "status": "open"})
         action = RATING_TO_ACTION[a.rating]
         if action:
             ov = journal.load_json("overrides.json", {}) or {}

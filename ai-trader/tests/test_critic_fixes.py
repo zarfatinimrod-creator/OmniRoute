@@ -61,6 +61,31 @@ class ForwardOnlyGrading(TempState):
         self.assertAlmostEqual(g["quant"]["excess"], 0.10)
 
 
+class OutOfHoursCall(TempState):
+    def test_call_logged_when_closed_is_graded_from_next_session(self):
+        idx = pd.bdate_range("2026-01-01", periods=30)
+        close = pd.DataFrame({"AAA": 100.0, "SPY": 100.0}, index=idx)
+        close.loc[idx[1]:, "AAA"] = 110.0  # overnight jump into session 1
+        journal.append("predictions.jsonl", {"date": str(idx[0].date()), "logged_at": f"{idx[0].date()}T23:00:00+00:00",
+                                             "symbol": "AAA", "horizon": 5, "source": "claude", "direction": "up",
+                                             "price": None, "bench_price": None, "status": "open"})
+        journal.evaluate_predictions(close, "SPY")
+        g = list(journal.graded().values())
+        self.assertEqual(len(g), 1)
+        self.assertAlmostEqual(g[0]["excess"], 0.0)  # entry = next session close (110): the jump earns nothing
+
+
+class DrawdownReentry(unittest.TestCase):
+    def test_reentry_at_half_scale_after_risk_on_streak(self):
+        b = PaperBroker(10000)
+        b.state.update({"dd_state": "flat", "peak_equity": 20000})
+        for i in range(19):
+            self.assertFalse(b.maybe_reset_peak("risk_on", f"d{i}", 20, -0.10))
+        self.assertTrue(b.maybe_reset_peak("risk_on", "d19", 20, -0.10))
+        ratio = b.peak_ratio({})
+        self.assertTrue(-0.20 < ratio - 1 <= -0.10)  # reads "halved", not "normal"
+
+
 class LiveCooldown(unittest.TestCase):
     def test_stop_cooldown_survives_the_fill_day(self):
         b = PaperBroker(10000, slippage_bps=0)
