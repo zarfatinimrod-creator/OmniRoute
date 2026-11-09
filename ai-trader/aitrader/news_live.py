@@ -165,7 +165,14 @@ class NewsTrader:
     def save(self):
         cutoff = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
         self.seen = {k: v for k, v in self.seen.items() if v >= cutoff}
-        journal.save_json("news_book.json", self.book.state)
+        # the book is rewritten when it really changes (trades, stops, cash); live marks alone are saved at most
+        # every 15 minutes, so the git-tracked state does not churn every 20 seconds
+        core = json.dumps({**self.book.state, "positions": {s: {k: v for k, v in p.items() if k != "last_price"}
+                                                           for s, p in self.book.state.get("positions", {}).items()}},
+                          sort_keys=True, default=str)
+        if core != getattr(self, "_saved_core", None) or time.time() - getattr(self, "_saved_at", 0.0) >= 900:
+            journal.save_json("news_book.json", self.book.state)
+            self._saved_core, self._saved_at = core, time.time()
         journal.save_json("news_seen.json", self.seen)
         journal.save_json("news_queue.json", self.queue)
 
