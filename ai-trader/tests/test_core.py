@@ -2,6 +2,7 @@
 
 import copy
 import json
+import os
 import unittest
 from pathlib import Path
 
@@ -12,6 +13,11 @@ from aitrader import backtest, learn
 from aitrader.broker import PaperBroker
 from aitrader.signals import compute_all
 from aitrader.strategy import _cap_weights, build_targets, precompute_aux
+
+# A test run must never reach the owner's phone: the alert channels read these at send time. On 2026-11-09/10 the
+# suite posted six fake "BUY" alerts per run because one test class did not stub the sender.
+for _var in ("AITRADER_NTFY_TOPIC", "AITRADER_TELEGRAM_TOKEN", "AITRADER_TELEGRAM_CHAT"):
+    os.environ.pop(_var, None)
 
 CFG = json.loads((Path(__file__).resolve().parent.parent / "config.json").read_text())
 

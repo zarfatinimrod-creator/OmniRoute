@@ -22,6 +22,8 @@ class CycleFlow(unittest.TestCase):
             "_market_opened": cycle._market_opened, "_bar_is_final": cycle._bar_is_final,
             "official_opens": cycle.official_opens,
         }
+        self._send = cycle.notify.send
+        cycle.notify.send = lambda *a, **k: []  # a test run must never reach the owner's phone
         cycle.official_opens = lambda syms, day: {}  # no network in tests; daily open is the fallback
         cycle.load_config = lambda: self.cfg
         cycle.market_status = lambda sym="SPY": {"is_open": False}
@@ -37,6 +39,7 @@ class CycleFlow(unittest.TestCase):
     def tearDown(self):
         for k, v in self.patches.items():
             setattr(cycle, k, v)
+        cycle.notify.send = self._send
         journal.STATE = self._state
         import aitrader.report as rep
 
