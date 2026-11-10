@@ -1,6 +1,116 @@
 {
-  "date": "2026-11-09",
+  "date": "2026-11-10",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-11-09",
+      "ticker": "UPBD",
+      "company": "Upbound Group, Inc.",
+      "industry": "Equipment Rental & Leasing",
+      "insiders": 8,
+      "price": 22.98,
+      "value": 1840818.0,
+      "delta_own": "+16%"
+    },
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-11-06",
+      "ticker": "GOOD",
+      "company": "Gladstone Commercial Corp",
+      "industry": "Lessors of Real Property",
+      "insiders": 2,
+      "price": 10.12,
+      "value": 186263.0,
+      "delta_own": "+30%"
+    },
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-11-05",
+      "ticker": "FLOC",
+      "company": "Flowco Holdings Inc.",
+      "industry": "Oil & Gas Field Machinery & Equipment",
+      "insiders": 2,
+      "price": 19.43,
+      "value": 682656.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-11-04",
+      "ticker": "LBTY",
+      "company": "Liberty Global Ltd.",
+      "industry": "Cable & Other Pay Television Services",
+      "insiders": 3,
+      "price": 9.52,
+      "value": 4486300.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-09",
+      "trade_date": "2026-11-05",
+      "ticker": "NXRT",
+      "company": "Nexpoint Residential Trust, Inc.",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 2,
+      "price": 17.31,
+      "value": 503368.0,
+      "delta_own": "+6%"
+    },
+    {
+      "filing_date": "2026-11-09",
+      "trade_date": "2026-11-06",
+      "ticker": "ADTN",
+      "company": "Adtran Holdings, Inc.",
+      "industry": "Telephone & Telegraph Apparatus",
+      "insiders": 2,
+      "price": 4.02,
+      "value": 675088.0,
+      "delta_own": "+13%"
+    },
+    {
+      "filing_date": "2026-11-09",
+      "trade_date": "2026-11-06",
+      "ticker": "LUCK",
+      "company": "Lucky Strike Entertainment Corp",
+      "industry": "Amusement & Recreation Services",
+      "insiders": 3,
+      "price": 15.83,
+      "value": 926691.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-09",
+      "trade_date": "2026-11-05",
+      "ticker": "MTDR",
+      "company": "Matador Resources Co",
+      "industry": "Crude Petroleum & Natural Gas",
+      "insiders": 6,
+      "price": 53.21,
+      "value": 442465.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-09",
+      "trade_date": "2026-11-06",
+      "ticker": "WCC",
+      "company": "Wesco International Inc",
+      "industry": "Electrical Apparatus & Equipment, Wiring Supplies",
+      "insiders": 2,
+      "price": 292.08,
+      "value": 603431.0,
+      "delta_own": "+12%"
+    },
+    {
+      "filing_date": "2026-11-09",
+      "trade_date": "2026-11-09",
+      "ticker": "OBIO",
+      "company": "Orchestra Biomed Holdings, Inc.",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 3,
+      "price": 4.96,
+      "value": 247900.0,
+      "delta_own": "+3%"
+    },
     {
       "filing_date": "2026-11-09",
       "trade_date": "2026-11-06",
@@ -77,17 +187,6 @@
       "price": 87.25,
       "value": 3926152.0,
       "delta_own": "+14%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "MTDR",
-      "company": "Matador Resources Co",
-      "industry": "Crude Petroleum & Natural Gas",
-      "insiders": 5,
-      "price": 53.27,
-      "value": 434964.0,
-      "delta_own": "+2%"
     },
     {
       "filing_date": "2026-11-09",
@@ -176,105 +275,6 @@
       "price": 13.11,
       "value": 10122778.0,
       "delta_own": "+145%"
-    },
-    {
-      "filing_date": "2026-11-05",
-      "trade_date": "2026-11-03",
-      "ticker": "FBRT",
-      "company": "Franklin Bsp Realty Trust, Inc.",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 2,
-      "price": 6.22,
-      "value": 1024108.0,
-      "delta_own": "+28%"
-    },
-    {
-      "filing_date": "2026-11-05",
-      "trade_date": "2026-11-03",
-      "ticker": "UPBD",
-      "company": "Upbound Group, Inc.",
-      "industry": "Equipment Rental & Leasing",
-      "insiders": 7,
-      "price": 22.46,
-      "value": 1390755.0,
-      "delta_own": "+12%"
-    },
-    {
-      "filing_date": "2026-11-05",
-      "trade_date": "2026-11-04",
-      "ticker": "LBTY",
-      "company": "Liberty Global Ltd.",
-      "industry": "Cable & Other Pay Television Services",
-      "insiders": 2,
-      "price": 9.42,
-      "value": 3026150.0,
-      "delta_own": "+18%"
-    },
-    {
-      "filing_date": "2026-11-04",
-      "trade_date": "2026-11-03",
-      "ticker": "HGV",
-      "company": "Hilton Grand Vacations Inc.",
-      "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
-      "insiders": 2,
-      "price": 41.03,
-      "value": 603099.0,
-      "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-04",
-      "trade_date": "2026-11-02",
-      "ticker": "PRLB",
-      "company": "Proto Labs Inc",
-      "industry": "Fabricated Structural Metal Products",
-      "insiders": 2,
-      "price": 68.86,
-      "value": 101230.0,
-      "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-03",
-      "trade_date": "2026-11-02",
-      "ticker": "ENPH",
-      "company": "Enphase Energy, Inc.",
-      "industry": "Semiconductors & Related Devices",
-      "insiders": 2,
-      "price": 27.1,
-      "value": 298104.0,
-      "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-03",
-      "trade_date": "2026-08-10",
-      "ticker": "STRZ",
-      "company": "Starz Entertainment Corp /Cn/",
-      "industry": "Motion Picture & Video Tape Production",
-      "insiders": 3,
-      "price": 22.58,
-      "value": 191930.0,
-      "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-02",
-      "trade_date": "2026-10-30",
-      "ticker": "ATEC",
-      "company": "Alphatec Holdings, Inc.",
-      "industry": "Surgical & Medical Instruments & Apparatus",
-      "insiders": 2,
-      "price": 8.12,
-      "value": 1421750.0,
-      "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-02",
-      "trade_date": "2026-10-30",
-      "ticker": "OCFC",
-      "company": "Oceanfirst Financial Corp",
-      "industry": "National Commercial Banks",
-      "insiders": 2,
-      "price": 17.85,
-      "value": 267777.0,
-      "delta_own": "+8%"
     }
   ],
   "congress_buy": null,

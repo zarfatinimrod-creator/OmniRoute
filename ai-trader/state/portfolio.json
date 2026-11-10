@@ -1,20 +1,20 @@
 {
-  "cash": 49838.1764992847,
+  "cash": 49844.98055249292,
   "positions": {
     "PM": {
       "qty": 12,
       "avg_cost": 198.2990969467163,
       "entry_date": "2026-11-09",
       "peak_close": 198.1999969482422,
-      "last_price": 193.1199951171875,
+      "last_price": 194.25,
       "ca_applied_through": "2026-11-10"
     },
     "CVX": {
       "qty": 11,
       "avg_cost": 210.95543110656737,
       "entry_date": "2026-11-09",
-      "peak_close": 210.85000610351562,
-      "last_price": 210.77999877929688,
+      "peak_close": 211.22000122070312,
+      "last_price": 211.22000122070312,
       "ca_applied_through": "2026-11-10"
     },
     "MRK": {
@@ -22,15 +22,15 @@
       "avg_cost": 148.44418011474608,
       "entry_date": "2026-11-09",
       "peak_close": 148.75999450683594,
-      "last_price": 148.75999450683594,
+      "last_price": 148.0500030517578,
       "ca_applied_through": "2026-11-10"
     },
     "UNP": {
       "qty": 8,
       "avg_cost": 292.5562086639404,
       "entry_date": "2026-11-09",
-      "peak_close": 297.010009765625,
-      "last_price": 297.010009765625,
+      "peak_close": 300.6199951171875,
+      "last_price": 300.6199951171875,
       "ca_applied_through": "2026-11-10"
     },
     "AMGN": {
@@ -45,16 +45,16 @@
       "qty": 2,
       "avg_cost": 1366.0777170410156,
       "entry_date": "2026-11-09",
-      "peak_close": 1411.949951171875,
-      "last_price": 1411.949951171875,
+      "peak_close": 1432.2900390625,
+      "last_price": 1432.2900390625,
       "ca_applied_through": "2026-11-10"
     },
     "KO": {
       "qty": 35,
       "avg_cost": 95.93794438934326,
       "entry_date": "2026-11-09",
-      "peak_close": 96.02999877929688,
-      "last_price": 96.02999877929688,
+      "peak_close": 96.91000366210938,
+      "last_price": 96.91000366210938,
       "ca_applied_through": "2026-11-10"
     },
     "TEVA": {
@@ -62,7 +62,7 @@
       "avg_cost": 43.031503320693965,
       "entry_date": "2026-11-09",
       "peak_close": 43.0099983215332,
-      "last_price": 42.970001220703125,
+      "last_price": 42.400001525878906,
       "ca_applied_through": "2026-11-10"
     },
     "DE": {
@@ -70,7 +70,7 @@
       "avg_cost": 685.8527647705077,
       "entry_date": "2026-11-09",
       "peak_close": 691.280029296875,
-      "last_price": 691.280029296875,
+      "last_price": 687.6400146484375,
       "ca_applied_through": "2026-11-10"
     },
     "JNJ": {
@@ -78,15 +78,15 @@
       "avg_cost": 278.139,
       "entry_date": "2026-11-09",
       "peak_close": 282.1099853515625,
-      "last_price": 282.1099853515625,
+      "last_price": 280.7799987792969,
       "ca_applied_through": "2026-11-10"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.98691633605955,
       "entry_date": "2026-11-09",
-      "peak_close": 293.8399963378906,
-      "last_price": 293.29998779296875,
+      "peak_close": 293.8900146484375,
+      "last_price": 293.8900146484375,
       "ca_applied_through": "2026-11-10"
     },
     "XOM": {
@@ -94,7 +94,7 @@
       "avg_cost": 163.89690994262693,
       "entry_date": "2026-11-09",
       "peak_close": 164.72999572753906,
-      "last_price": 164.72999572753906,
+      "last_price": 164.47000122070312,
       "ca_applied_through": "2026-11-10"
     },
     "AAPL": {
@@ -102,22 +102,22 @@
       "avg_cost": 345.107465057373,
       "entry_date": "2026-11-09",
       "peak_close": 350.69000244140625,
-      "last_price": 350.69000244140625,
+      "last_price": 348.510009765625,
       "ca_applied_through": "2026-11-10"
     },
     "XLV": {
       "qty": 39,
       "avg_cost": 186.51320816802976,
       "entry_date": "2026-11-09",
-      "peak_close": 188.3300018310547,
-      "last_price": 188.3300018310547,
+      "peak_close": 188.8800048828125,
+      "last_price": 188.8800048828125,
       "ca_applied_through": "2026-11-10"
     }
   },
-  "peak_equity": 100322.66619960208,
+  "peak_equity": 100338.03160840113,
   "blocked": {},
   "created": "2026-11-06",
-  "last_mark": "2026-11-09",
+  "last_mark": "2026-11-10",
   "start_prices": {
     "SPY": 735.2899780273438,
     "QQQ": 656.0999755859375,
@@ -213,7 +213,7 @@
     "WIX": 76.08999633789062,
     "MNDY": 87.93000030517578
   },
-  "regime": "risk_on+defensive",
+  "regime": "risk_on",
   "dd_state": "normal",
   "last_rebalance": "2026-11-06"
 }

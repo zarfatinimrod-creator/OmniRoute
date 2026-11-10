@@ -1,26 +1,11 @@
 {
-  "date": "2026-11-06",
+  "date": "2026-11-10",
   "vetoes": {},
   "size_mult": {
-    "KO": [
+    "COP": [
       0.5,
-      "desk Hold p=0.51: Trend evidence is strong but already in the price: ensemble score 0.615 (tsmom 0.94, trend 0.958), 3m excess return vs SPY +15.44 pts, +9.0% in a month, 16.64% ",
-      "2026-11-09T11:22:56+00:00"
-    ],
-    "UNP": [
-      0.5,
-      "desk Hold p=0.51: The trend is real but the ensemble score is a middling 0.475: tsmom 0.884 and trend 0.772 sit at +7.25% above the SMA200 and +4.4pp vs SPY over 3m, while xsmom ",
-      "2026-11-09T11:22:58+00:00"
-    ],
-    "CVX": [
-      0.5,
-      "desk Hold p=0.51: The long-term trend is real: 12m +44.8%, tsmom 0.954, trend 0.865, 10.3% above SMA200, +14.7% vs SPY over 3m. But the stock fell -9.73% in one week, from roughl",
-      "2026-11-09T11:22:59+00:00"
-    ],
-    "PM": [
-      0.5,
-      "desk Hold p=0.51: The trend is real: tsmom is 0.899, trend 0.849, PM is up 38.06% over 12 months, 11.95% ahead of SPY over 3 months and 9.7% above its 200-day. The ensemble that ",
-      "2026-11-09T11:23:00+00:00"
+      "desk Hold p=0.50: The long trend is intact (tsmom 0.97, trend 0.886, 3m +7.22%, +9.9 points vs SPY) but the Q3 beat and the 10.7% dividend raise were sold (1w -6.1%; COP 136.27 t",
+      "2026-11-10T21:31:06+00:00"
     ]
   }
 }
