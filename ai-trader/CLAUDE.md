@@ -102,6 +102,15 @@ At the end of every session: `logs/YYYY-MM-DD-<slug>.md` with the eight Hebrew h
 First line names the session type (cycle / pre-market / post-close review / weekly research).
 
 ## Agents and models
+**Owner's standing order (Nimrod, 2026-11-10): work only with Fable 5.2, for everything, until he says otherwise.**
+Every session, subagent and workflow stage runs on `claude-fable-5-2`. Never set another model on an agent, a
+workflow stage or a new session, and do not pin one in `agents/*.md` (they inherit the session model). A session
+that is still on another model is switched by Nimrod with `/model claude-fable-5-2` in that session.
+- If Fable's usage limit stops a session, say so to Nimrod at once (what stopped, at which step). Do not fall back
+  to another model on your own.
+- Not covered until he decides: the headline scorer inside the bot (`config.json` `news.model`). It is a trading
+  parameter, so it changes only through rule 4, with a measured comparison of accuracy and delay.
+
 `agents/web-researcher.md` for research, `agents/quant-critic.md` as the gate for strategy changes.
 In workflows: the session model builds and does the final check; one independent adversarial lens per
-unit that ships; volume scouting can use a cheaper model. Small waves, resumable.
+unit that ships. Small waves, resumable.
