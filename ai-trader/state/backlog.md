@@ -56,8 +56,34 @@ PASS -> only then merge. Sources: research/2026-11-09-repo-sweep-take-list.md, r
 24. [crypto] Parked and deferred minors from the crypto build (6 parked, 20 open minors, rulings R1-R19):
     research/2026-11-09-crypto-deferred-and-rulings.txt.
 25. [alerts] Engine alerts are written in English; the owner reads Hebrew. Translate the urgent ones.
+26. [news][ops] news-exit follow-ups from the gate of 2026-11-10 (PASS with should-fix). Until they land, do not
+    rely on an exit request made off-hours: the engine must not wait without limit on the requests lock (non-blocking
+    lock with a bounded retry); save the book right after a sale and before the request is cleared; an unreadable
+    requests file must reach the owner as an event, not only news_errors.jsonl; add `news-exit SYMBOL --cancel`;
+    validate the symbol; document the lever in the skill and in the config note; test a re-request made during the
+    price loop.
+27. [news][measurement] Mark every score and prediction with the scorer model and a hash of the prompt. The forward
+    record now pools three scorer versions (broken input on 2026-11-09, fixed input, session-gated null), so
+    "before and after" can only be told apart by timestamp.
+28. [news][risk] The priced-in rule now really softens negative scores on a stock that already fell, so the
+    bad-news exit (score <= 2) on a held name fires less. Owner/critic decision: never soften a negative score.
+29. [news][signal] Before the open and after the close the scorer gets no move (null), and in session the brake uses
+    the stock's own move with no market reference (on 2026-11-09, 39 of the 74 names were up 2% or more). Pass a
+    pre-market move and the benchmark's move; ties to item 15.
+30. [news][model] Compare scorer models on the same headlines (agreement, delay, cost). Haiku 5.5 today; the owner's
+    standing order is Fable 5.2 for all work, and the scorer is his decision with these numbers.
+31. [tests] The suite leaves its temporary state directories in /tmp (13,155 found on 2026-11-10): remove them in
+    tearDown.
+32. [news] Small ones from the gate: a non-numeric quote time still loses the price; a reply with no quote time
+    keeps the previous stamp; news-score should gate the move like the engine does; the "price is back" line still
+    says the stop "is checked again"; a failed move calculation leaves no record.
 
 ## Done
+- 2026-11-10 (second wave): the price is never lost to the move calculation; no fallback to an older close; the
+  blind-stop alert is retried until delivered and cannot abort a step; the scorer gets null outside the session;
+  operator exit lever (`news-exit`, state/news_exits.json, live quote only, no buy-back that day); the unit suite
+  can no longer reach the owner's phone; scheduled tasks moved off the main session (it can only be used from the
+  owner's trusted devices now).
 - 2026-11-10: news scorer input fixed (day move from the daily bars, in percent, journaled; null before the
   session); blind-stop alert (news.stop_blind_alert_seconds); second engine watchdog at minute 37; the dashboard
   session no longer starts the engine (exactly one engine, in the trader session).
