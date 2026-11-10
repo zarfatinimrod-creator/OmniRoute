@@ -35,7 +35,7 @@ import numpy as np
 import pandas as pd
 
 from . import backtest, data, journal, report
-from .metrics import boot_cfg, boot_rows, dsr
+from .metrics import boot_cfg, boot_error, boot_rows, dsr
 from .signals import compute_all
 from .strategy import periods_per_year, precompute_aux
 
@@ -121,22 +121,25 @@ def _ranges(runs: dict, daily: dict, hold: dict, cfg: dict) -> tuple[dict, dict]
     """Bootstrap range and paired probabilities of every run (metrics.boot_rows): Sharpe, CAGR and maxDD of the
     median over its phases, P(Sharpe above buy&hold of the benchmark coin) and P(Sharpe above its paired run), each
     phase against the same phase. Runs over the same window share one set of resampled days. Block length, resample
-    count and seed are the sweep's pre-registered bootstrap constants; the level is config "bootstrap" (boot_cfg).
-    Returns (settings, {run: {"range": ..., "phases": {phase: ...}}}). Informative only: no pass rule reads it."""
+    count and seed are the sweep's pre-registered bootstrap constants; the level and the floor (min_blocks) are config
+    "bootstrap" (boot_cfg). One window under the floor refuses the ranges of the whole sweep (metrics.BootRefused).
+    Returns (settings with "days" = the shortest window's, {run: {"range": ..., "phases": {phase: ...}}}).
+    Informative only: no pass rule reads it."""
     st = {**boot_cfg(cfg), "block_days": BOOT_BLOCK, "draws": BOOT_DRAWS, "seed": BOOT_SEED}
     windows: dict = {}
     for name, rec in runs.items():
         windows.setdefault(tuple(rec["window"]), []).append(name)
-    out = {}
+    out, days = {}, []
     for names in windows.values():
         cols = {(n, k): daily[n][k] for n in names for k in daily[n].columns}
         if hold.get(names[0]) is not None:
             cols[("hold", 0)] = hold[names[0]]
         boot = boot_rows(pd.DataFrame(cols), _rf_daily(cfg), periods_per_year(cfg), st,
                          {n: runs[n]["pair"] for n in names if "pair" in runs[n]}, "hold")
+        days.append(boot["settings"]["days"])
         for n in names:
             out[n] = {"range": boot["rows"][n], "phases": {k: boot["phases"][(n, k)] for k in daily[n].columns}}
-    return st, out
+    return {**st, "days": min(days)}, out
 
 
 def bootstrap_p(base: pd.Series, cand: pd.Series, ppy: int, seed: int = BOOT_SEED, block: int = BOOT_BLOCK,
@@ -287,7 +290,7 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
         for name, r in ranges.items():
             runs[name]["range"] = r["range"]
     except Exception as e:  # noqa: BLE001 - named in the report; never costs the sweep its verdict or its registration
-        honest["ranges_error"], ranges = type(e).__name__, {}
+        honest["ranges_error"], ranges = boot_error(e), {}  # a refusal gives its reason (a window under the floor)
     phase_rows = [{"run": name, **ph, **ranges.get(name, {}).get("phases", {}).get(ph["phase"], {})}
                   for name, rec in runs.items() for ph in rec["phases"]]
     shipped = final_run if ship == "crypto" else "base@50"
@@ -373,8 +376,7 @@ def _report(res, base, cand, btc, date, start, split, end, phases, n_seeded, n_p
     b = res.get("boot")
     if b:
         lvl, coin = f"{b['level']:.0%}", cand.get("benchmark", "BTC-USD").split("-")[0]
-        lines += [f"## Ranges ({lvl} stationary block bootstrap: mean block {b['block_days']} days, {b['draws']} resamples, "
-                  f"seed {b['seed']})", "",
+        lines += [report.range_title(b, "shortest run "), "",
                   f"| run | Sharpe med [{lvl} range] | CAGR med [{lvl} range] | maxDD med [{lvl} range] | "
                   f"P(Sharpe > {coin} hold) | vs | P(Sharpe > vs) |",
                   "|---|---|---|---|---:|---|---:|"]

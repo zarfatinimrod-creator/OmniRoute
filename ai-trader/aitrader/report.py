@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -112,6 +113,14 @@ def prob(x) -> str:
     return f"{x:.3f}" if _seen(x) else "-"
 
 
+def range_title(b: dict, of: str = "") -> str:
+    """Title of a ranges section: the method, and how many mean blocks of history the ranges stand on next to the
+    floor under which none is computed (metrics.boot_rows). of: what the day count is of, when not the one window."""
+    return (f"## Ranges ({b['level']:.0%} stationary block bootstrap: mean block {b['block_days']} days, {b['draws']} "
+            f"resamples, seed {b['seed']}; {of}{b['days']} days / {b['block_days']} = {b['days'] / b['block_days']:.1f} "
+            f"blocks, floor {b['min_blocks']})")
+
+
 def range_notes(level: str, bench: str, base: str = "base") -> list[str]:
     return [
         f"Each estimate is followed by the range it falls in on {level} of the resampled histories. A Sharpe range that "
@@ -142,14 +151,14 @@ def record_lines(rec: dict, cfg: dict) -> list[str]:
 
 
 def sweep_report(df, detail: dict, rec: dict, cfg: dict) -> str:
-    """What a stock time-machine sweep prints under its table: each estimate next to its range, the paired
-    probabilities, both Deflated-Sharpe readings (the registered one is the rule) and where the run record is."""
+    """What a stock time-machine sweep prints under its table: each estimate next to its range (or why no range was
+    computed), the paired probabilities, the Deflated-Sharpe readings (the registered one is the rule; then the
+    cost-rows-out reading and the rule on every base phase) and where the run record is."""
     bench = cfg.get("benchmark", "SPY")
     b, d = detail.get("boot"), detail.get("dsr")
     if b:
         lvl = f"{b['level']:.0%}"
-        lines = [f"## Ranges ({lvl} stationary block bootstrap: mean block {b['block_days']} days, {b['draws']} resamples, "
-                 f"seed {b['seed']}, {b['days']} days)", "",
+        lines = [range_title(b), "",
                  f"| row | Sharpe [{lvl} range] | CAGR [{lvl} range] | maxDD [{lvl} range] | P(Sharpe > {bench}) | P(Sharpe > base) |",
                  "|---|---|---|---|---:|---:|"]
         lines += [f"| {r['variant']} | {est(r['sharpe_med'], r['sharpe_lo'], r['sharpe_hi'])} | "
@@ -165,8 +174,15 @@ def sweep_report(df, detail: dict, rec: dict, cfg: dict) -> str:
                   f"| 1. every swept variant, cost-stress rows included | {d['rule']['rows_in_spread']} | "
                   f"{d['rule']['spread_annual']:.4f} | {d['rule']['value']:.3f} |",
                   f"| 2. cost-stress rows left out of the spread ({', '.join(d['alt']['left_out']) or 'none'}) | "
-                  f"{d['alt']['rows_in_spread']} | {d['alt']['spread_annual']:.4f} | {d['alt']['value']:.3f} |", "",
-                  "The first reading is the rule: it is the number registered in trials.jsonl and the only one a decision "
+                  f"{d['alt']['rows_in_spread']} | {d['alt']['spread_annual']:.4f} | {d['alt']['value']:.3f} |", ""]
+        ph = {k: x for k, x in enumerate(d.get("base_phases") or []) if _seen(x)}
+        if ph:  # reading 1 again on each base phase: the second reading alone shows the upward side only
+            lines += ["Reading 1 on every base rebalance phase (same N, same spread): "
+                      + ", ".join(f"phase {k} {x:.3f}" for k, x in ph.items())
+                      + f" - min {min(ph.values()):.3f} / median {statistics.median(ph.values()):.3f} / max "
+                      f"{max(ph.values()):.3f}. Phase 0 is the registered series by the written rule, wherever it falls "
+                      "among them; the other phases are the same book rebalanced on another day.", ""]
+        lines += ["The first reading is the rule: it is the number registered in trials.jsonl and the only one a decision "
                   "may use (skills/strategy-time-machine/SKILL.md). The second is printed to show how far the number moves "
                   "with the convention; it is never used to claim an edge, whichever of the two is higher."]
     else:
@@ -175,19 +191,23 @@ def sweep_report(df, detail: dict, rec: dict, cfg: dict) -> str:
 
 
 def drift_report(d: dict, cfg: dict) -> str:
-    """Paper versus time machine (backtest.drift): every live fill next to the official open a replay fills at."""
+    """Paper versus time machine (backtest.drift): every live fill next to the official open of the bar a replay
+    fills its decision on (the time-machine bar)."""
     def num(x, fmt):
         return "-" if x is None else format(x, fmt)
 
     t = d["total"]
     lines = ["# Paper versus time machine - fill drift", "",
-             f"Time-machine fill = the official daily open of the fill day, moved {d['slippage_bps']:g} bp against the trade "
-             "(costs.slippage_bps + costs.exec_delay_bps): the price a replay of that day fills at. Drift above 0: the paper "
-             "book paid more (buy) or received less (sell) than the time machine assumes. The open is the price of that "
-             "day itself, not scaled for later dividends or splits.", "",
-             "| date | symbol | side | qty | paper fill | official open | time-machine fill | drift bp | drift $ | running $ | note |",
-             "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|"]
-    lines += [f"| {r['date']} | {r['symbol']} | {r['side']} | {r['qty']:g} | {r['price']:.4f} | {num(r['official_open'], '.4f')} | "
+             "Time-machine bar = the symbol's first daily bar after the fill's decision date: the bar a replay fills that "
+             "decision on, whatever day the paper fill landed on (date). Time-machine fill = the official open of that "
+             f"bar, moved {d['slippage_bps']:g} bp against the trade (costs.slippage_bps + costs.exec_delay_bps). Drift "
+             "above 0: the paper book paid more (buy) or received less (sell) than the time machine assumes. The open is "
+             "the price of that bar's own day, not scaled for later dividends or splits.", "",
+             "| date | symbol | side | qty | paper fill | time-machine bar | its official open | time-machine fill | drift bp | "
+             "drift $ | running $ | note |",
+             "|---|---|---|---:|---:|---|---:|---:|---:|---:|---:|---|"]
+    lines += [f"| {r['date']} | {r['symbol']} | {r['side']} | {r['qty']:g} | {r['price']:.4f} | {r['tm_bar'] or '-'} | "
+              f"{num(r['official_open'], '.4f')} | "
               f"{num(r['tm_fill'], '.4f')} | {num(r['drift_bps'], '+.1f')} | {num(r['drift_usd'], '+.2f')} | "
               f"{num(r['running_usd'], '+.2f')} | {r['note']} |" for r in d["rows"]] or ["(no fills)"]
     if t["priced"]:

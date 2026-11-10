@@ -57,8 +57,18 @@ def dsr(daily: pd.Series, n_trials: int, sr_trials_std: float) -> float:
     return psr(daily, sr0)
 
 
-BOOT_DEFAULTS = {"block_days": 20, "draws": 2000, "seed": 0, "level": 0.95}  # config.json "bootstrap" overrides key by key
+# config.json "bootstrap" overrides key by key. min_blocks: under min_blocks x block_days days no range is computed
+BOOT_DEFAULTS = {"block_days": 20, "draws": 2000, "seed": 0, "level": 0.95, "min_blocks": 40}
 BOOT_CELLS = 4_000_000  # array cells (resamples x days x series) handled at once: memory, not a model assumption
+
+
+class BootRefused(ValueError):
+    """The ranges were refused on purpose; str() is the reason a report prints (boot_error)."""
+
+
+def boot_error(e: Exception) -> str:
+    """What follows "Ranges: not computed": the reason of a refusal, the type name of any other error."""
+    return str(e) if isinstance(e, BootRefused) else type(e).__name__
 
 
 def boot_cfg(cfg: dict | None) -> dict:
@@ -71,7 +81,9 @@ def boot_index(n: int, block: float, draws: int, seed: int) -> np.ndarray:
     length `block`); it wraps past the last day to the first, so every day is drawn equally often. Blocks keep the
     day-to-day dependence of returns that drawing single days would throw away."""
     if n < 2 or block < 1 or draws < 1:
-        raise ValueError(f"bootstrap needs n >= 2, block >= 1 and draws >= 1, got {n}, {block}, {draws}")
+        raise BootRefused(f"bootstrap needs n >= 2, block >= 1 and draws >= 1, got {n}, {block}, {draws}")
+    if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)) or seed < 0:  # None would run unseeded
+        raise BootRefused(f"bootstrap.seed must be a whole number >= 0, got {seed!r}: without it the ranges differ on every run")
     rng = np.random.default_rng(seed)
     pos = np.arange(n)
     new = rng.random((draws, n)) < 1.0 / block
@@ -115,8 +127,16 @@ def boot_rows(daily: pd.DataFrame, rf_daily: float, periods_per_year: int, setti
     p_gt_bench: share of resamples where the Sharpe is above the bench row's on the same resampled days.
     p_gt_base: the same for the median paired difference with pairs[row], each phase k against that row's phase
     k % (its number of phases). Both are probabilities under resampling, not tests: nothing here says "significant".
-    The max-drawdown range is approximate: reshuffled days break the path a drawdown breaker reacted to."""
+    The max-drawdown range is approximate: reshuffled days break the path a drawdown breaker reacted to.
+    Refused (BootRefused) under settings["min_blocks"] x block_days days: on few blocks the range comes out narrower
+    than its label (at 6 blocks of 20 days a 95% range held a known Sharpe 353 times in 400:
+    research/2026-11-10-time-machine-honesty.md, "After the gate review")."""
     d = daily.dropna()
+    need = settings["min_blocks"] * settings["block_days"]
+    if len(d) < need:
+        raise BootRefused(f"{len(d)} days of returns, under the floor of bootstrap.min_blocks x block_days = "
+                          f"{settings['min_blocks']} x {settings['block_days']} = {need} days: on fewer blocks the range "
+                          "is narrower than its label")
     cols = list(d.columns)
     at = {c: i for i, c in enumerate(cols)}
     st = boot_stats(d.to_numpy(dtype=float), boot_index(len(d), settings["block_days"], settings["draws"], settings["seed"]),

@@ -285,6 +285,17 @@
     "min_chars": {"what": 40, "lesson": 20, "fix": 10, "fix_ref": 7},
     "min_key_chars": 8
   },
+  "_note_bootstrap": "Time-machine ranges and the fill-drift report (measurement only: no decision, pass rule or live path reads them). bootstrap: stationary block bootstrap of daily returns - mean block length in days, number of resamples, seed (a whole number: null is refused), level of the range, and min_blocks: under min_blocks x block_days days of returns no range is computed. The crypto sweep keeps its own pre-registered block, draws and seed (aitrader/crypto_sweep.py) and takes level and min_blocks from here. Never change block_days after seeing a range. drift: seconds between Yahoo chart calls.",
+  "bootstrap": {
+    "block_days": 20,
+    "draws": 2000,
+    "seed": 0,
+    "level": 0.95,
+    "min_blocks": 40
+  },
+  "drift": {
+    "pause_seconds": 1.5
+  },
   "books": {
     "_note": "Book profiles (spec 2026-11-09-crypto-book-design, sections 3.1 and 5; plan planning decisions). load_config('crypto') = this file without 'books', then books.crypto merged over it, then books.<ship_profile> over that when it is not 'crypto'. universe, prior_weights, signals and benchmark are replaced whole; every other block merges key by key. crypto_base lists only what differs from the candidate. Zero-weight signals keep the stock parameters (the values the replays used); max_positions 2 = the whole two-coin universe (the replays' 15 behaves the same). The candidate leaves risk.dd_reentry_ref to its default (dd_halve + dd_flat) / 2 = -0.375 (planning decision 1). risk.max_position_pct_by_symbol XRP-USD is read only by the crypto sweep's BTC+XRP hindsight control (XRP is in no profile's universe).",
     "crypto": {

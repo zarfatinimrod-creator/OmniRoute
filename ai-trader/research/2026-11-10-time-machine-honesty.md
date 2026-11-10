@@ -35,12 +35,16 @@ ETF-only universe (no survivorship bias)     5.0       0.368       0.257       0
                DSR of base (N=74 trials)     NaN         NaN         NaN         NaN          NaN           NaN       NaN        NaN         NaN           NaN    0.547
 ```
 
-Against the registered v4 table, 10 of the 15 rows are identical to the last digit. Four differ in the third
-decimal of one to three cells (base median Sharpe 0.402 -> 0.399, CAGR 0.0723 -> 0.0720; costs 30bps dSharpe
--0.638 -> -0.635; monthly minimum 0.301 -> 0.304; 8 positions minimum 0.201 -> 0.199), and the DSR row moves from
-0.565 (N=59) to 0.547 (N=74 = the 62 rows registered by now + 12 variants). The v4 run stored no per-phase rows, no
-prices hash and no commit, so nobody can say which bar moved. That is the gap the run record closes. I did not
-run the old code on the real panel (one sweep was allowed); the unit test pins the old columns on a synthetic one.
+Against the registered v4 table, 9 of the 15 rows are identical to the last digit and 6 differ. The base row and
+the "prior weights" row (the same series) each differ in four cells: median Sharpe 0.402 -> 0.399, CAGR 0.0723 ->
+0.0720, Calmar 0.614 -> 0.611, PSR 0.882 -> 0.880. Three rows differ in one cell each: costs 30bps (dSharpe -0.638
+-> -0.635), monthly rebalance (minimum 0.301 -> 0.304), 8 positions max (minimum 0.201 -> 0.199). The DSR row moves
+from 0.565 (N=59) to 0.547 (N=74 = the 62 rows registered by now + 12 variants). The v4 run stored no per-phase
+rows, no prices hash and no commit, so nobody can say which bar moved. That is the gap the run record closes. I did
+not run the old code on the real panel (one sweep was allowed). The gate review of this change did, the same day:
+the code before the change (0215537a) and the code after it, as two full sweeps on the same cached panel, printed
+identical values in all 12 old columns of all 15 rows, and the old code prints 0.399 as well. So the gap to the v4
+table comes from the prices, not from this change. The unit test pins the old columns on a synthetic panel.
 
 ## After: the same run, with what the old output could not say
 
@@ -105,10 +109,77 @@ synthetic returns with a known Sharpe the range held the truth in 191 of 200 see
 - 8.8 years of daily data cannot narrow these ranges; only more independent data can.
 - The closes hash is "dates x symbols x closes". A revised open would change fills without changing it; the
   record also stores a hash over every price field and the VIX (`panel.inputs_sha256`).
-- The default settings (block 20, 2,000 resamples, seed 0, 95%) are `metrics.BOOT_DEFAULTS`; `config.json` has no
-  `bootstrap` block yet (it was outside this change), so the config hash does not show them. The record does.
-- One record is about 1.2 MB. `state/` is tracked by git, so every registered sweep adds that much to the repository.
+- When this run was made the settings (block 20, 2,000 resamples, seed 0, 95%) were only `metrics.BOOT_DEFAULTS`,
+  so its config hash does not show them; the record does. `config.json` carries them since the gate fix (below).
+- One record is about 1.2 MB. Since the gate fix `state/trial_runs/` is in `.gitignore`, so a registered sweep no
+  longer adds that to the repository (below).
 - The crypto sweep got the same ranges section and record; it was not run here (no crypto run is on record).
 - `backtest --drift` (new, read-only) on the 14 fills of 2026-11-09 in `state/trades.jsonl`, run 2026-11-10 about
   18:41 UTC against Yahoo's settled daily opens: 14 of 14 priced, notional $50,171.29, total drift -$2.67
   (-0.53 bp), largest 6.5 bp (UNP: paper 292.5562, time machine 292.7463). One day of fills.
+
+## After the gate review (same day; the commit "fix(ai-trader): time machine honesty - gate findings")
+
+The gate passed the change and left open items. This is what closing them changed. No registered number moves:
+the base row recomputed from the saved record of the run above with the settings now read from `config.json` is
+again 0.399 [-0.181, 0.982], P(Sharpe > SPY) 0.200.
+
+**A floor under the ranges.** Under `bootstrap.min_blocks` x `block_days` days of returns no range is computed:
+40 x 20 = 800 days for the stock sweep, 40 x 30 = 1,200 for the crypto sweep's own block. The report then prints
+`Ranges: not computed` with the reason; the table, the Deflated Sharpe, the registration and the run record are
+as before. The range header now shows what the ranges stand on. For the run above it reads
+`2224 days / 20 = 111.2 blocks, floor 40`. A null seed is refused the same way (it used to run unseeded).
+
+Why a floor. How often the 95% range of `metrics.boot_stats` holds a known Sharpe, measured here on synthetic
+returns: independent normal days, true annual Sharpe 1.0, daily sd 1%, 400 histories per row (data seed
+1000 + s, resample seed s, s = 0..399), 2,000 resamples. Scratch scripts, not in the repository.
+
+| days | mean block | blocks | range held the truth |
+|---:|---:|---:|---|
+| 300 | 5,000 | 0.06 | 30 of 400 = 7.5% (median width 0.13, against 3.31 at block 20) |
+| 120 | 60 | 2 | 314 of 400 = 78.5% |
+| 120 | 20 | 6 | 353 of 400 = 88.2% |
+| 250 | 20 | 12.5 | 373 of 400 = 93.2% |
+| 300 | 20 | 15 | 377 of 400 = 94.2% |
+| 500 | 20 | 25 | 380 of 400 = 95.0% |
+| 800 | 20 | 40 | 387 of 400 = 96.8% |
+| 1,200 | 20 | 60 | 374 of 400 = 93.5% |
+| 2,224 | 20 | 111.2 | 382 of 400 = 95.5% |
+
+With 400 histories a share near 95% is known to about 1 point either way (one standard error), so the rows from
+12.5 blocks up cannot be told from 95% here. What is measured: at 6 blocks and fewer the range is too narrow, and a
+block longer than the history collapses it with no error. The floor of 40 blocks is therefore a margin, not a
+measured threshold. The gate review reported lower shares at 250 and 500 days (91.2% and 91.0%) and the same
+88.2% and 95.5% at 120 and 2,224 days; its script is not in the repository and this recipe did not reproduce the
+two middle numbers. These are independent days: on volatility-clustered synthetic returns the gate measured 93.0%
+at 2,224 days, so on real returns the range may sit a little under its label even on the full window.
+
+**The Deflated Sharpe on every base phase.** The second reading shows only how far the number can rise. The report
+now also prints the rule's reading (same N, same spread) on each of the five base phases. From the saved record of
+the run above (N=74, spread 0.1877):
+
+| base phase | 0 (registered) | 1 | 2 | 3 | 4 |
+|---|---:|---:|---:|---:|---:|
+| Sharpe | 0.495 | 0.283 | 0.348 | 0.399 | 0.504 |
+| Deflated Sharpe by the rule | 0.547 | 0.306 | 0.376 | 0.435 | 0.558 |
+
+Minimum 0.306, median 0.435, maximum 0.558. The registered 0.547 is the second highest of the five, above the
+median. The rule (phase 0) and the registered number are unchanged; every phase is under 0.95.
+
+**Settings in `config.json`.** `bootstrap` (block_days 20, draws 2000, seed 0, level 0.95, min_blocks 40) and
+`drift` (pause_seconds 1.5) are now in the file, with the values the code defaults had. The config hash of later
+runs therefore differs from `f89a4f5df3b7...` once, with no number moving.
+
+**Run records stay out of git.** `state/trial_runs/` and `state/crypto/trial_runs/` are in `.gitignore`. The
+record is a working file on the machine that ran the sweep, for before/after comparisons with
+`backtest --compare`; the `trials.jsonl` line, with the hashes and the commit, is what the repository keeps.
+
+**Fill drift names its bar.** Each fill is compared with the official open of the symbol's first daily bar after
+its decision date, the bar a replay fills that decision on, and the report prints that bar. A fill that lands a
+session late is measured against the open it missed. Re-run 2026-11-10 about 19:45 UTC on the same 14 fills
+(read-only, against Yahoo): every fill's bar is 2026-11-09, its own day, and the totals are the ones above
+(14 of 14 priced, notional $50,171.29, drift -$2.67, -0.53 bp, largest 6.5 bp).
+
+**Two guards.** Each git call that names the code commit has a 10-second limit, and any failure there records
+"unknown" instead of stopping a sweep. The frame of daily returns is built inside the guarded block, so a failure
+there costs the ranges and the record, not the table or the registration.

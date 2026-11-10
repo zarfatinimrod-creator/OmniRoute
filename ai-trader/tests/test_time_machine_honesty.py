@@ -4,18 +4,23 @@
 - Every row carries the paired bootstrap probability that its Sharpe is above the benchmark's and above the base's.
 - Every registered sweep leaves a run record beside trials.jsonl (daily returns per run, per-phase rows, panel hash,
   code commit, config hash) that a later re-run can be compared with row by row.
-- The Deflated Sharpe is printed in both readings, and the registered one stays the rule.
+- The Deflated Sharpe is printed in both readings and on every base phase, and the registered one stays the rule.
+- A window under the floor (bootstrap.min_blocks x block_days days) or a null seed gets no range, and the reason is
+  printed; nothing the ranges need can cost a finished sweep its table or its registration.
+- The fill-drift report compares each live fill with the open of the bar a replay fills its decision on.
 None of it may move an existing number: the legacy columns below were recorded from the code before this change.
 
 Synthetic panels and a temp state dir: never the network, never the phone, never a subprocess, never the real state.
 """
 
+import concurrent.futures
 import contextlib
 import copy
 import io
 import json
 import math
 import shutil
+import statistics
 import subprocess
 import tempfile
 import unittest
@@ -57,9 +62,10 @@ def tearDownModule():
 
 RF = 0.035
 RF_D = (1 + RF) ** (1 / 252) - 1
-SET = {"block_days": 10, "draws": 300, "seed": 3, "level": 0.95}
+SET = {"block_days": 10, "draws": 300, "seed": 3, "level": 0.95, "min_blocks": 8}  # floor 8 x 10 = 80 days: the Sweep window has 89
 RANGE_COLS = ["sharpe_lo", "sharpe_hi", "cagr_lo", "cagr_hi", "maxdd_lo", "maxdd_hi", "p_gt_bench", "p_gt_base"]
 FAKE_COMMIT = {"commit": "c0ffee0123", "code_dirty": False}
+ROOT = Path(backtest.__file__).resolve().parent.parent
 
 
 def series(seed: int, n: int = 600, mu: float = 0.0005, sd: float = 0.01) -> pd.Series:
@@ -68,9 +74,46 @@ def series(seed: int, n: int = 600, mu: float = 0.0005, sd: float = 0.01) -> pd.
 
 class Bootstrap(unittest.TestCase):
     def test_settings_come_from_config_over_defaults(self):
-        self.assertEqual(set(metrics.BOOT_DEFAULTS), {"block_days", "draws", "seed", "level"})
+        self.assertEqual(set(metrics.BOOT_DEFAULTS), {"block_days", "draws", "seed", "level", "min_blocks"})
         self.assertEqual(metrics.boot_cfg({}), metrics.BOOT_DEFAULTS)
         self.assertEqual(metrics.boot_cfg({"bootstrap": {"draws": 50}}), {**metrics.BOOT_DEFAULTS, "draws": 50})
+
+    def test_config_json_carries_the_bootstrap_and_drift_blocks(self):
+        """Project rule 5: the assumptions are in config.json. Their values are the code defaults, so no number moved."""
+        raw = json.loads((ROOT / "config.json").read_text())
+        self.assertEqual(raw["bootstrap"], {"block_days": 20, "draws": 2000, "seed": 0, "level": 0.95, "min_blocks": 40})
+        self.assertEqual(raw["drift"], {"pause_seconds": 1.5})
+        self.assertEqual((raw["bootstrap"], raw["drift"]), (metrics.BOOT_DEFAULTS, backtest.DRIFT_DEFAULTS))
+        for cfg in (data.load_config("stocks"), data.load_config("crypto", "crypto"), data.load_config("crypto", "crypto_base")):
+            self.assertEqual((metrics.boot_cfg(cfg), cfg["drift"]), (raw["bootstrap"], raw["drift"]))  # one block, every book
+
+    def test_a_history_shorter_than_the_floor_is_refused_with_the_reason(self):
+        """Under min_blocks x block_days days the "95%" range is too narrow to carry its label: no range at all."""
+        frame = pd.DataFrame({("base", 0): series(1), ("bench", 0): series(2)})  # 600 days
+        at_floor = metrics.boot_rows(frame, 0.0, 252, {**SET, "min_blocks": 60}, None, "bench")  # 60 x 10 = 600: allowed
+        self.assertEqual(at_floor["settings"]["days"], 600)
+        with self.assertRaises(ValueError) as cm:
+            metrics.boot_rows(frame, 0.0, 252, {**SET, "min_blocks": 61}, None, "bench")
+        reason = metrics.boot_error(cm.exception)  # what the report prints after "Ranges: not computed"
+        for part in ("600 days", "bootstrap.min_blocks x block_days", "61 x 10 = 610"):
+            self.assertIn(part, reason)
+        with self.assertRaises(ValueError) as cm:  # days missing in one run do not count
+            metrics.boot_rows(pd.DataFrame({("base", 0): series(1), ("late", 0): series(3).iloc[5:]}), 0.0, 252,
+                              {**SET, "min_blocks": 60})
+        self.assertIn("595 days", metrics.boot_error(cm.exception))
+        self.assertEqual(metrics.boot_error(KeyError("x")), "KeyError")  # not a refusal: the error's name, as before
+
+    def test_a_seed_that_is_not_a_whole_number_is_refused(self):
+        """A null seed would give ranges that differ on every run with nothing in the output saying so."""
+        for seed in (None, 1.5, "7", True, -1):
+            with self.assertRaises(ValueError, msg=repr(seed)) as cm:
+                metrics.boot_index(100, 10, 5, seed)
+            self.assertIn("bootstrap.seed", metrics.boot_error(cm.exception), repr(seed))
+        frame = pd.DataFrame({("base", 0): series(1)})
+        with self.assertRaises(ValueError) as cm:
+            metrics.boot_rows(frame, 0.0, 252, {**SET, "seed": None})
+        self.assertIn("got None", metrics.boot_error(cm.exception))
+        self.assertEqual(metrics.boot_index(100, 10, 5, np.int64(4)).shape, (5, 100))  # a whole number of any kind
 
     def test_index_is_seeded_wrapped_and_made_of_blocks(self):
         n = 500
@@ -179,6 +222,34 @@ LEGACY = [
 ]
 
 
+class KeepingPool(concurrent.futures.ProcessPoolExecutor):
+    """The real process pool, keeping what the runs returned (Sweep.resweep reads them again)."""
+    kept: list = []
+
+    def map(self, fn, *iterables, **kw):
+        KeepingPool.kept = list(super().map(fn, *iterables, **kw))
+        return KeepingPool.kept
+
+
+class Replay:
+    """Stands in for the pool: hands back runs that were already made, so nothing is run a second time."""
+
+    def __init__(self, results: list):
+        self.results = results
+
+    def __call__(self, *a, **k):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def map(self, fn, jobs):
+        return self.results
+
+
 def records(df: pd.DataFrame) -> list[dict]:
     return json.loads(df.to_json(orient="records"))  # NaN -> None, so rows compare with ==
 
@@ -195,14 +266,17 @@ class Sweep(unittest.TestCase):
         cls.tmp = Path(tempfile.mkdtemp())
         cls._saved = journal.STATE, journal.BOOK, journal._BASE
         journal.STATE = cls.tmp
-        journal.append("trials.jsonl", {"logged_at": "x", "start": "s", "rows": [{"variant": "old"}] * 7})  # earlier looks
+        cls.earlier = [{"logged_at": "x", "start": "s", "rows": [{"variant": "old"}] * 7}]  # earlier looks
+        journal.append("trials.jsonl", cls.earlier[0])
         cls.panel, cls.cfg = small_book()
         cls.cfg["bootstrap"] = SET
         cls.start = str(cls.panel["close"].index[330].date())
         cls.detail = {}
         with mock.patch.object(backtest, "_variants", few_variants), \
-                mock.patch.object(backtest, "code_commit", lambda: dict(FAKE_COMMIT)):
+                mock.patch.object(backtest, "code_commit", lambda: dict(FAKE_COMMIT)), \
+                mock.patch.object(concurrent.futures, "ProcessPoolExecutor", KeepingPool):
             cls.df = backtest.sweep(cls.panel, cls.cfg, cls.start, detail=cls.detail)
+        cls.results = KeepingPool.kept
         # the code is named as it was when the sweep started: a commit made while it ran must not be recorded
         with mock.patch.object(backtest, "code_commit", lambda: {"commit": "made-later", "code_dirty": True}), \
                 mock.patch.object(journal, "now_utc", lambda: "2026-11-10T12:00:00+00:00"):
@@ -216,6 +290,70 @@ class Sweep(unittest.TestCase):
 
     def row(self, variant: str) -> dict:
         return next(r for r in records(self.df) if r["variant"] == variant)
+
+    def resweep(self, results: list | None = None, **boot) -> tuple[pd.DataFrame, dict]:
+        """backtest.sweep again over the runs of setUpClass (or `results`), with `boot` over the bootstrap settings:
+        everything after the runs is computed afresh, against the same 7 earlier trial rows."""
+        cfg, detail = {**self.cfg, "bootstrap": {**SET, **boot}}, {}
+        with mock.patch.object(backtest, "_variants", few_variants), mock.patch.object(backtest, "compute_all", lambda p, c: None), \
+                mock.patch.object(backtest, "code_commit", lambda: dict(FAKE_COMMIT)), \
+                mock.patch.object(journal, "read", lambda name: self.earlier), \
+                mock.patch.object(concurrent.futures, "ProcessPoolExecutor", Replay(results or self.results)):
+            return backtest.sweep(self.panel, cfg, self.start, detail=detail), detail
+
+    def legacy_only(self, df: pd.DataFrame) -> None:
+        self.assertEqual(list(df.columns), LEGACY_COLS)  # no range columns at all
+        self.assertEqual([[r[c] for c in LEGACY_COLS] for r in records(df)], LEGACY)  # the table and the registered DSR
+
+    def test_replaying_the_kept_runs_gives_the_same_sweep(self):
+        df, detail = self.resweep()  # the helper the refusal tests below stand on
+        self.assertEqual(records(df), records(self.df))
+        self.assertEqual((detail["boot"], detail["dsr"]), (self.detail["boot"], self.detail["dsr"]))
+
+    def test_a_window_shorter_than_the_floor_gets_no_ranges_and_says_why(self):
+        df, detail = self.resweep(min_blocks=40)  # 89 days against 40 blocks of 10
+        self.legacy_only(df)
+        self.assertNotIn("boot", detail)
+        for part in ("89 days", "40 x 10 = 400"):
+            self.assertIn(part, detail["ranges_error"])
+        self.assertEqual(detail["dsr"], self.detail["dsr"])  # the Deflated Sharpe does not hang on the ranges
+        self.assertEqual(len(detail["daily"].columns), 18)  # the run record keeps every run's days all the same
+        self.assertEqual([r["sharpe"] for r in detail["phase_rows"]], [r["sharpe"] for r in self.detail["phase_rows"]])
+        text = report.sweep_report(df, detail, self.rec, self.cfg)
+        self.assertIn(f"## Ranges: not computed ({detail['ranges_error']})", text)
+        self.assertNotIn("stationary block bootstrap", text)
+        self.assertIn("## Deflated Sharpe of the base", text)
+
+    def test_a_null_seed_is_refused_never_run_unseeded(self):
+        df, detail = self.resweep(seed=None)
+        self.legacy_only(df)
+        self.assertNotIn("boot", detail)
+        self.assertIn("bootstrap.seed", detail["ranges_error"])
+        self.assertIn("got None", detail["ranges_error"])
+        text = report.sweep_report(df, detail, self.rec, self.cfg)
+        self.assertIn(f"## Ranges: not computed ({detail['ranges_error']})", text)
+        self.assertNotIn("seed None", text)
+
+    def test_a_failure_building_the_daily_frame_keeps_the_table_and_the_registration(self):
+        broken = [{**r, "_bench_daily": None} if "_bench" in r else r for r in self.results]  # the frame cannot be built
+        df, detail = self.resweep(broken)
+        self.legacy_only(df)
+        self.assertEqual(detail["ranges_error"], "AttributeError")  # an unexpected error is named, not explained
+        self.assertNotIn("daily", detail)
+        self.assertEqual(detail["dsr"]["rule"], self.detail["dsr"]["rule"])
+        before = journal.read("trials.jsonl")
+        try:
+            with mock.patch.object(journal, "now_utc", lambda: "2026-11-10T15:00:00+00:00"):
+                rec = backtest.register(df, detail, self.panel, self.cfg, self.start)
+            lines = journal.read("trials.jsonl")
+            self.assertEqual(len(lines), len(before) + 1)  # the finished sweep is registered: the next N counts it
+            self.assertEqual(canon(lines[-1]["rows"]), records(df))
+            self.assertNotIn("record", rec)
+            text = report.sweep_report(df, detail, rec, self.cfg)
+            self.assertIn("## Ranges: not computed (AttributeError)", text)
+            self.assertIn("NOT saved", text)
+        finally:
+            journal.write_all("trials.jsonl", before)
 
     def test_existing_columns_and_the_registered_dsr_are_unchanged(self):
         self.assertEqual(list(self.df.columns), LEGACY_COLS + RANGE_COLS)  # new numbers are new columns, at the end
@@ -271,6 +409,20 @@ class Sweep(unittest.TestCase):
         self.assertEqual(d["alt"]["value"], round(metrics.dsr(day, 11, float(srs.drop("costs 15bps").std())), 3))
         self.assertAlmostEqual(d["alt"]["spread_annual"], float(srs.drop("costs 15bps").std()) * math.sqrt(252), places=3)
         self.assertNotEqual(d["alt"]["value"], d["rule"]["value"])
+
+    def test_dsr_is_shown_on_every_base_phase_and_phase_0_stays_the_registered_one(self):
+        d = self.detail["dsr"]
+        srs = pd.DataFrame(self.detail["phase_rows"]).groupby("variant").sharpe.median() / math.sqrt(252)
+        want = [round(metrics.dsr(self.detail["daily"][("base", k)] - RF_D, 11, float(srs.std())), 3) for k in range(5)]
+        self.assertEqual(d["base_phases"], want)  # the rule's N and spread, read on each phase's own days
+        self.assertEqual(d["base_phases"][0], d["rule"]["value"])  # phase 0 is the registered series
+        self.assertEqual(self.row("DSR of base (N=11 trials)")["psr_med"], 0.937)  # as registered before this line existed
+        self.assertGreater(max(want), min(want))  # the phases do not read the same: that is what the line shows
+        self.assertEqual(self.saved["dsr"]["base_phases"], want)  # kept in the run record
+        under = report.sweep_report(self.df, self.detail, self.rec, self.cfg).split("| 2. cost-stress rows left out")[1]
+        self.assertIn(", ".join(f"phase {k} {x:.3f}" for k, x in enumerate(want)), under)
+        self.assertIn(f"min {min(want):.3f} / median {statistics.median(want):.3f} / max {max(want):.3f}", under)
+        self.assertIn("Phase 0 is the registered series", under)
 
     def test_registration_keeps_the_trials_line_and_adds_the_record(self):
         lines = journal.read("trials.jsonl")
@@ -330,10 +482,11 @@ class Sweep(unittest.TestCase):
         self.assertEqual(backtest.config_hash(copy.deepcopy(self.cfg)), self.saved["config_sha256"])
 
     def test_commit_is_unknown_outside_a_repository(self):
-        calls = []
+        calls, waits = [], []
 
         def git(cmd, **kw):
             calls.append(cmd)
+            waits.append(kw.get("timeout"))
             out = "abc123def\n" if "rev-parse" in cmd else " M aitrader/backtest.py\n"
             return subprocess.CompletedProcess(cmd, 0, stdout=out, stderr="")
 
@@ -341,9 +494,21 @@ class Sweep(unittest.TestCase):
             self.assertEqual(backtest.code_commit(), {"commit": "abc123def", "code_dirty": True})
         self.assertEqual(calls[0], ["git", "rev-parse", "HEAD"])
         self.assertEqual(calls[1], ["git", "--no-optional-locks", "status", "--porcelain", "--", "aitrader", "config.json"])
-        for err in (FileNotFoundError("git"), subprocess.CalledProcessError(128, "git")):
-            with mock.patch.object(subprocess, "run", mock.Mock(side_effect=err)):
-                self.assertEqual(backtest.code_commit(), {"commit": "unknown", "code_dirty": None})
+        self.assertTrue(all(w is not None and 0 < w <= 30 for w in waits), waits)  # a git that hangs cannot hang a sweep
+        self.assertEqual(waits, [backtest.GIT_TIMEOUT_S] * 2)
+        for err in (FileNotFoundError("git"), subprocess.CalledProcessError(128, "git"), subprocess.TimeoutExpired("git", 10),
+                    UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"), RuntimeError("anything else")):
+            with mock.patch.object(subprocess, "run", mock.Mock(side_effect=err)):  # whatever git does, the sweep runs
+                self.assertEqual(backtest.code_commit(), {"commit": "unknown", "code_dirty": None}, repr(err))
+
+    def test_run_records_stay_out_of_git(self):
+        """About 1.2 MB of gzip per registered sweep: a same-machine working file. The trials line keeps the hashes."""
+        ignored = (ROOT / ".gitignore").read_text().split()
+        self.assertIn("state/trial_runs/", ignored)
+        self.assertIn("state/crypto/trial_runs/", ignored)
+        self.assertTrue(self.rec["record"].startswith("trial_runs/"))  # where the stock record is written
+        line = journal.read("trials.jsonl")[-1]
+        self.assertEqual({"run_id", "panel_sha256", "config_sha256", "commit", "code_dirty"} - set(line), set())
 
     def test_a_rerun_is_compared_row_by_row(self):
         a = self.saved
@@ -404,7 +569,8 @@ class Sweep(unittest.TestCase):
         base, costs = self.row("base"), self.row("costs 15bps")
         self.assertIn(f"| base | {base['sharpe_med']:.3f} [{base['sharpe_lo']:.3f}, {base['sharpe_hi']:.3f}] |", text)
         self.assertIn(f"{base['maxdd_med']:.4f} [{base['maxdd_lo']:.4f}, {base['maxdd_hi']:.4f}]", text)
-        self.assertIn("95% stationary block bootstrap: mean block 10 days, 300 resamples, seed 3, 89 days", text)
+        self.assertIn("## Ranges (95% stationary block bootstrap: mean block 10 days, 300 resamples, seed 3; "
+                      "89 days / 10 = 8.9 blocks, floor 8)", text)
         self.assertIn("P(Sharpe > SPY)", text)
         self.assertIn(f"| {costs['p_gt_bench']:.3f} | {costs['p_gt_base']:.3f} |", text)
         self.assertIn("probabilities under resampling, not verdicts", text)
@@ -425,10 +591,30 @@ class CryptoSweep(tcs.TempState):
         super().setUp()
         tcs.seed_script().seed()  # the sweep refuses to run without the DSR seed
 
-    def test_crypto_runs_get_ranges_a_report_section_and_a_record(self):
+    def sweep(self, **boot) -> dict:
+        """The crypto sweep over stand-in runs of 80 days, with `boot` over the config's bootstrap block."""
         with mock.patch.object(crypto_sweep, "_run", tcs.fake_run(tcs.SweepLogic.SHARPES, [])), \
+                mock.patch.object(crypto_sweep, "boot_cfg", lambda cfg: {**metrics.boot_cfg(cfg), **boot}), \
                 mock.patch.object(backtest, "code_commit", lambda: dict(FAKE_COMMIT)):
-            res = crypto_sweep.run_sweep(tcs.panel3(60), "2024-01-01", "2024-02-01", None, phases=7, report_path=self.tmp / "r.md")
+            return crypto_sweep.run_sweep(tcs.panel3(60), "2024-01-01", "2024-02-01", None, phases=7, report_path=self.tmp / "r.md")
+
+    def test_crypto_ranges_are_refused_under_the_floor_and_the_sweep_still_decides(self):
+        res = self.sweep()  # the config's floor: 40 blocks of the sweep's 30 days = 1,200 days, against 80
+        self.assertNotIn("boot", res)
+        for part in ("80 days", "40 x 30 = 1200"):
+            self.assertIn(part, res["ranges_error"])
+        self.assertFalse(any("range" in r for r in res["runs"].values()))
+        text = (self.tmp / "r.md").read_text()
+        self.assertIn(f"## Ranges: not computed ({res['ranges_error']})", text)
+        self.assertNotIn("stationary block bootstrap", text)
+        line = tcs.trials(self.tmp)[-1]  # the verdict, the registration and the record do not hang on the ranges
+        self.assertEqual((res["ship"], line["ship"], len(line["rows"])), ("crypto", "crypto", 7 * len(res["runs"])))
+        self.assertTrue((self.tmp / "crypto" / line["record"]).exists())
+        with_ranges = self.sweep(min_blocks=1)  # registered after the first one, so only its N (and DSR) may differ
+        self.assertEqual((with_ranges["ship"], with_ranges["pass_rule"]), (res["ship"], res["pass_rule"]))  # no rule reads a range
+
+    def test_crypto_runs_get_ranges_a_report_section_and_a_record(self):
+        res = self.sweep(min_blocks=1)
         for name, r in res["runs"].items():
             self.assertLess(r["range"]["sharpe_lo"], r["range"]["sharpe_hi"], name)
             self.assertIsNone(r["range"]["p_gt_bench"], name)  # the stand-in runs carry no benchmark days
@@ -438,7 +624,8 @@ class CryptoSweep(tcs.TempState):
         self.assertEqual(res["runs"]["abl:no_eth"]["range"]["p_gt_base"], 0.5)
         self.assertEqual(res["runs"]["final:h1"]["range"]["p_gt_base"], 1.0)
         text = (self.tmp / "r.md").read_text()
-        self.assertIn("## Ranges (95% stationary block bootstrap: mean block 30 days, 2000 resamples, seed 0)", text)
+        self.assertIn("## Ranges (95% stationary block bootstrap: mean block 30 days, 2000 resamples, seed 0; "
+                      "shortest run 80 days / 30 = 2.7 blocks, floor 1)", text)
         cand = res["runs"]["cand@50"]
         self.assertIn(f"| cand@50 | {cand['sharpe_med']:.3f} [{cand['range']['sharpe_lo']:.3f}, {cand['range']['sharpe_hi']:.3f}] |", text)
         self.assertNotIn("significan", text.lower())
@@ -477,15 +664,18 @@ def chart(opens: dict, splits: dict | None = None) -> dict:
             "events": {"splits": {str(ts(d)): {"date": ts(d), "numerator": r, "denominator": 1} for d, r in (splits or {}).items()}}}
 
 
-def fill(day: str, sym: str, side: str, qty: float, price: float) -> dict:
-    return {"date": day, "symbol": sym, "side": side, "qty": qty, "price": price, "value": round(qty * price, 2)}
+def fill(day: str, sym: str, side: str, qty: float, price: float, decided: str | None = "2026-11-06") -> dict:
+    """A trades.jsonl row as the cycle writes it: filled on `day` for the decision of `decided` (None: an old row)."""
+    row = {"date": day, "symbol": sym, "side": side, "qty": qty, "price": price, "value": round(qty * price, 2)}
+    return row if decided is None else {**row, "decision_date": decided}
 
 
 class Drift(tcs.TempState):
     """Paper versus time machine: every live fill next to the official open the time machine fills at."""
 
     CHARTS = {"AAA": chart({"2026-11-06": 99.0, "2026-11-09": 100.0}), "BBB": chart({"2026-11-09": 50.0}),
-              "CCC": chart({"2026-11-06": 10.0}), "SPL": chart({"2026-11-09": 25.0, "2026-11-10": 26.0}, {"2026-11-10": 4.0})}
+              "CCC": chart({"2026-11-06": 10.0}), "SPL": chart({"2026-11-09": 25.0, "2026-11-10": 26.0}, {"2026-11-10": 4.0}),
+              "LATE": chart({"2026-11-06": 40.0, "2026-11-09": 50.0, "2026-11-10": 60.0})}
     AFTER = datetime(2026, 11, 10, 18, 0, tzinfo=NY)  # both sessions closed
 
     def setUp(self):
@@ -508,7 +698,7 @@ class Drift(tcs.TempState):
         trades = [fill("2026-11-09", "AAA", "BUY", 10, round(100.0 * (1 + slip) * 1.001, 4)),  # paid 10 bp over
                   fill("2026-11-09", "BBB", "SELL", 4, round(50.0 * (1 - slip), 4)),  # exactly the time-machine price
                   fill("2026-11-09", "BBB", "SELL", 2, round(50.0 * (1 - slip) * 0.998, 4)),  # received 20 bp less
-                  fill("2026-11-09", "CCC", "BUY", 1, 10.0),  # no bar that day
+                  fill("2026-11-09", "CCC", "BUY", 1, 10.0),  # no bar after the decision
                   fill("2026-11-09", "GONE", "BUY", 1, 5.0)]  # Yahoo does not answer for it
         out = backtest.drift(trades, self.cfg, now=self.AFTER)
         r = out["rows"]
@@ -516,7 +706,8 @@ class Drift(tcs.TempState):
         self.assertEqual((r[1]["drift_bps"], r[1]["drift_usd"]), (0.0, 0.0))
         self.assertEqual((r[2]["tm_fill"], r[2]["drift_bps"], r[2]["drift_usd"]), (49.975, 20.0, 0.2))  # a worse sale is a cost
         self.assertEqual([x["running_usd"] for x in r], [1.0, 1.0, 1.2, None, None])
-        self.assertEqual((r[3]["official_open"], r[3]["note"]), (None, "no daily bar for this day"))
+        self.assertEqual([x["tm_bar"] for x in r], ["2026-11-09"] * 3 + [None, None])
+        self.assertEqual((r[3]["official_open"], r[3]["note"]), (None, "no daily bar after the decision of 2026-11-06"))
         self.assertEqual((r[4]["official_open"], r[4]["note"]), (None, "no data (RuntimeError)"))
         t = out["total"]
         self.assertEqual((t["fills"], t["priced"], t["drift_usd"], t["max_abs_bps"]), (5, 3, 1.2, 20.0))
@@ -530,6 +721,33 @@ class Drift(tcs.TempState):
         backtest.drift(trades[:2], {**self.cfg, "drift": {"pause_seconds": 0.25}}, now=self.AFTER)
         self.assertEqual(self.slept, [0.25])
 
+    def test_a_fill_is_compared_with_the_open_of_the_first_bar_after_its_decision(self):
+        """The time machine fills a decision at the open of the next bar (exec_lag 1), whatever day the paper fill
+        landed on: a fill that slipped a session is measured against the open it missed, not the one it got."""
+        slip = self.cfg["costs"]["slippage_bps"] / 1e4
+        trades = [fill("2026-11-09", "LATE", "BUY", 10, round(50.0 * (1 + slip), 4)),  # on the bar a replay fills on
+                  fill("2026-11-10", "LATE", "BUY", 10, round(50.0 * (1 + slip) * 1.2, 4)),  # a session late, at 60
+                  fill("2026-11-09", "AAA", "BUY", 1, round(100.0 * (1 + slip), 4), decided=None),  # a row without the date
+                  fill("2026-11-10", "AAA", "BUY", 1, 100.0, decided="2026-11-09")]  # no bar after its decision yet
+        out = backtest.drift(trades, self.cfg, now=self.AFTER)
+        r = out["rows"]
+        self.assertEqual([x["official_open"] for x in r], [50.0, 50.0, 100.0, None])
+        self.assertEqual([x["tm_bar"] for x in r], ["2026-11-09", "2026-11-09", "2026-11-09", None])
+        self.assertEqual((r[0]["drift_bps"], r[0]["note"]), (0.0, ""))
+        self.assertEqual((r[1]["tm_fill"], r[1]["drift_bps"], r[1]["drift_usd"]), (50.025, 2000.0, 100.05))
+        self.assertEqual(r[1]["note"], "filled 2026-11-10, not on the time-machine bar")
+        self.assertEqual((r[2]["drift_bps"], r[2]["note"]), (0.0, "no decision date on the row: the open of its own day is used"))
+        self.assertEqual(r[3]["note"], "no daily bar after the decision of 2026-11-09")
+        self.assertEqual((out["total"]["priced"], out["total"]["drift_usd"]), (3, 100.05))
+        # settled is read on the bar whose open is used: 11-09 closed long before the late fill's own session does
+        early = backtest.drift(trades[1:2], self.cfg, now=datetime(2026, 11, 10, 10, 0, tzinfo=NY))
+        self.assertEqual((early["total"]["priced"], early["rows"][0]["running_usd"]), (1, 100.05))
+        text = report.drift_report(out, self.cfg)
+        self.assertIn("| date | symbol | side | qty | paper fill | time-machine bar | its official open | time-machine fill |", text)
+        self.assertIn("| 2026-11-10 | LATE | BUY | 10 | 60.0300 | 2026-11-09 | 50.0000 | 50.0250 | +2000.0 | +100.05 | +100.05 | "
+                      "filled 2026-11-10, not on the time-machine bar |", text)
+        self.assertIn("first daily bar after the fill's decision date", text)
+
     def test_the_backtest_only_delay_cost_is_on_the_time_machine_side(self):
         cfg = copy.deepcopy(self.cfg)
         cfg["costs"].update({"slippage_bps": 5, "exec_delay_bps": 10})  # the crypto book: the paper fill has 5, the replay 15
@@ -538,7 +756,7 @@ class Drift(tcs.TempState):
         self.assertEqual(out["slippage_bps"], 15)
 
     def test_a_fill_before_a_split_is_compared_at_the_price_of_its_own_day(self):
-        trades = [fill("2026-11-09", "SPL", "BUY", 1, 100.05), fill("2026-11-10", "SPL", "BUY", 4, 26.013)]
+        trades = [fill("2026-11-09", "SPL", "BUY", 1, 100.05), fill("2026-11-10", "SPL", "BUY", 4, 26.013, decided="2026-11-09")]
         r = backtest.drift(trades, self.cfg, now=self.AFTER)["rows"]
         self.assertEqual((r[0]["official_open"], r[0]["drift_bps"]), (100.0, 0.0))  # 25.0 after the 4:1 split of 11-10
         self.assertEqual((r[1]["official_open"], r[1]["drift_bps"]), (26.0, 0.0))
@@ -559,9 +777,9 @@ class Drift(tcs.TempState):
         trades = [fill("2026-11-09", "AAA", "BUY", 10, 100.15), fill("2026-11-09", "BBB", "SELL", 2, 49.875),
                   fill("2026-11-09", "CCC", "BUY", 1, 10.0)]
         text = report.drift_report(backtest.drift(trades, self.cfg, now=self.AFTER), self.cfg)
-        self.assertIn("| 2026-11-09 | AAA | BUY | 10 | 100.1500 | 100.0000 | 100.0500 | +10.0 | +1.00 | +1.00 |", text)
-        self.assertIn("| 2026-11-09 | BBB | SELL | 2 | 49.8750 | 50.0000 | 49.9750 | +20.0 | +0.20 | +1.20 |", text)
-        self.assertIn("| 2026-11-09 | CCC | BUY | 1 | 10.0000 | - | - | - | - | - | no daily bar for this day", text)
+        self.assertIn("| 2026-11-09 | AAA | BUY | 10 | 100.1500 | 2026-11-09 | 100.0000 | 100.0500 | +10.0 | +1.00 | +1.00 |", text)
+        self.assertIn("| 2026-11-09 | BBB | SELL | 2 | 49.8750 | 2026-11-09 | 50.0000 | 49.9750 | +20.0 | +0.20 | +1.20 |", text)
+        self.assertIn("| 2026-11-09 | CCC | BUY | 1 | 10.0000 | - | - | - | - | - | - | no daily bar after the decision of 2026-11-06", text)
         self.assertIn("Total: 2 of 3 fills priced", text)
         self.assertIn("+1.20", text.split("Total:")[1])
         self.assertIn("5 bp", text)  # the cost the time machine adds to the open: from the config

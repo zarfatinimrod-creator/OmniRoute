@@ -24,7 +24,7 @@ import pandas as pd
 from . import data, journal
 from .broker import PaperBroker
 from .learn import walk_forward_weights
-from .metrics import boot_cfg, boot_rows, summary
+from .metrics import boot_cfg, boot_error, boot_rows, summary
 from .signals import compute_all
 from .strategy import build_targets, periods_per_year, precompute_aux
 
@@ -158,9 +158,10 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: i
     """Every variant x every weekly rebalance phase, compared PAIRED with the base at the same phase.
     Read the median and the win count, never one row: a change is real only if it wins in most phases.
     Each row also carries its bootstrap range (sharpe/cagr/maxdd _lo, _hi) and the paired probabilities p_gt_bench and
-    p_gt_base (metrics.boot_rows; settings: config "bootstrap" over metrics.BOOT_DEFAULTS). `detail`, when given, is
-    filled with what register() saves: per-phase rows, every run's daily returns, the bootstrap settings and both
-    Deflated-Sharpe readings."""
+    p_gt_base (metrics.boot_rows; settings: config "bootstrap" over metrics.BOOT_DEFAULTS), unless the window is
+    shorter than the floor: then the rows stay as they were and detail["ranges_error"] says why. `detail`, when given,
+    is filled with what register() saves: per-phase rows, every run's daily returns, the bootstrap settings and the
+    Deflated-Sharpe readings (the rule, the cost-rows-out reading, the rule on every base phase)."""
     from concurrent.futures import ProcessPoolExecutor
 
     info = {} if detail is None else detail
@@ -200,9 +201,6 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: i
         rows.append({"variant": f"DSR unavailable: {type(e).__name__}"})
     ppy = periods_per_year(cfg)
     rf_d = (1 + cfg["account"]["cash_yield_annual"]) ** (1 / ppy) - 1
-    runs = pd.DataFrame({**{(r["variant"], r["phase"]): r["_daily"] for r in results},
-                         **{(label, 0): s for label, s in b0["_bench_daily"].items()}}).dropna()  # the days every run has
-    info.update({"daily": runs, "phase_rows": df.to_dict("records")})
     try:  # the DSR row above is the rule (same inputs here); the second reading shows how far the convention moves it
         cost = [name for name, ov, *_ in _variants(cfg) if set(ov) == {"costs"}]  # the same trades at another cost
 
@@ -210,11 +208,19 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: i
             return {"value": round(dsr(daily, n_prev + len(srs), float(s.std())), 3), "rows_in_spread": len(s),
                     "spread_annual": round(float(s.std()) * ppy ** 0.5, 4)}
 
+        own = {r["phase"]: pd.Series(r["_daily"]) - rf_d for r in results if r["variant"] == "base"}  # each phase's days
         info["dsr"] = {"series": "base, phase 0, daily excess returns", "n": n_prev + len(srs), "n_prior_rows": n_prev,
-                       "n_sweep": len(srs), "rule": reading(srs), "alt": {**reading(srs.drop(cost)), "left_out": cost}}
+                       "n_sweep": len(srs), "rule": reading(srs), "alt": {**reading(srs.drop(cost)), "left_out": cost},
+                       # the rule's N and spread on every base phase (index = phase): phase 0 is the registered one
+                       "base_phases": [round(dsr(own[k], n_prev + len(srs), float(srs.std())), 3) for k in sorted(own)]}
     except Exception as e:  # noqa: BLE001 - informative only, like the DSR row (which names its own failure)
         info["dsr_error"] = type(e).__name__
-    try:  # new columns only: a failure here must not cost the table above or the registration of the sweep
+    # new columns only: a failure here, building the frame of daily returns included, must not cost the table above
+    # or the registration of the sweep
+    try:
+        runs = pd.DataFrame({**{(r["variant"], r["phase"]): r["_daily"] for r in results},
+                             **{(label, 0): s for label, s in b0["_bench_daily"].items()}}).dropna()  # the days every run has
+        info.update({"daily": runs, "phase_rows": df.to_dict("records")})
         pairs = {name: "base" for name, *_ in _variants(cfg) if name != "base"}
         boot = boot_rows(runs, rf_d, ppy, boot_cfg(cfg), pairs, "SPY buy&hold")
         for row in rows:
@@ -222,7 +228,7 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: i
         info.update({"boot": boot["settings"],
                      "phase_rows": [{**r, **boot["phases"][(r["variant"], r["phase"])]} for r in info["phase_rows"]]})
     except Exception as e:  # noqa: BLE001 - named in the report (report.sweep_report), never silent
-        info["ranges_error"] = type(e).__name__
+        info["ranges_error"] = boot_error(e)  # a refusal gives its reason (short history, no seed)
     return pd.DataFrame(rows)
 
 
@@ -242,18 +248,23 @@ def config_hash(cfg: dict) -> str:
     return hashlib.sha256(json.dumps(cfg, sort_keys=True, default=str).encode()).hexdigest()
 
 
+GIT_TIMEOUT_S = 10  # seconds per git call that names the code: plumbing, not a model assumption
+
+
 def code_commit() -> dict:
-    """git rev-parse HEAD of the code that ran ("unknown" outside a repository), and whether aitrader/ or config.json
-    held uncommitted changes (None when unknown): the commit names the code only when code_dirty is False."""
+    """git rev-parse HEAD of the code that ran ("unknown" when git cannot say: no repository, no git, a call over
+    GIT_TIMEOUT_S, any other failure), and whether aitrader/ or config.json held uncommitted changes (None when
+    unknown): the commit names the code only when code_dirty is False. Never raises: it must not cost a sweep."""
     root = Path(__file__).resolve().parent.parent
 
     def git(*args):
-        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True,
+                              timeout=GIT_TIMEOUT_S).stdout.strip()
 
     try:  # --no-optional-locks: a status that takes the index lock could fail a commit the live trader makes meanwhile
         return {"commit": git("rev-parse", "HEAD"),
                 "code_dirty": bool(git("--no-optional-locks", "status", "--porcelain", "--", "aitrader", "config.json"))}
-    except (OSError, subprocess.SubprocessError):
+    except Exception:  # noqa: BLE001 - the commit is a label on the record; a sweep runs without it
         return {"commit": "unknown", "code_dirty": None}
 
 
@@ -348,11 +359,13 @@ def _settled(day: str, cfg: dict, now) -> bool:
 
 
 def drift(trades: list[dict], cfg: dict, now=None) -> dict:
-    """Paper versus time machine, fill by fill (read-only). For every live fill: the official daily open of its day,
-    the price a replay of that day fills at (the open moved against the trade by costs.slippage_bps +
-    costs.exec_delay_bps, as run() does) and the gap in basis points and dollars with a running total. Positive: the
-    paper book paid more (buy) or received less (sell) than the time machine assumes. A fill whose daily open is not
-    settled yet is listed but left out of the totals. One Yahoo call per symbol, paced."""
+    """Paper versus time machine, fill by fill (read-only). For every live fill: its time-machine bar (tm_bar) - the
+    symbol's first daily bar after the fill's decision_date, the bar run() fills that decision on at exec_lag 1,
+    whatever day the paper fill landed on - the official open of that bar, the price a replay fills at (the open moved
+    against the trade by costs.slippage_bps + costs.exec_delay_bps, as run() does) and the gap in basis points and
+    dollars with a running total. Positive: the paper book paid more (buy) or received less (sell) than the time
+    machine assumes. A row without a decision_date is compared with the open of its own day and says so. A fill whose
+    bar's open is not settled yet is listed but left out of the totals. One Yahoo call per symbol, paced."""
     bps = cfg["costs"]["slippage_bps"] + cfg["costs"].get("exec_delay_bps", 0)
     pause = {**DRIFT_DEFAULTS, **cfg.get("drift", {})}["pause_seconds"]
     now = now or pd.Timestamp.now(tz="UTC")
@@ -367,17 +380,27 @@ def drift(trades: list[dict], cfg: dict, now=None) -> dict:
     rows, total, notional = [], 0.0, 0.0
     for t in trades:
         got = opens[t["symbol"]]
-        o = got.get(t["date"]) if isinstance(got, dict) else None
-        row = {**{k: t[k] for k in ("date", "symbol", "side", "qty", "price")}, "official_open": o, "tm_fill": None,
-               "drift_bps": None, "drift_usd": None, "running_usd": None,
-               "note": "" if o else f"no data ({got})" if isinstance(got, str) else "no daily bar for this day"}
+        days = got if isinstance(got, dict) else {}
+        dec = t.get("decision_date")
+        bar = min((d for d in days if d > dec), default=None) if dec else t["date"]
+        o = days.get(bar)
+        if isinstance(got, str):
+            note = f"no data ({got})"
+        elif not o:
+            note = f"no daily bar after the decision of {dec}" if dec else "no daily bar for this day"
+        elif not dec:
+            note = "no decision date on the row: the open of its own day is used"
+        else:
+            note = "" if bar == t["date"] else f"filled {t['date']}, not on the time-machine bar"
+        row = {**{k: t[k] for k in ("date", "symbol", "side", "qty", "price")}, "tm_bar": bar if o else None,
+               "official_open": o, "tm_fill": None, "drift_bps": None, "drift_usd": None, "running_usd": None, "note": note}
         if o:
             sign = 1 if t["side"] == "BUY" else -1
             tm = o * (1 + sign * bps / 1e4)
             usd = sign * (t["price"] - tm) * t["qty"]
             row.update({"tm_fill": round(tm, 4), "drift_usd": round(usd, 2) + 0.0,  # + 0.0: never print "-0.0"
                         "drift_bps": round(sign * (t["price"] / tm - 1) * 1e4, 1) + 0.0})
-            if _settled(t["date"], cfg, now):
+            if _settled(bar, cfg, now):
                 total, notional = total + usd, notional + tm * t["qty"]
                 row["running_usd"] = round(total, 2) + 0.0
             else:
