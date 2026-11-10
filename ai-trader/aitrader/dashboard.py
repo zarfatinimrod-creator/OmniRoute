@@ -60,13 +60,12 @@ def _il(ts: str | None) -> str | None:
         return ts
 
 
-def _px(sym: str) -> tuple[float | None, float | None]:
+def _px(sym: str) -> float | None:
     try:
-        meta = _chart(sym, "5d", "1d")["meta"]
-        px, prev = meta.get("regularMarketPrice"), meta.get("chartPreviousClose") or meta.get("previousClose")
-        return (float(px) if px else None), (px / prev - 1 if px and prev else None)
+        px = _chart(sym, "5d", "1d")["meta"].get("regularMarketPrice")
+        return float(px) if px else None
     except Exception:  # noqa: BLE001
-        return None, None
+        return None
 
 
 def _book_rows(state: dict | None, t: str, sectors: dict, prices: dict) -> tuple[list[dict], float, float]:
@@ -101,9 +100,7 @@ def _stock_rows() -> list[dict]:
     pending = journal.load_json("pending.json") or {}
 
     held = set(port.get("positions", {})) | set(news.get("positions", {})) | set(shadow.get("positions", {}))
-    prices = {}
-    for s in sorted(held | {bench, "^VIX"}):
-        prices[s], _ = _px(s)
+    prices = {s: _px(s) for s in sorted(held | {bench, "^VIX"})}
     pos, q_eq, q_cash = _book_rows(port, "pos", sectors, prices)
     npos, n_eq, n_cash = _book_rows(news, "npos", sectors, prices)
     _, s_eq, _ = _book_rows(shadow, "spos", sectors, prices)
@@ -321,7 +318,7 @@ def _crypto_rows() -> list[dict]:
     port, shadow, pending, latest, dsr = (load(n) or {} for n in ("portfolio.json", "shadow_portfolio.json", "pending.json",
                                                                     "latest.json", "dsr.json"))
     held = set(port.get("positions", {})) | set(shadow.get("positions", {}))
-    prices = {s: _px(s)[0] for s in sorted(held | {bench})}  # 24/7 market: the live price is the mark
+    prices = {s: _px(s) for s in sorted(held | {bench})}  # 24/7 market: the live price is the mark
     pos, eq, cash = _book_rows(port, "cpos", cfg["universe"], prices)
     _, s_eq, _ = _book_rows(shadow, "cspos", cfg["universe"], prices)
     eq, s_eq = eq or start, s_eq or start

@@ -14,6 +14,7 @@
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
   news-score [--n 8]                      score recent headlines without trading (scorer check)
   news-status                             news book, last trades, news scorecard
+  news-exit SYMBOL --reason TEXT          ask the news engine to sell a held name at its next live quote (never buys)
   dashboard                               build .cache/dashboard/snapshot.json for the Dashboard artifact
   placebo [--k 100]                       noise gate the learner must beat (signals shuffled across stocks)
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
@@ -79,6 +80,9 @@ def main(argv=None) -> int:
     ns.add_argument("--n", type=int, default=8)
     ns.add_argument("--minutes", type=int, default=120)
     sub.add_parser("news-status")
+    nx = sub.add_parser("news-exit")
+    nx.add_argument("symbol")
+    nx.add_argument("--reason", required=True)
     sub.add_parser("dashboard")
     pl = sub.add_parser("placebo")
     pl.add_argument("--k", type=int, default=100)
@@ -255,6 +259,13 @@ def _run(a: argparse.Namespace) -> int:
         print(json.dumps({"cash": round(b.get("cash", 0), 2), "positions": b.get("positions", {}),
                           "trades": journal.read("news_trades.jsonl")[-10:],
                           "scorecard": journal.scorecard(journal.read("news_predictions.jsonl"), "news_grades.jsonl")}, indent=1, default=str, ensure_ascii=False))
+    elif a.cmd == "news-exit":  # only a request: the book lives in the engine's session, which sells and clears it
+        from .news_live import _clean, exit_requests
+
+        ex = exit_requests()
+        ex[a.symbol.upper()] = {"reason": _clean(a.reason, 120), "requested_at": journal.now_utc()}
+        journal.save_json("news_exits.json", ex)
+        print(json.dumps(ex, indent=1, ensure_ascii=False))
     elif a.cmd == "placebo":
         from .data import load_config, load_market
         from .learn import placebo_gate

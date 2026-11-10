@@ -81,7 +81,7 @@ class Snapshot(unittest.TestCase):
         return {str(p.relative_to(self.tmp)): (p.read_bytes() if p.is_file() else None) for p in sorted(self.tmp.rglob("*"))}
 
     def build(self) -> list[dict]:
-        with mock.patch.object(dashboard, "_px", lambda s: (PRICES.get(s), None)), \
+        with mock.patch.object(dashboard, "_px", lambda s: PRICES.get(s)), \
                 mock.patch.object(dashboard, "datetime", FixedNow):
             rows = dashboard.build()
         self.assertEqual((journal.STATE, journal.BOOK, journal._BASE), (self.tmp, "stocks", self._saved[2]))
@@ -173,9 +173,18 @@ class Snapshot(unittest.TestCase):
         self.assertFalse((self.tmp / "crypto" / "lessons.md").exists())
 
     def build_in_book(self) -> list[dict]:
-        with mock.patch.object(dashboard, "_px", lambda s: (PRICES.get(s), None)), \
+        with mock.patch.object(dashboard, "_px", lambda s: PRICES.get(s)), \
                 mock.patch.object(dashboard, "datetime", FixedNow):
             return dashboard.build()
+
+    def test_px_is_the_price_alone(self):
+        # it used to return a second value, price / chartPreviousClose - 1: for a 5d window that base is the close
+        # five sessions back, not yesterday's, so it was never a day move (no caller read it)
+        meta = {"regularMarketPrice": 730.17, "chartPreviousClose": 833.59}
+        with mock.patch.object(dashboard, "_chart", lambda sym, rng, interval: {"meta": meta}):
+            self.assertEqual(dashboard._px("MU"), 730.17)
+        with mock.patch.object(dashboard, "_chart", side_effect=RuntimeError("no network")):
+            self.assertIsNone(dashboard._px("MU"))
 
     def test_regime_labels_are_book_aware(self):
         self.assertIn("חצי חשיפה", dashboard._regime_he("risk_off"))
