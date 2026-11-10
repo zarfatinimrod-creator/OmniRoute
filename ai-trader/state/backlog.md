@@ -148,6 +148,11 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     in the middle of a step the headlines already scored are scored again (duplicate score rows, never a
     duplicate buy).
 
+45. [desk][docs] The trading-desk skill disagrees with itself on cost: its steps ask for six agent calls a name
+    (bull, bear, one rebuttal each, the inversion lens, the risk team) and its cost guard says three. The COP desk
+    of 2026-11-10 used six, about 120k tokens each, most of it context. Decide which is meant, and give the roles
+    only the brief. The skill file is under the one-builder rule (BUILD_CLAIMS.md): claim it first.
+
 ## Done
 - 2026-11-10 (loss review, MU -137.70; commit e6a82895): the loss protocol is law (CLAUDE.md, skills/trader/SKILL.md
   3א-3ב) and has a tool (`postmortem`, state/postmortems.jsonl) wired into the five trading slots and the weekly
