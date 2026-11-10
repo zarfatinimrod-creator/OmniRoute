@@ -2,6 +2,7 @@
 
 import contextlib
 import pickle
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -26,10 +27,11 @@ def frozen_env(tmp_state: Path, panel_upto):
     saved = {k: getattr(cycle, k) for k in names}
     saved_send, saved_now, saved_intraday = cycle.notify.send, journal.now_utc, data.intraday_open
     saved_state, saved_rep = journal.STATE, rep.ROOT
+    reports = Path(tempfile.mkdtemp())  # removed on the way out; a caller that points rep.ROOT elsewhere keeps its own
     tick = iter(range(10**9))
     try:
         journal.STATE = Path(tmp_state)
-        rep.ROOT = Path(tempfile.mkdtemp())
+        rep.ROOT = reports
         journal.now_utc = lambda: f"2026-01-01T{(n := next(tick)) // 3600:02d}:{n // 60 % 60:02d}:{n % 60:02d}+00:00"
         cycle.notify.send = lambda *a, **k: []
         cycle.corporate_actions = lambda sym: []
@@ -47,6 +49,7 @@ def frozen_env(tmp_state: Path, panel_upto):
             setattr(cycle, k, v)
         cycle.notify.send, journal.now_utc, data.intraday_open = saved_send, saved_now, saved_intraday
         journal.STATE, rep.ROOT = saved_state, saved_rep
+        shutil.rmtree(reports, ignore_errors=True)
 
 
 def run_scripted_cycle(days: int) -> dict:
@@ -54,15 +57,14 @@ def run_scripted_cycle(days: int) -> dict:
     full = load_panel()
     cfg = cfg_for(full)
     cfg["risk"]["min_score"] = -1.0  # make sure something trades on synthetic data
-    tmp = Path(tempfile.mkdtemp())
 
     def upto(n):
         p = {k: v.iloc[:n] for k, v in full.items()}
         cycle.load_market = lambda c, rng="10y", age=0.1: p
 
-    with frozen_env(tmp, upto):
+    with tempfile.TemporaryDirectory() as tmp, frozen_env(tmp, upto):  # the state dir goes when the files are read
         cycle.load_config = lambda: cfg
         for i in range(days):
             upto(FIRST_BAR + i)
             cycle.run_cycle()
-    return {f.name: f.read_bytes() for f in sorted(tmp.iterdir()) if f.is_file()}
+        return {f.name: f.read_bytes() for f in sorted(Path(tmp).iterdir()) if f.is_file()}

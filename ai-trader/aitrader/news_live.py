@@ -11,6 +11,11 @@ Loop every few seconds:
      newer checks (no chase, a second look at the headline, no re-buy on the day of a stop) are on trial: with
      news.guards = "log" they only write to news_checks.jsonl what they would have refused.
 
+The engine also measures itself (basic law 2: speed and accuracy are numbers): news_scorer_calls.jsonl (one row per
+scorer call: time, tokens, cost), news_seen_log.jsonl (one row per new headline: scored, or why not) and
+news_health.jsonl (one row per five minutes). These three only record. They are not hash-chained - a damaged one must
+never stop the engine and its stop checks - and a row that cannot be written never costs a step.
+
 Paper money only. Headlines are untrusted data: they go to the scorer as quoted data and the scorer's output is
 validated (symbol must match, score clamped to 1..10); nothing in a headline can change sizing or rules.
 """
@@ -23,6 +28,7 @@ import html
 import json
 import os
 import re
+import statistics
 import subprocess
 import tempfile
 import threading
@@ -47,6 +53,7 @@ DEFAULTS = {
     "sell_on_score_at_most": 2, "max_hold_days": 5, "max_gross": 1.0, "slippage_bps": 10, "starting_cash": 100000,
     "model": "claude-haiku-5-5", "trade_outside_hours": False, "batch_max": 12, "stop_blind_alert_seconds": 300,
     "block_buys_until_loss_reviewed": True,
+    "health_log_seconds": 300, "exits_lock_wait_seconds": 1.0, "exits_lock_retry_seconds": 0.05, "seen_keep_days": 3,
     # entry and exit guards added after the MU loss of 2026-11-10 (state/postmortems.jsonl). Each one can only
     # refuse a buy or bring a sale forward; none can add a position, enlarge one or hold back a sale.
     "require_known_move": True, "max_day_move_pct_to_buy": 3.0, "rebuy_cooldown_sessions": 1,
@@ -65,20 +72,39 @@ def ncfg(cfg: dict) -> dict:
     return {**DEFAULTS, **cfg.get("news", {})}
 
 
+ERRORS_SAID: set[tuple] = set()  # (where, error type, New York day) already in news_errors.jsonl from this process
+
+
+def error_once(where: str, e: Exception) -> None:
+    """One news_errors.jsonl row per place, error type and New York day: a fault that comes back every 20 seconds must
+    not bury the journal. It never raises: its callers are measurements, which must never cost a price or a step."""
+    try:
+        said = (where, type(e).__name__, datetime.now(NY).date())
+        if said in ERRORS_SAID:
+            return
+        journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__, "detail": str(e)[:300],
+                                             "where": where})
+        ERRORS_SAID.add(said)  # only once it is written: a fault the journal could not take is tried again the next time
+    except Exception as e2:  # noqa: BLE001 - nowhere left to write it
+        print(f"[news] error not journaled ({where}: {type(e).__name__}): {type(e2).__name__}", flush=True)
+
+
 # ---------------------------------------------------------------- headlines
 def _clean(text: str, cap: int = 240) -> str:
     t = re.sub(r"[\x00-\x1f\x7f<>{}`\ud800-\udfff]", " ", text or "")  # half a surrogate pair cannot be written to a journal
     return re.sub(r"\s+", " ", t).strip()[:cap]
 
 
-def fetch_headlines(sym: str, session: requests.Session) -> list[dict]:
+def _feed(sym: str, session: requests.Session) -> list[dict] | None:
+    """One ticker's Yahoo feed. None when the feed did not answer (no reply, or not HTTP 200): the health row counts
+    the feeds that did."""
     url = "https://feeds.finance.yahoo.com/rss/2.0/headline"
     try:
         r = session.get(url, params={"s": sym, "region": "US", "lang": "en-US"}, timeout=10)
         if r.status_code != 200:
-            return []
+            return None
     except requests.RequestException:
-        return []
+        return None
     out = []
     for it in re.findall(r"<item>(.*?)</item>", r.text, re.S):
         title = re.search(r"<title>(.*?)</title>", it, re.S)
@@ -100,6 +126,10 @@ def fetch_headlines(sym: str, session: requests.Session) -> list[dict]:
         out.append({"key": key, "symbol": sym, "title": t, "link": (link.group(1).strip() if link else ""),
                     "published": ts.isoformat(), "description": d})
     return out
+
+
+def fetch_headlines(sym: str, session: requests.Session) -> list[dict]:
+    return _feed(sym, session) or []
 
 
 # ---------------------------------------------------------------- scoring (Claude)
@@ -124,33 +154,79 @@ ITEMS:
 PROMPT_ID = hashlib.sha256(PROMPT.encode()).hexdigest()[:12]  # written with every score: which wording produced it
 
 
-def score_batch(items: list[dict], model: str, timeout: int = 90) -> dict[str, dict]:
-    """Ask Claude (claude -p) to score a batch. Returns {key: {score, why}}; empty dict on failure."""
+def _cli_figures(envelope: dict) -> dict:
+    """What the CLI's JSON envelope says the call took: its own clock, the API's, the cost and the token counts.
+    Only numbers that are there; never a guess."""
+    num = (int, float)
+    out = {k: envelope[k] for k in ("duration_ms", "duration_api_ms", "total_cost_usd") if isinstance(envelope.get(k), num)}
+    usage = envelope.get("usage") if isinstance(envelope.get("usage"), dict) else {}
+    out.update({k: v for k, v in usage.items() if k.endswith("_tokens") and isinstance(v, num)})
+    details = usage.get("output_tokens_details")
+    if isinstance(details, dict) and isinstance(details.get("thinking_tokens"), num):
+        out["thinking_tokens"] = details["thinking_tokens"]
+    return out
+
+
+class Scores(dict):
+    """What score_batch returns: {key: {score, why}}, and in `facts` what the call was and cost, for the caller to
+    journal (score_batch itself writes nothing): model, prompt (PROMPT_ID), sent, wall_s, the CLI's own time, cost
+    and token counts when its envelope carries them (also when the answer in it cannot be read), answered and the
+    keys answered under another ticker (symbol_mismatch) - or, on failure, the error type instead of the answer
+    count. No items, no call: no facts."""
+
+    def __init__(self):
+        super().__init__()
+        self.facts: dict = {}
+
+
+def score_batch(items: list[dict], model: str, timeout: int = 90) -> Scores:
+    """Ask Claude (claude -p) to score a batch. Returns {key: {score, why}} (a Scores: the facts of the call ride on
+    it); empty on failure.
+    It never raises on a reply, whatever its shape: an error out of here fails the step. A row is skipped when its
+    id is no index or its score is not a whole number (null, text, 8.6; 9.0 is 9). A fraction is not rounded: 9 from
+    8.6 would be a buy the scorer did not call."""
+    out = Scores()
     if not items:
-        return {}
+        return out
+    facts = out.facts
+    facts.update(model=model, prompt=PROMPT_ID, sent=len(items))
     payload = [{"id": i, "symbol": x["symbol"], "headline": x["title"], "published_utc": x["published"][:16],
                 "stock_move_today_pct": x.get("day_move_pct")} for i, x in enumerate(items)]
     prompt = PROMPT + json.dumps(payload, ensure_ascii=False)
+    t0 = time.monotonic()
     try:
         cp = subprocess.run(["claude", "-p", "--model", model, "--output-format", "json", prompt],
                             capture_output=True, text=True, timeout=timeout)
         envelope = json.loads(cp.stdout)
+        facts.update(_cli_figures(envelope))  # at once: the call is paid for whatever the answer below is worth
         text = envelope.get("result", "")
         m = re.search(r"\[.*\]", text, re.S)
         arr = json.loads(m.group(0)) if m else []
-    except (subprocess.SubprocessError, ValueError, OSError, AttributeError, TypeError) as e:
+    except Exception as e:  # noqa: BLE001 - no reply, or one of any shape (not an object, no text, nested too deep)
+        facts["error"] = type(e).__name__
         print(f"[news] scorer failed: {type(e).__name__}")
-        return {}
-    out = {}
+        return out
+    finally:
+        facts["wall_s"] = round(time.monotonic() - t0, 3)
+    if envelope.get("is_error"):  # the CLI answered with a failure of its own: on record as one, not as an empty answer
+        facts["error"] = "is_error"
+    off = []
     for row in arr if isinstance(arr, list) else []:
         try:  # a row in a shape nobody expected (a score that is a word or null) is skipped: it must not abort the step
             x = items[int(row["id"])]
             if str(row.get("symbol", "")).upper() != x["symbol"]:  # validated: the scorer cannot redirect to another ticker
+                off.append(x["key"])
                 continue
-            sc = int(max(1, min(10, int(row.get("score", 5)))))
-            out[x["key"]] = {"score": sc, "why": _clean(str(row.get("why", "")), 120)}
-        except Exception:  # noqa: BLE001 - whatever is wrong with one row (a score of 1e999 too), the other rows stand
+            sc = row.get("score", 5)
+            if isinstance(sc, bool) or not (isinstance(sc, int) or isinstance(sc, float) and sc.is_integer()):
+                continue  # not a whole number: no score for this headline ("scorer_no_answer"), never an error
+            out[x["key"]] = {"score": int(max(1, min(10, sc))), "why": _clean(str(row.get("why", "")), 120)}
+        except Exception:  # noqa: BLE001 - whatever is wrong with one row (an id of 1e999 too), the other rows stand
             continue
+    if "error" not in facts:
+        facts["answered"] = len(out)
+    if off:
+        facts["symbol_mismatch"] = off
     return out
 
 
@@ -298,15 +374,23 @@ def live_price(sym: str) -> tuple[float | None, float | None]:
     try:
         res = _chart(sym, "5d", "1d")
         meta = res["meta"]
-        if meta.get("regularMarketTime"):
-            QUOTE_TIME[sym] = datetime.fromtimestamp(int(meta["regularMarketTime"]), timezone.utc).isoformat(timespec="seconds")
         px = meta.get("regularMarketPrice")
         px = float(px) if px else None
     except Exception:  # noqa: BLE001
         return None, None
+    try:  # the price is read first: a quote time that is not a number must never cost it
+        at = meta.get("regularMarketTime")
+        stamp = datetime.fromtimestamp(int(at), timezone.utc).isoformat(timespec="seconds") if at else None
+    except Exception:  # noqa: BLE001
+        stamp = None
+    if stamp:
+        QUOTE_TIME[sym] = stamp
+    else:  # no quote time, or one that cannot be read: an earlier reply's stamp would pass this undated price off as live
+        QUOTE_TIME.pop(sym, None)
     try:  # the stops run on the price; the move is an extra for the scorer and must never cost a good price
         return px, _day_move_pct(res, datetime.now(NY).date())
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        error_once("day_move", e)
         return px, None
 
 
@@ -357,22 +441,44 @@ def exit_requests() -> tuple[dict, str]:
     return asks, ("news_exits.json entries that are not requests (no reason), left in place: " + ", ".join(odd)) if odd else ""
 
 
-def update_exits(put: dict | None = None, done: dict | None = None) -> tuple[dict, bool]:
+def _exit_reason(ask: dict) -> str:
+    """The reason a sale made on the owner's request is journaled with."""
+    return "operator exit: " + _clean(ask["reason"], 120)
+
+
+SYMBOL = re.compile(r"[A-Z0-9.^=-]{1,12}")  # what news-exit takes as a ticker (fullmatch): the name becomes a key in the file
+
+
+def update_exits(put: dict | None = None, done: dict | None = None, drop: tuple | list = (),
+                 wait: float | None = None, retry: float | None = None) -> tuple[dict, dict | None]:
     """The only writer of state/news_exits.json, for news-exit and for the engine: two writers that each saved
     their own copy erased each other's requests. Under an exclusive lock it reads the file again, sets the `put`
-    entries, deletes each `done` entry that is still the one its caller loaded, and saves only a change. Returns
-    (the file as it now stands, whether what was there could be read). An unreadable file is replaced only by a
-    new request, never by a clean-up.
+    entries, deletes each `done` entry that is still the one its caller loaded and each `drop` name whatever it
+    holds (news-exit --cancel), and saves only a change. Returns (the file as it now stands, the file as it was -
+    None when it could not be read). An unreadable file is replaced only by a new request, never by a clean-up.
     The lock is on the state directory itself: the file cannot hold it (save_json replaces the file), and a lock
-    file would be one more untracked file in the git-tracked state."""
+    file would be one more untracked file in the git-tracked state. It is never waited for without limit: it is
+    tried every `retry` seconds (exits_lock_retry_seconds) and after `wait` seconds (exits_lock_wait_seconds)
+    TimeoutError is raised and nothing is written - a writer that hangs with the lock must not hold up the engine,
+    which checks the stops in the same step. Both come from the caller's news config; DEFAULTS when not given."""
+    wait = DEFAULTS["exits_lock_wait_seconds"] if wait is None else wait
+    retry = DEFAULTS["exits_lock_retry_seconds"] if retry is None else retry
     lock = os.open(journal._path("news_exits.json").parent, os.O_RDONLY)
     try:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        give_up = time.monotonic() + wait
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= give_up:
+                    raise TimeoutError(f"news_exits.json: the lock was held by another writer for {wait:g} s") from None
+                time.sleep(retry)
         was = _exits_file()
-        new = {s: v for s, v in (was or {}).items() if not (s in (done or {}) and v == done[s])} | (put or {})
+        new = {s: v for s, v in (was or {}).items() if s not in drop and not (s in (done or {}) and v == done[s])} | (put or {})
         if new != (was or {}):
             journal.save_json("news_exits.json", new)
-        return new, was is not None
+        return new, was
     finally:
         os.close(lock)  # closing the descriptor releases the lock
 
@@ -443,7 +549,7 @@ class NewsTrader:
         """Book, queue and (seen=True, the end of a step) the marks of the headlines already seen. A save in the
         middle of a step leaves the marks alone: they include headlines polled but not scored yet, and an engine
         killed before it scores them must find them unseen at its next start (a bad-news sale could hang on one)."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.n["seen_keep_days"])).isoformat()
         self.seen = {k: v for k, v in self.seen.items() if v >= cutoff}
         # the book is rewritten when it really changes (trades, stops, cash); live marks alone are saved at most
         # every 15 minutes, so the git-tracked state does not churn every 20 seconds
@@ -457,19 +563,129 @@ class NewsTrader:
             journal.save_json("news_seen.json", self.seen)
         journal.save_json("news_queue.json", self.queue)
 
+    # -- the engine's own numbers (measurement only: nothing here may cost a score, a sale or a step)
+    def _record(self, name: str, row: dict):
+        """One row in a measurement journal. A row that cannot be written goes on record once and the step goes on."""
+        try:
+            journal.append(name, row)
+        except Exception as e:  # noqa: BLE001
+            error_once(name, e)
+
+    def _tally(self) -> dict:
+        """What happened since the last news_health.jsonl row. In memory only: a restart starts a new window."""
+        if getattr(self, "_health", None) is None:
+            self._health = {"since": time.time(), "step_s": [], "poll_s": [], "feeds_min": None, "scorer_calls": 0,
+                            "scorer_fails": 0, "scorer_sent": 0, "scorer_answered": 0, "stop_checks": 0,
+                            "stop_gap_max_s": None, "stop_quote_age_max_s": None, "stop_quotes_undated": 0,
+                            "stop_names_max": 0, "stop_quotes_missing": 0}
+        return self._health
+
+    def scorer_called(self, facts: dict):
+        """news_scorer_calls.jsonl: one row per scorer call, from the facts score_batch hands back (none: no call).
+        A call made outside the engine names itself in "source" (the news-score check); an engine row has none.
+        The calls of the second check (the checker and the re-score) are not on record here."""
+        if facts:
+            h = self._tally()
+            h["scorer_calls"] += 1
+            h["scorer_fails"] += "answered" not in facts  # the call failed, or its answer could not be read
+            h["scorer_sent"] += facts.get("sent", 0)  # a call that was read and scored nothing is not a failed call:
+            h["scorer_answered"] += facts.get("answered", 0)  # it shows only as sent against answered
+            self._record("news_scorer_calls.jsonl", {"at": journal.now_utc(), **facts})
+
+    def _scored(self, chunk: list[dict]) -> tuple[dict, dict]:
+        """One scorer call for the loop: (its scores, the facts of the call). The call goes on record whatever became
+        of it. A stand-in scorer that answers with a plain dict (the tests) made no call and leaves no row."""
+        try:
+            scores = score_batch(chunk, self.n["model"])
+        except Exception:  # noqa: BLE001 - score_batch never raises on a reply; whatever did, the call is on record
+            self.scorer_called({"model": self.n["model"], "prompt": PROMPT_ID, "sent": len(chunk)})
+            raise
+        facts = getattr(scores, "facts", {})
+        self.scorer_called(facts)
+        return scores, facts
+
+    def _seen_row(self, x: dict, outcome: str):
+        """news_seen_log.jsonl: one row per new headline, with what became of it: "scored", or why it was not -
+        "stale" (older than fresh_minutes at first sight), "scorer_failed" (the call failed), "scorer_no_answer" (the
+        answer had no row for it, or one whose score is not a whole number), "symbol_mismatch" (answered under another
+        ticker), "step_failed" (the step broke before it had an outcome). One more row, at a first start:
+        {"outcome": "primed", "count": N}. A headline older than seen_keep_days leaves no row: it cannot be told from
+        one the engine saw and has forgotten."""
+        self._record("news_seen_log.jsonl", {"key": x["key"], "symbol": x["symbol"], "published": x["published"],
+                                             "first_seen": self.seen.get(x["key"]), "outcome": outcome})
+
+    def _stops_measured(self, sight: dict, used: dict, now: datetime, t0: float, before: datetime | None):
+        """One stop check for the health row: the gap since the one before (inside one day: the night is not a gap),
+        the names it looked at and those it got no price for (a check that saw nothing must not read like an empty
+        book), and the age of each quote it used, at the moment it was used. sight: symbol -> price (None = no
+        quote); used: symbol -> (quote stamp, monotonic time); before: when the stops were looked at before this
+        check, by this engine (None = this is its first)."""
+        h = self._tally()
+        h["stop_checks"] += 1
+        h["stop_names_max"] = max(h["stop_names_max"], len(sight))
+        h["stop_quotes_missing"] += sum(not px for px in sight.values())
+        if before is not None and before.astimezone(now.tzinfo).date() == now.date():
+            h["stop_gap_max_s"] = max(h["stop_gap_max_s"] or 0.0, round((now - before).total_seconds(), 1))
+        for stamp, at in used.values():
+            if not stamp:
+                h["stop_quotes_undated"] += 1  # a price with no time of its own: its age is not known
+                continue
+            age = round((now - datetime.fromisoformat(stamp)).total_seconds() + (at - t0), 1)
+            h["stop_quote_age_max_s"] = age if h["stop_quote_age_max_s"] is None else max(h["stop_quote_age_max_s"], age)
+
+    def _step_measured(self, step_s: float):
+        """The end of every step, failed or not: the headlines it left without an outcome, and one news_health.jsonl
+        row per health_log_seconds. It never raises."""
+        try:
+            for x in getattr(self, "_pending", {}).values():  # marked seen, so they will not come back: on record now
+                self._seen_row(x, "step_failed")
+            self._pending = {}
+            h = self._tally()
+            h["step_s"].append(step_s)
+            if time.time() - h["since"] < self.n.get("health_log_seconds", DEFAULTS["health_log_seconds"]):
+                return
+            self._health = None  # the next window starts here, whatever becomes of this row: its counts run from this
+            self._tally()  # moment, so its clock does too (opened at the next poll, window_s left out the wait before it)
+
+            def mid_max(name):  # seconds; None when the window had none (no poll, say)
+                v = h[name]
+                return {name + "_median": round(statistics.median(v), 3) if v else None,
+                        name + "_max": round(max(v), 3) if v else None}
+            journal.append("news_health.jsonl", {
+                "at": journal.now_utc(), "window_s": round(time.time() - h["since"]), "steps": len(h["step_s"]),
+                **mid_max("step_s"), **mid_max("poll_s"), "feeds_min": h["feeds_min"], "universe": len(self.universe),
+                **{k: h[k] for k in ("scorer_calls", "scorer_fails", "scorer_sent", "scorer_answered", "stop_checks",
+                                     "stop_gap_max_s", "stop_quote_age_max_s", "stop_quotes_undated", "stop_names_max",
+                                     "stop_quotes_missing")}})
+        except Exception as e:  # noqa: BLE001
+            error_once("news_health.jsonl", e)
+
     # -- headlines -> scores
-    def poll_headlines(self) -> list[dict]:
+    def poll_headlines(self, prime: bool = False) -> list[dict]:
+        """The fresh headlines not seen before. Every other new one is too old to act on and leaves a "stale" row;
+        prime=True (the first start) marks everything already out as seen under ONE summary row."""
+        t0, h = time.monotonic(), self._tally()  # before the feeds are asked: a first window covers its first poll
         with ThreadPoolExecutor(max_workers=8) as ex:
-            batches = list(ex.map(lambda s: fetch_headlines(s, self.session), self.universe))
+            batches = list(ex.map(lambda s: _feed(s, self.session), self.universe))
+        answered = sum(b is not None for b in batches)
+        h["poll_s"].append(time.monotonic() - t0)
+        h["feeds_min"] = answered if h["feeds_min"] is None else min(h["feeds_min"], answered)
         fresh_after = datetime.now(timezone.utc) - timedelta(minutes=self.n["fresh_minutes"])
-        new = []
+        kept_after = datetime.now(timezone.utc) - timedelta(days=self.n["seen_keep_days"])  # as far back as `seen` remembers
+        new, marked = [], 0
         for items in batches:
-            for x in items:
+            for x in items or []:
                 if x["key"] in self.seen:
                     continue
                 self.seen[x["key"]] = datetime.now(timezone.utc).isoformat()
-                if datetime.fromisoformat(x["published"]) >= fresh_after:
+                marked += 1
+                published = datetime.fromisoformat(x["published"])
+                if published >= fresh_after:
                     new.append(x)
+                elif not prime and published >= kept_after:  # an older one comes back each time `seen` forgets it: no row
+                    self._seen_row(x, "stale")
+        if prime:
+            self._record("news_seen_log.jsonl", {"at": journal.now_utc(), "outcome": "primed", "count": marked})
         return new
 
     # -- rules
@@ -494,6 +710,14 @@ class NewsTrader:
         if hold:
             return ("hold", f"קניות חדשות עצורות: {hold['reason']}. סטופים ומכירות עובדים כרגיל")
         return None
+
+    def _exited_today(self) -> dict:
+        """The sales made today on the owner's word, from news_trades.jsonl: {symbol: the reasons they carry}."""
+        today, out = datetime.now(NY).date().isoformat(), {}
+        for t in journal.read("news_trades.jsonl"):
+            if t.get("date") == today and str(t.get("reason")).startswith("operator exit:"):
+                out.setdefault(str(t.get("symbol")), set()).add(t["reason"])
+        return out
 
     def _note_check(self, row: dict) -> None:
         """One row in news_checks.jsonl. It is a record, not a trade journal: it is not hash-chained (a broken chain
@@ -608,19 +832,22 @@ class NewsTrader:
 
     def check_stops(self, events: list, now: datetime | None = None):
         now = now or datetime.now(NY)
+        t0, before = time.monotonic(), getattr(self, "_stops_checked_at", None)  # both only for the health row
         exits, wrong = exit_requests()
         had = set(self.book.positions)  # held when this call began
         sight = {}  # symbol -> the price this step saw (None = no quote)
+        used = {}  # symbol -> (the quote's own stamp, when it was used): only for the health row
         for sym, pos in list(self.book.positions.items()):
             px, _ = live_price(sym)
             sight[sym] = px
             if not px:
                 continue
+            used[sym] = (QUOTE_TIME.get(sym), time.monotonic())
             pos["last_price"] = px
             reason = None
             if sym in exits and self._quote_is_live(QUOTE_TIME.get(sym), None, now):
                 # sold only at a live quote; without one the request waits and the stop below works as always
-                reason = "operator exit: " + _clean(exits[sym]["reason"], 120)
+                reason = _exit_reason(exits[sym])
             elif px <= pos.get("stop_price", pos["avg_cost"] * (1 - self.n["stop_loss_pct"])):
                 reason = f"stop -{self.n['stop_loss_pct']:.0%} (entry {pos['avg_cost']:.2f}, now {px:.2f})"
             elif (self.n["stop_catchup"] == "sell" and pos.get("stop_breach")
@@ -645,9 +872,16 @@ class NewsTrader:
             # sold or never held: nothing to exit. A name still queued keeps its request until _buy has turned the buy down
             done = {s: v for s, v in exits.items() if s not in self.book.positions and all(q["symbol"] != s for q in self.queue)}
             if done:  # only these, and only as loaded above: a request that came in during the price loop stays
-                left = update_exits(done=done)[0]
+                self.save(seen=False)  # a request is cleared only once the book is on disk: a failed save keeps it, on record below
+                left = update_exits(done=done, wait=self.n.get("exits_lock_wait_seconds"),
+                                    retry=self.n.get("exits_lock_retry_seconds"))[0]
+                gone = [s for s in done if s not in had and s not in left]
+                # "not held" is not said of a request that was sold in an earlier pass and could only be cleared now (the
+                # lock was busy, or the book could not be saved): the name was held, and the sale's own line told him.
+                # A new request for that name made after the sale is still answered, unless it repeats the reason word for word
+                sold = self._exited_today() if gone else {}
                 events.extend(f"exit request for {_clean(s, 20)} dropped: not held"
-                              for s in done if s not in had and s not in left)
+                              for s in gone if _exit_reason(done[s]) not in sold.get(s, ()))
         except Exception as e:  # noqa: BLE001
             bad = (type(e).__name__, str(e))
         if bad != getattr(self, "_exits_bad", None):  # on record once per problem, not once per step
@@ -655,6 +889,8 @@ class NewsTrader:
             if bad:
                 journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": bad[0], "detail": bad[1][:300],
                                                      "where": "news_exits"})
+                if wrong:  # the owner believes he asked: a file the engine cannot use reaches him, not only the journal
+                    events.append("exit requests: " + _clean(wrong))
         # alerts come after every stop has been looked at: a failing alert must never delay a sale
         self._blind = {s: v for s, v in getattr(self, "_blind", {}).items() if s in self.book.positions}
         self._covered = {s_: t for s_, t in self._covered.items() if s_ in self.book.positions}
@@ -669,6 +905,10 @@ class NewsTrader:
                 except Exception as e:  # noqa: BLE001 - a failing alert must not abort the step: the sales above still get saved
                     journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__,
                                                          "detail": str(e)[:300], "where": "stop_sight"})
+        try:  # measurement comes last and never costs a sale or its report
+            self._stops_measured(sight, used, now, t0, before)
+        except Exception as e:  # noqa: BLE001
+            error_once("stop_health", e)
 
     def _last_stop_check(self) -> datetime | None:
         """When the stops were last looked at: this run's own clock, else the previous run's heartbeat, else (a new
@@ -837,7 +1077,7 @@ class NewsTrader:
         channel took is tried again after another window, and "the price is back" follows only a delivered alert."""
         if seeing:
             if self._blind.pop(sym, [now, False])[1]:
-                notify.send("AI Trader - חדשות", f"המחיר של {sym} חזר. הסטופ נבדק שוב (כסף נייר)", self.cfg, "high")
+                notify.send("AI Trader - חדשות", f"המחיר של {sym} חזר. הסטופ שוב רואה מחיר עדכני (כסף נייר)", self.cfg, "high")
             return
         since = self._blind.setdefault(sym, [now, False])
         gap = (now - since[0]).total_seconds()
@@ -903,7 +1143,8 @@ class NewsTrader:
             if s["score"] != 5:  # graded forward at 1 and 5 trading days (non-quant: from the logged price)
                 for h in (1, 5):
                     journal.append("news_predictions.jsonl", {
-                        **{k: rec[k] for k in ("date", "logged_at", "price_at", "id", "symbol", "price", "bench_price")}, "horizon": h,
+                        **{k: rec[k] for k in ("date", "logged_at", "price_at", "id", "symbol", "price", "bench_price", "model",
+                                               "prompt")}, "horizon": h,
                         "source": "news_claude", "direction": "up" if s["score"] > 5 else "down",
                         "prob": round(0.5 + (s["score"] - 5.5) * 0.04, 3), "score": s["score"], "headline": x["title"],
                         "entry": "live" if live else "session_close", "status": "open"})
@@ -1083,6 +1324,7 @@ class NewsTrader:
     def step(self) -> list[str]:
         events: list[str] = []
         self.last_events = events  # the loop prints them also when the step fails after a trade
+        t0 = time.monotonic()
         try:
             self._step(events)
         finally:  # whatever fails further down, what the step already did is said: a sale at its top is never lost
@@ -1093,6 +1335,7 @@ class NewsTrader:
                     notify.send("AI Trader - חדשות", body, self.cfg, "high")
                 except Exception as e:  # noqa: BLE001 - the alert must not hide the error of the step itself
                     self._note_error(e, "step_alert")
+            self._step_measured(time.monotonic() - t0)  # measurement only, after the alert, and it never raises
         return events
 
     def _step(self, events: list):
@@ -1107,6 +1350,7 @@ class NewsTrader:
             self._early_look = self._look_at_stops(events, guarded=True)
         self.run_queue_at_open(events)
         new = self.poll_headlines()
+        self._pending = {x["key"]: x for x in new}  # no outcome on record yet (news_seen_log.jsonl)
         is_open = market_open_now()
         for x in new:
             x["price"], move = live_price(x["symbol"])
@@ -1115,7 +1359,12 @@ class NewsTrader:
             x["price_at"] = QUOTE_TIME.get(x["symbol"])  # the quote's own time (None = unknown = not live)
         for i in range(0, len(new), self.n["batch_max"]):
             chunk = new[i:i + self.n["batch_max"]]
-            self.handle_scored(chunk, score_batch(chunk, self.n["model"]), events)
+            scores, facts = self._scored(chunk)
+            self.handle_scored(chunk, scores, events)
+            for x in chunk:  # after its score is journaled; a headline a failing step leaves behind gets "step_failed"
+                why_not = ("scorer_failed" if "error" in facts else
+                           "symbol_mismatch" if x["key"] in facts.get("symbol_mismatch", ()) else "scorer_no_answer")
+                self._seen_row(self._pending.pop(x["key"], x), "scored" if x["key"] in scores else why_not)
             if i + self.n["batch_max"] < len(new) and market_open_now():
                 # between batches: several slow scorer calls in a row must not blind the stops. Guarded: a look that
                 # fails here must not cost the batches still to be scored (the look at the end reports its own failure)
@@ -1164,7 +1413,7 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool) -> None:
     print(f"[news] engine started on commit {nt.code['commit']}"
           + (" + uncommitted changes" if nt.code["dirty"] else "") + f", guards {nt.n['guards']}", flush=True)
     if prime and not nt.seen:  # first start: mark everything already out as seen, act only on what comes next
-        nt.poll_headlines()
+        nt.poll_headlines(prime=True)
         nt.save()
         print(f"[news] primed {len(nt.seen)} existing headlines")
     if not journal.calendar_covers(datetime.now(NY).date()):

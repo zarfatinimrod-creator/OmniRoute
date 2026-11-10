@@ -1,5 +1,6 @@
 """Owner's news rules (2026-11-09): buy only if score > 8, max 5% of the account per trade, sell at -3%."""
 
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,6 +25,7 @@ class NewsRules(unittest.TestCase):
     def tearDown(self):
         journal.STATE = self._state
         news_live.live_price, news_live.market_open_now = self._lp, self._mo
+        shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _item(self, key="k1"):
         return {"key": key, "symbol": "AAA", "title": "AAA wins huge contract", "published": "2026-11-09T14:00:00+00:00", "price": self.prices["AAA"],

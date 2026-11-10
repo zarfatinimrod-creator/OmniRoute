@@ -1,5 +1,6 @@
 """Regression tests for the quant-critic HOLD findings (2026-11-09)."""
 
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,6 +22,7 @@ class TempState(unittest.TestCase):
 
     def tearDown(self):
         journal.STATE = self._state
+        shutil.rmtree(self.tmp, ignore_errors=True)
 
 
 class OverrideCutoff(TempState):

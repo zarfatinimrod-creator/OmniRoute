@@ -1,4 +1,5 @@
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,6 +20,7 @@ class TempState(unittest.TestCase):
 
     def tearDown(self):
         journal.STATE = self._state
+        shutil.rmtree(self.tmp, ignore_errors=True)
 
 
 def _panel(days=20):
@@ -110,6 +112,7 @@ class StockUnchanged(TempState):
         outs = []
         for kw in ({}, {"market": None}, {"market": STOCK}):
             journal.STATE = Path(tempfile.mkdtemp())
+            self.addCleanup(shutil.rmtree, journal.STATE, True)
             journal.append("predictions.jsonl", rec)
             journal.evaluate_predictions(close, "SPY", **kw)
             g = list(journal.graded().values())

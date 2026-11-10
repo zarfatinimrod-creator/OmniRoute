@@ -16,6 +16,7 @@
   news-status                             news book, last trades, news scorecard
   news-exit SYMBOL --reason TEXT          ask the news engine to sell a held name at its next live quote (never buys);
                                           a waiting request, or an exit sold today, also keeps the engine from buying it
+  news-exit SYMBOL --cancel               take a waiting request back (exit 1 when there is none: it may have been acted on)
   dashboard                               build .cache/dashboard/snapshot.json for the Dashboard artifact
   placebo [--k 100]                       noise gate the learner must beat (signals shuffled across stocks)
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
@@ -88,7 +89,9 @@ def main(argv=None) -> int:
     sub.add_parser("news-status")
     nx = sub.add_parser("news-exit")
     nx.add_argument("symbol")
-    nx.add_argument("--reason", required=True)
+    how = nx.add_mutually_exclusive_group(required=True)
+    how.add_argument("--reason")
+    how.add_argument("--cancel", action="store_true", help="take a waiting request back")
     sub.add_parser("dashboard")
     pl = sub.add_parser("placebo")
     pl.add_argument("--k", type=int, default=100)
@@ -277,7 +280,7 @@ def _run(a: argparse.Namespace) -> int:
         from datetime import datetime, timedelta, timezone
 
         from .data import load_config
-        from .news_live import NewsTrader, live_price, ncfg, score_batch
+        from .news_live import NewsTrader, live_price, market_open_now, ncfg, score_batch
 
         cfg = load_config()
         nt = NewsTrader(cfg)
@@ -288,9 +291,13 @@ def _run(a: argparse.Namespace) -> int:
             items = [x for b in ex.map(lambda s_: fetch_headlines(s_, nt.session), nt.universe) for x in b]
         after = datetime.now(timezone.utc) - timedelta(minutes=a.minutes)
         items = sorted([x for x in items if datetime.fromisoformat(x["published"]) >= after], key=lambda x: x["published"], reverse=True)[: a.n]
+        is_open = market_open_now()
         for x in items:
-            x["price"], x["day_move_pct"] = live_price(x["symbol"])
+            x["price"], move = live_price(x["symbol"])
+            x["day_move_pct"] = move if is_open else None  # as the engine: outside the session it is not "so far today"
         sc = score_batch(items, ncfg(cfg)["model"])
+        # a check costs what an engine call costs: on record with the others, and named so it is not taken for one
+        nt.scorer_called(sc.facts and {**sc.facts, "source": "news-score"})
         for x in items:
             s_ = sc.get(x["key"], {})
             print(f"{s_.get('score', '?'):>2} | {x['symbol']:<5} | {x['published'][11:16]}Z | move {x['day_move_pct']} | {x['title'][:90]} | {s_.get('why', '')}")
@@ -331,14 +338,32 @@ def _run(a: argparse.Namespace) -> int:
         print("commit and push state/news_hold.json and state/news_holds.jsonl now: a hold that is not pushed is lost"
               " with the container", file=sys.stderr)
     elif a.cmd == "news-exit":  # only a request: the book lives in the engine's session, which sells and clears it
-        from .news_live import _clean, update_exits
+        from .data import load_config
+        from .news_live import SYMBOL, _clean, ncfg, update_exits
 
-        reason = _clean(a.reason, 120)
-        if not reason:  # the engine takes only an entry with a reason as a request
+        sym = a.symbol.upper()
+        if not SYMBOL.fullmatch(sym):  # the name becomes a key in the requests file and a line in the owner's alerts
+            print(f"news-exit: {_clean(a.symbol, 20)!r} is not a ticker symbol", file=sys.stderr)
+            return 2
+        reason = _clean(a.reason or "", 120)
+        if not a.cancel and not reason:  # the engine takes only an entry with a reason as a request
             print("news-exit needs a reason with text in it", file=sys.stderr)
             return 2
-        ex, readable = update_exits(put={a.symbol.upper(): {"reason": reason, "requested_at": journal.now_utc()}})
-        if not readable:
+        n = ncfg(load_config())
+        lock = {"wait": n["exits_lock_wait_seconds"], "retry": n["exits_lock_retry_seconds"]}  # config.json's, as the engine's
+        try:
+            if a.cancel:
+                ex, was = update_exits(drop=[sym], **lock)
+            else:
+                ex, was = update_exits(put={sym: {"reason": reason, "requested_at": journal.now_utc()}}, **lock)
+        except TimeoutError as e:  # another writer hangs with the lock
+            print(f"{e}: nothing was changed, run the command again", file=sys.stderr)
+            return 1
+        if a.cancel and sym not in (was or {}):
+            print(("news_exits.json cannot be read" if was is None else f"no exit request for {sym} is waiting (the engine may"
+                   " already have acted on it: see news-status)") + ": nothing was cancelled", file=sys.stderr)
+            return 1
+        if was is None:
             print("news_exits.json could not be read and was replaced: any request that was in it is gone", file=sys.stderr)
         print(json.dumps(ex, indent=1, ensure_ascii=False))
     elif a.cmd == "placebo":

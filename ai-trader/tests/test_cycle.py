@@ -1,5 +1,6 @@
 """Live-cycle timing and idempotency on synthetic data (no network)."""
 
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -44,6 +45,7 @@ class CycleFlow(unittest.TestCase):
         import aitrader.report as rep
 
         rep.ROOT = self._rep_root
+        shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _upto(self, n):
         p = {k: v.iloc[:n] for k, v in self.full.items()}

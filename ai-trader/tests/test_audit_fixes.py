@@ -7,6 +7,7 @@
 """
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 class TempState(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
+        # removed after tearDown has restored journal.STATE; per call, because two tests call setUp again for a fresh dir
+        self.addCleanup(shutil.rmtree, self.tmp, True)
         self._state = journal.STATE
         journal.STATE = self.tmp
 

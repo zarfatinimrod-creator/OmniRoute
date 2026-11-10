@@ -4,10 +4,14 @@ Regenerate (only on purpose, from ai-trader/): GOLDEN_WRITE=1 python3 -m unittes
 import json
 import os
 import pickle
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 from aitrader import backtest
-from golden_util import FIXTURES, load_panel, run_scripted_cycle
+from aitrader import report as rep
+from golden_util import FIXTURES, frozen_env, load_panel, run_scripted_cycle
 from test_core import cfg_for, synthetic_panel
 
 WRITE = os.environ.get("GOLDEN_WRITE") == "1"
@@ -47,6 +51,21 @@ class GoldenStock(unittest.TestCase):
         self.assertEqual(sorted(got), sorted(want))
         for name in want:
             self.assertEqual(got[name], want[name], name)
+
+
+class TempDirs(unittest.TestCase):
+    """The helpers every cycle test runs on remove what they make (backlog 31): on 2026-11-10 one suite run left 90
+    directories in the temp dir, all from these two."""
+
+    def test_the_helpers_leave_no_temp_dir_behind(self):
+        with tempfile.TemporaryDirectory() as box, mock.patch.object(tempfile, "tempdir", box):
+            self.assertIn("trades.jsonl", run_scripted_cycle(2))  # a decision and a fill: state and reports were written
+            self.assertEqual(os.listdir(box), [])
+            mine = Path(box, "reports")
+            with frozen_env(Path(box, "state"), None):
+                rep.ROOT = mine  # as test_crypto_cycle does; its tests read their reports after the block
+                (mine / "x").mkdir(parents=True)
+            self.assertEqual(sorted(p.name for p in Path(box).rglob("*")), ["reports", "x"])  # the caller's dir is the caller's
 
 
 if __name__ == "__main__":

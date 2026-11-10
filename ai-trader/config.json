@@ -239,7 +239,7 @@
   "sec_user_agent": "ai-trader-research-bot contact@example.com",
   "_note_priors": "2026-11-09: reversal/high52/rsi2 demoted (decayed after publication, strategy-science brief); lowvol used as an exclusion filter instead of a score.",
   "news": {
-    "_note": "Owner's rules 2026-11-09: buy only if Claude's headline score > 8; max 5% of the account per trade; sell at -3% from entry, no exceptions. sell_on_score_at_most and max_hold_days are Claude's additions (set to 0 to disable). block_buys_until_loss_reviewed: Claude's reduce-only addition that keeps the owner's order of 2026-11-10 (Basic law, item 3: every loss is studied). While a realized news loss has no review in state/postmortems.jsonl the engine opens no new position; sales and stops are never held back; false switches it off.",
+    "_note": "Owner's rules 2026-11-09: buy only if Claude's headline score > 8; max 5% of the account per trade; sell at -3% from entry, no exceptions. sell_on_score_at_most and max_hold_days are Claude's additions (set to 0 to disable). block_buys_until_loss_reviewed: Claude's reduce-only addition that keeps the owner's order of 2026-11-10 (Basic law, item 3: every loss is studied). While a realized news loss has no review in state/postmortems.jsonl the engine opens no new position; sales and stops are never held back; false switches it off. Exit lever: `python3 -m aitrader news-exit SYMBOL --reason TEXT` asks the engine to sell a held name at its next live quote and keeps it from buying that name that day (state/news_exits.json; `--cancel` takes a waiting request back); it never buys and never weakens the stop.",
     "poll_seconds": 20,
     "fresh_minutes": 30,
     "buy_min_score": 8,
@@ -275,7 +275,10 @@
     "stop_catchup_min_lows": 2,
     "stop_catchup_min_minutes": 4,
     "stop_catchup_min_bar_share": 0.5,
-    "verify_parallel": 1
+    "verify_parallel": 1,
+    "health_log_seconds": 300,
+    "exits_lock_wait_seconds": 1.0,
+    "exits_lock_retry_seconds": 0.05
   },
   "postmortem": {
     "_note": "Basic law, item 3 (loss reviews, aitrader/postmortem.py). min_chars: the shortest text a review may have in each answer, so a one-word review cannot clear a loss (fix_ref: where the fix lives, a commit or a backlog item; not asked of a planned loss). min_key_chars: how many characters of a sale's hash a review must give to name it.",
