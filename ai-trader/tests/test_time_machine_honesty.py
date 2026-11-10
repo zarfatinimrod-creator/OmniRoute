@@ -19,15 +19,18 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
 import requests
 
 import test_crypto_sweep as tcs  # a module, not its TestCase classes: importing those would run them twice
-from aitrader import backtest, crypto_sweep, data, journal, metrics, news_live, notify, report
+import test_dashboard_books as tdb
+from aitrader import backtest, crypto_sweep, dashboard, data, journal, metrics, news_live, notify, report
 from aitrader.__main__ import main
 from test_core import cfg_for, synthetic_panel
 
@@ -197,7 +200,8 @@ class Sweep(unittest.TestCase):
         cls.cfg["bootstrap"] = SET
         cls.start = str(cls.panel["close"].index[330].date())
         cls.detail = {}
-        with mock.patch.object(backtest, "_variants", few_variants), mock.patch.object(backtest, "code_commit", lambda: dict(FAKE_COMMIT)):
+        with mock.patch.object(backtest, "_variants", few_variants), \
+                mock.patch.object(backtest, "code_commit", lambda: dict(FAKE_COMMIT)):
             cls.df = backtest.sweep(cls.panel, cls.cfg, cls.start, detail=cls.detail)
         # the code is named as it was when the sweep started: a commit made while it ran must not be recorded
         with mock.patch.object(backtest, "code_commit", lambda: {"commit": "made-later", "code_dirty": True}), \
@@ -297,6 +301,14 @@ class Sweep(unittest.TestCase):
         for (variant, phase), col in daily.items():  # every run's daily returns, exact to the last bit
             self.assertEqual(s["daily"]["series"][f"{variant}|{phase}"], col.tolist(), (variant, phase))
 
+    def test_dashboard_reads_the_registered_sweep_as_before(self):
+        tdb.stock_book(self.tmp)  # the page's time-machine table reads the last trials line by column name
+        with mock.patch.object(dashboard, "_px", lambda s: tdb.PRICES.get(s)), mock.patch.object(dashboard, "datetime", tdb.FixedNow):
+            rows = dashboard.build()
+        shown = [[r["variant"], r["sharpe"], r["cagr"], r["maxdd"], r["calmar"], r["wins"]] for r in rows if r["t"] == "bt"]
+        self.assertEqual(canon(shown), [[x[0], x[2], x[7], x[8], x[9], x[5]] for x in LEGACY[:-1]])
+        self.assertEqual([(r["label"], r["dsr"]) for r in rows if r["t"] == "bt_dsr"], [("DSR of base (N=11 trials)", 0.937)])
+
     def test_panel_and_config_hashes_move_with_what_they_name(self):
         p = self.panel
         h = backtest.panel_hash(p)
@@ -327,7 +339,8 @@ class Sweep(unittest.TestCase):
 
         with mock.patch.object(subprocess, "run", git):
             self.assertEqual(backtest.code_commit(), {"commit": "abc123def", "code_dirty": True})
-        self.assertEqual([c[:3] for c in calls], [["git", "rev-parse", "HEAD"], ["git", "status", "--porcelain"]])
+        self.assertEqual(calls[0], ["git", "rev-parse", "HEAD"])
+        self.assertEqual(calls[1], ["git", "--no-optional-locks", "status", "--porcelain", "--", "aitrader", "config.json"])
         for err in (FileNotFoundError("git"), subprocess.CalledProcessError(128, "git")):
             with mock.patch.object(subprocess, "run", mock.Mock(side_effect=err)):
                 self.assertEqual(backtest.code_commit(), {"commit": "unknown", "code_dirty": None})
@@ -426,8 +439,8 @@ class CryptoSweep(tcs.TempState):
         self.assertEqual(res["runs"]["final:h1"]["range"]["p_gt_base"], 1.0)
         text = (self.tmp / "r.md").read_text()
         self.assertIn("## Ranges (95% stationary block bootstrap: mean block 30 days, 2000 resamples, seed 0)", text)
-        rng = res["runs"]["cand@50"]["range"]
-        self.assertIn(f"| cand@50 | {res['runs']['cand@50']['sharpe_med']:.3f} [{rng['sharpe_lo']:.3f}, {rng['sharpe_hi']:.3f}] |", text)
+        cand = res["runs"]["cand@50"]
+        self.assertIn(f"| cand@50 | {cand['sharpe_med']:.3f} [{cand['range']['sharpe_lo']:.3f}, {cand['range']['sharpe_hi']:.3f}] |", text)
         self.assertNotIn("significan", text.lower())
         recs = tcs.trials(self.tmp)
         self.assertEqual(len(recs), 2)  # the seed and ONE sweep line, as before
@@ -449,6 +462,121 @@ class CryptoSweep(tcs.TempState):
         want = p["close"]["BTC-USD"].loc[start:end].pct_change().dropna()
         pd.testing.assert_series_equal(out["bench_daily"], want, check_names=False)
         self.assertEqual(len(out["bench_daily"]), len(out["daily"]))
+
+
+NY = ZoneInfo("America/New_York")
+
+
+def chart(opens: dict, splits: dict | None = None) -> dict:
+    """A Yahoo daily chart reply: bars stamped 09:30 New York, raw opens, split events {day: ratio}."""
+    def ts(day):
+        return int(pd.Timestamp(f"{day} 09:30", tz="America/New_York").timestamp())
+
+    return {"meta": {"exchangeTimezoneName": "America/New_York"}, "timestamp": [ts(d) for d in opens],
+            "indicators": {"quote": [{"open": list(opens.values())}]},
+            "events": {"splits": {str(ts(d)): {"date": ts(d), "numerator": r, "denominator": 1} for d, r in (splits or {}).items()}}}
+
+
+def fill(day: str, sym: str, side: str, qty: float, price: float) -> dict:
+    return {"date": day, "symbol": sym, "side": side, "qty": qty, "price": price, "value": round(qty * price, 2)}
+
+
+class Drift(tcs.TempState):
+    """Paper versus time machine: every live fill next to the official open the time machine fills at."""
+
+    CHARTS = {"AAA": chart({"2026-11-06": 99.0, "2026-11-09": 100.0}), "BBB": chart({"2026-11-09": 50.0}),
+              "CCC": chart({"2026-11-06": 10.0}), "SPL": chart({"2026-11-09": 25.0, "2026-11-10": 26.0}, {"2026-11-10": 4.0})}
+    AFTER = datetime(2026, 11, 10, 18, 0, tzinfo=NY)  # both sessions closed
+
+    def setUp(self):
+        super().setUp()
+        self.cfg = cfg_for(synthetic_panel(n_days=5, n_syms=3))
+        self.asked, self.slept = [], []
+        for target, name, fake in ((data, "_chart", self.yahoo), (backtest.time, "sleep", self.slept.append)):
+            patch = mock.patch.object(target, name, fake)
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def yahoo(self, sym, rng, interval):
+        self.asked.append((sym, rng, interval))
+        if sym not in self.CHARTS:
+            raise RuntimeError(f"GET failed {sym}")
+        return self.CHARTS[sym]
+
+    def test_a_fill_10bp_from_the_open_is_reported_as_10bp(self):
+        slip = self.cfg["costs"]["slippage_bps"] / 1e4  # 5 bp, on both sides of the comparison
+        trades = [fill("2026-11-09", "AAA", "BUY", 10, round(100.0 * (1 + slip) * 1.001, 4)),  # paid 10 bp over
+                  fill("2026-11-09", "BBB", "SELL", 4, round(50.0 * (1 - slip), 4)),  # exactly the time-machine price
+                  fill("2026-11-09", "BBB", "SELL", 2, round(50.0 * (1 - slip) * 0.998, 4)),  # received 20 bp less
+                  fill("2026-11-09", "CCC", "BUY", 1, 10.0),  # no bar that day
+                  fill("2026-11-09", "GONE", "BUY", 1, 5.0)]  # Yahoo does not answer for it
+        out = backtest.drift(trades, self.cfg, now=self.AFTER)
+        r = out["rows"]
+        self.assertEqual((r[0]["official_open"], r[0]["tm_fill"], r[0]["drift_bps"], r[0]["drift_usd"]), (100.0, 100.05, 10.0, 1.0))
+        self.assertEqual((r[1]["drift_bps"], r[1]["drift_usd"]), (0.0, 0.0))
+        self.assertEqual((r[2]["tm_fill"], r[2]["drift_bps"], r[2]["drift_usd"]), (49.975, 20.0, 0.2))  # a worse sale is a cost
+        self.assertEqual([x["running_usd"] for x in r], [1.0, 1.0, 1.2, None, None])
+        self.assertEqual((r[3]["official_open"], r[3]["note"]), (None, "no daily bar for this day"))
+        self.assertEqual((r[4]["official_open"], r[4]["note"]), (None, "no data (RuntimeError)"))
+        t = out["total"]
+        self.assertEqual((t["fills"], t["priced"], t["drift_usd"], t["max_abs_bps"]), (5, 3, 1.2, 20.0))
+        notional = 10 * 100.05 + 6 * 49.975
+        self.assertEqual(t["notional"], round(notional, 2))
+        self.assertAlmostEqual(t["drift_bps"], 1.2 / notional * 1e4, delta=0.02)  # dollars over notional
+        # one daily-bar call per symbol over the book's history range, paced (Yahoo throttles a burst)
+        self.assertEqual(self.asked, [(s, self.cfg["market"]["history"], "1d") for s in ("AAA", "BBB", "CCC", "GONE")])
+        self.assertEqual(self.slept, [backtest.DRIFT_DEFAULTS["pause_seconds"]] * 3)
+        self.slept.clear()
+        backtest.drift(trades[:2], {**self.cfg, "drift": {"pause_seconds": 0.25}}, now=self.AFTER)
+        self.assertEqual(self.slept, [0.25])
+
+    def test_the_backtest_only_delay_cost_is_on_the_time_machine_side(self):
+        cfg = copy.deepcopy(self.cfg)
+        cfg["costs"].update({"slippage_bps": 5, "exec_delay_bps": 10})  # the crypto book: the paper fill has 5, the replay 15
+        out = backtest.drift([fill("2026-11-09", "AAA", "BUY", 1, round(100.0 * 1.0005, 4))], cfg, now=self.AFTER)
+        self.assertEqual((out["rows"][0]["tm_fill"], out["rows"][0]["drift_bps"]), (100.15, -10.0))  # paid less than assumed
+        self.assertEqual(out["slippage_bps"], 15)
+
+    def test_a_fill_before_a_split_is_compared_at_the_price_of_its_own_day(self):
+        trades = [fill("2026-11-09", "SPL", "BUY", 1, 100.05), fill("2026-11-10", "SPL", "BUY", 4, 26.013)]
+        r = backtest.drift(trades, self.cfg, now=self.AFTER)["rows"]
+        self.assertEqual((r[0]["official_open"], r[0]["drift_bps"]), (100.0, 0.0))  # 25.0 after the 4:1 split of 11-10
+        self.assertEqual((r[1]["official_open"], r[1]["drift_bps"]), (26.0, 0.0))
+
+    def test_a_stock_open_counts_only_after_its_session_closed(self):
+        trades = [fill("2026-11-09", "AAA", "BUY", 10, 100.15)]
+        early = backtest.drift(trades, self.cfg, now=datetime(2026, 11, 9, 10, 0, tzinfo=NY))
+        self.assertIsNone(early["rows"][0]["running_usd"])
+        self.assertIn("not settled", early["rows"][0]["note"])
+        self.assertEqual((early["rows"][0]["drift_bps"], early["total"]["priced"], early["total"]["drift_usd"]), (10.0, 0, 0.0))
+        closed = backtest.drift(trades, self.cfg, now=datetime(2026, 11, 9, 16, 0, tzinfo=NY))
+        self.assertEqual((closed["rows"][0]["running_usd"], closed["total"]["priced"]), (1.0, 1))
+        utc = copy.deepcopy(self.cfg)
+        utc["market"]["calendar"] = "utc_daily"  # a coin's daily open is its first print of the UTC day
+        self.assertEqual(backtest.drift(trades, utc, now=datetime(2026, 11, 9, 10, 0, tzinfo=NY))["total"]["priced"], 1)
+
+    def test_report_lists_every_fill_with_a_running_total(self):
+        trades = [fill("2026-11-09", "AAA", "BUY", 10, 100.15), fill("2026-11-09", "BBB", "SELL", 2, 49.875),
+                  fill("2026-11-09", "CCC", "BUY", 1, 10.0)]
+        text = report.drift_report(backtest.drift(trades, self.cfg, now=self.AFTER), self.cfg)
+        self.assertIn("| 2026-11-09 | AAA | BUY | 10 | 100.1500 | 100.0000 | 100.0500 | +10.0 | +1.00 | +1.00 |", text)
+        self.assertIn("| 2026-11-09 | BBB | SELL | 2 | 49.8750 | 50.0000 | 49.9750 | +20.0 | +0.20 | +1.20 |", text)
+        self.assertIn("| 2026-11-09 | CCC | BUY | 1 | 10.0000 | - | - | - | - | - | no daily bar for this day", text)
+        self.assertIn("Total: 2 of 3 fills priced", text)
+        self.assertIn("+1.20", text.split("Total:")[1])
+        self.assertIn("5 bp", text)  # the cost the time machine adds to the open: from the config
+        self.assertIn("(no fills)", report.drift_report(backtest.drift([], self.cfg, now=self.AFTER), self.cfg))
+
+    def test_cli_drift_is_read_only(self):
+        for t in [fill("2026-11-09", "AAA", "BUY", 10, 100.15), fill("2026-11-09", "BBB", "SELL", 2, 49.875)]:
+            journal.append("trades.jsonl", t)
+        before = {f.name: f.read_bytes() for f in self.tmp.rglob("*") if f.is_file()}
+        out = io.StringIO()
+        with mock.patch.object(data, "load_config", lambda *a: self.cfg), contextlib.redirect_stdout(out):
+            self.assertEqual(main(["backtest", "--drift"]), 0)
+        self.assertIn("| 2026-11-09 | AAA | BUY | 10 |", out.getvalue())
+        self.assertIn("Total: ", out.getvalue())
+        self.assertEqual({f.name: f.read_bytes() for f in self.tmp.rglob("*") if f.is_file()}, before)  # nothing written
 
 
 if __name__ == "__main__":

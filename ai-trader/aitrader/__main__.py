@@ -4,6 +4,7 @@
   status                                  print the latest summary
   backtest [--start 2018-01-01] [--sweep] the time machine (historical replay); --book crypto: the crypto sweep (spec 7)
            [--compare RUN_A RUN_B]        two saved sweep records row by row (read-only)
+           [--drift]                      paper versus time machine: every live fill against the official open (read-only)
   predict SYMBOL up|down [--horizon N] [--note TEXT]   log Claude's own call for later grading
   veto SYMBOL --reason TEXT               veto today's new entry in SYMBOL (Claude review)
   shrink SYMBOL MULT --reason TEXT        shrink today's target for SYMBOL (0..1)
@@ -69,7 +70,10 @@ def main(argv=None) -> int:
     b.add_argument("--start", default="2018-01-01")
     b.add_argument("--end", default=None)
     b.add_argument("--sweep", action="store_true")
-    b.add_argument("--compare", nargs=2, metavar=("RUN_A", "RUN_B"), help="two run records (ids under state/trial_runs), row by row; read-only")
+    b.add_argument("--compare", nargs=2, metavar=("RUN_A", "RUN_B"),
+                   help="two run records (ids under state/trial_runs), row by row; read-only")
+    b.add_argument("--drift", action="store_true",
+                   help="every live fill next to the official open the time machine fills at; read-only")
     p = sub.add_parser("predict")
     p.add_argument("symbol")
     p.add_argument("direction", choices=["up", "down"])
@@ -165,6 +169,12 @@ def _run(a: argparse.Namespace) -> int:
         ra, rb = (backtest.load_record(journal.STATE / "trial_runs" / f"{x}.json.gz") for x in a.compare)
         diff = backtest.diff_records(ra, rb)
         print(json.dumps({"a": ra["run_id"], "b": rb["run_id"], "identical": not diff, "differences": diff}, indent=1, default=str))
+    elif a.cmd == "backtest" and a.drift:  # read-only: the gap between the price the bot got and the one a replay assumes
+        from . import backtest, report
+        from .data import load_config
+
+        cfg = load_config()
+        print(report.drift_report(backtest.drift(journal.read("trades.jsonl"), cfg), cfg))
     elif a.cmd == "backtest" and a.book == "crypto":  # spec 7: the paired-phase sweep decides crypto_base vs candidate
         from . import crypto_sweep
         from .data import fetch_panel, load_config

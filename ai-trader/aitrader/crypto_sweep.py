@@ -187,8 +187,9 @@ def _diff(ref: dict, c: dict) -> dict:
 def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, phases: int = 7,
               report_path: str | Path | None = None) -> dict:
     """The whole sweep (module docstring). panel_all: wide OHLCV panels holding every symbol in SYMBOLS.
-    Writes <crypto state>/dsr.json, appends this sweep's per-phase rows to <crypto state>/trials.jsonl and writes the
-    report (default research/<date>-crypto-sweep.md under report.ROOT)."""
+    Writes <crypto state>/dsr.json, appends this sweep's per-phase rows to <crypto state>/trials.jsonl, saves the run
+    record beside it (<crypto state>/trial_runs/, backtest.save_record) and writes the report (default
+    research/<date>-crypto-sweep.md under report.ROOT), which also carries each run's bootstrap range (_ranges)."""
     base = data.load_config("crypto", "crypto_base")
     cand = data.load_config("crypto", "crypto")
     missing = (set(base["universe"]) | set(cand["universe"]) | {"XRP-USD"}) - set(panel_all["close"].columns)
@@ -311,7 +312,8 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
         line = {"logged_at": journal.now_utc(), "kind": "crypto_sweep", "start": start, "split": split,
                 "end": end, "phases": phases, "ship": ship, "rows": rows}
         try:  # the run record beside trials.jsonl: every run's daily returns (NaN outside its window), what ran
-            meta = {k: line[k] for k in ("logged_at", "start", "split", "end", "phases", "ship")} | {"code": code, "boot": honest.get("boot")}
+            meta = {k: line[k] for k in ("logged_at", "start", "split", "end", "phases", "ship")}
+            meta |= {"code": code, "boot": honest.get("boot")}
             frame = pd.DataFrame({(n, k): daily[n][k] for n in runs for k in daily[n].columns})
             honest["record"] = backtest.save_record("crypto_sweep", meta, rows, phase_rows, frame,
                                                     {f: panel_all[f] for f in FIELDS}, {"crypto_base": base, "crypto": cand})
@@ -373,12 +375,14 @@ def _report(res, base, cand, btc, date, start, split, end, phases, n_seeded, n_p
         lvl, coin = f"{b['level']:.0%}", cand.get("benchmark", "BTC-USD").split("-")[0]
         lines += [f"## Ranges ({lvl} stationary block bootstrap: mean block {b['block_days']} days, {b['draws']} resamples, "
                   f"seed {b['seed']})", "",
-                  f"| run | Sharpe med [{lvl} range] | CAGR med [{lvl} range] | maxDD med [{lvl} range] | P(Sharpe > {coin} hold) | vs | P(Sharpe > vs) |",
+                  f"| run | Sharpe med [{lvl} range] | CAGR med [{lvl} range] | maxDD med [{lvl} range] | "
+                  f"P(Sharpe > {coin} hold) | vs | P(Sharpe > vs) |",
                   "|---|---|---|---|---:|---|---:|"]
         for name, r in res["runs"].items():
             g = r["range"]
             lines.append(f"| {name} | {report.est(r['sharpe_med'], g['sharpe_lo'], g['sharpe_hi'])} | "
-                         f"{report.est(r['cagr_med'], g['cagr_lo'], g['cagr_hi'], 4)} | {report.est(r['maxdd_med'], g['maxdd_lo'], g['maxdd_hi'], 4)} | "
+                         f"{report.est(r['cagr_med'], g['cagr_lo'], g['cagr_hi'], 4)} | "
+                         f"{report.est(r['maxdd_med'], g['maxdd_lo'], g['maxdd_hi'], 4)} | "
                          f"{report.prob(g['p_gt_bench'])} | {r.get('pair', '-')} | {report.prob(g['p_gt_base'])} |")
         lines += ["", *report.range_notes(lvl, f"{coin} hold", "vs"),
                   "These ranges are informative: the pass rule above is unchanged and reads none of them (its own "

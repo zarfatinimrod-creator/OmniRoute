@@ -13,13 +13,15 @@ import copy
 import gzip
 import hashlib
 import json
+import math
 import subprocess
+import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from . import journal
+from . import data, journal
 from .broker import PaperBroker
 from .learn import walk_forward_weights
 from .metrics import boot_cfg, boot_rows, summary
@@ -147,9 +149,8 @@ def _job(args):
     out["_daily"] = res["_equity"].pct_change().dropna()  # every run: the ranges and the run record are built from these
     if name == "base" and phase == 0:
         out["_bench"] = {"SPY buy&hold": res["benchmark_spy"], "Equal-weight universe": res["benchmark_equal_weight_universe"]}
-        be = res["_bench_equity"]
-        out["_bench_daily"] = {label: be[k].dropna().pct_change().dropna()
-                               for label, k in (("SPY buy&hold", "benchmark"), ("Equal-weight universe", "equal_weight")) if be[k] is not None}
+        be = {"SPY buy&hold": res["_bench_equity"]["benchmark"], "Equal-weight universe": res["_bench_equity"]["equal_weight"]}
+        out["_bench_daily"] = {label: eq.dropna().pct_change().dropna() for label, eq in be.items() if eq is not None}
     return out
 
 
@@ -249,8 +250,9 @@ def code_commit() -> dict:
     def git(*args):
         return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
 
-    try:
-        return {"commit": git("rev-parse", "HEAD"), "code_dirty": bool(git("status", "--porcelain", "--", "aitrader", "config.json"))}
+    try:  # --no-optional-locks: a status that takes the index lock could fail a commit the live trader makes meanwhile
+        return {"commit": git("rev-parse", "HEAD"),
+                "code_dirty": bool(git("--no-optional-locks", "status", "--porcelain", "--", "aitrader", "config.json"))}
     except (OSError, subprocess.SubprocessError):
         return {"commit": "unknown", "code_dirty": None}
 
@@ -307,7 +309,8 @@ def load_record(path) -> dict:
 def diff_records(a: dict, b: dict) -> list[dict]:
     """Two run records row by row: what differs in what ran (commit, config, prices) and in each run's daily returns.
     An empty list means the re-run reproduced the registered run exactly."""
-    out = [{"what": k, "a": a.get(k), "b": b.get(k)} for k in ("commit", "code_dirty", "config_sha256", "panel") if a.get(k) != b.get(k)]
+    out = [{"what": k, "a": a.get(k), "b": b.get(k)} for k in ("commit", "code_dirty", "config_sha256", "panel")
+           if a.get(k) != b.get(k)]
     da, db = a["daily"], b["daily"]
     for key in sorted(set(da["series"]) | set(db["series"])):
         if key not in da["series"] or key not in db["series"]:
@@ -317,8 +320,74 @@ def diff_records(a: dict, b: dict) -> list[dict]:
         gap = (x - y).abs()  # aligned by day; a day only one run has is a difference too
         bad = gap[~((gap == 0) | (x.reindex(gap.index).isna() & y.reindex(gap.index).isna()))]
         if len(bad):
-            out.append({"what": "daily", "row": key, "days_differing": len(bad), "first": bad.index[0], "max_abs_diff": float(gap.max())})
+            out.append({"what": "daily", "row": key, "days_differing": len(bad), "first": bad.index[0],
+                        "max_abs_diff": float(gap.max())})
     return out
+
+
+DRIFT_DEFAULTS = {"pause_seconds": 1.5}  # between Yahoo chart calls, which throttle a burst; config "drift" overrides
+
+
+def raw_opens(sym: str, rng: str) -> dict:
+    """{day: the daily open as it traded that day} from one Yahoo chart call. The cached panel cannot serve here: it
+    scales old opens down after every dividend, and a fill is compared at the price of its own day. Yahoo's raw opens
+    are already divided by later splits, so each is multiplied back by the splits after its day."""
+    res = data._chart(sym, rng, "1d")
+    tz = res["meta"].get("exchangeTimezoneName", "America/New_York")
+    days = [str(d.date()) for d in pd.to_datetime(res.get("timestamp") or [], unit="s", utc=True).tz_convert(tz)]
+    splits = data._events_from_chart(res)["splits"]
+    return {day: float(o) * math.prod(s["ratio"] for s in splits if s["date"] > day)
+            for day, o in zip(days, res["indicators"]["quote"][0].get("open") or []) if o}
+
+
+def _settled(day: str, cfg: dict, now) -> bool:
+    """Is the daily open of `day` final? A stock's is trusted once its session has closed (early in a session Yahoo's
+    daily bar can carry a wrong open: data.official_opens); a UTC-daily bar's open is its first print."""
+    hours = journal.session_hours(day) if cfg["market"]["calendar"] == "nyse" else None
+    return hours is None or now >= pd.Timestamp(day, tz="America/New_York") + pd.Timedelta(hours=hours[1][0], minutes=hours[1][1])
+
+
+def drift(trades: list[dict], cfg: dict, now=None) -> dict:
+    """Paper versus time machine, fill by fill (read-only). For every live fill: the official daily open of its day,
+    the price a replay of that day fills at (the open moved against the trade by costs.slippage_bps +
+    costs.exec_delay_bps, as run() does) and the gap in basis points and dollars with a running total. Positive: the
+    paper book paid more (buy) or received less (sell) than the time machine assumes. A fill whose daily open is not
+    settled yet is listed but left out of the totals. One Yahoo call per symbol, paced."""
+    bps = cfg["costs"]["slippage_bps"] + cfg["costs"].get("exec_delay_bps", 0)
+    pause = {**DRIFT_DEFAULTS, **cfg.get("drift", {})}["pause_seconds"]
+    now = now or pd.Timestamp.now(tz="UTC")
+    opens: dict = {}
+    for i, sym in enumerate(sorted({t["symbol"] for t in trades})):
+        if i:
+            time.sleep(pause)
+        try:
+            opens[sym] = raw_opens(sym, cfg["market"]["history"])
+        except Exception as e:  # noqa: BLE001 - a symbol without data is reported in its rows, the others still print
+            opens[sym] = type(e).__name__
+    rows, total, notional = [], 0.0, 0.0
+    for t in trades:
+        got = opens[t["symbol"]]
+        o = got.get(t["date"]) if isinstance(got, dict) else None
+        row = {**{k: t[k] for k in ("date", "symbol", "side", "qty", "price")}, "official_open": o, "tm_fill": None,
+               "drift_bps": None, "drift_usd": None, "running_usd": None,
+               "note": "" if o else f"no data ({got})" if isinstance(got, str) else "no daily bar for this day"}
+        if o:
+            sign = 1 if t["side"] == "BUY" else -1
+            tm = o * (1 + sign * bps / 1e4)
+            usd = sign * (t["price"] - tm) * t["qty"]
+            row.update({"tm_fill": round(tm, 4), "drift_usd": round(usd, 2) + 0.0,  # + 0.0: never print "-0.0"
+                        "drift_bps": round(sign * (t["price"] / tm - 1) * 1e4, 1) + 0.0})
+            if _settled(t["date"], cfg, now):
+                total, notional = total + usd, notional + tm * t["qty"]
+                row["running_usd"] = round(total, 2) + 0.0
+            else:
+                row["note"] = "session still open: the daily open is not settled, left out of the totals"
+        rows.append(row)
+    priced = [r for r in rows if r["running_usd"] is not None]
+    return {"rows": rows, "slippage_bps": bps,
+            "total": {"fills": len(rows), "priced": len(priced), "notional": round(notional, 2), "drift_usd": round(total, 2),
+                      "drift_bps": round(total / notional * 1e4, 2) if notional else None,
+                      "max_abs_bps": max((abs(r["drift_bps"]) for r in priced), default=None)}}
 
 
 def to_json(res: dict) -> str:

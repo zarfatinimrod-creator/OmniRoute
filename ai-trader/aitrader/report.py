@@ -172,3 +172,27 @@ def sweep_report(df, detail: dict, rec: dict, cfg: dict) -> str:
     else:
         lines += ["", f"## Deflated Sharpe readings: not computed ({detail.get('dsr_error', 'the sweep kept no detail')})"]
     return "\n".join(lines + ["", *record_lines(rec, cfg)])
+
+
+def drift_report(d: dict, cfg: dict) -> str:
+    """Paper versus time machine (backtest.drift): every live fill next to the official open a replay fills at."""
+    def num(x, fmt):
+        return "-" if x is None else format(x, fmt)
+
+    t = d["total"]
+    lines = ["# Paper versus time machine - fill drift", "",
+             f"Time-machine fill = the official daily open of the fill day, moved {d['slippage_bps']:g} bp against the trade "
+             "(costs.slippage_bps + costs.exec_delay_bps): the price a replay of that day fills at. Drift above 0: the paper "
+             "book paid more (buy) or received less (sell) than the time machine assumes. The open is the price of that "
+             "day itself, not scaled for later dividends or splits.", "",
+             "| date | symbol | side | qty | paper fill | official open | time-machine fill | drift bp | drift $ | running $ | note |",
+             "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|"]
+    lines += [f"| {r['date']} | {r['symbol']} | {r['side']} | {r['qty']:g} | {r['price']:.4f} | {num(r['official_open'], '.4f')} | "
+              f"{num(r['tm_fill'], '.4f')} | {num(r['drift_bps'], '+.1f')} | {num(r['drift_usd'], '+.2f')} | "
+              f"{num(r['running_usd'], '+.2f')} | {r['note']} |" for r in d["rows"]] or ["(no fills)"]
+    if t["priced"]:
+        lines += ["", f"Total: {t['priced']} of {t['fills']} fills priced, notional ${t['notional']:,.2f}, drift "
+                  f"{t['drift_usd']:+.2f} $ ({t['drift_bps']:+.2f} bp of notional), largest single drift {t['max_abs_bps']:.1f} bp."]
+    else:
+        lines += ["", f"Total: 0 of {t['fills']} fills priced."]
+    return "\n".join(lines)
