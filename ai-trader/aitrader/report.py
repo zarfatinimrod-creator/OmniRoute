@@ -97,3 +97,78 @@ def write_daily_report(s: dict, cfg: dict | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+def _seen(x) -> bool:
+    return x is not None and x == x  # not None, not NaN
+
+
+def est(x, lo, hi, nd: int = 3) -> str:
+    """An estimate next to its range: 0.402 [-0.210, 1.020]."""
+    return "n/a" if not _seen(x) else f"{x:.{nd}f}" + (f" [{lo:.{nd}f}, {hi:.{nd}f}]" if _seen(lo) and _seen(hi) else "")
+
+
+def prob(x) -> str:
+    return f"{x:.3f}" if _seen(x) else "-"
+
+
+def range_notes(level: str, bench: str, base: str = "base") -> list[str]:
+    return [
+        f"Each estimate is followed by the range it falls in on {level} of the resampled histories. A Sharpe range that "
+        "reaches below 0 means even the sign is not established.",
+        f"P(Sharpe > {bench}) and P(Sharpe > {base}) are the share of resamples in which the row's Sharpe was the higher "
+        "one on the same resampled days (paired; a tie counts half). They are probabilities under resampling, not "
+        "verdicts: 0.5 means no difference was seen.",
+        "A row is the median over its rebalance phases; the phases hold nearly the same book, so they are not "
+        "independent tests. The maxDD range is approximate: reshuffled days break the path the drawdown breaker "
+        "reacted to.",
+    ]
+
+
+def record_lines(rec: dict, cfg: dict) -> list[str]:
+    """Where a sweep's run record is and what ran (backtest.save_record), or that it could not be saved."""
+    if not rec.get("record"):
+        return ["## Run record", "", f"NOT saved ({rec.get('record_error', 'no detail kept')}): the sweep is registered in "
+                "trials.jsonl without its daily returns, so a later re-run cannot be compared with it."]
+    book = cfg.get("market", {}).get("state_subdir", "")  # "" = the stock book; a book's state folder carries its name
+    path = "/".join(x for x in ("state", book, rec["record"]) if x)
+    dirty = {True: "yes", False: "no"}.get(rec.get("code_dirty"), "unknown")
+    return ["## Run record", "",
+            f"run {rec['run_id']}: {path} ({rec['record_bytes']:,} bytes) - every run's daily returns, the per-phase rows "
+            "and the table rows.",
+            f"code commit {rec['commit']} (uncommitted code changes: {dirty}) | config sha256 {rec['config_sha256'][:12]} | "
+            f"closes sha256 {rec['panel_sha256'][:12]}",
+            f"compare two runs row by row: python3 -m aitrader{' --book ' + book if book else ''} backtest --compare <run A> <run B>"]
+
+
+def sweep_report(df, detail: dict, rec: dict, cfg: dict) -> str:
+    """What a stock time-machine sweep prints under its table: each estimate next to its range, the paired
+    probabilities, both Deflated-Sharpe readings (the registered one is the rule) and where the run record is."""
+    bench = cfg.get("benchmark", "SPY")
+    b, d = detail.get("boot"), detail.get("dsr")
+    if b:
+        lvl = f"{b['level']:.0%}"
+        lines = [f"## Ranges ({lvl} stationary block bootstrap: mean block {b['block_days']} days, {b['draws']} resamples, "
+                 f"seed {b['seed']}, {b['days']} days)", "",
+                 f"| row | Sharpe [{lvl} range] | CAGR [{lvl} range] | maxDD [{lvl} range] | P(Sharpe > {bench}) | P(Sharpe > base) |",
+                 "|---|---|---|---|---:|---:|"]
+        lines += [f"| {r['variant']} | {est(r['sharpe_med'], r['sharpe_lo'], r['sharpe_hi'])} | "
+                  f"{est(r['cagr_med'], r['cagr_lo'], r['cagr_hi'], 4)} | {est(r['maxdd_med'], r['maxdd_lo'], r['maxdd_hi'], 4)} | "
+                  f"{prob(r['p_gt_bench'])} | {prob(r['p_gt_base'])} |" for r in df.to_dict("records") if _seen(r.get("sharpe_lo"))]
+        lines += ["", *range_notes(lvl, bench)]
+    else:
+        lines = [f"## Ranges: not computed ({detail.get('ranges_error', 'the sweep kept no detail')})"]
+    if d:
+        lines += ["", f"## Deflated Sharpe of the base - two readings (N={d['n']}: {d['n_prior_rows']} rows registered "
+                  f"earlier + {d['n_sweep']} variants here; {d['series']})", "",
+                  "| reading | variants in the Sharpe spread | spread (annual Sharpe) | DSR |", "|---|---:|---:|---:|",
+                  f"| 1. every swept variant, cost-stress rows included | {d['rule']['rows_in_spread']} | "
+                  f"{d['rule']['spread_annual']:.4f} | {d['rule']['value']:.3f} |",
+                  f"| 2. cost-stress rows left out of the spread ({', '.join(d['alt']['left_out']) or 'none'}) | "
+                  f"{d['alt']['rows_in_spread']} | {d['alt']['spread_annual']:.4f} | {d['alt']['value']:.3f} |", "",
+                  "The first reading is the rule: it is the number registered in trials.jsonl and the only one a decision "
+                  "may use (skills/strategy-time-machine/SKILL.md). The second is printed to show how far the number moves "
+                  "with the convention; it is never used to claim an edge, whichever of the two is higher."]
+    else:
+        lines += ["", f"## Deflated Sharpe readings: not computed ({detail.get('dsr_error', 'the sweep kept no detail')})"]
+    return "\n".join(lines + ["", *record_lines(rec, cfg)])

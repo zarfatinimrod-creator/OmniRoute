@@ -35,7 +35,7 @@ import numpy as np
 import pandas as pd
 
 from . import backtest, data, journal, report
-from .metrics import dsr
+from .metrics import boot_cfg, boot_rows, dsr
 from .signals import compute_all
 from .strategy import periods_per_year, precompute_aux
 
@@ -112,7 +112,31 @@ def _run(name: str, cfg: dict, panel_all: dict, start: str, end: str | None, pha
         rows.append({"phase": k, "sharpe": _sharpe(eq, cfg), "maxdd": float((eq / eq.cummax() - 1).min()),
                      "cagr": float(res["strategy"].get("cagr", float("nan"))), "n_fills": len(res["_fills"]),
                      "symbols": sorted({f["symbol"] for f in res["_fills"]})})
-    return {"phases": rows, "daily": pd.DataFrame(daily), "bench": res.get("benchmark_spy", {})}
+    hold = res["_bench_equity"]["benchmark"]  # buy&hold of the benchmark coin over the run's window
+    return {"phases": rows, "daily": pd.DataFrame(daily), "bench": res.get("benchmark_spy", {}),
+            "bench_daily": None if hold is None else hold.dropna().pct_change().dropna()}
+
+
+def _ranges(runs: dict, daily: dict, hold: dict, cfg: dict) -> tuple[dict, dict]:
+    """Bootstrap range and paired probabilities of every run (metrics.boot_rows): Sharpe, CAGR and maxDD of the
+    median over its phases, P(Sharpe above buy&hold of the benchmark coin) and P(Sharpe above its paired run), each
+    phase against the same phase. Runs over the same window share one set of resampled days. Block length, resample
+    count and seed are the sweep's pre-registered bootstrap constants; the level is config "bootstrap" (boot_cfg).
+    Returns (settings, {run: {"range": ..., "phases": {phase: ...}}}). Informative only: no pass rule reads it."""
+    st = {**boot_cfg(cfg), "block_days": BOOT_BLOCK, "draws": BOOT_DRAWS, "seed": BOOT_SEED}
+    windows: dict = {}
+    for name, rec in runs.items():
+        windows.setdefault(tuple(rec["window"]), []).append(name)
+    out = {}
+    for names in windows.values():
+        cols = {(n, k): daily[n][k] for n in names for k in daily[n].columns}
+        if hold.get(names[0]) is not None:
+            cols[("hold", 0)] = hold[names[0]]
+        boot = boot_rows(pd.DataFrame(cols), _rf_daily(cfg), periods_per_year(cfg), st,
+                         {n: runs[n]["pair"] for n in names if "pair" in runs[n]}, "hold")
+        for n in names:
+            out[n] = {"range": boot["rows"][n], "phases": {k: boot["phases"][(n, k)] for k in daily[n].columns}}
+    return st, out
 
 
 def bootstrap_p(base: pd.Series, cand: pd.Series, ppy: int, seed: int = BOOT_SEED, block: int = BOOT_BLOCK,
@@ -176,12 +200,14 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
     with journal.use_book("crypto"):  # fail before ~15 minutes of runs, not after
         if _seeded(journal.read("trials.jsonl")) != seed_script().SEED_ROWS:
             raise RuntimeError("seed missing: run scripts/seed_crypto_trials.py")
+    code = backtest.code_commit()  # read before the runs: the code that is loaded now
     ppy = periods_per_year(cand)
     h1_end = str((pd.Timestamp(split) - pd.Timedelta(days=1)).date())
     lo, hi = FEES_BP
     runs: dict = {}
     daily: dict = {}
     bench: dict = {}
+    hold: dict = {}  # run -> daily returns of buy&hold of the benchmark coin over the run's window (None: not kept)
 
     def fee(cfg: dict, bp: int) -> dict:
         c = copy.deepcopy(cfg)
@@ -202,7 +228,7 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
         if pair:
             d = [a["sharpe"] - b["sharpe"] for a, b in zip(out["phases"], runs[pair]["phases"])]
             rec.update({"pair": pair, "d_sharpe": d, "d_sharpe_med": statistics.median(d), "wins": f"{sum(x > 0 for x in d)}/{len(d)}"})
-        runs[name], daily[name], bench[name] = rec, out["daily"], out["bench"]
+        runs[name], daily[name], bench[name], hold[name] = rec, out["daily"], out["bench"], out.get("bench_daily")
         return rec
 
     go("base@50", fee(base, lo), "crypto_base", base, "crypto_base")
@@ -254,6 +280,15 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
              "exec_lag": rec["exec_lag"], "window": rec["window"], "sharpe": round(ph["sharpe"], 6),
              "sharpe_pp": ph["sharpe"] / math.sqrt(ppy), "maxdd": round(ph["maxdd"], 6), "benchmark": False}
             for name, rec in runs.items() for ph in rec["phases"]]
+    honest: dict = {}  # ranges for the report and the run record: new numbers only, no rule above or below reads them
+    try:
+        honest["boot"], ranges = _ranges(runs, daily, hold, cand)
+        for name, r in ranges.items():
+            runs[name]["range"] = r["range"]
+    except Exception as e:  # noqa: BLE001 - named in the report; never costs the sweep its verdict or its registration
+        honest["ranges_error"], ranges = type(e).__name__, {}
+    phase_rows = [{"run": name, **ph, **ranges.get(name, {}).get("phases", {}).get(ph["phase"], {})}
+                  for name, rec in runs.items() for ph in rec["phases"]]
     shipped = final_run if ship == "crypto" else "base@50"
     day = daily[shipped][0] - rf  # phase 0: the single phase a live book trades (conservative vs the phase average)
     with journal.use_book("crypto"):
@@ -273,10 +308,18 @@ def run_sweep(panel_all: dict, start: str, split: str, end: str | None = None, p
                                        "sr_std_pp": round(spread, 6), "daily_series": f"{shipped}, phase 0 daily excess returns",
                                        "window": [str(day.index[0].date()), str(day.index[-1].date())],
                                        "computed_at": journal.now_utc(), "report": str(path)})
-        journal.append("trials.jsonl", {"logged_at": journal.now_utc(), "kind": "crypto_sweep", "start": start, "split": split,
-                                        "end": end, "phases": phases, "ship": ship, "rows": rows})
+        line = {"logged_at": journal.now_utc(), "kind": "crypto_sweep", "start": start, "split": split,
+                "end": end, "phases": phases, "ship": ship, "rows": rows}
+        try:  # the run record beside trials.jsonl: every run's daily returns (NaN outside its window), what ran
+            meta = {k: line[k] for k in ("logged_at", "start", "split", "end", "phases", "ship")} | {"code": code, "boot": honest.get("boot")}
+            frame = pd.DataFrame({(n, k): daily[n][k] for n in runs for k in daily[n].columns})
+            honest["record"] = backtest.save_record("crypto_sweep", meta, rows, phase_rows, frame,
+                                                    {f: panel_all[f] for f in FIELDS}, {"crypto_base": base, "crypto": cand})
+        except Exception as e:  # noqa: BLE001 - the trials still count
+            honest["record"] = {"record_error": type(e).__name__}
+        journal.append("trials.jsonl", {**line, **honest["record"]})
     res = {"runs": runs, "ablations": ablations, "final_candidate": final_candidate, "pass_rule": pr, "ship": ship,
-           **change, "dsr": out, "report": str(path)}
+           **change, "dsr": out, "report": str(path), **honest}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_report(res, base, cand, bench["base@50"], date, start, split, end, phases, n_seeded, len(prior_rows),
                             len(rows), spread, day), encoding="utf-8")
@@ -324,8 +367,25 @@ def _report(res, base, cand, btc, date, start, split, end, phases, n_seeded, n_p
                      f"[{_f(r['sharpe_min'])}, {_f(r['sharpe_max'])}] | {_f(r['maxdd_med'])} | {_f(r['cagr_med'])} | "
                      f"{r.get('pair', '-')} | {_f(r.get('d_sharpe_med'))} | {r.get('wins', '-')} |")
     lines += ["", f"BTC buy&hold over the window (a benchmark, not a trial): Sharpe {btc.get('sharpe', 'n/a')}, "
-              f"maxDD {btc.get('max_drawdown', 'n/a')}, CAGR {btc.get('cagr', 'n/a')}.", "",
-              "## Merged configs", ""]
+              f"maxDD {btc.get('max_drawdown', 'n/a')}, CAGR {btc.get('cagr', 'n/a')}.", ""]
+    b = res.get("boot")
+    if b:
+        lvl, coin = f"{b['level']:.0%}", cand.get("benchmark", "BTC-USD").split("-")[0]
+        lines += [f"## Ranges ({lvl} stationary block bootstrap: mean block {b['block_days']} days, {b['draws']} resamples, "
+                  f"seed {b['seed']})", "",
+                  f"| run | Sharpe med [{lvl} range] | CAGR med [{lvl} range] | maxDD med [{lvl} range] | P(Sharpe > {coin} hold) | vs | P(Sharpe > vs) |",
+                  "|---|---|---|---|---:|---|---:|"]
+        for name, r in res["runs"].items():
+            g = r["range"]
+            lines.append(f"| {name} | {report.est(r['sharpe_med'], g['sharpe_lo'], g['sharpe_hi'])} | "
+                         f"{report.est(r['cagr_med'], g['cagr_lo'], g['cagr_hi'], 4)} | {report.est(r['maxdd_med'], g['maxdd_lo'], g['maxdd_hi'], 4)} | "
+                         f"{report.prob(g['p_gt_bench'])} | {r.get('pair', '-')} | {report.prob(g['p_gt_base'])} |")
+        lines += ["", *report.range_notes(lvl, f"{coin} hold", "vs"),
+                  "These ranges are informative: the pass rule above is unchanged and reads none of them (its own "
+                  "block-bootstrap P is the moving-block one of the spec).", ""]
+    else:
+        lines += [f"## Ranges: not computed ({res.get('ranges_error', 'no detail')})", ""]
+    lines += [*report.record_lines(res.get("record") or {}, cand), "", "## Merged configs", ""]
     for title, cfg in (("crypto_base", base), ("crypto (candidate)", cand)):
         shown = {k: v for k, v in cfg.items() if not k.startswith("_")}
         lines += [f"### {title}", "", "```json", json.dumps(shown, indent=1, default=str), "```", ""]

@@ -10,14 +10,19 @@ conclusion flips between reasonable assumptions there is no conclusion, only sen
 from __future__ import annotations
 
 import copy
+import gzip
+import hashlib
 import json
+import subprocess
+from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from . import journal
 from .broker import PaperBroker
 from .learn import walk_forward_weights
-from .metrics import summary
+from .metrics import boot_cfg, boot_rows, summary
 from .signals import compute_all
 from .strategy import build_targets, periods_per_year, precompute_aux
 
@@ -99,6 +104,7 @@ def run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode
     }
     res["_equity"] = eq
     res["_fills"] = all_fills
+    res["_bench_equity"] = {"benchmark": spy, "equal_weight": ew}  # the day series behind the two benchmark summaries
     return res
 
 
@@ -138,17 +144,26 @@ def _job(args):
             c[sec].update(kv)
     res = run(panel, c, _G["start"], _G["end"], mode, every, signals=signals, aux=precompute_aux(panel, c), phase=phase)
     out = {"variant": name, "phase": phase, "trades": res["n_trades"], **res["strategy"]}
+    out["_daily"] = res["_equity"].pct_change().dropna()  # every run: the ranges and the run record are built from these
     if name == "base" and phase == 0:
-        out["_daily"] = (res["_equity"].pct_change().dropna()).tolist()
         out["_bench"] = {"SPY buy&hold": res["benchmark_spy"], "Equal-weight universe": res["benchmark_equal_weight_universe"]}
+        be = res["_bench_equity"]
+        out["_bench_daily"] = {label: be[k].dropna().pct_change().dropna()
+                               for label, k in (("SPY buy&hold", "benchmark"), ("Equal-weight universe", "equal_weight")) if be[k] is not None}
     return out
 
 
-def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: int = 4) -> pd.DataFrame:
+def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: int = 4, detail: dict | None = None) -> pd.DataFrame:
     """Every variant x every weekly rebalance phase, compared PAIRED with the base at the same phase.
-    Read the median and the win count, never one row: a change is real only if it wins in most phases."""
+    Read the median and the win count, never one row: a change is real only if it wins in most phases.
+    Each row also carries its bootstrap range (sharpe/cagr/maxdd _lo, _hi) and the paired probabilities p_gt_bench and
+    p_gt_base (metrics.boot_rows; settings: config "bootstrap" over metrics.BOOT_DEFAULTS). `detail`, when given, is
+    filled with what register() saves: per-phase rows, every run's daily returns, the bootstrap settings and both
+    Deflated-Sharpe readings."""
     from concurrent.futures import ProcessPoolExecutor
 
+    info = {} if detail is None else detail
+    info["code"] = code_commit()  # read before the runs: the code that is loaded now, not what the tree holds later
     _G.update({"panel": panel, "cfg": cfg, "start": start, "end": end, "signals": compute_all(panel, cfg)})
     base_every = cfg["risk"].get("rebalance_every_days", 5)
     jobs = []
@@ -182,7 +197,128 @@ def sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: i
         rows.append({"variant": f"DSR of base (N={n_prev + len(srs)} trials)", "psr_med": round(dsr(daily, n_prev + len(srs), float(srs.std())), 3)})
     except Exception as e:  # noqa: BLE001 - informative only
         rows.append({"variant": f"DSR unavailable: {type(e).__name__}"})
+    ppy = periods_per_year(cfg)
+    rf_d = (1 + cfg["account"]["cash_yield_annual"]) ** (1 / ppy) - 1
+    runs = pd.DataFrame({**{(r["variant"], r["phase"]): r["_daily"] for r in results},
+                         **{(label, 0): s for label, s in b0["_bench_daily"].items()}}).dropna()  # the days every run has
+    info.update({"daily": runs, "phase_rows": df.to_dict("records")})
+    try:  # the DSR row above is the rule (same inputs here); the second reading shows how far the convention moves it
+        cost = [name for name, ov, *_ in _variants(cfg) if set(ov) == {"costs"}]  # the same trades at another cost
+
+        def reading(s: pd.Series) -> dict:
+            return {"value": round(dsr(daily, n_prev + len(srs), float(s.std())), 3), "rows_in_spread": len(s),
+                    "spread_annual": round(float(s.std()) * ppy ** 0.5, 4)}
+
+        info["dsr"] = {"series": "base, phase 0, daily excess returns", "n": n_prev + len(srs), "n_prior_rows": n_prev,
+                       "n_sweep": len(srs), "rule": reading(srs), "alt": {**reading(srs.drop(cost)), "left_out": cost}}
+    except Exception as e:  # noqa: BLE001 - informative only, like the DSR row (which names its own failure)
+        info["dsr_error"] = type(e).__name__
+    try:  # new columns only: a failure here must not cost the table above or the registration of the sweep
+        pairs = {name: "base" for name, *_ in _variants(cfg) if name != "base"}
+        boot = boot_rows(runs, rf_d, ppy, boot_cfg(cfg), pairs, "SPY buy&hold")
+        for row in rows:
+            row.update(boot["rows"].get(row["variant"], {}))
+        info.update({"boot": boot["settings"],
+                     "phase_rows": [{**r, **boot["phases"][(r["variant"], r["phase"])]} for r in info["phase_rows"]]})
+    except Exception as e:  # noqa: BLE001 - named in the report (report.sweep_report), never silent
+        info["ranges_error"] = type(e).__name__
     return pd.DataFrame(rows)
+
+
+def panel_hash(panel: dict, fields=("close",)) -> str:
+    """sha256 of the prices a run read: dates x symbols x values of each field (default: the closes). A revised bar, a
+    slid history window or a renamed symbol gives another hash, so a re-run that differs can be told from a code change."""
+    h = hashlib.sha256()
+    for f in fields:
+        x = panel[f].to_frame() if isinstance(panel[f], pd.Series) else panel[f]
+        h.update(json.dumps([f, [str(d) for d in x.index], [str(c) for c in x.columns]]).encode())
+        a = x.to_numpy(dtype="float64")
+        h.update(np.where(np.isnan(a), np.nan, a).tobytes())  # one bit pattern for every missing value
+    return h.hexdigest()
+
+
+def config_hash(cfg: dict) -> str:
+    return hashlib.sha256(json.dumps(cfg, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def code_commit() -> dict:
+    """git rev-parse HEAD of the code that ran ("unknown" outside a repository), and whether aitrader/ or config.json
+    held uncommitted changes (None when unknown): the commit names the code only when code_dirty is False."""
+    root = Path(__file__).resolve().parent.parent
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+
+    try:
+        return {"commit": git("rev-parse", "HEAD"), "code_dirty": bool(git("status", "--porcelain", "--", "aitrader", "config.json"))}
+    except (OSError, subprocess.SubprocessError):
+        return {"commit": "unknown", "code_dirty": None}
+
+
+def save_record(kind: str, meta: dict, rows: list, phase_rows: list, daily: pd.DataFrame, panel: dict, cfg: dict) -> dict:
+    """Write one sweep as <state>/trial_runs/<run_id>.json.gz, beside the trials.jsonl line that names it: what ran
+    (code commit, config hash, price-panel hash and shape), the table rows, the per-phase rows and every run's daily
+    returns (columns (row, phase) -> "row|phase"), so a later re-run can be compared row by row (diff_records).
+    meta["code"]: code_commit() as read when the sweep started (read now when absent). Returns the keys the trials
+    line carries."""
+    close = panel["close"]
+    prices = sorted(k for k, v in panel.items() if isinstance(v, (pd.DataFrame, pd.Series)))
+    meta = dict(meta)
+    ident = {"kind": kind, **(meta.pop("code", None) or code_commit()), **meta, "config_sha256": config_hash(cfg),
+             "panel": {"sha256": panel_hash(panel), "inputs_sha256": panel_hash(panel, prices), "fields": prices,
+                       "first": str(close.index[0].date()), "last": str(close.index[-1].date()),
+                       "days": len(close), "symbols": len(close.columns)}}
+    run_id = f"{meta['logged_at'][:10]}-{config_hash(ident)[:12]}"
+    body = {"run_id": run_id, **ident, "rows": rows, "phase_rows": phase_rows,
+            "daily": {"days": [str(d.date()) for d in daily.index],
+                      "series": {f"{r}|{k}": daily[(r, k)].tolist() for r, k in daily.columns}}}
+    path = journal.STATE / "trial_runs" / f"{run_id}.json.gz"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    with gzip.open(tmp, "wt", encoding="utf-8") as f:
+        json.dump(body, f, default=str)
+    tmp.replace(path)
+    return {"run_id": run_id, "record": f"trial_runs/{path.name}", "record_bytes": path.stat().st_size,
+            "panel_sha256": ident["panel"]["sha256"], "config_sha256": ident["config_sha256"],
+            "commit": ident["commit"], "code_dirty": ident["code_dirty"]}
+
+
+def register(df: pd.DataFrame, detail: dict, panel: dict, cfg: dict, start: str, end: str | None = None) -> dict:
+    """Register a sweep: the trials.jsonl line every later Deflated Sharpe counts (logged_at, start, rows - as before)
+    plus the keys of its run record. A record that cannot be written never costs the registration: the line is
+    appended either way and names the failure (record_error)."""
+    rec = {"logged_at": journal.now_utc(), "start": start, "rows": df.to_dict("records")}
+    if detail.get("daily") is not None:
+        try:
+            meta = {"logged_at": rec["logged_at"], "start": start, "end": end, "code": detail.get("code"),
+                    "boot": detail.get("boot"), "dsr": detail.get("dsr")}
+            rec.update(save_record("stock_sweep", meta, rec["rows"], detail["phase_rows"], detail["daily"], panel, cfg))
+        except Exception as e:  # noqa: BLE001 - the trial still counts
+            rec["record_error"] = type(e).__name__
+    journal.append("trials.jsonl", rec)
+    return rec
+
+
+def load_record(path) -> dict:
+    with gzip.open(path, "rt", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def diff_records(a: dict, b: dict) -> list[dict]:
+    """Two run records row by row: what differs in what ran (commit, config, prices) and in each run's daily returns.
+    An empty list means the re-run reproduced the registered run exactly."""
+    out = [{"what": k, "a": a.get(k), "b": b.get(k)} for k in ("commit", "code_dirty", "config_sha256", "panel") if a.get(k) != b.get(k)]
+    da, db = a["daily"], b["daily"]
+    for key in sorted(set(da["series"]) | set(db["series"])):
+        if key not in da["series"] or key not in db["series"]:
+            out.append({"what": "run", "row": key, "only_in": "a" if key in da["series"] else "b"})
+            continue
+        x, y = (pd.Series(d["series"][key], index=d["days"], dtype=float) for d in (da, db))
+        gap = (x - y).abs()  # aligned by day; a day only one run has is a difference too
+        bad = gap[~((gap == 0) | (x.reindex(gap.index).isna() & y.reindex(gap.index).isna()))]
+        if len(bad):
+            out.append({"what": "daily", "row": key, "days_differing": len(bad), "first": bad.index[0], "max_abs_diff": float(gap.max())})
+    return out
 
 
 def to_json(res: dict) -> str:

@@ -3,6 +3,7 @@
   cycle [--dry-run] [--force-rebalance]   one live paper cycle (execute only when the market is open)
   status                                  print the latest summary
   backtest [--start 2018-01-01] [--sweep] the time machine (historical replay); --book crypto: the crypto sweep (spec 7)
+           [--compare RUN_A RUN_B]        two saved sweep records row by row (read-only)
   predict SYMBOL up|down [--horizon N] [--note TEXT]   log Claude's own call for later grading
   veto SYMBOL --reason TEXT               veto today's new entry in SYMBOL (Claude review)
   shrink SYMBOL MULT --reason TEXT        shrink today's target for SYMBOL (0..1)
@@ -68,6 +69,7 @@ def main(argv=None) -> int:
     b.add_argument("--start", default="2018-01-01")
     b.add_argument("--end", default=None)
     b.add_argument("--sweep", action="store_true")
+    b.add_argument("--compare", nargs=2, metavar=("RUN_A", "RUN_B"), help="two run records (ids under state/trial_runs), row by row; read-only")
     p = sub.add_parser("predict")
     p.add_argument("symbol")
     p.add_argument("direction", choices=["up", "down"])
@@ -157,6 +159,12 @@ def _run(a: argparse.Namespace) -> int:
         print(json.dumps(journal.load_json("latest.json", {}), indent=1, default=str))
     elif a.cmd == "scorecard":
         print(json.dumps(journal.scorecard(), indent=1))
+    elif a.cmd == "backtest" and a.compare:  # read-only: did a re-run reproduce a registered run (the active book's records)
+        from . import backtest
+
+        ra, rb = (backtest.load_record(journal.STATE / "trial_runs" / f"{x}.json.gz") for x in a.compare)
+        diff = backtest.diff_records(ra, rb)
+        print(json.dumps({"a": ra["run_id"], "b": rb["run_id"], "identical": not diff, "differences": diff}, indent=1, default=str))
     elif a.cmd == "backtest" and a.book == "crypto":  # spec 7: the paired-phase sweep decides crypto_base vs candidate
         from . import crypto_sweep
         from .data import fetch_panel, load_config
@@ -177,9 +185,13 @@ def _run(a: argparse.Namespace) -> int:
         cfg = load_config()
         panel = load_market(cfg, "10y")
         if a.sweep:
-            df = backtest.sweep(panel, cfg, a.start, a.end)
+            from . import report
+
+            detail: dict = {}
+            df = backtest.sweep(panel, cfg, a.start, a.end, detail=detail)
             print(df.to_string(index=False))
-            journal.append("trials.jsonl", {"logged_at": journal.now_utc(), "start": a.start, "rows": df.to_dict("records")})
+            rec = backtest.register(df, detail, panel, cfg, a.start, a.end)  # the trials.jsonl line + the run record
+            print("\n" + report.sweep_report(df, detail, rec, cfg))
         else:
             print(backtest.to_json(backtest.run(panel, cfg, a.start, a.end)))
     elif a.cmd == "predict":

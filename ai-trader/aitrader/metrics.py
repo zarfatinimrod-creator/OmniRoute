@@ -57,6 +57,94 @@ def dsr(daily: pd.Series, n_trials: int, sr_trials_std: float) -> float:
     return psr(daily, sr0)
 
 
+BOOT_DEFAULTS = {"block_days": 20, "draws": 2000, "seed": 0, "level": 0.95}  # config.json "bootstrap" overrides key by key
+BOOT_CELLS = 4_000_000  # array cells (resamples x days x series) handled at once: memory, not a model assumption
+
+
+def boot_cfg(cfg: dict | None) -> dict:
+    return {**BOOT_DEFAULTS, **((cfg or {}).get("bootstrap") or {})}
+
+
+def boot_index(n: int, block: float, draws: int, seed: int) -> np.ndarray:
+    """Day positions of `draws` resamples of an n-day history, shape (draws, n): the stationary bootstrap (Politis and
+    Romano 1994). A block starts on a random day, runs on day after day and ends with probability 1/block (mean
+    length `block`); it wraps past the last day to the first, so every day is drawn equally often. Blocks keep the
+    day-to-day dependence of returns that drawing single days would throw away."""
+    if n < 2 or block < 1 or draws < 1:
+        raise ValueError(f"bootstrap needs n >= 2, block >= 1 and draws >= 1, got {n}, {block}, {draws}")
+    rng = np.random.default_rng(seed)
+    pos = np.arange(n)
+    new = rng.random((draws, n)) < 1.0 / block
+    new[:, 0] = True
+    began = np.maximum.accumulate(np.where(new, pos, 0), axis=1)  # where the block covering each position began
+    first = np.take_along_axis(rng.integers(0, n, (draws, n)), began, axis=1)  # the day that block starts on
+    return (first + pos - began) % n
+
+
+def boot_stats(returns: np.ndarray, idx: np.ndarray, rf_daily: float, periods_per_year: int = TD) -> dict:
+    """Sharpe (annualised, excess of cash), CAGR and max drawdown of every series on every resample, as summary()
+    defines them. returns: (days, series); idx: boot_index(); each result: (draws, series). A resample without
+    variance has Sharpe 0. Every series is read on the same resampled days, so their differences are paired."""
+    n, k = returns.shape
+    step = max(1, BOOT_CELLS // (n * k))
+    out = {name: np.empty((len(idx), k)) for name in ("sharpe", "cagr", "maxdd")}
+    for a in range(0, len(idx), step):
+        x = returns[idx[a:a + step]]  # (resamples, days, series)
+        ex = x - rf_daily
+        sd = ex.std(axis=1, ddof=1)
+        out["sharpe"][a:a + step] = np.divide(ex.mean(axis=1), sd, out=np.zeros_like(sd), where=sd > 0) * math.sqrt(periods_per_year)
+        eq = np.cumprod(1 + x, axis=1)
+        out["cagr"][a:a + step] = eq[:, -1] ** (periods_per_year / n) - 1
+        peak = np.maximum(np.maximum.accumulate(eq, axis=1), 1.0)  # the path starts at 1, before the first return
+        out["maxdd"][a:a + step] = (eq / peak - 1).min(axis=1)
+    return out
+
+
+def p_above(d) -> float:
+    """Share of resamples with d > 0. A tie counts half, so a row identical to its reference reads 0.5, not 0."""
+    d = np.asarray(d, dtype=float)
+    return float((d > 0).mean() + 0.5 * (d == 0).mean())
+
+
+def boot_rows(daily: pd.DataFrame, rf_daily: float, periods_per_year: int, settings: dict, pairs: dict | None = None,
+              bench: str | None = None) -> dict:
+    """Ranges and paired probabilities for the rows of a sweep. daily: days x runs with columns (row, phase); days
+    missing in any column are dropped, so every run is read on the same days. A row's number is the median over its
+    phases (what the sweep table prints) and its range is the central `level` share of that median over the
+    resamples; "phases" holds the same for each single run.
+    p_gt_bench: share of resamples where the Sharpe is above the bench row's on the same resampled days.
+    p_gt_base: the same for the median paired difference with pairs[row], each phase k against that row's phase
+    k % (its number of phases). Both are probabilities under resampling, not tests: nothing here says "significant".
+    The max-drawdown range is approximate: reshuffled days break the path a drawdown breaker reacted to."""
+    d = daily.dropna()
+    cols = list(d.columns)
+    at = {c: i for i, c in enumerate(cols)}
+    st = boot_stats(d.to_numpy(dtype=float), boot_index(len(d), settings["block_days"], settings["draws"], settings["seed"]),
+                    rf_daily, periods_per_year)
+    q = [(1 - settings["level"]) / 2, (1 + settings["level"]) / 2]
+    phases = {r: [k for name, k in cols if name == r] for r in dict.fromkeys(name for name, _ in cols)}
+    pairs = pairs or {}
+
+    def describe(row: str, ks: list) -> dict:
+        sel = [at[(row, k)] for k in ks]
+        out = {}
+        for name, nd in (("sharpe", 3), ("cagr", 4), ("maxdd", 4)):
+            lo, hi = np.quantile(np.median(st[name][:, sel], axis=1), q)
+            out[f"{name}_lo"], out[f"{name}_hi"] = round(float(lo), nd), round(float(hi), nd)
+        s = st["sharpe"][:, sel]
+        out["p_gt_bench"] = out["p_gt_base"] = None
+        if bench in phases and row != bench:
+            out["p_gt_bench"] = round(p_above(np.median(s, axis=1) - st["sharpe"][:, at[(bench, phases[bench][0])]]), 3)
+        if pairs.get(row) in phases:
+            m = len(phases[pairs[row]])
+            out["p_gt_base"] = round(p_above(np.median(s - st["sharpe"][:, [at[(pairs[row], k % m)] for k in ks]], axis=1)), 3)
+        return out
+
+    return {"rows": {r: describe(r, ks) for r, ks in phases.items()},
+            "phases": {(r, k): describe(r, [k]) for r, ks in phases.items() for k in ks},
+            "settings": {**settings, "days": len(d), "method": "stationary bootstrap, circular"}}
+
+
 def summary(equity: pd.Series, turnover: pd.Series | None = None, rf_annual: float = 0.0, periods_per_year: int = TD) -> dict:
     """Sharpe/Sortino/PSR use returns in EXCESS of the cash rate, so earning interest on idle cash
     does not flatter a low-exposure strategy against SPY."""
