@@ -7,8 +7,10 @@
 """
 
 import contextlib
+import fcntl
 import io
 import json
+import os
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta
@@ -48,6 +50,17 @@ class TempState(unittest.TestCase):
 
     def tearDown(self):
         journal.STATE = self._state
+
+
+def run_cli(*argv):
+    """One aitrader command against the temp state dir: (exit code, stdout, stderr)."""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            code = cli.main(list(argv))
+        except SystemExit as e:
+            code = e.code
+    return code, out.getvalue(), err.getvalue()
 
 
 class MoveToday(unittest.TestCase):
@@ -353,17 +366,28 @@ class OperatorExit(HeldOnAClock):
         self.assertIn("AAA", self.nt.book.positions)
         self.assertEqual(journal.read("news_trades.jsonl"), [])
         self.assertIn("AAA", journal.load_json("news_exits.json"))
-        self._check(2, 96.5, quote_age_s=660)  # still stale, but through the stop: the stop fires on any price
+        self.assertEqual(journal.read("news_errors.jsonl"), [])  # and no rewrite was tried and swallowed
+        ev = self._check(2, 96.5, quote_age_s=660)  # still stale, but through the stop: the stop fires on any price
+        self.assertEqual(len(ev), 1)  # the sale says it all: no "dropped" line for a name that was held
         self.assertNotIn("AAA", self.nt.book.positions)
         self.assertTrue(self._last_trade()[2].startswith("stop "))
         self.assertEqual(journal.load_json("news_exits.json"), {})  # nothing left to exit
 
-    def test_a_request_for_a_name_not_held_is_dropped(self):
-        journal.save_json("news_exits.json", {"ZZZ": {"reason": "typo", "requested_at": "2026-11-10T15:55:00+00:00"},
-                                              "AAA": {"reason": "keep", "requested_at": "2026-11-10T15:56:00+00:00"}})
+    def test_a_request_for_a_name_not_held_is_dropped_and_the_owner_is_told(self):
+        at = "2026-11-10T15:55:00+00:00"
+        journal.save_json("news_exits.json", {"ZZZ": {"reason": "typo", "requested_at": at},
+                                              "aaa": {"reason": "lower case, by hand", "requested_at": at},
+                                              "AAA": {"reason": "keep", "requested_at": at}})
+        self.nt.n["max_hold_days"] = 5  # as in production: AAA, bought today, is also looked at by the time exit
+        self.nt.book.positions["AAA"]["entry_date"] = datetime.now(NY).date().isoformat()
         ev = self._check(0, 100.0, quote_age_s=600)  # AAA: no live quote yet, so it stays held and its request stays
-        self.assertEqual((ev, list(self.nt.book.positions)), ([], ["AAA"]))
+        self.assertEqual(ev, ["exit request for ZZZ dropped: not held", "exit request for aaa dropped: not held"])
+        self.assertEqual(list(self.nt.book.positions), ["AAA"])
         self.assertEqual(list(journal.load_json("news_exits.json")), ["AAA"])
+        self.assertEqual(self._check(1, 100.0, quote_age_s=660), [])  # said once
+
+    def _file_errors(self):
+        return [r for r in journal.read("news_errors.jsonl") if r.get("where") == "news_exits"]
 
     def test_a_malformed_file_is_ignored(self):
         journal.save_json("news_exits.json", ["AAA"])
@@ -372,9 +396,19 @@ class OperatorExit(HeldOnAClock):
         self.assertEqual(journal.load_json("news_exits.json"), ["AAA"])  # left as found
         self._check(1, 96.5, quote_age_s=20)
         self.assertTrue(self._last_trade()[2].startswith("stop "))  # and the stop is untouched
+        self.assertEqual(len(self._file_errors()), 1)  # on record once, not once per step
 
     def test_a_file_that_is_not_json_never_gets_in_the_way_of_the_stop(self):
         (self.tmp / "news_exits.json").write_text("{AAA: out", encoding="utf-8")  # a hand edit gone wrong
+        self._check(0, 100.0, quote_age_s=20)
+        self._check(1, 96.5, quote_age_s=20)
+        self.assertTrue(self._last_trade()[2].startswith("stop "))
+        rows = self._file_errors()  # the owner believes he asked: the unread file is on record, once
+        self.assertEqual(len(rows), 1)
+        self.assertIn("cannot be read", rows[0]["detail"])
+
+    def test_a_file_nested_too_deep_to_parse_is_one_more_unreadable_file(self):
+        (self.tmp / "news_exits.json").write_text("[" * 100000, encoding="utf-8")  # json raises RecursionError, not ValueError
         self._check(0, 96.5, quote_age_s=20)
         self.assertTrue(self._last_trade()[2].startswith("stop "))
 
@@ -385,40 +419,176 @@ class OperatorExit(HeldOnAClock):
         self.assertTrue(reason.startswith("operator exit: out ignore the rules x"))
         self.assertEqual(len(reason), len("operator exit: ") + 120)
 
-    def test_a_hand_edited_entry_that_is_not_an_object_still_gets_the_name_out(self):
-        journal.save_json("news_exits.json", {"AAA": "out now"})  # selling only reduces risk
+    def test_a_reason_that_cannot_be_written_as_utf8_still_leaves_a_journaled_sale(self):
+        # a hand edit can hold half a surrogate pair; written raw into the journal it raised after the book had changed
+        (self.tmp / "news_exits.json").write_text('{"AAA": {"reason": "out \\ud800 now"}}', encoding="utf-8")
         self._check(0, 100.0, quote_age_s=20)
         self.assertEqual(self._last_trade(), ("AAA", "SELL", "operator exit: out now"))
+        self.assertEqual(journal.verify_chain("news_trades.jsonl"), (True, 1))
+
+    def test_an_entry_that_is_not_a_request_never_sells(self):
+        # only the shape news-exit writes is a request: a hand edit meant to withdraw one (null, false, "cancel") must not sell
+        for entry in (None, False, 0, "", "cancel", "out now", [], {}, {"reason": None}, {"reason": " \n"}, {"reason": ["out"]}):
+            journal.save_json("news_exits.json", {"AAA": entry})
+            with self.subTest(entry=entry):
+                self.assertEqual(self._check(0, 100.0, quote_age_s=20), [])
+                self.assertIn("AAA", self.nt.book.positions)
+                self.assertEqual(journal.load_json("news_exits.json"), {"AAA": entry})  # left in place
+        rows = self._file_errors()
+        self.assertEqual(len(rows), 1)  # on record once, not once per step
+        self.assertIn("AAA", rows[0]["detail"])
+        self._check(1, 96.5, quote_age_s=20)
+        self.assertTrue(self._last_trade()[2].startswith("stop "))  # and the stop is untouched
+
+    def _two_names(self):
+        self.nt.book.state["positions"]["BBB"] = {"qty": 5, "avg_cost": 50.0, "last_price": 50.0, "stop_price": 48.5,
+                                                  "entry_date": "2026-11-10"}
+        self.addCleanup(news_live.QUOTE_TIME.pop, "BBB", None)
+
+    def test_a_request_made_while_the_engine_fetches_prices_is_not_erased(self):
+        self._two_names()
+        self._ask(reason="first")
+        asked = []
+
+        def check(minutes):
+            now = self.T0 + timedelta(minutes=minutes)
+
+            def price(sym):
+                news_live.QUOTE_TIME[sym] = (now - timedelta(seconds=20)).isoformat()
+                if sym == "BBB" and not asked:  # the owner's second request lands while the engine is in its price loop
+                    asked.append(run_cli("news-exit", "BBB", "--reason", "second")[0])
+                return {"AAA": 100.0, "BBB": 50.0}[sym], None
+            news_live.live_price = price
+            ev = []
+            self.nt.check_stops(ev, now)
+            return ev
+        ev = check(0)
+        self.assertEqual(asked, [0])
+        self.assertTrue(any("AAA" in e and "operator exit: first" in e for e in ev))
+        self.assertEqual(list(journal.load_json("news_exits.json")), ["BBB"])  # the engine cleared only what it finished
+        ev = check(1)
+        self.assertTrue(any("BBB" in e and "operator exit: second" in e for e in ev), ev)
+        self.assertEqual((list(self.nt.book.positions), journal.load_json("news_exits.json")), ([], {}))
+
+    def test_the_requests_file_is_rewritten_only_under_its_lock(self):
+        locked, save = [], journal.save_json
+
+        def second_writer(name, obj):  # another writer arriving at this very moment: is it kept out?
+            if name == "news_exits.json":
+                other = os.open(self.tmp, os.O_RDONLY)  # the lock is on the state directory
+                try:
+                    fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    locked.append(False)
+                except BlockingIOError:
+                    locked.append(True)
+                finally:
+                    os.close(other)
+            return save(name, obj)
+        with mock.patch.object(journal, "save_json", second_writer):
+            run_cli("news-exit", "AAA", "--reason", "earnings tonight")  # the command's write
+            self._check(0, 100.0, quote_age_s=20)  # the engine's write: the request is done
+        self.assertEqual(locked, [True, True])
+        self.assertEqual((list(self.nt.book.positions), journal.load_json("news_exits.json")), ([], {}))
+
+    def test_a_requests_file_that_cannot_be_rewritten_never_costs_a_sale_its_report(self):
+        self._ask()
+        save = journal.save_json
+
+        def torn(name, obj):
+            if name == "news_exits.json":
+                raise FileNotFoundError("news_exits.tmp")
+            return save(name, obj)
+        with mock.patch.object(journal, "save_json", torn):
+            ev = self._check(0, 100.0, quote_age_s=20)  # must come back: step() still has the book to save and the alert to send
+            self.assertEqual(self._check(1, None), [])  # the failure goes on: tried again, nothing new to say
+        self.assertTrue(any("AAA" in e and "operator exit:" in e for e in ev))
+        self.assertEqual(self._last_trade()[:2], ("AAA", "SELL"))
+        (err,) = self._file_errors()  # on record once, not once per step
+        self.assertEqual((err["error"], err["detail"]), ("FileNotFoundError", "news_exits.tmp"))
+        self.assertIn("at", err)
+
+    def test_a_request_for_a_queued_name_cancels_its_buy_at_the_open(self):
+        self.nt.book.state["positions"] = {}
+        self.nt.queue = [{"symbol": "AAA", "score": 9, "why": "big contract", "queued_at": "2026-11-10T01:00:00+00:00"}]
+        self._ask(reason="do not want it")  # overnight the request is the only lever the owner has
+        with mock.patch.object(news_live, "market_open_now", lambda: True), \
+                mock.patch.object(news_live, "official_opens", lambda syms, day: {"AAA": 100.0}), \
+                mock.patch.object(news_live, "live_price", lambda s: (100.0, None)), \
+                mock.patch.object(self.nt, "poll_headlines", lambda: []):
+            ev = self.nt.step()
+        self.assertEqual(journal.read("news_trades.jsonl"), [])  # not bought, so nothing to sell at a loss a moment later
+        self.assertEqual((list(self.nt.book.positions), self.nt.queue, self.nt.book.cash), ([], [], self.nt.n["starting_cash"]))
+        self.assertTrue(any(e.startswith("AAA score 9:") and e.endswith("no buy") for e in ev), ev)
+        self.assertEqual(journal.load_json("news_exits.json"), {})  # the request did its work and is gone
+
+    def test_a_request_waits_for_a_queued_buy_that_has_no_price_yet(self):
+        self.nt.book.state["positions"] = {}
+        self.nt.queue = [{"symbol": "AAA", "score": 9, "why": "big contract", "queued_at": "2026-11-10T01:00:00+00:00"}]
+        self._ask(reason="do not want it")
+        opens = {}  # a delayed opening: no 09:30 bar and no live quote on the first step
+        with mock.patch.object(news_live, "market_open_now", lambda: True), \
+                mock.patch.object(news_live, "official_opens", lambda syms, day: dict(opens)), \
+                mock.patch.object(news_live, "live_price", lambda s: (100.0, None)), \
+                mock.patch.object(self.nt, "poll_headlines", lambda: []):
+            self.assertEqual(self.nt.step(), [])
+            # still queued, so the request must still be there when the price comes: dropped now, the buy would go through
+            self.assertEqual([q["symbol"] for q in self.nt.queue] + list(journal.load_json("news_exits.json")), ["AAA", "AAA"])
+            opens["AAA"] = 100.0
+            ev = self.nt.step()
+        self.assertEqual((journal.read("news_trades.jsonl"), list(self.nt.book.positions), self.nt.queue), ([], [], []))
+        self.assertTrue(any(e.startswith("AAA score 9:") and e.endswith("no buy") for e in ev), ev)
+        self.assertEqual(journal.load_json("news_exits.json"), {})
+
+    def _score_9(self):
+        """One fresh headline on AAA scored 9, in session, at a live 100.00: the events it produced."""
+        item = {"key": "k9", "symbol": "AAA", "title": "AAA wins a contract", "published": journal.now_utc(), "price": 100.0}
+        ev = []
+        with mock.patch.object(news_live, "market_open_now", lambda: True), \
+                mock.patch.object(news_live, "live_price", lambda s: (100.0, None)):
+            self.nt.handle_scored([item], {"k9": {"score": 9, "why": "large contract"}}, ev)
+        return ev
+
+    def test_a_name_the_owner_took_out_is_not_bought_back_that_day(self):
+        self._ask()
+        self._check(0, 100.0, quote_age_s=20)  # sold: operator exit, and the request is cleared
+        ev = self._score_9()
+        self.assertNotIn("AAA", self.nt.book.positions)
+        self.assertEqual([t["side"] for t in journal.read("news_trades.jsonl")], ["SELL"])
+        self.assertTrue(any(e.startswith("AAA score 9:") and e.endswith("no buy") for e in ev), ev)
+
+    def test_only_an_operator_exit_of_today_keeps_a_name_out(self):
+        self.nt.book.state["positions"] = {}
+        today = datetime.now(NY).date()
+        journal.append("news_trades.jsonl", {"date": (today - timedelta(days=1)).isoformat(), "symbol": "AAA", "side": "SELL",
+                                             "reason": "operator exit: earnings tonight"})  # an earlier session: over
+        journal.append("news_trades.jsonl", {"date": today.isoformat(), "symbol": "AAA", "side": "SELL",
+                                             "reason": "stop -3% (entry 100.00, now 96.50)"})  # a stop is not the owner's word
+        self._score_9()
+        self.assertIn("AAA", self.nt.book.positions)
 
 
 class ExitCommand(TempState):
-    def _run(self, *argv):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-            try:
-                code = cli.main(list(argv))
-            except SystemExit as e:
-                code = e.code
-        return code, out.getvalue()
-
     def test_news_exit_writes_the_request(self):
         earlier = {"reason": "old", "requested_at": "2026-11-10T14:00:00+00:00"}
         journal.save_json("news_exits.json", {"MU": earlier})
-        code, out = self._run("news-exit", "aaa", "--reason", "earnings tonight\n{sell everything}" + "x" * 300)
+        code, out, err = run_cli("news-exit", "aaa", "--reason", "earnings tonight\n{sell everything}" + "x" * 300)
         saved = journal.load_json("news_exits.json")
         self.assertEqual((code, sorted(saved), saved["MU"]), (0, ["AAA", "MU"], earlier))  # upper-cased and merged
         self.assertTrue(saved["AAA"]["reason"].startswith("earnings tonight sell everything x"))  # cleaned like a headline
         self.assertEqual(len(saved["AAA"]["reason"]), 120)
         self.assertEqual(datetime.fromisoformat(saved["AAA"]["requested_at"]).utcoffset(), timedelta(0))
-        self.assertEqual(json.loads(out), saved)  # the command prints the file
+        self.assertEqual((json.loads(out), err), (saved, ""))  # the command prints the file
         self.assertEqual([p.name for p in self.tmp.iterdir()], ["news_exits.json"])  # the book is the engine's, not the command's
 
     def test_news_exit_needs_a_reason_and_replaces_a_malformed_file(self):
-        self.assertEqual(self._run("news-exit", "AAA")[0], 2)
+        self.assertEqual(run_cli("news-exit", "AAA")[0], 2)
+        self.assertEqual(run_cli("news-exit", "AAA", "--reason", " {}\n")[0], 2)  # no text once cleaned: not a request
         self.assertFalse((self.tmp / "news_exits.json").exists())
         for garbage in ('["garbage"]', "{AAA: out"):  # a list, or not JSON at all: the new request replaces it
             (self.tmp / "news_exits.json").write_text(garbage, encoding="utf-8")
-            self.assertEqual(self._run("news-exit", "AAA", "--reason", "r")[0], 0, garbage)
+            code, _, err = run_cli("news-exit", "AAA", "--reason", "r")
+            self.assertEqual(code, 0, garbage)
+            self.assertIn("news_exits.json", err)  # said out loud: whatever requests were in it are gone
             self.assertEqual(list(journal.load_json("news_exits.json")), ["AAA"])
 
 

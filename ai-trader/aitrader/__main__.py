@@ -14,7 +14,8 @@
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
   news-score [--n 8]                      score recent headlines without trading (scorer check)
   news-status                             news book, last trades, news scorecard
-  news-exit SYMBOL --reason TEXT          ask the news engine to sell a held name at its next live quote (never buys)
+  news-exit SYMBOL --reason TEXT          ask the news engine to sell a held name at its next live quote (never buys);
+                                          a waiting request, or an exit sold today, also keeps the engine from buying it
   dashboard                               build .cache/dashboard/snapshot.json for the Dashboard artifact
   placebo [--k 100]                       noise gate the learner must beat (signals shuffled across stocks)
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
@@ -260,11 +261,15 @@ def _run(a: argparse.Namespace) -> int:
                           "trades": journal.read("news_trades.jsonl")[-10:],
                           "scorecard": journal.scorecard(journal.read("news_predictions.jsonl"), "news_grades.jsonl")}, indent=1, default=str, ensure_ascii=False))
     elif a.cmd == "news-exit":  # only a request: the book lives in the engine's session, which sells and clears it
-        from .news_live import _clean, exit_requests
+        from .news_live import _clean, update_exits
 
-        ex = exit_requests()
-        ex[a.symbol.upper()] = {"reason": _clean(a.reason, 120), "requested_at": journal.now_utc()}
-        journal.save_json("news_exits.json", ex)
+        reason = _clean(a.reason, 120)
+        if not reason:  # the engine takes only an entry with a reason as a request
+            print("news-exit needs a reason with text in it", file=sys.stderr)
+            return 2
+        ex, readable = update_exits(put={a.symbol.upper(): {"reason": reason, "requested_at": journal.now_utc()}})
+        if not readable:
+            print("news_exits.json could not be read and was replaced: any request that was in it is gone", file=sys.stderr)
         print(json.dumps(ex, indent=1, ensure_ascii=False))
     elif a.cmd == "placebo":
         from .data import load_config, load_market

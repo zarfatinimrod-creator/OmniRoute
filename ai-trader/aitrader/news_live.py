@@ -13,8 +13,10 @@ validated (symbol must match, score clamped to 1..10); nothing in a headline can
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
+import os
 import re
 import subprocess
 import time
@@ -45,7 +47,7 @@ def ncfg(cfg: dict) -> dict:
 
 # ---------------------------------------------------------------- headlines
 def _clean(text: str, cap: int = 240) -> str:
-    t = re.sub(r"[\x00-\x1f\x7f<>{}`]", " ", text or "")
+    t = re.sub(r"[\x00-\x1f\x7f<>{}`\ud800-\udfff]", " ", text or "")  # half a surrogate pair cannot be written to a journal
     return re.sub(r"\s+", " ", t).strip()[:cap]
 
 
@@ -174,14 +176,46 @@ def market_open_now() -> bool:
     return hours is not None and hours[0] <= (now.hour, now.minute) < hours[1]
 
 
-def exit_requests() -> dict:
-    """The owner's exit requests, {symbol: {reason, requested_at}} (state/news_exits.json, written by news-exit).
-    A file that cannot be read or is not an object asks for nothing: it must never get in the way of the stops."""
+def _exits_file() -> dict | None:
+    """state/news_exits.json as it stands; None when it cannot be read or is not an object."""
     try:
         ex = journal.load_json("news_exits.json", {})
-    except (OSError, ValueError):
-        ex = None
-    return ex if isinstance(ex, dict) else {}
+    except Exception:  # noqa: BLE001 - OSError, bad JSON, nesting too deep to parse: all the same to the stops
+        return None
+    return ex if isinstance(ex, dict) else None
+
+
+def exit_requests() -> tuple[dict, str]:
+    """(the owner's exit requests, what is wrong with the file - "" when nothing is). A request has the shape
+    news-exit writes: {symbol: {"reason": <text>, "requested_at": <UTC>}}. Anything else under a symbol (null, false,
+    a bare word, no reason) asks for nothing and is left in place: a hand edit meant to withdraw a request must never
+    sell. A file that cannot be read asks for nothing either: it must never get in the way of the stops."""
+    ex = _exits_file()
+    if ex is None:
+        return {}, "news_exits.json cannot be read as an object: no exit request is seen"
+    asks = {s: v for s, v in ex.items() if isinstance(v, dict) and isinstance(v.get("reason"), str) and _clean(v["reason"])}
+    odd = [_clean(s, 20) for s in ex if s not in asks]
+    return asks, ("news_exits.json entries that are not requests (no reason), left in place: " + ", ".join(odd)) if odd else ""
+
+
+def update_exits(put: dict | None = None, done: dict | None = None) -> tuple[dict, bool]:
+    """The only writer of state/news_exits.json, for news-exit and for the engine: two writers that each saved
+    their own copy erased each other's requests. Under an exclusive lock it reads the file again, sets the `put`
+    entries, deletes each `done` entry that is still the one its caller loaded, and saves only a change. Returns
+    (the file as it now stands, whether what was there could be read). An unreadable file is replaced only by a
+    new request, never by a clean-up.
+    The lock is on the state directory itself: the file cannot hold it (save_json replaces the file), and a lock
+    file would be one more untracked file in the git-tracked state."""
+    lock = os.open(journal._path("news_exits.json").parent, os.O_RDONLY)
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        was = _exits_file()
+        new = {s: v for s, v in (was or {}).items() if not (s in (done or {}) and v == done[s])} | (put or {})
+        if new != (was or {}):
+            journal.save_json("news_exits.json", new)
+        return new, was is not None
+    finally:
+        os.close(lock)  # closing the descriptor releases the lock
 
 
 # ---------------------------------------------------------------- the loop
@@ -234,8 +268,16 @@ class NewsTrader:
         return new
 
     # -- rules
-    def _buy(self, sym: str, px: float, why: str, score: int) -> dict | None:
+    def _buy(self, sym: str, px: float, why: str, score: int, events: list) -> dict | None:
         if sym in self.book.positions:
+            return None
+        today = datetime.now(NY).date().isoformat()
+        if sym in exit_requests()[0] or any(t.get("symbol") == sym and t.get("date") == today
+                                            and str(t.get("reason")).startswith("operator exit:")
+                                            for t in journal.read("news_trades.jsonl")):
+            # the owner wants out of this name: a request is waiting (made while the name was only queued), or his exit
+            # was sold today. Buying it, or buying it back, would undo his word within the same session.
+            events.append(f"{sym} score {score}: exit requested by the owner - no buy")
             return None
         marks = self._marks()
         eq = self.book.equity(marks)
@@ -266,7 +308,8 @@ class NewsTrader:
 
     def check_stops(self, events: list, now: datetime | None = None):
         now = now or datetime.now(NY)
-        exits = exit_requests()
+        exits, wrong = exit_requests()
+        had = set(self.book.positions)  # held when this call began
         sight = {}  # symbol -> the price this step saw (None = no quote)
         for sym, pos in list(self.book.positions.items()):
             px, _ = live_price(sym)
@@ -277,8 +320,7 @@ class NewsTrader:
             reason = None
             if sym in exits and self._quote_is_live(QUOTE_TIME.get(sym), None, now):
                 # sold only at a live quote; without one the request waits and the stop below works as always
-                ask = exits[sym]
-                reason = "operator exit: " + _clean(str((ask.get("reason") if isinstance(ask, dict) else ask) or ""), 120)
+                reason = "operator exit: " + _clean(exits[sym]["reason"], 120)
             elif px <= pos.get("stop_price", pos["avg_cost"] * (1 - self.n["stop_loss_pct"])):
                 reason = f"stop -{self.n['stop_loss_pct']:.0%} (entry {pos['avg_cost']:.2f}, now {px:.2f})"
             elif self.n.get("max_hold_days"):
@@ -289,9 +331,21 @@ class NewsTrader:
                 f = self._sell(sym, px, reason)
                 if f:
                     self._log_trade(f, events)
-        open_exits = {s: v for s, v in exits.items() if s in self.book.positions}  # sold or never held: nothing to exit
-        if open_exits != exits:
-            journal.save_json("news_exits.json", open_exits)
+        bad = ("ExitRequests", wrong) if wrong else None
+        try:  # the requests file is tidied after the sales: a failure here must not cost them their save and their report
+            # sold or never held: nothing to exit. A name still queued keeps its request until _buy has turned the buy down
+            done = {s: v for s, v in exits.items() if s not in self.book.positions and all(q["symbol"] != s for q in self.queue)}
+            if done:  # only these, and only as loaded above: a request that came in during the price loop stays
+                left = update_exits(done=done)[0]
+                events.extend(f"exit request for {_clean(s, 20)} dropped: not held"
+                              for s in done if s not in had and s not in left)
+        except Exception as e:  # noqa: BLE001
+            bad = (type(e).__name__, str(e))
+        if bad != getattr(self, "_exits_bad", None):  # on record once per problem, not once per step
+            self._exits_bad = bad
+            if bad:
+                journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": bad[0], "detail": bad[1][:300],
+                                                     "where": "news_exits"})
         # alerts come after every stop has been looked at: a failing alert must never delay a sale
         self._blind = {s: v for s, v in getattr(self, "_blind", {}).items() if s in self.book.positions}
         for sym, px in sight.items():
@@ -371,7 +425,7 @@ class NewsTrader:
             if s["score"] > self.n["buy_min_score"]:
                 buy_px = px if live else (x.get("price") if not is_open and self.n["trade_outside_hours"] else None)
                 if buy_px:
-                    f = self._buy(x["symbol"], buy_px, s["why"], s["score"])
+                    f = self._buy(x["symbol"], buy_px, s["why"], s["score"], events)
                     if f:
                         self._log_trade(f, events)
                 elif not is_open and not any(q["symbol"] == x["symbol"] for q in self.queue):
@@ -395,7 +449,7 @@ class NewsTrader:
             if not px:
                 continue  # stays queued; tried again next step
             if px:
-                f = self._buy(q["symbol"], px, q["why"] + f" (queued, filled at {how})", q["score"])
+                f = self._buy(q["symbol"], px, q["why"] + f" (queued, filled at {how})", q["score"], events)
                 if f:
                     self._log_trade(f, events)
             self.queue.remove(q)
