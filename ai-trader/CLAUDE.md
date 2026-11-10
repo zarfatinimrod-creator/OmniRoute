@@ -174,6 +174,18 @@ At the end of every session: `logs/YYYY-MM-DD-<slug>.md` with the eight Hebrew h
 הבקשה · מה נעשה · קבצים ששונו · החלטות · כשלים בדרך · אימות · עבודה ידנית חוזרת → לאוטומציה · בזבוז טוקנים.
 First line names the session type (cycle / pre-market / post-close review / weekly research).
 
+## One builder at a time (2026-11-10)
+Several sessions work this folder (the owner's main chat, the trader session, one-task sessions). Operations never
+wait for each other, code does:
+- **Not claimed, every session writes its own:** `state/`, `logs/`, `reports/`, lessons and postmortem records.
+- **Claimed:** anything under `aitrader/`, `tests/`, `scripts/`, `config.json`, `skills/`, `agents/`, `dashboard/`
+  and this file. Before changing one of these: `git pull`, read `BUILD_CLAIMS.md`. If another session holds an open
+  claim on that file younger than 24 hours, do not edit it: add a line under "Waiting" and push that. Otherwise add
+  your claim (session, files, purpose, UTC time), commit and push THAT FIRST, then work, and move the claim to
+  "Done" in the push that carries the work.
+- A defect fix from the loss protocol that cannot wait may go ahead over a claim only after saying so in the claims
+  file, in a pushed commit, naming the files it will touch.
+
 ## Agents and models
 **Owner's standing order (Nimrod, 2026-11-10): work only with Fable 5.2, for everything, until he says otherwise.**
 Every session, subagent and workflow stage runs on `claude-fable-5-2`. Never set another model on an agent, a
