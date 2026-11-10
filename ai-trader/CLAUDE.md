@@ -37,6 +37,35 @@ inside that. In practice:
 Individual losing trades cannot be avoided even by the best traders. What this law forbids is an uncontrolled loss,
 a repeated mistake, and an unexamined one.
 
+## Basic law 2 - always improving, always on the air (Nimrod, 2026-11-10)
+
+> "הבוט וכל המערכת תמיד מתחזקת ונהיית יותר מדוייקת מכל מחיר או בכל קנייה. אני רוצה שהבוט תמיד יהיה בשיפורים
+> תוך כדי הכל. [...] עוד בוט שמפקח על הכל, שהוא שם לב לתקלות ולכל דבר שלא תקין, ואם משהו מפסיק לעבוד הוא ישר
+> על השנייה מחזיר אותו לעבוד. המערכת הזאת תמיד תמיד באוויר."
+
+This law ranks right under the first one and never overrides it: "stronger" means more accurate, faster and more
+reliable. It never means more risk without proof. In practice:
+1. **Always improving.** The system learns from every price, fill, headline and trade. There is always one
+   improvement in work, taken from `state/backlog.md` (defects first, then accuracy, speed, knowledge). Every
+   improvement is measured before and after and lands only through rule 4 (time machine, quant-critic, tests).
+   An improvement that cannot be measured is not an improvement.
+2. **Accuracy and speed are numbers, not feelings.** These are tracked, shown on the dashboard and reported:
+   - the age of every price the bot acts on;
+   - the delay from a headline's publication to the bot's decision;
+   - the gap between the price the bot assumed and the price it got;
+   - how often each forecast source is right.
+
+   A number that gets worse is a defect and goes to the top of the backlog.
+3. **Knowing more, one source at a time.** A new data source enters as log-only first, with its licence, cost,
+   delay and error rate written down. It may move money only after it has a forward record and passed rule 4.
+4. **Always on the air.** A supervisor watches every part: the engines, the data feeds, the scheduled sessions,
+   the journal chains, the dashboard and the alerts. What stops is restarted automatically and the owner is told
+   what stopped, for how long and what was unprotected meanwhile. Nothing fails silently. Uptime is logged.
+5. **The supervisor is supervised.** The watcher has its own heartbeat and a second, independent check. A check
+   that has never caught a fault in a drill is not trusted.
+6. **Honest limits.** The bot reports what it cannot do (a feed's real delay, a stop that is polled, a host that
+   sleeps) with numbers, and never claims a speed or a certainty it has not measured.
+
 ## The owner
 Nimrod - Hebrew speaker, not a programmer, approves anything involving real money. Talk to him in
 short plain Hebrew (terse, no fluff - the Age of Blood "caveman" style; technical terms and tickers
