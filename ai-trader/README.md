@@ -29,6 +29,9 @@ python3 -m aitrader cycle            # מחזור אחד (מבצע רק כשהש
 python3 -m aitrader cycle --dry-run  # רק הצעה, בלי ביצוע
 python3 -m aitrader status           # מצב אחרון
 python3 -m aitrader backtest --start 2018-01-01 --sweep   # מכונת הזמן
+python3 -m aitrader backtest --drift                # כל ביצוע חי מול הפתיחה שמכונת הזמן מניחה (קריאה בלבד)
+python3 -m aitrader backtest --compare RUN_A RUN_B  # שתי הרצות שמורות של מכונת הזמן, שורה מול שורה (קריאה בלבד)
+python3 -m aitrader news-exit NVDA --reason "..."   # בקשה למכור מניה מתיק החדשות במחיר חי; רק מוכרת, ומודיעים לנמרוד (--cancel מבטל)
 python3 -m aitrader predict NVDA up --horizon 20 --note "..."   # תחזית של Claude לבדיקה
 python3 -m aitrader scorecard        # כרטיס ציונים
 python3 -m aitrader brief NVDA       # חבילת נתונים לדסק המסחר
