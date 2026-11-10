@@ -21,6 +21,11 @@
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
   desk SYMBOL RATING --prob P --thesis T --invalidation I   record the desk's final call (Sell/Underweight=veto, Hold=shrink 0.5)
   scorecard                               grade matured predictions
+  postmortem                              realized losses with no review yet (Basic law, item 3), all books; with --record
+                                          --keys K[,K] --inside-rules yes|no --data-ok yes|no --verdict V --causes T[,T]
+                                          --what TEXT --lesson TEXT --fix TEXT [--fix-ref REF] it writes the review
+  news-hold --reason TEXT                 the news engine opens no new position until the hold is lifted (stops and sales
+                                          go on); `news-hold --release --reason TEXT` lifts it, on the owner's word
 
   --book stocks|crypto (before or after the command; default stocks) picks the paper book. crypto runs in
   state/crypto/ and is accepted by cycle, status, scorecard, backtest, verify, predict, context, veto, shrink, summary;
@@ -105,6 +110,20 @@ def main(argv=None) -> int:
     s.add_argument("--reason", required=True)
     n = sub.add_parser("news")
     n.add_argument("symbol")
+    nh = sub.add_parser("news-hold")
+    nh.add_argument("--reason", required=True, help="why the hold is set, or (with --release) the owner's word that lifts it")
+    nh.add_argument("--release", action="store_true")
+    pm = sub.add_parser("postmortem")
+    pm.add_argument("--record", action="store_true", help="write a review for the fills named by --keys")
+    pm.add_argument("--keys", default="", help="comma-separated fill keys as the list prints them (book:hash; 8 or more characters of the hash); one book per review")
+    pm.add_argument("--inside-rules", choices=["yes", "no"], default=None)
+    pm.add_argument("--data-ok", choices=["yes", "no"], default=None)
+    pm.add_argument("--verdict", default=None, help="bad_data | bad_rule | rule_broken | ops_defect | planned_loss")
+    pm.add_argument("--causes", default="", help="comma-separated cause tags (reused across reviews to catch repeats)")
+    pm.add_argument("--what", default="")
+    pm.add_argument("--lesson", default="")
+    pm.add_argument("--fix", default="")
+    pm.add_argument("--fix-ref", default="", help="commit, backlog item or lesson that carries the fix")
     for sp in sub.choices.values():  # --book also after the command; SUPPRESS keeps the top-level value when absent
         sp.add_argument("--book", choices=["stocks", "crypto"], default=argparse.SUPPRESS)
     a = ap.parse_args(argv)
@@ -224,12 +243,36 @@ def _run(a: argparse.Namespace) -> int:
             print(f"{name}: {'OK' if ok else 'BROKEN at record ' + str(n)} ({n} records)")
             bad += [] if ok else [name]
         print("ALL CHAINS OK" if not bad else "BROKEN: " + ", ".join(bad) + " - stop and report")
+        try:  # Basic law, item 3: a realized loss with no review is shown at every session start (never fatal here)
+            from . import postmortem
+
+            waiting = postmortem.pending()
+            if waiting:
+                print(f"LOSSES AWAITING REVIEW: {len(waiting)} (-${abs(sum(x['loss'] for x in waiting)):,.2f})"
+                      " - after this slot's own steps run `python3 -m aitrader postmortem` and follow"
+                      " skills/trader/SKILL.md section 3א")
+            again = postmortem.repeated()
+            if again:
+                print("REPEATED CAUSES: " + ", ".join(f"{t} ({n} losses)" for t, n in again.items())
+                      + " - the same cause in two losing sales: if it is a second event, top of state/backlog.md as a"
+                        " defect and tell the owner once (skills/trader/SKILL.md section 0)")
+        except Exception as e:  # noqa: BLE001
+            print(f"postmortem check failed: {type(e).__name__}")
+        if journal.BOOK == "stocks":
+            try:
+                from .news_live import buy_hold
+
+                hold = buy_hold()
+                if hold:
+                    print(f"NEWS BUYS ON HOLD since {hold.get('since')}: {hold['reason']}")
+            except Exception as e:  # noqa: BLE001
+                print(f"news hold check failed: {type(e).__name__}")
         if bad:
             sys.exit(1)
     elif a.cmd == "news-live":
         from .news_live import run
 
-        run(a.until, a.minutes)
+        return run(a.until, a.minutes) or 0  # 3 = another engine holds the book and this one did not start
     elif a.cmd == "news-score":  # score recent headlines without trading (a check of the scorer)
         from datetime import datetime, timedelta, timezone
 
@@ -256,10 +299,37 @@ def _run(a: argparse.Namespace) -> int:
 
         print(write())
     elif a.cmd == "news-status":
+        from . import postmortem
+        from .news_live import buy_hold
+
         b = journal.load_json("news_book.json", {}) or {}
+        try:  # a blocked book must not look like a quiet one
+            waiting = postmortem.pending("news")
+        except Exception as e:  # noqa: BLE001
+            waiting = f"unreadable ({type(e).__name__}): buys are blocked"
         print(json.dumps({"cash": round(b.get("cash", 0), 2), "positions": b.get("positions", {}),
                           "trades": journal.read("news_trades.jsonl")[-10:],
+                          "losses_awaiting_review": waiting, "buy_hold": buy_hold(),
                           "scorecard": journal.scorecard(journal.read("news_predictions.jsonl"), "news_grades.jsonl")}, indent=1, default=str, ensure_ascii=False))
+    elif a.cmd == "news-hold":  # the news book's kind of veto: only ever stops buys; sales and stops never pass through it
+        from .news_live import set_hold
+
+        from .news_live import buy_hold
+
+        try:
+            h = set_hold(a.reason, release=a.release)
+        except ValueError as e:
+            print(f"news-hold: {e}", file=sys.stderr)
+            return 2
+        except OSError as e:  # the two files are written one after the other: say which state the hold is in now
+            now = buy_hold()
+            print(f"news-hold: {type(e).__name__}: {str(e)[:200]}. The hold is now "
+                  + (f"SET ({now['reason']})" if now else "NOT set") + "; check state/news_hold.json and"
+                  " state/news_holds.jsonl", file=sys.stderr)
+            return 1
+        print(json.dumps({"hold": h or None, "released": a.reason.strip() if a.release else None}, indent=1, ensure_ascii=False))
+        print("commit and push state/news_hold.json and state/news_holds.jsonl now: a hold that is not pushed is lost"
+              " with the container", file=sys.stderr)
     elif a.cmd == "news-exit":  # only a request: the book lives in the engine's session, which sells and clears it
         from .news_live import _clean, update_exits
 
@@ -319,6 +389,33 @@ def _run(a: argparse.Namespace) -> int:
                 ov["size_mult"][sym] = [action[1], reason, journal.now_utc()]
             journal.save_json("overrides.json", ov)
         print(f"desk logged: {sym} {a.rating} p={prob:.2f} -> {action or 'no override (code decides size)'}")
+    elif a.cmd == "postmortem":
+        from . import postmortem
+
+        if not a.record and any((a.keys, a.inside_rules, a.data_ok, a.verdict, a.causes, a.what, a.lesson, a.fix, a.fix_ref)):
+            print("postmortem: the answers of a review need --record; nothing was written", file=sys.stderr)
+            return 2
+        if a.record:
+            if a.inside_rules is None or a.data_ok is None or a.verdict is None:
+                print("postmortem --record needs --inside-rules, --data-ok and --verdict", file=sys.stderr)
+                return 2
+            try:
+                rec = postmortem.record([k for k in a.keys.split(",") if k.strip()], a.inside_rules == "yes", a.data_ok == "yes",
+                                        a.verdict, a.causes.split(","), a.what, a.lesson, a.fix, a.fix_ref)
+            except ValueError as e:
+                print(f"postmortem: {e}", file=sys.stderr)
+                return 2
+            except Exception as e:  # noqa: BLE001 - a ledger or journal that cannot be used: say which, no traceback
+                print(f"postmortem: the review was NOT written ({type(e).__name__}: {str(e)[:200]}); check"
+                      f" state/{postmortem.LEDGER} and the trade journals", file=sys.stderr)
+                return 1
+            print(json.dumps(rec, indent=1, ensure_ascii=False))
+        try:
+            print(json.dumps(postmortem.summary(), indent=1, ensure_ascii=False))
+        except Exception as e:  # noqa: BLE001 - say which file, do not die with a traceback
+            print(f"postmortem: the list could not be built ({type(e).__name__}: {str(e)[:200]}); check state/{postmortem.LEDGER}"
+                  " and the trade journals. Until it can be read the news engine opens no position.", file=sys.stderr)
+            return 1
     elif a.cmd == "news":
         from .data import news_headlines
 

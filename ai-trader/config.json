@@ -239,7 +239,7 @@
   "sec_user_agent": "ai-trader-research-bot contact@example.com",
   "_note_priors": "2026-11-09: reversal/high52/rsi2 demoted (decayed after publication, strategy-science brief); lowvol used as an exclusion filter instead of a score.",
   "news": {
-    "_note": "Owner's rules 2026-11-09: buy only if Claude's headline score > 8; max 5% of the account per trade; sell at -3% from entry, no exceptions. sell_on_score_at_most and max_hold_days are Claude's additions (set to 0 to disable).",
+    "_note": "Owner's rules 2026-11-09: buy only if Claude's headline score > 8; max 5% of the account per trade; sell at -3% from entry, no exceptions. sell_on_score_at_most and max_hold_days are Claude's additions (set to 0 to disable). block_buys_until_loss_reviewed: Claude's reduce-only addition that keeps the owner's order of 2026-11-10 (Basic law, item 3: every loss is studied). While a realized news loss has no review in state/postmortems.jsonl the engine opens no new position; sales and stops are never held back; false switches it off.",
     "poll_seconds": 20,
     "fresh_minutes": 30,
     "buy_min_score": 8,
@@ -256,7 +256,31 @@
     "max_quote_age_minutes": 3,
     "chain_check_seconds": 300,
     "alert_after_errors": 5,
-    "stop_blind_alert_seconds": 300
+    "stop_blind_alert_seconds": 300,
+    "block_buys_until_loss_reviewed": true,
+    "_note_guards": "Added after the MU loss of 2026-11-10 (state/postmortems.jsonl). Each can only refuse a buy or bring a sale forward. guards: the no-chase limit (max_day_move_pct_to_buy), the second check (verify_*) and the stop cooldown (rebuy_cooldown_sessions) are new rules, not repairs, and they rest on one loss: with guards = log (the default) they only write to state/news_checks.jsonl what they would have refused and change no trade; with guards = enforce they refuse. Enforcing is a rule change: on evidence it may be proposed only after 30 or more graded above-the-line headlines in news_checks.jsonl with |t| > 2 for the guard (skills/trader/SKILL.md section 3, item 5), through rule 4 and with the owner's answer; before that it is only the owner's own choice to reduce risk, and is put to him as such (one case, no forward record). Do NOT set enforce yet: in that mode the second check runs inside the batch and can age the quote of a bad-news sale behind it (state/backlog.md, item 35); the batch must first be handled in two passes, sales before buys. require_known_move is a repair (Basic law, item 1: missing data, no trade) and is always enforced: no buy in session when today's move of the stock is not known. max_day_move_pct_to_buy: the stock is already up this many percent today (3 = the stop distance, not a measured number; 0 switches it off). rebuy_cooldown_sessions: a name sold at its stop, until this many sessions have opened since (1 = the day of the stop). verify_buys: with guards = enforce, before a buy or a place in the queue, verify_calls independent checks must each call the headline a new, confirmed event of one of verify_allow_kinds (verify_model null = news.model), and with verify_rescore the same scorer, asked again, must still score it above buy_min_score; a check that fails or does not answer within verify_timeout_seconds is a refusal. With guards = log the same questions are asked after the buy, in the background (verify_parallel at a time), and only written down; they hold up no buy, no sale and no look at a stop, and an answer that is still out when a run ends in market hours is dropped, not waited for. stop_catchup: when a held name's stop was not looked at for more than stop_catchup_gap_seconds (engine down, a stalled step, no live quote), today's 1-minute bars of that stretch are read once at least stop_catchup_min_seconds of it have passed; a bar that closed at or under the stop, or stop_catchup_min_lows bars with a low at or under it, means the stop was traded through unseen (bars are trusted only when, for a stretch of stop_catchup_min_minutes or more, at least stop_catchup_min_bar_share of its minutes are there). alert (default until the owner decides): he is told at once and the position stays on its normal stop. sell: it is also sold at its first live quote that day. off: no look.",
+    "require_known_move": true,
+    "max_day_move_pct_to_buy": 3.0,
+    "rebuy_cooldown_sessions": 1,
+    "verify_buys": true,
+    "verify_calls": 2,
+    "verify_rescore": true,
+    "verify_timeout_seconds": 60,
+    "verify_model": null,
+    "verify_allow_kinds": ["company_announcement", "regulator_or_counterparty"],
+    "guards": "log",
+    "stop_catchup": "alert",
+    "stop_catchup_gap_seconds": 90,
+    "stop_catchup_min_seconds": 120,
+    "stop_catchup_min_lows": 2,
+    "stop_catchup_min_minutes": 4,
+    "stop_catchup_min_bar_share": 0.5,
+    "verify_parallel": 1
+  },
+  "postmortem": {
+    "_note": "Basic law, item 3 (loss reviews, aitrader/postmortem.py). min_chars: the shortest text a review may have in each answer, so a one-word review cannot clear a loss (fix_ref: where the fix lives, a commit or a backlog item; not asked of a planned loss). min_key_chars: how many characters of a sale's hash a review must give to name it.",
+    "min_chars": {"what": 40, "lesson": 20, "fix": 10, "fix_ref": 7},
+    "min_key_chars": 8
   },
   "books": {
     "_note": "Book profiles (spec 2026-11-09-crypto-book-design, sections 3.1 and 5; plan planning decisions). load_config('crypto') = this file without 'books', then books.crypto merged over it, then books.<ship_profile> over that when it is not 'crypto'. universe, prior_weights, signals and benchmark are replaced whole; every other block merges key by key. crypto_base lists only what differs from the candidate. Zero-weight signals keep the stock parameters (the values the replays used); max_positions 2 = the whole two-coin universe (the replays' 15 behaves the same). The candidate leaves risk.dd_reentry_ref to its default (dd_halve + dd_flat) / 2 = -0.375 (planning decision 1). risk.max_position_pct_by_symbol XRP-USD is read only by the crypto sweep's BTC+XRP hindsight control (XRP is in no profile's universe).",

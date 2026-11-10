@@ -26,7 +26,8 @@ class NewsRules(unittest.TestCase):
         news_live.live_price, news_live.market_open_now = self._lp, self._mo
 
     def _item(self, key="k1"):
-        return {"key": key, "symbol": "AAA", "title": "AAA wins huge contract", "published": "2026-11-09T14:00:00+00:00", "price": self.prices["AAA"]}
+        return {"key": key, "symbol": "AAA", "title": "AAA wins huge contract", "published": "2026-11-09T14:00:00+00:00", "price": self.prices["AAA"],
+                "day_move_pct": 0.0}
 
     def test_score_8_does_not_buy_score_9_does(self):
         ev = []

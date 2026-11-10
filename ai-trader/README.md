@@ -67,3 +67,7 @@ is named in the next record (`after_torn`). Anything else needs a person:
    record means the history was changed: write down what changed in `logs/` and tell Nimrod.
 3. Restore the file from that commit (`git checkout <sha> -- state/<file>`), re-append the intact newer records in
    order with `journal.append`, and run `verify` again. Never edit hashes by hand, and never use `git stash`.
+   A repaired chain gives its records new hashes, and a loss review names its sale by that hash: run
+   `python3 -m aitrader postmortem` afterwards and record again the reviews of the sales that show up as pending.
+   The second record repeats the first one's cause tag, so `verify` then lists it under REPEATED CAUSES although it
+   is one loss: say so in the session log.

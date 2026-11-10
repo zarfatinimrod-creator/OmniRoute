@@ -21,6 +21,15 @@ for _var in ("AITRADER_NTFY_TOPIC", "AITRADER_TELEGRAM_TOKEN", "AITRADER_TELEGRA
 
 CFG = json.loads((Path(__file__).resolve().parent.parent / "config.json").read_text())
 
+# A test run must never start a scorer process either. The second look before a news buy answers "a confirmed company
+# announcement" (news_live.verify_headline) and "scored 10 again" (news_live.rescore_headline) here unless a test puts
+# its own answers in; the real calls are news_live._ask_checker and news_live._rescore, tested with stubs.
+from aitrader import news_live as _news_live  # noqa: E402
+
+APPROVED = {"kind": "company_announcement", "confirmed": True, "why": "test"}
+_news_live.verify_headline = lambda item, model, timeout=60: dict(APPROVED)
+_news_live.rescore_headline = lambda item, model, timeout=None: 10
+
 
 def synthetic_panel(n_days=700, n_syms=30, seed=0):
     rng = np.random.default_rng(seed)

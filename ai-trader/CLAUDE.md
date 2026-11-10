@@ -21,14 +21,16 @@ inside that. In practice:
    - Never hold a position hoping it comes back.
 
    Refusing to take a small loss is the classic way to lose a lot of money.
-3. **Every loss is studied - no exceptions.** Each realized loss (stop, exit, losing news trade, a losing week) gets
-   a review in the after-close session. The review answers:
+3. **Every loss is studied - no exceptions.** Each losing sale (a stop, an exit, a losing news trade) starts the
+   loss protocol below. The review answers:
    - Was the trade inside the rules?
    - Was the data there?
    - Was it bad luck or a bad rule?
 
-   The answer goes into `state/lessons.md` with the evidence. A rule that keeps losing is fixed through the time
-   machine + quant-critic. The same mistake must not happen twice.
+   The answers go into `state/postmortems.jsonl`, and into `state/lessons.md` with the evidence when they teach
+   something new. A rule that keeps losing is fixed through the time machine + quant-critic. The same mistake must
+   not happen twice. A losing week has no sale to attach a review to: it is studied in the Saturday review with the
+   same questions and written in the weekly report.
 4. **Honesty about losses.** Losses are reported to Nimrod as they are, with exact numbers, never hidden, rounded
    away or explained away.
 5. **Growth, not gambling.** The goal is steady risk-adjusted growth that beats SPY. A single big win does not
@@ -36,6 +38,75 @@ inside that. In practice:
 
 Individual losing trades cannot be avoided even by the best traders. What this law forbids is an uncontrolled loss,
 a repeated mistake, and an unexamined one.
+
+### Loss protocol - what happens every time money is lost (Nimrod, 2026-11-10)
+
+> "תבדוק מה קרה, למה הפסדנו כסף, תלמד מזה, תבדוק איך אפשר לתקן את זה שלא יקרה שוב, ותעשה את זה. תרשום את זה
+> בחוק שכל פעם שמפסידים כסף אתה עושה את זה. מה שחשוב זה שנלמד מטעויות ולא נפסיד כסף."
+
+Every losing sale, in any book and of any size, is reviewed without waiting to be asked. The five scheduled
+trading slots (the two engine watchdogs, open, midday, close) run `python3 -m aitrader postmortem` after their own
+duty, so a loss is picked up by the next of them. In market hours that is the next engine-watchdog slot, about 30
+minutes away at most by the schedule; after the last watchdog (15:37 New York) it is the close slot at 16:22, up to
+45 minutes. A crypto sale made at night is picked up by the next of these slots, which can be hours away (after a
+Friday night: the Saturday review). This is the schedule, not a measured delay: a slot waits while another turn is
+running.
+
+In market hours the slot's own duty comes first (the engine check, the cycle) and the review turn stays short:
+steps 1-4, and the record when it is a planned loss. Longer work, such as a defect fix through rule 4, runs in the
+background or in a separate session, so that no watchdog slot waits behind it.
+1. **Find it.** `python3 -m aitrader postmortem` lists every losing sale that has no review yet. `verify` prints
+   how many are waiting.
+2. **What happened.** Rebuild the trade from the journals and the market data: why it was opened and on what data,
+   how it was closed, and what the system was doing in between (engine up, stop checked, price fresh). Exact
+   numbers and times, each with its source.
+3. **Why.** Was the trade inside the rules? Was the data right and present? Did the system do its job the whole
+   time? Was it a bad rule, or the planned small loss of a good one? Judge the decision by what could be known
+   then, not by how it ended.
+4. **Learn.** One line in `state/lessons.md` with the evidence, when the review found something new. A planned loss
+   gets none: its record in `state/postmortems.jsonl` is enough.
+5. **Fix, and do it.** What is done depends on what the review found.
+   - **A defect:** the system did not do what the written rules already say (wrong data reached a decision, a
+     check that exists in the rules did not run, a part was down). It is fixed now, through rule 4, and the review
+     is recorded only after the fix is pushed (`--fix-ref` names the commit). When the fix is in the news engine
+     the engine is restarted on it first: the record is what lets the engine buy again, and it must buy on the
+     fixed code. A news position that is still open and was opened on the defective data no longer has the
+     evidence its rule asks for: its exit is requested (`news-exit`) and the owner is told. It is not left to its
+     stop. The same holds when the defect is found before any loss (an audit, a fix): the exit is requested then.
+   - **A rule that looks wrong, or a check the rules never had:** this is a rule change, not a defect. One loss is
+     one case, not proof, so it changes no trade now. It goes to `state/backlog.md` with the evidence and waits
+     for rule 4. A rule the owner set (the news rules) also waits for his answer. A new check may enter the code
+     at once only in log mode, through rule 4: it writes down what it would have refused and changes no trade, so
+     its forward record starts on day one. Until the rule is decided Claude may only use the levers that can only
+     reduce risk: `veto`, `shrink`, `news-exit`, `news-hold`. Each use is written in the review. A `veto` or a
+     `shrink` applies to one decision date and is not carried to the next. A `news-exit` is not undone. A `news-hold` is lifted only on Nimrod's
+     word, whatever condition was written next to it. A `news-hold` that is to outlast the review is set and pushed
+     before the review is recorded: the record frees the buys at once.
+   - **A planned loss inside the rules:** nothing changes, and the review says so and why.
+6. **Record and report.** `python3 -m aitrader postmortem --record ...` writes the review to
+   `state/postmortems.jsonl`; it is committed and pushed in the same turn, with `lessons.md` and `backlog.md`.
+   Nimrod gets the short version (what was lost, why, what was changed) for every verdict but a planned loss, and
+   for a repeated mistake. A planned loss goes into the daily summary. When the fix needs his decision he gets one
+   question, with options and a recommendation.
+
+Kept by the code, not by memory:
+- While a news loss has no review, the news engine opens no new position (`news.block_buys_until_loss_reviewed`).
+  Stops and sales are never held back. The engine says so in the alert of the losing sale itself, and `verify`,
+  `news-status` and the engine's heartbeat show it for as long as it lasts.
+- A review cannot be a single word. Each answer has a shortest length (`postmortem.min_chars`), the answers must
+  agree with the verdict, every verdict but a planned loss names where its fix lives, a loss is named by enough
+  of its hash to be the only one (`postmortem.min_key_chars`) and reviewed once, and one review covers one book.
+- The code counts a cause tag named by the reviews of two different losses (`repeated_causes`, planned losses left
+  out) and `verify` prints it. Moving it to the top of the backlog as a defect and telling Nimrod is the session's
+  job, in the same turn.
+
+Kept by the session, not by the code: the review is recorded only after the fix is pushed; the engine is
+restarted on the fix first; the backlog item exists; a hold is set before the record and lifted only on Nimrod's
+word. The code asks only that `--fix-ref` has 7 characters or more.
+
+What the protocol promises: every losing sale stays on the list until it has a review, and every mistake a review
+finds is either fixed or sits in `state/backlog.md` as an open item with its evidence. It cannot promise that no
+trade ever loses.
 
 ## Basic law 2 - always improving, always on the air (Nimrod, 2026-11-10)
 
@@ -77,8 +148,9 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
    type passwords, or handle payment details - he signs in himself.
 2. **Never commit secrets.** API keys arrive through the environment's network secrets (proxy injection)
    or env vars - never in files, logs, reports or commit messages.
-3. **Claude can only reduce risk.** Overrides (`python3 -m aitrader veto|shrink`) may veto new entries or
-   shrink sizes; never add names, never increase size, never disable stops or the drawdown breaker.
+3. **Claude can only reduce risk.** Overrides (`python3 -m aitrader veto|shrink`; in the news book `news-hold`
+   and `news-exit`) may veto new entries, shrink sizes or ask for an exit; never add names, never increase size,
+   never disable stops or the drawdown breaker. A `news-hold` is lifted only on Nimrod's word.
 4. **Every change to strategy/risk/learning** goes through the time machine sweep before and after, the
    `quant-critic` agent, and `python3 -m unittest discover -s tests` (from `ai-trader/`). No exceptions.
 5. **Assumptions live in `config.json`.** Never hard-code a number in the logic.
@@ -91,7 +163,8 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
 
 ## Memory (four layers)
 - working: `state/portfolio.json`, `state/weights.json`, `state/latest.json`
-- episodic: `state/predictions.jsonl`, `decisions.jsonl`, `trades.jsonl`, `learning.jsonl`, `equity.jsonl`
+- episodic: `state/predictions.jsonl`, `decisions.jsonl`, `trades.jsonl`, `learning.jsonl`, `equity.jsonl`,
+  `postmortems.jsonl` (one review per realized loss)
 - semantic: `state/lessons.md` - each lesson: date, observation, evidence (numbers + file), confidence,
   what would change our mind. A lesson changes behaviour only after it is confirmed by data.
 - procedural: `config.json`, `skills/*/SKILL.md` - changed only via rule 4.

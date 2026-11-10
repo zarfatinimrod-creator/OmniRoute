@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 state/news_heartbeat.json
 state/news_seen.json
+state/news_engine.lock

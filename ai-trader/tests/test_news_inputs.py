@@ -87,6 +87,28 @@ class MoveToday(unittest.TestCase):
             res = chart_reply(730.17, [656.39, 690.00, bad, 730.17], self.AT)
             self.assertIsNone(news_live._day_move_pct(res, date(2026, 11, 9)), bad)
 
+    def test_a_day_missing_from_the_reply_gives_no_move_never_a_two_day_one(self):
+        res = chart_reply(730.17, list(MU_CLOSES), self.AT)  # a copy: the fixture hands its list on as it is
+        for part in (res["timestamp"], res["indicators"]["quote"][0]["close"]):
+            del part[3]  # Friday 11-06 is not in the reply at all: the last earlier bar is Thursday's 656.39
+        self.assertEqual(round((730.17 / 656.39 - 1) * 100, 2), 11.24)  # what a two-day base would have called "today"
+        self.assertIsNone(news_live._day_move_pct(res, date(2026, 11, 9)))
+
+    def test_the_session_before_a_holiday_is_the_base_after_it(self):
+        at = datetime(2026, 11, 27, 10, 0, tzinfo=NY)  # Friday after Thanksgiving: the session before it is Wednesday
+        res = chart_reply(101.0, [98.0, 99.0, 100.0, 101.0], at)
+        stamps = res["timestamp"]
+        stamps[2] = int(datetime(2026, 11, 25, 9, 30, tzinfo=NY).timestamp())  # the fixture knows weekends, not holidays
+        stamps[1] = int(datetime(2026, 11, 24, 9, 30, tzinfo=NY).timestamp())
+        stamps[0] = int(datetime(2026, 11, 23, 9, 30, tzinfo=NY).timestamp())
+        self.assertEqual(news_live._day_move_pct(res, date(2026, 11, 27)), 1.0)
+        stamps[2] = stamps[1]  # Wednesday's bar missing: Tuesday's close is not a base
+        self.assertIsNone(news_live._day_move_pct(res, date(2026, 11, 27)))
+
+    def test_a_year_the_calendar_does_not_cover_gives_no_move(self):
+        at = datetime(2031, 3, 4, 10, 0, tzinfo=NY)
+        self.assertIsNone(news_live._day_move_pct(chart_reply(101.0, [100.0, 101.0], at), date(2031, 3, 4)))
+
     def test_bars_and_closes_of_different_length_give_no_move(self):
         res = chart_reply(730.17, MU_CLOSES, self.AT)
         res["timestamp"] = res["timestamp"][1:]  # one stamp short: every close would be paired with the wrong day
@@ -368,7 +390,8 @@ class OperatorExit(HeldOnAClock):
         self.assertIn("AAA", journal.load_json("news_exits.json"))
         self.assertEqual(journal.read("news_errors.jsonl"), [])  # and no rewrite was tried and swallowed
         ev = self._check(2, 96.5, quote_age_s=660)  # still stale, but through the stop: the stop fires on any price
-        self.assertEqual(len(ev), 1)  # the sale says it all: no "dropped" line for a name that was held
+        # the sale, and the line that says buys now wait for the review: no "dropped" line for a name that was held
+        self.assertEqual([e[:4] for e in ev], ["SELL", "נמכר"])
         self.assertNotIn("AAA", self.nt.book.positions)
         self.assertTrue(self._last_trade()[2].startswith("stop "))
         self.assertEqual(journal.load_json("news_exits.json"), {})  # nothing left to exit
@@ -541,7 +564,8 @@ class OperatorExit(HeldOnAClock):
 
     def _score_9(self):
         """One fresh headline on AAA scored 9, in session, at a live 100.00: the events it produced."""
-        item = {"key": "k9", "symbol": "AAA", "title": "AAA wins a contract", "published": journal.now_utc(), "price": 100.0}
+        item = {"key": "k9", "symbol": "AAA", "title": "AAA wins a contract", "published": journal.now_utc(), "price": 100.0,
+                "day_move_pct": 0.0}
         ev = []
         with mock.patch.object(news_live, "market_open_now", lambda: True), \
                 mock.patch.object(news_live, "live_price", lambda s: (100.0, None)):

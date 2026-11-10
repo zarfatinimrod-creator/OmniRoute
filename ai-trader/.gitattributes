@@ -1,0 +1,4 @@
+# append-only and not hash-chained: two checkouts that each add a line must not conflict in an unattended slot
+state/postmortems.jsonl merge=union
+state/lessons.md merge=union
+state/news_holds.jsonl merge=union
