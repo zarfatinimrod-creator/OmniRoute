@@ -29,6 +29,7 @@ import requests
 from aitrader import cycle, data, journal
 from aitrader import report as rep
 from aitrader.market import UtcDailyCalendar
+from aitrader.strategy import precompute_aux
 from golden_util import FIRST_BAR, frozen_env, load_panel
 from test_core import cfg_for
 from test_regime import crypto_panel
@@ -477,6 +478,23 @@ class Rulings(CryptoBook):
         self.assertFalse([e for e in out["events"] if "bp" in e])
         self.assertNotIn("revised_close", [r.get("event") for r in read_jsonl(self.state, "decisions.jsonl")])
 
+    def test_revised_close_audit_on_the_shipped_yahoo_source(self):
+        """R6 under close_source "yahoo" (shipped, Task 11): a decision close that history later changes by more
+        than the limit is alerted once the bar is no longer the decision bar; the same run decides the next bar."""
+        self.assertEqual(self.cfg["market"]["close_source"], "yahoo")
+        self.decide()
+        self.set_bars(I + 1, 1)
+        self.at(I + 1, self.ts(I + 1, 1, 7))
+        self.assertFalse(any("bp" in e for e in self.sent))
+        revised = {**self.p, "close": self.p["close"].copy()}
+        revised["close"].iloc[I, revised["close"].columns.get_loc("BTC-USD")] *= 1.001  # +10 bp on bar D
+        out = self.at(I + 1, self.ts(I + 2, 0, 12), panel=self.panel(I + 1, revised))
+        self.assertTrue(out["decided_now"])
+        alerts = [e for e in out["events"] if "BTC-USD" in e and "bp" in e]
+        self.assertEqual(len(alerts), 1)
+        self.assertNotIn("ETH-USD", alerts[0])
+        self.assertEqual([r["date"] for r in read_jsonl(self.state, "decisions.jsonl") if r.get("event") == "revised_close"], [self.day(I)])
+
     def test_coinbase_breach_persisted_and_main_fills_exits_only(self):
         """R9a: a breach is persisted on the pending order; the main book fills exits-only, the shadow book does not."""
         held = {"BTC-USD": 0.10, "ETH-USD": 0.50}
@@ -620,6 +638,33 @@ class FinalReview(CryptoBook):
         book = load(self.state, "portfolio.json")
         self.assertNotIn("ETH-USD", book["positions"])
         self.assertIn("ETH-USD", book["blocked"])
+
+    def test_expired_regime_off_exit_is_decided_again(self):
+        """Gate finding B1 (2026-11-11): the regime turns off, the exit order never fills and expires. The book's
+        regime was saved at decision time, so the next decision sees no regime change; it must still be a full
+        decision (not exits-only, which would hold the book) and sell. On the shipped one-coin profile, whose only
+        exits are regime-off and the -50% step."""
+        self.cfg = data.load_config("crypto", "crypto_base")
+        self.coins = sorted(self.cfg["universe"])
+        self.p = {k: v[self.coins] if isinstance(v, pd.DataFrame) and set(self.coins) <= set(v.columns) else v
+                  for k, v in self.p.items()}
+        reg = precompute_aux(self.p, self.cfg)["regime"]
+        j = next(k for k in range(250, len(reg) - 3)
+                 if reg.iloc[k - 1] == "risk_on" and all(reg.iloc[k:k + 2] == "risk_off"))
+        seed = {**self.seed({"BTC-USD": 0.5}, j - 1), "regime": "risk_on", "dd_state": "normal", "last_rebalance": self.day(j - 2)}
+        self.decide(j, seed=seed)
+        first = self.pending()
+        self.assertEqual((first["targets"], first["exits_only"]), ({}, False))  # the regime change sells everything
+        out = self.decide(j + 1)  # no intraday bar came: the order expires at the next decision
+        pend = self.pending()
+        self.assertEqual([r.get("event") for r in read_jsonl(self.state, "decisions.jsonl")], [None, "expired_unfilled", None])
+        self.assertTrue(out["decided_now"])
+        self.assertFalse(pend["exits_only"])
+        self.assertNotIn("BTC-USD", pend["targets"])
+        self.set_bars(j + 2, 1)
+        out = self.at(j + 2, self.ts(j + 2, 1, 7))
+        self.assertEqual([(f["side"], f["symbol"]) for f in out["executed"]], [("SELL", "BTC-USD")])
+        self.assertNotIn("BTC-USD", load(self.state, "portfolio.json")["positions"])
 
     def test_fill_walk_capped_at_fill_max_wait_hours(self):
         self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
