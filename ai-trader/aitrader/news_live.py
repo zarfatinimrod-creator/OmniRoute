@@ -656,6 +656,8 @@ class NewsTrader:
     def scorer_called(self, facts: dict):
         """news_scorer_calls.jsonl: one row per scorer call, from the facts score_batch hands back (none: no call).
         A call made outside the engine names itself in "source" (the news-score check); an engine row has none.
+        Every row carries how many rows of the answer were a fraction, 0 too (a failed call, a news-score check):
+        the count is read forward (the owner's decision of 2026-11-11, state/backlog.md item 62).
         The calls of the second check (the checker and the re-score) are not on record here."""
         if facts:
             h = self._tally()
@@ -663,7 +665,7 @@ class NewsTrader:
             h["scorer_fails"] += "answered" not in facts  # the call failed, or its answer could not be read
             h["scorer_sent"] += facts.get("sent", 0)  # a call that was read and scored nothing is not a failed call:
             h["scorer_answered"] += facts.get("answered", 0)  # it shows only as sent against answered
-            self._record("news_scorer_calls.jsonl", {"at": journal.now_utc(), **facts})
+            self._record("news_scorer_calls.jsonl", {"at": journal.now_utc(), "fractions": 0, **facts})
 
     def _scored(self, chunk: list[dict]) -> tuple[dict, dict]:
         """One scorer call for the loop: (its scores, the facts of the call). The call goes on record whatever became
@@ -679,8 +681,6 @@ class NewsTrader:
             self.scorer_called({"model": self.n["model"], "prompt": PROMPT_ID, "sent": len(chunk)})
             raise
         facts = getattr(scores, "facts", {})
-        if facts:
-            facts.setdefault("fractions", 0)
         self.scorer_called(facts)
         fractions = getattr(scores, "fractions", {})
         for x in chunk:

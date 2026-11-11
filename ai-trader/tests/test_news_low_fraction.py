@@ -119,6 +119,15 @@ class LowFraction(_Engine):
         self.fresh_engine()
         self.step_with([{"symbol": "AAA", "score": 7}])
         self.assertEqual(journal.read("news_scorer_calls.jsonl")[-1]["fractions"], 0)
+        # every row carries the count, 0 too: also the row of a call that raised out of the scorer ...
+        with mock.patch.object(news_live, "score_batch", side_effect=ValueError("x")), self.assertRaises(ValueError):
+            self.step_with([{"symbol": "AAA", "score": 7}])
+        self.assertEqual(journal.read("news_scorer_calls.jsonl")[-1]["fractions"], 0)
+        # ... and the row of a news-score check, written as aitrader/__main__.py writes it
+        sc = news_live.score_batch([{"symbol": "AAA", "title": "AAA news", "published": journal.now_utc()}], "m")
+        self.nt.scorer_called(sc.facts and {**sc.facts, "source": "news-score"})
+        row = journal.read("news_scorer_calls.jsonl")[-1]
+        self.assertEqual((row["source"], row["fractions"]), ("news-score", 0))
 
 
 if __name__ == "__main__":
