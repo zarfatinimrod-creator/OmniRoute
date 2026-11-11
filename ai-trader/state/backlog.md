@@ -205,6 +205,15 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     his word and the cancel is written down. In CLAUDE.md since 2026-11-11 (the loss protocol and hard rule 3).
     Still to build (queued after Task 8b of the supervisor plan, same gate): `--cancel` refuses without
     `--said TEXT` (his words) and writes a row to `state/news_exit_cancels.jsonl`; the SKILL.md 3ב lines with it.
+64. [news][owner] The hold on new buys in the news book (set 2026-11-10 19:42 UTC, `state/news_hold.json`) stays.
+    **Owner's decision (Nimrod, 2026-11-11, answer א):** no buys until there is a record; the engine keeps scoring
+    and grading every headline. Review trigger: 10 graded headlines with a score above `news.buy_min_score` since
+    the hold began (`state/news_predictions.jsonl` with `state/news_grades.jsonl`; what each guard would have said
+    is in `state/news_checks.jsonl`). Then the main session brings him the count, the hit rate, the mean excess
+    return against SPY at the grading horizon and what each guard would have refused, and he decides. Evidence for
+    the pace: 1 headline of 1,190 scored above 8 on 2026-11-09 and 2026-11-10 (`state/news_scores.jsonl`), so
+    about a month. The hold is lifted only on his word. The Saturday review writes the running count in the
+    weekly report.
 
 ## Done
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
