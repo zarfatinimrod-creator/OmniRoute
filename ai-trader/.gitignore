@@ -10,3 +10,6 @@ state/crypto/trial_runs/
 
 # Working files of the day-trader skills when they run from ai-trader/ (not skills/trader/)
 /trader/
+
+# journal.save_json writes <name>.tmp and renames it; a leftover must never be committed
+/state/*.tmp
