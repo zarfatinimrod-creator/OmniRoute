@@ -732,7 +732,7 @@ class OperatorExit(HeldOnAClock):
             return save(name, obj)
         with mock.patch.object(journal, "save_json", second_writer):
             run_cli("news-exit", "BBB", "--reason", "by mistake")
-            run_cli("news-exit", "BBB", "--cancel")  # the command taking a request back
+            run_cli("news-exit", "BBB", "--cancel", "--said", "cancel it")  # the command taking a request back
             run_cli("news-exit", "AAA", "--reason", "earnings tonight")  # the command's write
             self._check(0, 100.0, quote_age_s=20)  # the engine's write: the request is done
         self.assertEqual(locked, [True, True, True, True])
@@ -855,36 +855,36 @@ class ExitCommand(TempState):
         at = "2026-11-10T14:00:00+00:00"
         journal.save_json("news_exits.json", {"MU": {"reason": "old", "requested_at": at},
                                               "AAA": {"reason": "by mistake", "requested_at": at}})
-        code, out, err = run_cli("news-exit", "aaa", "--cancel")
+        code, out, err = run_cli("news-exit", "aaa", "--cancel", "--said", "cancel it")
         self.assertEqual((code, err), (0, ""))
         self.assertEqual(journal.load_json("news_exits.json"), {"MU": {"reason": "old", "requested_at": at}})
         self.assertEqual(json.loads(out), journal.load_json("news_exits.json"))  # the command prints the file
 
     def test_cancel_also_removes_an_entry_that_is_not_a_request(self):
         journal.save_json("news_exits.json", {"AAA": None})  # an earlier hand edit
-        self.assertEqual(run_cli("news-exit", "AAA", "--cancel")[0], 0)
+        self.assertEqual(run_cli("news-exit", "AAA", "--cancel", "--said", "cancel it")[0], 0)
         self.assertEqual(journal.load_json("news_exits.json"), {})
 
     def test_cancel_with_nothing_to_cancel_says_so_and_writes_nothing(self):
-        code, out, err = run_cli("news-exit", "AAA", "--cancel")
+        code, out, err = run_cli("news-exit", "AAA", "--cancel", "--said", "cancel it")
         self.assertEqual((code, out), (1, ""))  # not 0: the request may already have been acted on
         self.assertIn("AAA", err)
         self.assertIn("nothing was cancelled", err)
         self.assertFalse((self.tmp / "news_exits.json").exists())
         (self.tmp / "news_exits.json").write_text("{AAA: out", encoding="utf-8")
-        code, _, err = run_cli("news-exit", "AAA", "--cancel")
+        code, _, err = run_cli("news-exit", "AAA", "--cancel", "--said", "cancel it")
         self.assertEqual(code, 1)
         self.assertIn("cannot be read", err)
         self.assertEqual((self.tmp / "news_exits.json").read_text(encoding="utf-8"), "{AAA: out")  # never replaced by a clean-up
 
     def test_a_request_is_either_made_or_cancelled(self):
-        self.assertEqual(run_cli("news-exit", "AAA", "--reason", "r", "--cancel")[0], 2)
+        self.assertEqual(run_cli("news-exit", "AAA", "--reason", "r", "--cancel", "--said", "cancel it")[0], 2)
         self.assertFalse((self.tmp / "news_exits.json").exists())
 
     def test_a_symbol_that_is_not_a_ticker_is_refused(self):
         for bad in ("", "A B", "AAA;rm", "$(reboot)", "../../etc", "AAA\n", "ABCDEFGHIJKLM", "מיקרון"):
             with self.subTest(bad=bad):
-                for how in (("--reason", "r"), ("--cancel",)):
+                for how in (("--reason", "r"), ("--cancel", "--said", "cancel it")):
                     code, out, err = run_cli("news-exit", bad, *how)
                     self.assertEqual((code, out), (2, ""))
                     self.assertIn("ticker", err)

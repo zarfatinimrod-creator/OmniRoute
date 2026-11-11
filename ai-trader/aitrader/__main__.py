@@ -22,7 +22,8 @@
   news-status                             news book, last trades, news scorecard
   news-exit SYMBOL --reason TEXT          ask the news engine to sell a held name at its next live quote (never buys);
                                           a waiting request, or an exit sold today, also keeps the engine from buying it
-  news-exit SYMBOL --cancel               take a waiting request back (exit 1 when there is none: it may have been acted on)
+  news-exit SYMBOL --cancel --said TEXT   take a waiting request back, only on the owner's word (TEXT: his words, written
+                                          to state/news_exit_cancels.jsonl); exit 1 when there is none: it may have been acted on
   dashboard                               build .cache/dashboard/snapshot.json for the Dashboard artifact
   placebo [--k 100]                       noise gate the learner must beat (signals shuffled across stocks)
   brief SYMBOL                            analyst packet for the trading desk (the only facts agents may cite)
@@ -105,7 +106,8 @@ def main(argv=None) -> int:
     nx.add_argument("symbol")
     how = nx.add_mutually_exclusive_group(required=True)
     how.add_argument("--reason")
-    how.add_argument("--cancel", action="store_true", help="take a waiting request back")
+    how.add_argument("--cancel", action="store_true", help="take a waiting request back (only with --said)")
+    nx.add_argument("--said", help="with --cancel: the owner's own words that take the request back (written down)")
     sub.add_parser("dashboard")
     pl = sub.add_parser("placebo")
     pl.add_argument("--k", type=int, default=100)
@@ -375,9 +377,17 @@ def _run(a: argparse.Namespace) -> int:
         if not SYMBOL.fullmatch(sym):  # the name becomes a key in the requests file and a line in the owner's alerts
             print(f"news-exit: {_clean(a.symbol, 20)!r} is not a ticker symbol", file=sys.stderr)
             return 2
+        if a.said is not None and not a.cancel:
+            print("--said belongs to --cancel", file=sys.stderr)
+            return 2
         reason = _clean(a.reason or "", 120)
         if not a.cancel and not reason:  # the engine takes only an entry with a reason as a request
             print("news-exit needs a reason with text in it", file=sys.stderr)
+            return 2
+        said = _clean(a.said or "", 120)
+        if a.cancel and not said:  # a cancel keeps a position open: more risk, so only on the owner's word (backlog 63)
+            print("news-exit --cancel needs --said with the owner's words: a waiting exit is taken back only on his word",
+                  file=sys.stderr)
             return 2
         n = ncfg(load_config())
         lock = {"wait": n["exits_lock_wait_seconds"], "retry": n["exits_lock_retry_seconds"]}  # config.json's, as the engine's
@@ -393,6 +403,14 @@ def _run(a: argparse.Namespace) -> int:
             print(("news_exits.json cannot be read" if was is None else f"no exit request for {sym} is waiting (the engine may"
                    " already have acted on it: see news-status)") + ": nothing was cancelled", file=sys.stderr)
             return 1
+        if a.cancel:  # on record with his words; not hash-chained (the engine never reads it, so it can never stop it)
+            try:
+                journal.append("news_exit_cancels.jsonl", {"at": journal.now_utc(), "symbol": sym, "said": said,
+                                                           "request": was[sym]})
+            except Exception:  # noqa: BLE001 - the request is already gone, whatever stopped the row: the owner is told
+                print(f"the request for {sym} was cancelled but the cancel could not be written down: tell the owner",
+                      file=sys.stderr)
+                return 1
         if was is None:
             print("news_exits.json could not be read and was replaced: any request that was in it is gone", file=sys.stderr)
         print(json.dumps(ex, indent=1, ensure_ascii=False))
