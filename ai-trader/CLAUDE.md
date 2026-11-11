@@ -148,6 +148,9 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
 1. **Paper money only** until Nimrod explicitly says otherwise in chat, after at least 3 months of paper
    results that beat SPY on a risk-adjusted basis. Never place a real-money order. Never create accounts,
    type passwords, or handle payment details - he signs in himself.
+   The order skill `trader-broker` (`.claude/skills/`) is installed for that day only (his request,
+   2026-11-11): until he says real money starts it runs only when he types `/trader-broker`, only with an Alpaca
+   paper account, and no engine, slot or agent calls it.
 2. **Never commit secrets.** API keys arrive through the environment's network secrets (proxy injection)
    or env vars - never in files, logs, reports or commit messages.
 3. **Claude can only reduce risk.** Overrides (`python3 -m aitrader veto|shrink`; in the news book `news-hold`
