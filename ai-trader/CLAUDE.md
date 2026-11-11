@@ -153,6 +153,13 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
    never disable stops or the drawdown breaker. A `news-hold` is lifted only on Nimrod's word.
 4. **Every change to strategy/risk/learning** goes through the time machine sweep before and after, the
    `quant-critic` agent, and `python3 -m unittest discover -s tests` (from `ai-trader/`). No exceptions.
+   - **Owner's ruling (Nimrod, 2026-11-11):** a change that touches only how the news engine is run, supervised or
+     measured skips the time machine sweep. The time machine replays the stock book and never loads those files, so
+     the sweep cannot move, and every registered run makes the Deflated Sharpe stricter for no reason. The
+     quant-critic and the unit suite stay mandatory, and the critic's verdict must say that the diff touches no file
+     the time machine loads (`backtest.py`, `strategy.py`, `signals.py`, `learn.py`, `metrics.py`, `broker.py`,
+     `data.py`, the `risk`/`signals`/`costs` blocks of `config.json`). A change that does touch one of them gets the
+     sweep before and after, as written.
 5. **Assumptions live in `config.json`.** Never hard-code a number in the logic.
 6. **Evidence discipline.** Every number in a report or lesson cites where it came from (a file in
    `state/`, a backtest run, or a URL). Never present an estimate as a measurement. Never claim the bot
