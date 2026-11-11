@@ -307,7 +307,7 @@
   "books": {
     "_note": "Book profiles (spec 2026-11-09-crypto-book-design, sections 3.1 and 5; plan planning decisions). load_config('crypto') = this file without 'books', then books.crypto merged over it, then books.<ship_profile> over that when it is not 'crypto'. universe, prior_weights, signals and benchmark are replaced whole; every other block merges key by key. crypto_base lists only what differs from the candidate. Zero-weight signals keep the stock parameters (the values the replays used); max_positions 2 = the whole two-coin universe (the replays' 15 behaves the same). The candidate leaves risk.dd_reentry_ref to its default (dd_halve + dd_flat) / 2 = -0.375 (planning decision 1). risk.max_position_pct_by_symbol XRP-USD is read only by the crypto sweep's BTC+XRP hindsight control (XRP is in no profile's universe).",
     "crypto": {
-      "ship_profile": "crypto",
+      "ship_profile": "crypto_base",
       "benchmark": "BTC-USD",
       "universe": {
         "BTC-USD": "Crypto",
@@ -417,7 +417,8 @@
         "delete_proposal_on_decision": true,
         "grading": "absolute",
         "stale_skips_run": true,
-        "close_source": "next_open",
+        "close_source": "yahoo",
+        "close_source_note": "Revised-close check 2026-11-11 16:09 UTC (research/2026-11-11-crypto-revised-close.md): the open moved, the close did not. BTC 11-08 close stayed 74,584.65 and the 11-09 open became 74,584.65 (was 74,719.82 on 11-09); ETH the same (2,120.98; the open was 2,124.33). So the decision close is Yahoo's close as fetched, and next_open is not used.",
         "coinbase_guard_pct": 0.01,
         "report_dir": "reports/crypto",
         "intraday_alert_pct": 0.08,

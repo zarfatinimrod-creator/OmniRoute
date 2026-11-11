@@ -5,15 +5,23 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-11 10:20 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
-  `aitrader/notify.py`, `config.json`, new `aitrader/ownerlines.py`, `aitrader/supervise.py`, `aitrader/deadman.py`,
-  `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `scripts/drill_supervisor.py`, `tests/helpers/`,
-  new `tests/test_ownerlines.py`, `tests/test_news_supervised.py`, `tests/test_supervise.py`, `tests/test_uptime.py`,
-  `tests/test_slots.py`, `tests/test_watch.py`, `tests/test_slot_files.py`, `skills/trader/SKILL.md`,
-  `skills/trader/slots/`. Purpose: the supervisor ("always on the air"), plan
-  `research/plans/2026-11-10-supervisor.md`, approved by the owner on 2026-11-11. Build tasks 2-8 first (engine
-  changes); nothing reaches the live engine before its gate. Tests-only additions to other test files are welcome
-  from any session: say so under "Waiting" first so the two do not collide.
+- **2026-11-11 10:09 - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
+  `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
+  `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
+  `skills/trader/SKILL.md`, `skills/trader/slots/`, `scripts/drill_supervisor.py`, `tests/helpers/`,
+  `tests/fixtures/ntfy/`, `tests/fixtures/list_triggers_sample.json`, `tests/test_news_supervised.py`,
+  `tests/test_supervise.py`, `tests/test_ownerlines.py`, `tests/test_uptime.py`, `tests/test_slots.py`,
+  `tests/test_watch.py`, `tests/test_slot_files.py`, `tests/test_news_guards.py` (class `OneEngine` only).
+  Added 2026-11-11 10:35 after the baseline: `tests/test_loss_protocol_pins.py`, `tests/test_audit_fixes.py`,
+  `tests/test_news_measure.py` and the rest of `tests/test_news_guards.py` - only the expectation of a test that
+  calls `run`/`_run` or reads the heartbeat or the lock file, where the spec changes an exit code or a file's
+  shape (four pins end the loop with `ChainBroken` and expect 0; the spec makes that 4). No test about a trade,
+  a stop, a buy or a hold is changed.
+  Purpose: supervisor: spec 2026-11-10-supervisor-design, plan 2026-11-10-supervisor (approved by the owner on
+  2026-11-11). The time above is the last refresh; the claim was opened earlier the same day, in the commit that
+  closed the wave-3 claim. Build tasks 2-8 first (engine changes); nothing reaches the live engine before its
+  gate. Tests-only additions to other test files are welcome from any session: say so under "Waiting" first so
+  the two do not collide.
 
 ## Waiting
 
@@ -38,6 +46,25 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
+
+- **2026-11-11 16:15 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W), for the main session** (your claim
+  of 10:09 holds `config.json` and `skills/trader/SKILL.md`). Plan 2026-11-09-crypto-book-v1 Task 11, ordered by the
+  owner, needs three small edits and no other line of either file:
+  1. `config.json` `books.crypto.market.close_source` -> `"yahoo"` plus a `close_source_note` key (the revised-close
+     check found that the open moved: `research/2026-11-11-crypto-revised-close.md`);
+  2. `config.json` `books.crypto.ship_profile` (and `books.crypto` overrides only if `state/crypto/dsr.json` asks);
+  3. `skills/trader/SKILL.md`: one new section "crypto night" (spec 6.3), appended, no existing line changed.
+  **Owner's answer in this session's chat, 2026-11-11, between 16:12 and 16:26 UTC: "א - לערוך עכשיו"** (a message to the main session
+  was refused by the platform: trusted-device rule). The three edits go ahead, and only these.
+  ~~I do not edit either file until you answer here or by message.~~ The sweep and the quant-critic run meanwhile (they
+  touch `state/crypto/` and `research/` only).
+  **Done 2026-11-11 16:42 UTC**: the three edits are pushed (3bc08d02, 0673a07a, 72b75ca0); nothing else in either file
+  was touched. `config.json` and `skills/trader/SKILL.md` are the main session's again.
+
+- **2026-11-11 16:34 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py` (the
+  `due` line of `_decide` only), `tests/test_crypto_cycle.py`. Purpose: quant-critic HOLD on the crypto go-live gate
+  (B1: an order that expires unfilled drops a regime-off exit; the next decision must be a full re-decision).
+  **Done 2026-11-11 16:41 UTC**: fixed, gated (quant-critic PASS, round 2), 549 tests, pushed (bdaab0df).
 
 - **2026-11-10 20:40 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/backtest.py`, `aitrader/metrics.py`, `aitrader/report.py`, `aitrader/crypto_sweep.py`, `config.json`,

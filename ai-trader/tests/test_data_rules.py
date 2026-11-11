@@ -140,7 +140,7 @@ class StaleSymbolsAndBarEnd(unittest.TestCase):
         self.assertEqual(data.stale_symbols({"close": close}, idx[-1], end), {"B"})  # ruling R1: no times = fresh
 
     def test_bar_end_stock_1605_new_york_even_on_early_close_crypto_0005_utc(self):
-        stock, coins = cfg_for(load_panel()), data.load_config("crypto")
+        stock, coins = cfg_for(load_panel()), data.load_config("crypto", "crypto")
         friday = pd.Timestamp("2026-11-27")  # the day after Thanksgiving closes at 13:00; bar_end stays 16:05
         self.assertEqual(cycle._bar_end_utc(friday, stock), datetime(2026, 11, 27, 21, 5, tzinfo=UTC))
         self.assertEqual(cycle._bar_end_utc(pd.Timestamp("2026-07-02"), stock), datetime(2026, 7, 2, 20, 5, tzinfo=UTC))
@@ -294,7 +294,7 @@ class CryptoRun(unittest.TestCase):
     def setUp(self):
         self.p = crypto_panel()
         self.idx = self.p["close"].index
-        self.cfg = data.load_config("crypto")
+        self.cfg = data.load_config("crypto", "crypto")
         self.dirs: list[Path] = []
 
     def tearDown(self):
@@ -364,6 +364,7 @@ class CryptoRun(unittest.TestCase):
         self.assertEqual(journal_json(state, "pending.json")["decision_date"], str(d.date()))
 
     def test_next_open_close_source_and_missing_row(self):
+        self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
         p, d = self.p, self.idx[self.I]
         nxt = self.idx[self.I + 1]
         panel = {k: v.iloc[:self.I + 2] for k, v in p.items()}
@@ -419,6 +420,7 @@ class CryptoRun(unittest.TestCase):
         return float(self.p["open"].iloc[self.idx.get_loc(pd.Timestamp(day)) + 1][sym])
 
     def test_coinbase_breach_exits_only(self):
+        self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
         held = {"BTC-USD": 0.10, "ETH-USD": 0.50}
         _, pend, dec = self.decide(self.I, held, self.agree)
         self.assertEqual(dec["diag"]["coinbase_guard"]["status"], "ok")

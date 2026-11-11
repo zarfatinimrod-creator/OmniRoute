@@ -79,7 +79,9 @@ background or in a separate session, so that no watchdog slot waits behind it.
      at once only in log mode, through rule 4: it writes down what it would have refused and changes no trade, so
      its forward record starts on day one. Until the rule is decided Claude may only use the levers that can only
      reduce risk: `veto`, `shrink`, `news-exit`, `news-hold`. Each use is written in the review. A `veto` or a
-     `shrink` applies to one decision date and is not carried to the next. A `news-exit` is not undone. A `news-hold` is lifted only on Nimrod's
+     `shrink` applies to one decision date and is not carried to the next. A `news-exit` is not undone by Claude: a request
+     that is still waiting is taken back (`news-exit SYMBOL --cancel`) only on Nimrod's word, and the cancel is written
+     down with his words (his decision of 2026-11-11). A `news-hold` is lifted only on Nimrod's
      word, whatever condition was written next to it. A `news-hold` that is to outlast the review is set and pushed
      before the review is recorded: the record frees the buys at once.
    - **A planned loss inside the rules:** nothing changes, and the review says so and why.
@@ -146,11 +148,15 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
 1. **Paper money only** until Nimrod explicitly says otherwise in chat, after at least 3 months of paper
    results that beat SPY on a risk-adjusted basis. Never place a real-money order. Never create accounts,
    type passwords, or handle payment details - he signs in himself.
+   The order skill `trader-broker` (`.claude/skills/`) is installed for that day only (his request,
+   2026-11-11): until he says real money starts it runs only when he types `/trader-broker`, only with an Alpaca
+   paper account, and no engine, slot or agent calls it.
 2. **Never commit secrets.** API keys arrive through the environment's network secrets (proxy injection)
    or env vars - never in files, logs, reports or commit messages.
 3. **Claude can only reduce risk.** Overrides (`python3 -m aitrader veto|shrink`; in the news book `news-hold`
    and `news-exit`) may veto new entries, shrink sizes or ask for an exit; never add names, never increase size,
-   never disable stops or the drawdown breaker. A `news-hold` is lifted only on Nimrod's word.
+   never disable stops or the drawdown breaker. A `news-hold` is lifted, and a waiting `news-exit` is cancelled, only on
+   Nimrod's word.
 4. **Every change to strategy/risk/learning** goes through the time machine sweep before and after, the
    `quant-critic` agent, and `python3 -m unittest discover -s tests` (from `ai-trader/`). No exceptions.
    - **Owner's ruling (Nimrod, 2026-11-11):** a change that touches only how the news engine is run, supervised or
@@ -160,6 +166,19 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
      the time machine loads (`backtest.py`, `strategy.py`, `signals.py`, `learn.py`, `metrics.py`, `broker.py`,
      `data.py`, the `risk`/`signals`/`costs` blocks of `config.json`). A change that does touch one of them gets the
      sweep before and after, as written.
+   - **Owner's second ruling (Nimrod, 2026-11-11):** a change to the trading rules of the news engine itself (when it
+     buys, sells or holds) skips the sweep too, for the same reason: the time machine never runs the news engine and
+     cannot measure it. In its place, all three: the quant-critic, the unit suite, and a forward measurement written
+     down with the change - what the journals showed before (the count and the file) and what will be read after
+     (which rows, in which file, from which date). The critic's verdict must again say that the diff touches no file
+     on the list above. A change that touches the stock book, or any file on that list, still gets the sweep before
+     and after.
+   - **Owner's third ruling (Nimrod, 2026-11-11), the general rule:** the two rulings above hold for every change,
+     not only for the news engine. A change that touches no file on the list above (the dashboard publisher and its
+     `dashboard_push` config block, the supervisor, the alerts, the page) skips the sweep and is gated by the
+     quant-critic and the unit suite; a change to a trading rule adds its forward measurement. The critic's verdict
+     always says whether the diff touches a file on the list. Only a change that touches the stock book, or a file
+     on the list, gets the sweep before and after.
 5. **Assumptions live in `config.json`.** Never hard-code a number in the logic.
 6. **Evidence discipline.** Every number in a report or lesson cites where it came from (a file in
    `state/`, a backtest run, or a URL). Never present an estimate as a measurement. Never claim the bot
@@ -220,15 +239,26 @@ wait for each other, code does:
   file, in a pushed commit, naming the files it will touch.
 
 ## Agents and models
-**Owner's standing order (Nimrod, 2026-11-10): work only with Fable 5.2, for everything, until he says otherwise.**
-Every session, subagent and workflow stage runs on `claude-fable-5-2`. Never set another model on an agent, a
-workflow stage or a new session, and do not pin one in `agents/*.md` (they inherit the session model). A session
-that is still on another model is switched by Nimrod with `/model claude-fable-5-2` in that session.
-- If Fable's usage limit stops a session, say so to Nimrod at once (what stopped, at which step). Do not fall back
-  to another model on your own.
+**Owner's standing order (Nimrod, 2026-11-11; it replaces the Fable-only order of 2026-11-10):**
+> "תמשיך לעבוד על opus אבל מתי שבונים משהו יוצרים משהו תעבור לfable"
+
+Work on Opus; switch to Fable 5.2 when something is built or created.
+- **Fable 5.2 (`claude-fable-5-2`)** for an agent or workflow stage that builds or creates: an implementer that writes
+  or fixes code, the writer or reviser of a spec, a plan, a design or a page.
+- **Opus (`claude-opus-5-5`)** for everything else: reviews and gates (the quant-critic too), verification, scans,
+  research, reading and summarising, record keeping, monitoring.
+- Set the model on every agent and workflow stage by its full id, by this rule. Do not rely on the session's own
+  model and do not pin one in `agents/*.md`. No third model is used.
+- A session's own model is switched only by Nimrod (`/model <id>` in that session). Until he switches them, the
+  trader session and the crypto session stay on the model he last set (Fable 5.2).
+- If a usage limit stops a session or an agent, say so to Nimrod at once (what stopped, at which step). Do not fall
+  back to another model on your own.
+- **Temporary (Nimrod, 2026-11-11, answer א):** the Fable 5.2 limit was reached at about 16:45 UTC on 2026-11-11.
+  Until Fable is available again, Opus (`claude-opus-5-5`) also builds and creates, with the same separate reviewers;
+  he switches the trading sessions to Opus himself. When Fable is back, the rule above applies again without asking.
 - Not covered until he decides: the headline scorer inside the bot (`config.json` `news.model`). It is a trading
   parameter, so it changes only through rule 4, with a measured comparison of accuracy and delay.
 
 `agents/web-researcher.md` for research, `agents/quant-critic.md` as the gate for strategy changes.
-In workflows: the session model builds and does the final check; one independent adversarial lens per
-unit that ships. Small waves, resumable.
+In workflows: Fable builds, Opus checks; one independent adversarial lens per unit that ships. Small waves,
+resumable.

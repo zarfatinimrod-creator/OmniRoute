@@ -7,3 +7,6 @@ state/news_engine.lock
 # time-machine run records (~1.2 MB gzip per registered sweep): same-machine working files; trials.jsonl keeps the hashes
 state/trial_runs/
 state/crypto/trial_runs/
+
+# Working files of the day-trader skills when they run from ai-trader/ (not skills/trader/)
+/trader/

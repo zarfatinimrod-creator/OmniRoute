@@ -87,7 +87,7 @@ class RegimeSeries(unittest.TestCase):
     def test_hysteresis_switch_counts(self):
         """A close oscillating +-1.5% around the go-to-cash line SMA*(1-band), 10 bars each side: the offset rule
         switches at every crossing, hysteresis never comes back (that needs a close above SMA*(1+band))."""
-        cfg = data.load_config("crypto")
+        cfg = data.load_config("crypto", "crypto")
         line = 1 - cfg["risk"]["regime_band_pct"]
         for first, hyst in ((-1, 0), (+1, 1)):  # starting below the line: 0 switches; above it: one switch to off
             ratios = ([line * (1 + first * 0.015)] * 10 + [line * (1 - first * 0.015)] * 10) * 15
@@ -120,7 +120,7 @@ class RegimeSeries(unittest.TestCase):
         k = 300
         close.iloc[k, close.columns.get_loc("BTC-USD")] = np.nan
         p = {**p, "close": close}
-        cfg = data.load_config("crypto")
+        cfg = data.load_config("crypto", "crypto")
         aux = precompute_aux(p, cfg)
         reg, state = aux["regime"], aux["regime_state"]
         self.assertEqual([i for i in range(len(reg)) if reg.iloc[i] == ND], [*range(199), k])  # warm-up + that day
@@ -138,7 +138,7 @@ class RegimeSeries(unittest.TestCase):
         """Regime, regime state, targets and diag at t are identical when all data after t is dropped."""
         stock, coins = load_panel(), crypto_panel()
         seen = set()
-        for p, cfg in ((stock, cfg_for(stock)), (coins, data.load_config("crypto"))):
+        for p, cfg in ((stock, cfg_for(stock)), (coins, data.load_config("crypto", "crypto"))):
             sig, aux = compute_all(p, cfg), precompute_aux(p, cfg)
             reg = aux["regime"]
             flips = [i for i in range(201, len(reg)) if reg.iloc[i] != reg.iloc[i - 1]]
@@ -168,7 +168,7 @@ class SameRegimeEverywhere(unittest.TestCase):
 
     def test_same_regime_in_main_shadow_proposal_backtest(self):
         p = crypto_panel()
-        cfg = data.load_config("crypto")
+        cfg = data.load_config("crypto", "crypto")
         # Same closes on both paths: next_open (Task 5) would drop each stub's newest bar (no D+1 row) and, on this
         # synthetic panel, open[D+1] != close[D]. The close-source rule has its own tests in test_data_rules.
         cfg["market"]["close_source"] = "yahoo"
@@ -217,7 +217,7 @@ class NoPicksDiag(unittest.TestCase):
         """Review Focus 5 / planning decision 8: on a crypto day with no picks the diag still carries the regime
         and the drawdown state, so a flat book's -50% re-entry streak keeps counting; the stock diag is unchanged."""
         p = crypto_panel()
-        cfg = data.load_config("crypto")
+        cfg = data.load_config("crypto", "crypto")
         cfg["risk"]["min_score"] = 9.0  # scores live in [-1, 1]: nothing is ever picked
         r = cfg["risk"]
         sig, aux = compute_all(p, cfg), precompute_aux(p, cfg)

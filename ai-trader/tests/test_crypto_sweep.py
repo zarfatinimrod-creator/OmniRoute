@@ -257,13 +257,13 @@ class SweepLogic(TempState):
         with mock.patch.object(crypto_sweep, "dsr", lambda day, n, sd: seen.append(day) or 0.5), \
                 mock.patch.object(data, "load_config", load):
             res, calls = self.sweep({**self.SHARPES, "abl:no_eth": 0.9, "abl:no_atr_stop": 0.9})
-        daily = fake_run(self.SHARPES, [])("cand@50", data.load_config("crypto"), None, None, None, 7)["daily"]
+        daily = fake_run(self.SHARPES, [])("cand@50", data.load_config("crypto", "crypto"), None, None, None, 7)["daily"]
         pd.testing.assert_series_equal(seen[0], daily[0], check_names=False)  # phase 0, not the phase average
         self.assertIn("phase 0", json.loads((self.tmp / "crypto" / "dsr.json").read_text())["daily_series"])
         ctl = dict((n, c) for n, c, _ in calls)["control:btc_xrp"]
         self.assertEqual(ctl["risk"]["max_position_pct_by_symbol"], {"BTC-USD": 1.0, "XRP-USD": 0.4})
         self.assertEqual(res["runs"]["control:btc_xrp"]["caps"]["XRP-USD"], 0.4)
-        self.assertEqual(data.load_config("crypto")["risk"]["max_position_pct_by_symbol"]["XRP-USD"], 0.6)  # config.json
+        self.assertEqual(data.load_config("crypto", "crypto")["risk"]["max_position_pct_by_symbol"]["XRP-USD"], 0.6)  # config.json
 
     def test_fee_leg_must_match_the_profile_fee(self):
         with mock.patch.object(crypto_sweep, "FEES_BP", (60, 100)), self.assertRaisesRegex(ValueError, "costs.fee_bps"):
@@ -291,7 +291,8 @@ class MergedConfig(unittest.TestCase):
             c = data.load_config("crypto", profile)
             self.assertEqual(c["profile"], profile)
             self.assertNotIn("ship_profile", c)
-        self.assertEqual(data.load_config("crypto")["profile"], "crypto")  # the default: books.crypto.ship_profile
+        # the default: books.crypto.ship_profile, which Task 11 set from the sweep of 2026-11-11 (crypto_base shipped)
+        self.assertEqual(data.load_config("crypto")["profile"], "crypto_base")
         self.assertNotIn("profile", data.load_config("stocks"))
 
 

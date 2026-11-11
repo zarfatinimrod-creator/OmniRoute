@@ -194,8 +194,51 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
 62. [news][owner] A scorer answer that is not a whole number is skipped. For buys that is the safe side; for the
     bad-news exit it is not: a score of 1.6 on a held name no longer sells (the stop still holds). Accept
     whole-number text ("1", "9") as that number, and decide with the owner what a fraction at the low end does.
+    **Owner's decision (Nimrod, 2026-11-11, answer א):** for the bad-news exit a fraction is compared as it is: 2 or
+    less sells (1.6 sells, 2.4 does not). Buys do not change: only a whole number above 8 buys. Evidence before the
+    change: 1,190 rows in `state/news_scores.jsonl` on 2026-11-11, all whole numbers, 0 fractions, so no sale was
+    missed so far. Forward measurement (as built in Task 8b of the supervisor build): "after" = the SELL rows of
+    `state/news_trades.jsonl` that match a `news_scores.jsonl` row carrying `raw_score` (same symbol, same step); a
+    `raw_score` row with no matching sale (blocked by the live-quote rule, or the name already sold) is its own figure;
+    and the sum of `fractions` in `state/news_scorer_calls.jsonl`. Read at every Saturday review. Waits for its build slot (one builder at a time: after Task 8 of the supervisor plan) and for
+    rule 4.
 63. [news][owner] The law says a news-exit is not undone, and the merge added `news-exit --cancel`. One sentence in
     CLAUDE.md and SKILL.md 3ב: a waiting request is cancelled only on the owner's word, and the cancel is logged.
+    **Owner's decision (Nimrod, 2026-11-11, answer א):** the command stays; a waiting request is cancelled only on
+    his word and the cancel is written down. In CLAUDE.md since 2026-11-11 (the loss protocol and hard rule 3).
+    Still to build (queued after Task 8b of the supervisor plan, same gate): `--cancel` refuses without
+    `--said TEXT` (his words) and writes a row to `state/news_exit_cancels.jsonl`; the SKILL.md 3ב lines with it.
+64. [news][owner] The hold on new buys in the news book (set 2026-11-10 19:42 UTC, `state/news_hold.json`) stays.
+    **Owner's decision (Nimrod, 2026-11-11, answer א):** no buys until there is a record; the engine keeps scoring
+    and grading every headline. Review trigger: 10 graded headlines with a score above `news.buy_min_score` since
+    the hold began (`state/news_predictions.jsonl` with `state/news_grades.jsonl`; what each guard would have said
+    is in `state/news_checks.jsonl`). Then the main session brings him the count, the hit rate, the mean excess
+    return against SPY at the grading horizon and what each guard would have refused, and he decides. Evidence for
+    the pace: 1 headline of 1,190 scored above 8 on 2026-11-09 and 2026-11-10 (`state/news_scores.jsonl`), so
+    about a month. The hold is lifted only on his word. The Saturday review writes the running count in the
+    weekly report.
+65. [news][source] SEC filings as a faster news source, log-only first (roadmap 2026-11-10, sub-project 4).
+    **Owner's decision (Nimrod, 2026-11-11, answer א):** the SEC contact address for the User-Agent is a new address
+    used only by the bot; he opens it himself and gives it in chat. It lives only in the environment variable
+    `AITRADER_SEC_CONTACT` (never in a file, a log, a journal, an error text or the repository; the repository is
+    public). Until it exists nothing calls the SEC. Next: the design spec (being written from the roadmap), his
+    approval, a plan, then the build in the one-at-a-time queue. The source moves no money until it has a forward
+    record and passes rule 4 (Basic law 2, item 3).
+    **Spec approved by the owner on 2026-11-11 (answer א):** `research/specs/2026-11-11-sec-filings-feed-design.md`.
+    Next: its implementation plan; the build joins the one-at-a-time queue after the supervisor and the trading room.
+66. [crypto][gate] Deferred by the quant-critic at the go-live gate of 2026-11-11 (PASS, round 2;
+    `logs/2026-11-11-crypto-go-live.md`). None is blocking for paper.
+    - N1: after an expired order the next decision is a full rebalance even when the expired one was exits-only
+      (`aitrader/cycle.py` `redo`). Inside caps and vol target, but the backtest always fills, so it is a live/replay
+      difference. Narrower option: `expiring and old.rebalance`. Needs its own gate.
+    - N2: a veto or shrink on an expired decision date does not carry to the decision that replaces it (within the
+      rules); say so in the expiry alert.
+    - N3: no live-cycle test on crypto_base beyond the expiry test (regime-on entry, -50% flat and re-entry through
+      the cycle); `costs.exec_delay_bps` 10 is an assumption - measure it from the first fills (the backtest fills at
+      open[D+1], which Yahoo rewrites to close[D]); dust below one lot is dropped without credit (under $0.10).
+    - Not measured: whether Yahoo's close of bar D is final at 00:12 UTC. The R6 audit
+      (`market.revised_close_alert_bps` 5) checks every decision; read `close_audit` in `state/crypto/pending.json`
+      and `revised_close` rows in `state/crypto/decisions.jsonl` after the first week.
 
 ## Done
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):

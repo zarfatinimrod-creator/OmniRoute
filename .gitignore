@@ -296,3 +296,6 @@ docker-compose.yml.bak
 
 # check:install-upgrade work trees (~12 GB, disposable)
 /.install-upgrade/
+
+# Working files of the day-trader skills (.claude/skills/trader-*), written to trader/ under the folder they run in
+/trader/
