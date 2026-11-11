@@ -16,10 +16,10 @@ import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 from zoneinfo import ZoneInfo
 
 from aitrader.broker import PaperBroker
-from helpers import engine_child
 
 TESTS = Path(__file__).resolve().parent
 ENGINE_CHILD = TESTS / "helpers" / "engine_child.py"
@@ -72,11 +72,17 @@ class Procs(unittest.TestCase):
         return str(path)
 
     def start_engine(self, scenario: dict, *options: str) -> subprocess.Popen:
-        """engine_child.py on self.state with this scenario; `options` go to news-live as they are. A start does not
-        prime: without a seen file the engine would mark the scenario's first poll as old news."""
+        """engine_child.py on self.state with this scenario; `options` go to news-live as they are, behind `--until
+        23:59` when they name no end of their own. A start does not prime: without a seen file the engine would mark
+        the scenario's first poll as old news."""
         seen = self.state / "news_seen.json"
         if not seen.exists():
             seen.write_text(json.dumps({"before-the-test": datetime.now(timezone.utc).isoformat()}))
+        if not any(o.split("=")[0] == "--until" for o in options):
+            # The engine ends by the real New York clock and its own default is 16:05: the gate runs this suite after
+            # that, and such a start would end before its first step. With 23:59, the last minute of the day, a test
+            # passes at any hour but one minute. The known ceiling: a start made between 23:59 and 00:00 New York.
+            options = ("--until", "23:59", *options)
         p = subprocess.Popen([sys.executable, str(ENGINE_CHILD), "--state-dir", str(self.state), "--scenario",
                               self.scenario(scenario), "--sent", str(self.sent_file), *options],
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=no_phone.clean_env())
@@ -274,8 +280,22 @@ class Harness(Procs):
         self.assertIn("sesion", p.stderr.read())
         self.assertFalse((self.state / "news_engine.lock").exists())
 
-    def test_a_start_has_no_end_by_the_clock_unless_its_options_name_one(self):
+    def test_a_start_made_here_ends_at_23_59_new_york_unless_its_options_name_an_end(self):
         # the engine's own default is 16:05 New York: after the close a start would end before its first step
-        self.assertEqual(engine_child.engine_options(["--minutes", "5"]), ["--until", "24:00", "--minutes", "5"])
-        for own in (["--minutes", "5", "--until", "16:05"], ["--until=16:05"]):
-            self.assertEqual(engine_child.engine_options(own), own)
+        with mock.patch.object(subprocess, "Popen") as popen:   # what start_engine would start, and no process
+            for own in (("--minutes", "5"), ("--minutes", "5", "--until", "16:05"), ("--until=16:05",)):
+                self.start_engine({}, *own)
+        self._started.clear()                          # stand-ins: tearDown has nothing to end
+        options = [c.args[0][c.args[0].index(str(self.sent_file)) + 1:] for c in popen.call_args_list]
+        self.assertEqual(options, [["--until", "23:59", "--minutes", "5"], ["--minutes", "5", "--until", "16:05"],
+                                   ["--until=16:05"]])
+
+    def test_the_engine_child_hands_the_engine_its_options_as_they_came(self):
+        # no end of its own: under a parent or in a drill the child ends by the clock as the real engine does
+        engine = ("import json, sys; sys.path.insert(0, sys.argv[1]); from helpers import engine_child\n"
+                  "engine_child.cli.main = lambda argv: print(json.dumps(argv))\n"   # the engine's command line, not run
+                  "sys.exit(engine_child.main(sys.argv[2:]))")
+        p = subprocess.run([sys.executable, "-c", engine, str(TESTS), "--state-dir", str(self.state), "--scenario",
+                            self.scenario({}), "--sent", str(self.sent_file), "--minutes", "5"],
+                           capture_output=True, text=True, env=no_phone.clean_env(), timeout=20)
+        self.assertEqual((p.returncode, p.stdout), (0, '["news-live", "--minutes", "5"]\n'), p.stderr[-400:])

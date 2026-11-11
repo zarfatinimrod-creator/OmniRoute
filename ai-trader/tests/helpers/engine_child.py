@@ -22,10 +22,11 @@ Scenario keys, all optional (SCENARIO holds the defaults):
   bars             bars_since, rows of [start (UTC ISO), low, close].
   commit           the commit code_stamp names.
 
-A start must be the same at any hour and take a second, so two things are set that no scenario key names: the loop
-waits QUICK["poll_seconds"] between steps unless the scenario's news.poll_seconds says otherwise (config.json's own
-wait would hold every exit back by that long), and the engine runs until 24:00 New York, which never comes, unless the
-options carry --until (the engine's default, 16:05, would end a start made after the close before its first step).
+A start must take a second, so one thing is set that no scenario key names: the loop waits QUICK["poll_seconds"]
+between steps unless the scenario's news.poll_seconds says otherwise (config.json's own wait would hold every exit
+back by that long). The options go to news-live as they came. With no --until the engine ends at its own default,
+16:05 New York, by the real clock: a start made after that ends before its first step. Whoever needs a start at any
+hour names the end (the tests do: Procs.start_engine in tests/test_supervise.py).
 The session is what the scenario says; the calendar behind catch_up_stops and the 5-day exit stays the real one.
 """
 
@@ -162,11 +163,6 @@ def install_tripwire(path: str) -> None:
     guard(subprocess.Popen, "__init__", "subprocess.Popen", lambda self, args, *a, **k: program(args) not in ("claude", "git"))
 
 
-def engine_options(options: list[str]) -> list[str]:
-    """The news-live options as they were given, behind `--until 24:00` when they name no end of their own."""
-    return options if any(o.split("=")[0] == "--until" for o in options) else ["--until", "24:00", *options]
-
-
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0], allow_abbrev=False)
     for name in ("--state-dir", "--scenario", "--sent"):
@@ -179,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
     journal.STATE = Path(args.state_dir)
     install({**SCENARIO, **given}, args.sent)
     install_tripwire(args.sent + ".tripwire")
-    return cli.main(["news-live", *engine_options(options)])
+    return cli.main(["news-live", *options])
 
 
 if __name__ == "__main__":
