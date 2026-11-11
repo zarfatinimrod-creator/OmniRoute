@@ -177,8 +177,9 @@ class EveryCallAndEveryStart(_Engine):
         self.assertEqual(look(0, True), ([], None))               # no held name: nothing to stamp, and no beat
         hold(self.nt)
         # no live quote, so the ten minutes since 09:35 are read from the bars (the stand-in has none: the stretch is
-        # marked as looked at). The beats of the quote and of the bar read were written before that stamp was set
-        self.assertEqual(look(0, False), (["stops", "stops", "stops"], utc(0)))
+        # marked as looked at). The beats of the quote and of the bar read were written before that stamp was set; the
+        # owner's "could not be read" alert that follows has its own beat (Task 8a), and the closing beat comes last
+        self.assertEqual(look(0, False), (["stops", "stops", "stops", "stops"], utc(0)))
         self.assertEqual(look(30, False), (["stops"], utc(0)))    # nothing new was stamped: the quote's beat and no more
         self.assertEqual(look(60, True), (["stops", "stops"], utc(60)))   # a live quote stamps the name
 
@@ -1300,3 +1301,26 @@ class FollowUps(_Engine):
         self.assertEqual([what for what, _ in calls], ["quote", "quote", "send", "bars", "send", "bars", "send"])
         beats = [n for _, n in calls] + [self.writes()]
         self.assertEqual(beats, sorted(set(beats)))   # a beat after each call, the three sends included
+
+    def test_the_earlier_day_alert_and_the_unread_bars_alert_of_a_look_are_each_followed_by_a_beat(self):
+        opened = datetime(2026, 11, 10, 9, 30, tzinfo=NY)   # a fixed clock in a session: the test says the same at any hour
+        self.nt.n["stop_catchup"] = "alert"
+        # the run before looked last on Monday at 14:00, two hours before that close: the morning after an engine that died
+        self.nt.adopt_previous({"stops_checked_at": datetime(2026, 11, 9, 14, 0, tzinfo=NY).astimezone(timezone.utc).isoformat()})
+        names = [f"N{i:02d}" for i in range(6)]
+        for sym in names:
+            hold(self.nt, sym)
+            self.prices[sym] = 50.0                   # above its stop of 48.50: nothing is sold
+        calls = []                                    # every call of a look that leaves the process: (what, beats so far)
+        price = news_live.live_price
+        news_live.live_price = lambda sym: calls.append(("quote", self.writes())) or price(sym)
+        news_live.bars_since = lambda sym, since, now: calls.append(("bars", self.writes())) or None   # the bars cannot be read
+        news_live.notify.send = lambda title, body, cfg, prio="default", **kw: calls.append(("send", self.writes())) or ["ntfy"]
+        with mock.patch.object(self.nt, "_quote_is_live", lambda *a, **k: True):
+            # less than news.stop_catchup_min_seconds after the open: one earlier-day alert per name and no bar read yet
+            self.nt._look_at_stops([], now=opened + timedelta(seconds=60))
+            # ten minutes later the stretch since that look is read: one "could not be read" alert per name
+            self.nt._look_at_stops([], now=opened + timedelta(minutes=10))
+        self.assertEqual([what for what, _ in calls], ["quote"] * 6 + ["send"] * 6 + ["quote"] * 6 + ["bars", "send"] * 6)
+        beats = [n for _, n in calls] + [self.writes()]
+        self.assertEqual(beats, sorted(set(beats)))   # strictly rising: a beat after each send, as after each call

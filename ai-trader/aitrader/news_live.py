@@ -1089,6 +1089,7 @@ class NewsTrader:
         notify.send("AI Trader - תקלה", f"הסטופ של {sym} לא נבדק בין {since.strftime('%H:%M')} ל-{now.strftime('%H:%M')}"
                     " (שעון ניו יורק), ואי אפשר לקרוא את המחירים של הזמן הזה כדי לבדוק אם הוא נחצה."
                     " הסטופ הרגיל ממשיך לעבוד (כסף נייר)", self.cfg, "urgent")
+        self._beat("stops")  # after the send, as after every send of a look: a morning after an outage is many of them
 
     def _earlier_days_unread(self, sym: str, looked: datetime, opened: datetime):
         """Only today's minute bars are read. When the last look at a name is from an earlier day and a session was
@@ -1108,6 +1109,7 @@ class NewsTrader:
         notify.send("AI Trader - תקלה", f"הסטופ של {sym} לא נבדק מאז {looked.strftime('%d.%m %H:%M')} שעון ניו יורק."
                     " המנוע בודק עכשיו רק את המחירים של היום: מה שקרה בימי המסחר שלפני כן לא נבדק בדיעבד."
                     " הסטופ הרגיל עובד (כסף נייר)", self.cfg, "urgent")
+        self._beat("stops")  # after the send: just after the open these come name after name, with no bar read between
 
     def _look_at_stops(self, events: list, guarded: bool = False, now: datetime | None = None) -> bool:
         """Every look at the stops inside a step goes through here. The live quotes first: no bar read and no alert
