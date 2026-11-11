@@ -1,26 +1,26 @@
 {
   "date": "2026-11-11",
-  "as_of_utc": "2026-11-11T14:52:54+00:00",
+  "as_of_utc": "2026-11-11T20:22:42+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-11T14:30:00+00:00",
     "regular_end_utc": "2026-11-11T21:00:00+00:00",
-    "last_trade_utc": "2026-11-11T14:52:50+00:00",
-    "price": 755.65
+    "last_trade_utc": "2026-11-11T20:22:38+00:00",
+    "price": 760.05
   },
-  "equity": 100247.03,
+  "equity": 100807.54,
   "cash": 23137.82,
-  "gross": 0.7692,
-  "return_since_start": 0.0025,
-  "shadow_return_since_start": 0.0029,
+  "gross": 0.7705,
+  "return_since_start": 0.0081,
+  "shadow_return_since_start": 0.0085,
   "baselines": {
-    "spy_since_start": 0.0275,
-    "equal_weight_since_start": 0.0242
+    "spy_since_start": 0.0337,
+    "equal_weight_since_start": 0.0324
   },
   "started": "2026-11-06",
   "regime": "risk_on",
   "dd_state": "normal",
-  "drawdown": -0.0009,
+  "drawdown": 0.0047,
   "decided_now": false,
   "weights": {
     "tsmom": 0.25,
@@ -145,88 +145,7 @@
       }
     ]
   },
-  "executed": [
-    {
-      "date": "2026-11-11",
-      "symbol": "DE",
-      "side": "BUY",
-      "qty": 2,
-      "price": 686.8232,
-      "value": 1373.65,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-11",
-      "symbol": "AAPL",
-      "side": "BUY",
-      "qty": 5,
-      "price": 349.7598,
-      "value": 1748.8,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-11",
-      "symbol": "XLV",
-      "side": "BUY",
-      "qty": 15,
-      "price": 187.4837,
-      "value": 2812.26,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-11",
-      "symbol": "COP",
-      "side": "BUY",
-      "qty": 21,
-      "price": 136.4982,
-      "value": 2866.46,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-11",
-      "symbol": "PM",
-      "side": "BUY",
-      "qty": 18,
-      "price": 193.4967,
-      "value": 3482.94,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-11",
-      "symbol": "CVX",
-      "side": "BUY",
-      "qty": 19,
-      "price": 212.4212,
-      "value": 4036.0,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-11",
-      "symbol": "UNP",
-      "side": "BUY",
-      "qty": 16,
-      "price": 300.11,
-      "value": 4801.76,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-11",
-      "symbol": "KO",
-      "side": "BUY",
-      "qty": 58,
-      "price": 96.2981,
-      "value": 5585.29,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    }
-  ],
+  "executed": [],
   "top_scores": null,
   "bottom_scores": null,
   "stopped": [],
@@ -519,130 +438,125 @@
     "PM": {
       "qty": 30,
       "avg_cost": 195.42,
-      "last": 193.67,
-      "pnl_pct": -0.0089,
+      "last": 196.64,
+      "pnl_pct": 0.0063,
       "since": "2026-11-09"
     },
     "CVX": {
       "qty": 30,
       "avg_cost": 211.88,
-      "last": 211.95,
-      "pnl_pct": 0.0003,
+      "last": 212.68,
+      "pnl_pct": 0.0038,
       "since": "2026-11-09"
     },
     "MRK": {
       "qty": 17,
       "avg_cost": 148.44,
-      "last": 146.26,
-      "pnl_pct": -0.0147,
+      "last": 146.76,
+      "pnl_pct": -0.0113,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 24,
       "avg_cost": 297.59,
-      "last": 300.3,
-      "pnl_pct": 0.0091,
+      "last": 301.2,
+      "pnl_pct": 0.0121,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 461.53,
-      "pnl_pct": -0.0082,
+      "last": 466.83,
+      "pnl_pct": 0.0031,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1419.22,
-      "pnl_pct": 0.0389,
+      "last": 1430.56,
+      "pnl_pct": 0.0472,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 93,
       "avg_cost": 96.16,
-      "last": 96.6,
-      "pnl_pct": 0.0045,
+      "last": 97.5,
+      "pnl_pct": 0.0139,
       "since": "2026-11-09"
     },
     "TEVA": {
       "qty": 90,
       "avg_cost": 43.03,
-      "last": 42.48,
-      "pnl_pct": -0.0128,
+      "last": 42.94,
+      "pnl_pct": -0.0022,
       "since": "2026-11-09"
     },
     "DE": {
       "qty": 7,
       "avg_cost": 686.13,
-      "last": 685.97,
-      "pnl_pct": -0.0002,
+      "last": 690.25,
+      "pnl_pct": 0.006,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 277.72,
-      "pnl_pct": -0.0015,
+      "last": 280.43,
+      "pnl_pct": 0.0082,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 291.32,
-      "pnl_pct": -0.0091,
+      "last": 294.08,
+      "pnl_pct": 0.0003,
       "since": "2026-11-09"
     },
     "XOM": {
       "qty": 27,
       "avg_cost": 163.9,
-      "last": 165.71,
-      "pnl_pct": 0.0111,
+      "last": 166.11,
+      "pnl_pct": 0.0135,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 20,
       "avg_cost": 346.27,
-      "last": 353.07,
-      "pnl_pct": 0.0196,
+      "last": 354.9,
+      "pnl_pct": 0.0249,
       "since": "2026-11-09"
     },
     "XLV": {
       "qty": 54,
       "avg_cost": 186.78,
-      "last": 187.5,
-      "pnl_pct": 0.0038,
+      "last": 188.7,
+      "pnl_pct": 0.0103,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 136.43,
-      "pnl_pct": -0.0005,
+      "last": 137.72,
+      "pnl_pct": 0.009,
       "since": "2026-11-11"
     }
   },
   "day_moves": {
-    "PM": -0.003,
-    "CVX": 0.0034,
-    "MRK": -0.0121,
-    "UNP": -0.0011,
-    "AMGN": -0.008,
-    "LLY": -0.0091,
-    "KO": -0.0032,
-    "TEVA": 0.0019,
-    "DE": -0.0024,
-    "JNJ": -0.0109,
-    "ABBV": -0.0087,
-    "XOM": 0.0075,
-    "AAPL": 0.0131,
-    "XLV": -0.0073,
-    "COP": 0.0062
+    "PM": 0.0123,
+    "CVX": 0.0069,
+    "MRK": -0.0087,
+    "UNP": 0.0019,
+    "AMGN": 0.0034,
+    "LLY": -0.0012,
+    "KO": 0.006,
+    "TEVA": 0.0126,
+    "DE": 0.0038,
+    "JNJ": -0.0012,
+    "ABBV": 0.0006,
+    "XOM": 0.01,
+    "AAPL": 0.0183,
+    "XLV": -0.001,
+    "COP": 0.0157
   },
-  "alert_channels": [
-    "ntfy"
-  ],
-  "events": [
-    "בוצע בפתיחה 2026-11-11: BUY 2 DE @ 686.8232, BUY 5 AAPL @ 349.7598, BUY 15 XLV @ 187.4837, BUY 21 COP @ 136.4982, BUY 18 PM @ 193.4967, BUY 19 CVX @ 212.4212, BUY 16 UNP @ 300.11, BUY 58 KO @ 96.2981"
-  ]
+  "events": []
 }
