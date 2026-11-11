@@ -676,8 +676,9 @@ class WhoWasTold(_Starts):
         # the look between the batches said the sale at once; the buy before it waits for the closing message
         self.assertEqual([("SELL 10 BBB" in b, "BUY" in b) for _, b in self.sent], [(True, False), (False, True)])
         self.assertEqual(at_scorer, [None, None])    # so at the second batch the mark had not passed the buy
-        self.assertEqual((self.nt.told_through, news_live.read_heartbeat()["told_through"], self.nt._unsent),
-                         (sell["hash"], sell["hash"], []))
+        b = news_live.read_heartbeat()               # the beat after the closing message: the step is over, the mark moved
+        self.assertEqual((self.nt.told_through, b["told_through"], b["phase"], self.nt._unsent),
+                         (sell["hash"], sell["hash"], "idle", []))
 
     def test_a_look_whose_send_raises_leaves_its_lines_to_the_closing_message_and_a_row_on_record(self):
         hold(self.nt); self.prices["BBB"] = 48.0
@@ -719,6 +720,15 @@ class WhoWasTold(_Starts):
         b = news_live.read_heartbeat()
         self.assertEqual((b["phase"], b["told_through"], self.nt._unsent),
                          ("stops", journal.read("news_trades.jsonl")[-1]["hash"], []))
+
+    def test_the_beat_after_a_looks_message_says_stops_also_when_the_look_asked_no_quote(self):
+        step(self.nt)                                # a whole step with nothing held: the file says "idle"
+        news_live.update_exits(put={"ZZZ": {"reason": "the owner said so", "requested_at": journal.now_utc()}})
+        self.nt.seen["k0"] = journal.now_utc()       # what only the beat at the end of a step may work out again
+        self.nt._look_at_stops([])                   # no held name, so no beat of a quote: its one line drops the request
+        b = news_live.read_heartbeat()
+        self.assertEqual((["dropped: not held" in body for _, body in self.sent], b["phase"], b["headlines_seen"]),
+                         ([True], "stops", 0))
 
     def test_a_row_whose_hash_cannot_be_read_back_costs_its_place_in_the_count_and_never_the_sale(self):
         hold(self.nt); self.prices["BBB"] = 48.0

@@ -574,7 +574,7 @@ class NewsTrader:
         self._late: list = []  # today's rows that the run before left with no line taken; say_late says them
         self._last_row = None  # the hash of the journal's last row, as far as this process has read
         self._told_lines: set = set()  # the places, in the running step's lines, that a look's own message delivered
-        self._phase = "boot"  # the phase of the last beat
+        self._phase = "boot"  # where the loop is: the phase of the last beat, and "stops" from the start of every look
         for key, known, safe in (("stop_catchup", ("alert", "sell", "off"), "alert"), ("guards", ("log", "enforce"), "log")):
             if self.n[key] not in known:  # a word the code does not know is read as the safe side, and said out loud
                 notify.send("AI Trader - תקלה", f"בהגדרות (config.json) כתוב news.{key} = {self.n[key]!r}, וזה לא ערך מוכר"
@@ -1088,6 +1088,7 @@ class NewsTrader:
         for the poll and the scorer, and a kill in between does not lose its line. Never before a sale."""
         seen, n, looked = dict(self._covered), len(events), True
         mine = len(self._unsent)  # the trade rows this look appends come after these
+        self._phase = "stops"  # for the beat after the look's own message, also when the look asked no quote (nothing held)
         if not hasattr(self, "_prev_look"):
             # what the run before this one left. It stays the stamp of every name this run has not looked at yet: the
             # loop's own clock moves at every look, also for a name that had no live quote and no bars all along
@@ -1160,6 +1161,8 @@ class NewsTrader:
         except Exception as e:  # noqa: BLE001 - the save at the end of the step tries again and reports its own failure
             self._note_error(e, "save_after_trade")
         try:  # which row that was, read back: its line is owed to the owner until a channel has taken it (_mark_told)
+            # ponytail: the whole journal is read for one hash, about 15 ms at 2,000 rows (measured; it has a few rows a
+            # day). If it ever grows past that, read only its last line
             self._last_row = journal.read("news_trades.jsonl")[-1]["hash"]
             self._unsent.append(self._last_row)
         except Exception as e:  # noqa: BLE001 - the trade is made and saved; only the count of who was told misses it
