@@ -197,7 +197,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     **Owner's decision (Nimrod, 2026-11-11, answer א):** for the bad-news exit a fraction is compared as it is: 2 or
     less sells (1.6 sells, 2.4 does not). Buys do not change: only a whole number above 8 buys. Evidence before the
     change: 1,190 rows in `state/news_scores.jsonl` on 2026-11-11, all whole numbers, 0 fractions, so no sale was
-    missed so far. Waits for its build slot (one builder at a time: after Task 8 of the supervisor plan) and for
+    missed so far. Forward measurement (as built in Task 8b of the supervisor build): "after" = the SELL rows of
+    `state/news_trades.jsonl` that match a `news_scores.jsonl` row carrying `raw_score` (same symbol, same step); a
+    `raw_score` row with no matching sale (blocked by the live-quote rule, or the name already sold) is its own figure;
+    and the sum of `fractions` in `state/news_scorer_calls.jsonl`. Read at every Saturday review. Waits for its build slot (one builder at a time: after Task 8 of the supervisor plan) and for
     rule 4.
 63. [news][owner] The law says a news-exit is not undone, and the merge added `news-exit --cancel`. One sentence in
     CLAUDE.md and SKILL.md 3ב: a waiting request is cancelled only on the owner's word, and the cancel is logged.
