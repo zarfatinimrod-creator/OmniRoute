@@ -60,7 +60,7 @@ DEFAULTS = {
     "sell_on_score_at_most": 2, "max_hold_days": 5, "max_gross": 1.0, "slippage_bps": 10, "starting_cash": 100000,
     "model": "claude-haiku-5-5", "trade_outside_hours": False, "batch_max": 12, "stop_blind_alert_seconds": 300,
     "block_buys_until_loss_reviewed": True,
-    "sleep_slice_seconds": 0.5,
+    "sleep_slice_seconds": 0.5, "unsent_resend_seconds": 120,
     "health_log_seconds": 300, "exits_lock_wait_seconds": 1.0, "exits_lock_retry_seconds": 0.05, "seen_keep_days": 3,
     # entry and exit guards added after the MU loss of 2026-11-10 (state/postmortems.jsonl). Each one can only
     # refuse a buy or bring a sale forward; none can add a position, enlarge one or hold back a sale.
@@ -608,6 +608,7 @@ class NewsTrader:
         # who was told of a trade (_mark_told). Until adopt_previous is called nothing is told, unsent or late
         self.told_through = None  # every news_trades.jsonl row up to this hash had its line taken by a channel
         self._unsent: list = []  # hashes of the rows whose line no channel has taken yet, oldest first
+        self._carried_at: dict = {}  # row hash -> when a step's closing message last carried its line (monotonic)
         self._late: list = []  # today's rows that the run before left with no line taken; say_late says them
         self._last_row = None  # the hash of the journal's last row, as far as this process has read
         self._told_lines: set = set()  # the places, in the running step's lines, that a look's own message delivered
@@ -617,6 +618,13 @@ class NewsTrader:
                 notify.send("AI Trader - תקלה", f"בהגדרות (config.json) כתוב news.{key} = {self.n[key]!r}, וזה לא ערך מוכר"
                             f" ({', '.join(known)}). המנוע עובד כאילו כתוב {safe!r} (כסף נייר)", cfg, "urgent")
                 self.n = {**self.n, key: safe}
+        piece = self.n["sleep_slice_seconds"]
+        if isinstance(piece, bool) or not isinstance(piece, (int, float)) or not piece > 0:
+            # the wait between steps is slept in these slices: 0, a negative or a word would spin it for ever, with no
+            # step and no stop look. The default is used instead, and put on record once, at the start
+            self._note_error(ValueError(f"news.sleep_slice_seconds = {piece!r} is not a positive number:"
+                                        f" {DEFAULTS['sleep_slice_seconds']} is used"), "config")
+            self.n = {**self.n, "sleep_slice_seconds": DEFAULTS["sleep_slice_seconds"]}
 
     def save(self, seen: bool = True):
         """Book, queue and (seen=True, the end of a step) the marks of the headlines already seen. A save in the
@@ -752,12 +760,19 @@ class NewsTrader:
         """The fresh headlines not seen before. Every other new one is too old to act on and leaves a "stale" row;
         prime=True (the first start) marks everything already out as seen under ONE summary row."""
         t0, h = time.monotonic(), self._tally()  # before the feeds are asked: a first window covers its first poll
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            asked = [ex.submit(_feed, s, self.session) for s in self.universe]
+        ex = ThreadPoolExecutor(max_workers=8)
+        asked = [ex.submit(_feed, s, self.session) for s in self.universe]
+        try:
             if prime:  # this thread, never a worker, beats after each feed call it gets back: a start whose feeds are
                 for _ in as_completed(asked):  # slow is busy, not hung (a step's poll has its one beat after the poll)
                     self._beat(self._phase)
+                    if STOP.is_set():  # a planned stop: the feeds not answered by now are not primed, and not waited for
+                        asked = [f for f in asked if f.done()]
+                        break
             batches = [f.result() for f in asked]
+        finally:  # as a `with` block would, except that after a planned stop nothing still out is waited for or started
+            stopping = STOP.is_set()
+            ex.shutdown(wait=not stopping, cancel_futures=stopping)
         answered = sum(b is not None for b in batches)
         h["poll_s"].append(time.monotonic() - t0)
         h["feeds_min"] = answered if h["feeds_min"] is None else min(h["feeds_min"], answered)
@@ -1252,6 +1267,7 @@ class NewsTrader:
 
     def handle_scored(self, items: list[dict], scores: dict, events: list):
         bench_px, _ = live_price(self.cfg.get("benchmark", "SPY"))
+        self._beat("score")  # a quote, like any other call that leaves the process
         is_open = market_open_now()
         for x in items:
             s = scores.get(x["key"])
@@ -1439,9 +1455,9 @@ class NewsTrader:
             px, how = opens.get(q["symbol"]), "the 09:30 open"
             if not px:  # no 09:30 bar yet (delayed opening / lagging minute data): only a live quote will do
                 lp = live_price(q["symbol"])[0]
+                self._beat("queue")  # its own beat: a live quote found here is followed by the quote of the move
                 px, how = (lp, "the first live quote") if lp and self._quote_is_live(QUOTE_TIME.get(q["symbol"])) else (None, "")
             if not px:
-                self._beat("queue")
                 continue  # stays queued; tried again next step
             try:
                 if self.n["guards"] == "enforce" and self.n["verify_buys"] and q.get("second_check") != "passed":
@@ -1458,11 +1474,13 @@ class NewsTrader:
                 self._beat("queue")
 
     def _say(self, lines: list[str]) -> bool:
-        """One message to the owner: these lines, then the book line. Whether a channel took it."""
+        """One message to the owner: these lines, then the book line. Whether it was taken: by a channel, or, when no
+        channel is configured at all (notify.channels), by the engine's log, where notify.send printed it and which is
+        all that setup has. Only a configured channel that took nothing leaves the lines owed."""
         eq = self.book.equity(self._marks())
         body = ("\n".join(lines) + f"\nתיק חדשות (נייר): ${eq:,.0f} ({eq / self.n['starting_cash'] - 1:+.2%})"
                 ". כסף נייר")  # the last words of every message the owner gets: a trade, a refused buy
-        return bool(notify.send("AI Trader - חדשות", body, self.cfg, "high"))
+        return bool(notify.send("AI Trader - חדשות", body, self.cfg, "high")) or not notify.channels(self.cfg)
 
     def _mark_told(self, hashes: list[str]) -> None:
         """After a message that a channel took and that carried the lines of these trade rows: they are owed no
@@ -1477,14 +1495,15 @@ class NewsTrader:
     def say_late(self) -> None:
         """The trades of today that the run before made and no channel took the line of, in one message. Only rows
         that were on disk when this process started (adopt_previous): its own trades are said by its own looks and
-        steps. A message nobody took leaves them owed, for the next start of the day. Never raises."""
+        steps. A message nobody took leaves them owed: each step of this process says it again (step), and else the
+        next start of the day does. With no channel configured the log took it (_say). Never raises."""
         if not self._late:
             return
         try:
             # a row written by hand may lack a field: it is said with a question mark, not left out
             rows = [{**dict.fromkeys(("side", "qty", "symbol", "price", "reason"), "?"), **t} for t in self._late]
             body = "דווח באיחור: " + " | ".join(_trade_line(t) for t in rows) + ". כסף נייר"
-            if notify.send("AI Trader - חדשות", body, self.cfg, "high"):
+            if notify.send("AI Trader - חדשות", body, self.cfg, "high") or not notify.channels(self.cfg):
                 self._mark_told([t["hash"] for t in self._late])
                 self._late = []
         except Exception as e:  # noqa: BLE001 - a line that cannot be built or sent must not cost the start
@@ -1510,17 +1529,29 @@ class NewsTrader:
             if earlier:
                 try:  # their lines as the journal has them; a journal that cannot be read leaves them to the next step
                     rows = {t.get("hash"): t for t in journal.read("news_trades.jsonl") if isinstance(t, dict)}
-                    earlier = [h for h in earlier if h in rows]
+                    # sent again at most once every unsent_resend_seconds: in an outage each send costs up to 15 s a
+                    # channel, every step. One whose wait is not over is left out of this message and stays owed
+                    due = time.monotonic() - self.n["unsent_resend_seconds"]
+                    earlier = [h for h in earlier if h in rows and self._carried_at.get(h, due) <= due]
                     owed = [_trade_line(rows[h]) for h in earlier] + owed
                 except Exception as e:  # noqa: BLE001
                     earlier = []
                     self._note_error(e, "step_alert")
             if owed:
+                told = False
+                carried = earlier + self._unsent[mine:]  # every row whose line this message carries
+                self._carried_at.update(dict.fromkeys(carried, time.monotonic()))
                 try:
-                    if self._say(owed):
-                        self._mark_told(earlier + self._unsent[mine:])  # every row whose line this message carried
+                    told = self._say(owed)
+                    if told:
+                        self._mark_told(carried)
                 except Exception as e:  # noqa: BLE001 - the alert must not hide the error of the step itself
                     self._note_error(e, "step_alert")
+                if not told:
+                    self._beat(self._phase)  # a send that nothing took has taken its time all the same
+            if getattr(self, "_late", None):  # the run before's trades that no channel took the line of: said again
+                self.say_late()
+                self._beat(self._phase)  # after its send, taken or not, as at a start
             self._step_measured(time.monotonic() - t0)  # measurement only, after the alert, and it never raises
         return events
 
@@ -1554,6 +1585,10 @@ class NewsTrader:
             chunk = new[i:i + self.n["batch_max"]]
             scores, facts = self._scored(chunk)
             self._beat("score")
+            if "error" in facts and not scores and STOP.is_set():
+                # the call failed while a planned stop was asked (a signal to the whole group ends the scorer too):
+                # its headlines go back with those of the batches never started, below, and the next engine scores them
+                break
             self.handle_scored(chunk, scores, events)
             for x in chunk:  # after its score is journaled; a headline a failing step leaves behind gets "step_failed"
                 why_not = ("scorer_failed" if "error" in facts else
@@ -1564,8 +1599,9 @@ class NewsTrader:
                 # fails here must not cost the batches still to be scored (the look at the end reports its own failure)
                 self._look_at_stops(events, guarded=True)
         if STOP.is_set():
-            # what was polled and not handed to the scorer is unseen again, and off the record of headlines with no
-            # outcome yet: the next engine polls it, scores it and writes its one row (no "step_failed" row here)
+            # what was polled and not handed to the scorer, or handed to a call that failed after the stop was asked, is
+            # unseen again, and off the record of headlines with no outcome yet: the next engine polls it, scores it and
+            # writes its one row (no "step_failed" row here)
             for key in self._pending:
                 self.seen.pop(key, None)
             self._pending = {}
@@ -1783,7 +1819,11 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
         earlier = {sig: signal.signal(sig, request_stop) for sig in (signal.SIGTERM, signal.SIGINT)}
     try:
         if supervised is not None:
-            _set_pdeathsig()
+            try:
+                _set_pdeathsig()
+            except Exception as e:  # noqa: BLE001 - the check of the parent at the top of every round still ends it
+                print(f"[news] the engine could not ask to die with its parent ({type(e).__name__}): it looks for its"
+                      " parent at the top of every round", flush=True)
             if os.getppid() != supervised:
                 print(f"[news] the parent process is not pid {supervised}: this engine does not start (exit 143)", flush=True)
                 return 143
@@ -1800,9 +1840,12 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
                 print(f"[news] the engine lock could not be taken ({type(e).__name__}): running without it", flush=True)
                 locked = False
             if locked:  # one line, the holder's own; an engine that got no lock leaves the file to whoever holds it
-                lock.truncate(0)
-                lock.write(json.dumps({"pid": os.getpid(), "started_at": journal.now_utc()}) + "\n")
-                lock.flush()
+                try:
+                    lock.truncate(0)
+                    lock.write(json.dumps({"pid": os.getpid(), "started_at": journal.now_utc()}) + "\n")
+                    lock.flush()
+                except OSError as e:  # the name is only for whoever asks (a full disk): the lock is held all the same
+                    error_once("lock_file", e)
             return _run(until_ny, max_minutes, prime, locked=locked, supervised=supervised)
     finally:
         for sig, handler in earlier.items():  # None: a handler that was not set from Python cannot be named here
@@ -1828,14 +1871,20 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
     cfg = load_config()
     code, why, mismatch = start_checks(cfg)  # before the trader is built: a book that cannot be read is not built on
     if code == 5:
-        notify.send("AI Trader - תקלה", f"config.json calendar does not cover {datetime.now(NY).year}: the news engine"
-                    " treats every day as closed: it will not trade and will NOT check stops on open news positions until the"
-                    " NYSE holidays are added (כסף נייר)", cfg, "urgent")
+        try:  # a line that cannot be built or sent must not turn the code into a traceback
+            notify.send("AI Trader - תקלה", f"config.json calendar does not cover {datetime.now(NY).year}: the news engine"
+                        " treats every day as closed: it will not trade and will NOT check stops on open news positions until"
+                        " the NYSE holidays are added (כסף נייר)", cfg, "urgent")
+        except Exception as e:  # noqa: BLE001
+            error_once("calendar_line", e)
         return code
     if code:
         print(f"[news] start refused: {why} (exit {code})", flush=True)
         if code == 6 and supervised is None:  # the bare engine says it itself; under a parent, the parent does
-            notify.send("AI Trader - תקלה", owner_line(cfg, "R5d"), cfg, "urgent")
+            try:  # as above
+                notify.send("AI Trader - תקלה", owner_line(cfg, "R5d"), cfg, "urgent")
+            except Exception as e:  # noqa: BLE001
+                error_once("book_line", e)
         return code
     nt = NewsTrader(cfg)
     nt.locked = locked  # in every heartbeat: False = this engine runs with no lock on the book
@@ -1854,7 +1903,10 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
                                         " says why. The first step looks again"), "first_look")
     except ChainBroken as e:
         print(f"[news] {e}", flush=True)
-        notify.send("AI Trader - תקלה", f"{e} (כסף נייר)", cfg, "urgent")
+        try:  # as above: the code is 4 whatever becomes of the line
+            notify.send("AI Trader - תקלה", f"{e} (כסף נייר)", cfg, "urgent")
+        except Exception as e2:  # noqa: BLE001
+            error_once("chain_line", e2)
         return 4
     except Exception as e:  # noqa: BLE001 - not a crash: it goes on record, and the first step of the loop looks again
         nt._note_error(e, "first_look")
@@ -1878,9 +1930,10 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
             pass
         try:
             told = {"day": datetime.now(NY).date().isoformat(), "symbol": mismatch["symbol"]}
-            if nt._mismatch_told != told and notify.send("AI Trader - תקלה", owner_line(
-                    cfg, "E1", side=ownerlines.WORDS["E1.side"][mismatch["side"]], sym=mismatch["symbol"]), cfg, "urgent"):
-                nt._mismatch_told = told  # only once a channel took it: a line nobody got is said by the next start
+            if nt._mismatch_told != told and (notify.send("AI Trader - תקלה", owner_line(
+                    cfg, "E1", side=ownerlines.WORDS["E1.side"][mismatch["side"]], sym=mismatch["symbol"]), cfg, "urgent")
+                    or not notify.channels(cfg)):  # with no channel configured, the log it was printed to took it (_say)
+                nt._mismatch_told = told  # only once it was taken: a line nobody got is said by the next start
         except Exception as e:  # noqa: BLE001 - as above: the stops of the book there is still need this engine
             error_once("mismatch_line", e)
         nt._beat(nt._phase)  # after the send, taken or not: a pair a channel took is in the file for the next start
@@ -1934,8 +1987,9 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
             left -= nt.n["sleep_slice_seconds"]
     nt.save()
     # a trial answer still out is only a record. While the market is open the next engine must not wait for it (the
-    # lock is held until this returns, and no stop is looked at meanwhile); after the close one call's time is given
-    nt.drain_trial(wait=0 if market_open_now() else nt.n["verify_timeout_seconds"])
+    # lock is held until this returns, and no stop is looked at meanwhile), nor after a planned stop, whose grace this
+    # time would eat; after the close one call's time is given
+    nt.drain_trial(wait=0 if market_open_now() or STOP.is_set() else nt.n["verify_timeout_seconds"])
     if code == 143:
         nt._beat("stopping")  # the last beat of a planned stop: whoever reads the file knows this engine was not killed
     print("[news] stopped", flush=True)

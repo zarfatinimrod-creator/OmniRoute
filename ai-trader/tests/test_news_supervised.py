@@ -4,6 +4,7 @@ its heartbeat and the checks of a start."""
 from helpers import no_phone  # noqa: F401  (first: a test run must never reach the owner's phone)
 
 import contextlib
+import fcntl
 import io
 import json
 import os
@@ -20,9 +21,22 @@ from zoneinfo import ZoneInfo
 
 from aitrader import __main__ as cli
 from aitrader import journal, news_live
-from test_news_guards import _Engine
+from test_news_guards import _Engine as _GuardsEngine
 
 NY = ZoneInfo("America/New_York")
+
+
+class _Engine(_GuardsEngine):
+    """test_news_guards' stand-ins, and a channel configured on the stand-in phone (notify.channels answers ["ntfy"]),
+    so that a send it answers with [] is a channel that failed. self.real_channels is notify.channels itself, which
+    finds no channel in a test run (helpers.no_phone): GateFollowUps tests that setup with it."""
+
+    def setUp(self):
+        super().setUp()
+        self.real_channels = news_live.notify.channels
+        configured = mock.patch.object(news_live.notify, "channels", lambda cfg: ["ntfy"])
+        configured.start()
+        self.addCleanup(configured.stop)
 
 
 def hold(nt, sym="BBB", entry=50.0):
@@ -207,11 +221,12 @@ class EveryCallAndEveryStart(_Engine):
     def test_a_second_check_the_loop_waited_for_leaves_a_beat_and_one_on_trial_leaves_none(self):
         with written() as beats:
             self._score(self._item())                  # "enforce": the check is asked, and waited for, before the buy
-        self.assertEqual((beats, list(self.nt.book.positions)), (["score"], ["AAA"]))
+        # the first beat is the benchmark quote's (task 9b), the second the check's
+        self.assertEqual((beats, list(self.nt.book.positions)), (["score", "score"], ["AAA"]))
         self.nt.n["guards"] = "log"
         with written() as beats:
             self._score(self._item("k2", "BBB"))       # on trial: asked in the background, the loop does not wait
-        self.assertEqual((beats, list(self.nt.book.positions)), ([], ["AAA", "BBB"]))
+        self.assertEqual((beats, list(self.nt.book.positions)), (["score"], ["AAA", "BBB"]))   # the benchmark quote's only
 
     def test_between_the_ends_of_two_steps_a_beat_repeats_what_the_last_end_worked_out(self):
         step(self.nt)
@@ -811,7 +826,7 @@ class WhoWasTold(_Starts):
 
     def test_a_steps_closing_message_does_not_tell_the_rows_of_the_run_before(self):
         hold(self.nt); self.nt.save()
-        gone = trade("GONE")
+        trade("GONE")
         journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
         nt = news_live.NewsTrader(self.cfg)
         nt.adopt_previous(news_live.read_heartbeat())   # and the late line has not gone out yet
@@ -823,7 +838,9 @@ class WhoWasTold(_Starts):
             return ["ntfy"] if len(bodies) > 1 else []
         with mock.patch.object(news_live.notify, "send", send):
             step(nt)
-        self.assertEqual((["SELL 10 BBB" in b for b in bodies], nt.told_through, nt._unsent), ([True, True], None, [gone]))
+        # the closing message carried BBB's line and not GONE's; the late line said again after it (task 9b) told GONE
+        self.assertEqual(([("SELL 10 BBB" in b, "GONE" in b) for b in bodies], nt.told_through, nt._unsent),
+                         ([(True, False), (True, False), (False, True)], journal.read("news_trades.jsonl")[-1]["hash"], []))
 
     def test_a_late_line_that_cannot_be_sent_costs_a_row_and_never_the_start(self):
         hold(self.nt); self.nt.save()
@@ -831,7 +848,8 @@ class WhoWasTold(_Starts):
         journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
         with mock.patch.object(news_live.notify, "send", side_effect=OSError("no network")):
             self.assertEqual(self.start(), 0)
-        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")], [("late_line", "OSError")])
+        # a row each time the late line is tried: at the start and after each step (task 9b)
+        self.assertEqual({(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")}, {("late_line", "OSError")})
         self.assertIsNone(news_live.read_heartbeat()["told_through"])   # still owed: the next start of the day says it
 
     def test_a_start_says_what_the_run_before_left_unsaid_and_the_next_start_says_nothing(self):
@@ -1221,6 +1239,7 @@ class FollowUps(_Engine):
 
     def test_a_line_no_message_took_is_carried_step_after_step_oldest_first_and_once_in_each_message(self):
         hold(self.nt); hold(self.nt, "AAA", 100.0)
+        self.nt.n["unsent_resend_seconds"] = 0       # no back-off: the steps here are milliseconds apart (GateFollowUps tests it)
         bodies = []
 
         def send(title, body, cfg, prio="default", **kw):   # no channel takes the first three messages; one takes the fourth
@@ -1267,7 +1286,8 @@ class FollowUps(_Engine):
             return got
         with mock.patch.object(news_live.NewsTrader, "poll_headlines", primed):   # start()'s priming poll calls it
             self.assertEqual(self.start(locked=False, prime=True), 0)
-        self.assertEqual(len(seen), 3 + 1 + 30)       # three sends, code_stamp, thirty feed calls
+        # three sends, code_stamp, thirty feed calls; then the late line again after each step (task 9b)
+        self.assertEqual(len(seen), 3 + 1 + 30 + news_live.read_heartbeat()["step"])
         self.assertEqual(seen[:4], sorted(set(seen[:4])))   # a beat between any two of the sends and git
         self.assertGreater(min(seen[4:]), seen[3])    # and between git and the first feed call
         # the feeds are asked side by side: at least one beat per feed call while the priming poll runs, and one after
@@ -1306,7 +1326,8 @@ class FollowUps(_Engine):
             return []
         news_live.notify.send = send
         self.assertEqual(self.start(), 0)
-        self.assertEqual(sum("SELL" in b for _, b in calls), 1)              # the late line only, not the closing message too
+        # the late line only, at the start and again after each step (task 9b), never in the closing message too
+        self.assertEqual(sum("SELL" in b for _, b in calls), 1 + news_live.read_heartbeat()["step"])
         self.assertTrue(calls[0][1].startswith("דווח באיחור: SELL 10 BBB"))
         b = news_live.read_heartbeat()                # and the loop made steps, each one with a closing message to build
         self.assertEqual((b["step"] > 0, b["told_through"]), (True, None))
@@ -1358,3 +1379,283 @@ class FollowUps(_Engine):
         self.assertEqual([what for what, _ in calls], ["quote"] * 6 + ["send"] * 6 + ["quote"] * 6 + ["bars", "send"] * 6)
         beats = [n for _, n in calls] + [self.writes()]
         self.assertEqual(beats, sorted(set(beats)))   # strictly rising: a beat after each send, as after each call
+
+
+class GateFollowUps(_Engine):
+    """What the quant-critic and the review of rollout step 1 owed before step 2 (task 9b): the late line is said
+    again, no channel configured counts as said to the log, a line sent again backs off, the start's sends and writes
+    never turn a code into a traceback, the wait's slice is clamped, a planned stop waits on nothing, three more
+    beats, and the two procedures of SKILL.md 3ב."""
+
+    def setUp(self):
+        super().setUp()
+        self.cfg["news"]["stop_catchup"] = self.nt.n["stop_catchup"] = "off"   # whether a bar read is due depends on the hour
+        self.addCleanup(news_live.STOP.clear)                                  # no test leaves a stop asked for behind it
+        quiet = contextlib.redirect_stdout(io.StringIO())                      # the engine's own log lines
+        self.out = quiet.__enter__()
+        self.addCleanup(quiet.__exit__, None, None, None)
+
+    def nobody(self, title, body, cfg, prio="default", **kw):
+        """The phone when no channel takes a line: written down in self.sent, and [] back."""
+        self.sent.append((prio, body))
+        return []
+
+    @contextlib.contextmanager
+    def quick(self, sleep=lambda s: None):
+        """The stand-ins of a start whose loop lasts 30 ms: the config, git, the poll and the wait."""
+        with mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda nt, *a, **k: []), \
+                mock.patch.object(news_live, "code_stamp", lambda: {"commit": "abc1234", "dirty": False, "started": "now"}), \
+                mock.patch.object(news_live.time, "sleep", sleep), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg):
+            yield
+
+    def start(self, until="23:59", sleep=lambda s: None, **kw):
+        """_run on the temporary state, with quick()'s stand-ins."""
+        with self.quick(sleep):
+            return news_live._run(until, 0.0005, False, **kw)
+
+    # 1. the late line (review M3)
+    def test_a_late_line_no_channel_took_at_the_start_is_said_again_by_the_next_step_and_told_once(self):
+        gone = trade("GONE")                                   # of the run before, and nobody was told of it
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        nt = news_live.NewsTrader(self.cfg)
+        nt.adopt_previous(news_live.read_heartbeat())
+        bodies = []
+
+        def send(title, body, cfg, prio="default", **kw):     # no channel takes the first message; one takes the later ones
+            bodies.append(body)
+            return ["ntfy"] if len(bodies) > 1 else []
+        with mock.patch.object(news_live.notify, "send", send):
+            nt.say_late()                                      # the start's late line
+            self.assertEqual((nt.told_through, nt._unsent), (None, [gone]))
+            step(nt)                                           # nothing of its own to say: after it, the late line again
+            step(nt)                                           # and the step after that has nothing left to say
+        self.assertEqual(bodies, ["דווח באיחור: SELL 1 GONE @ 9.0 - x. כסף נייר"] * 2)
+        self.assertEqual((nt.told_through, nt._unsent, nt._late, news_live.read_heartbeat()["told_through"]),
+                         (gone, [], [], gone))
+
+    # 2. no channel configured (review M4)
+    def test_the_channels_configured_are_read_from_the_variables_the_config_names(self):
+        cfg = {"alerts": {"ntfy_topic_env": "T9B_TOPIC", "telegram_token_env": "T9B_TOKEN", "telegram_chat_env": "T9B_CHAT"}}
+        for env, want in (({}, []), ({"T9B_TOPIC": "t"}, ["ntfy"]), ({"T9B_TOKEN": "t"}, []), ({"T9B_CHAT": "c"}, []),
+                          ({"T9B_TOKEN": "t", "T9B_CHAT": "c"}, ["telegram"]),
+                          ({"T9B_TOPIC": "t", "T9B_TOKEN": "t", "T9B_CHAT": "c"}, ["ntfy", "telegram"])):
+            with mock.patch.dict(os.environ, env):
+                self.assertEqual(self.real_channels(cfg), want, env)
+        self.assertEqual(self.real_channels({}), [])           # the default names, which a test run never holds
+
+    def test_with_no_channel_configured_the_lines_of_a_start_count_as_said_to_the_log(self):
+        hold(self.nt)
+        book, today = dict(self.nt.book.state), datetime.now(NY).date().isoformat()
+
+        def scene():  # BBB held, a SELL of the run before that nobody was told of, then a BUY the book does not show (E1)
+            for p in self.tmp.iterdir():
+                if p.is_file():
+                    p.unlink()
+            journal.save_json("news_book.json", book)
+            trade("GONE")
+            journal.append("news_trades.jsonl", {**BUY_AAA, "date": today})
+            journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        self.prices["BBB"] = 48.0                              # under its stop of 48.50: the first look sells it and says so
+        for channels, told in ((news_live.notify.channels, False), (self.real_channels, True)):   # one that failed; none
+            scene()
+            with mock.patch.object(news_live.notify, "channels", channels), \
+                    mock.patch.object(news_live.notify, "send", self.nobody):
+                self.assertEqual(self.start(until="00:00"), 0)   # 00:00 has always passed: the start's lines and no step
+            b, sale = news_live.read_heartbeat(), journal.read("news_trades.jsonl")[-1]["hash"]   # the sale is the last row
+            self.assertEqual((b["told_through"], b["mismatch_told"]),
+                             (sale, {"day": today, "symbol": "AAA"}) if told else (None, None), told)
+        # each start: the first look's message, E1 and the late line, once each
+        self.assertEqual([(b.startswith("SELL 10 BBB"), b.startswith(E1_AAA), b.startswith("דווח באיחור: SELL 1 GONE"))
+                          for _, b in self.sent], [(True, False, False), (False, True, False), (False, False, True)] * 2)
+
+    def test_with_no_channel_configured_a_closing_message_is_owed_no_longer_and_with_one_that_failed_it_still_is(self):
+        self.nt.n["verify_buys"] = False                       # the buy is made in the batch: only the closing message says it
+        scored = lambda batch, model: {x["key"]: {"score": 9, "why": "test"} for x in batch}   # noqa: E731
+        with mock.patch.object(news_live.notify, "send", self.nobody), \
+                mock.patch.object(self.nt, "_quote_is_live", lambda *a, **k: True):
+            with mock.patch.object(news_live.notify, "channels", self.real_channels):   # no topic, no Telegram pair
+                step(self.nt, items(1), scored)
+            aaa = journal.read("news_trades.jsonl")[-1]["hash"]
+            self.assertEqual((self.nt.told_through, self.nt._unsent), (aaa, []))
+            step(self.nt, [{**items(1)[0], "key": "b1", "symbol": "BBB", "title": "BBB news"}], scored)   # a channel, down
+        bbb = journal.read("news_trades.jsonl")[-1]["hash"]
+        self.assertEqual((self.nt.told_through, self.nt._unsent), (aaa, [bbb]))
+        self.assertEqual([(b.startswith("BUY"), "AAA" in b, "BBB" in b) for _, b in self.sent],
+                         [(True, True, False), (True, False, True)])
+
+    # 3. a line sent again backs off (critic N5)
+    def test_a_line_no_channel_took_is_sent_again_at_most_once_every_unsent_resend_seconds(self):
+        self.assertEqual(self.nt.n["unsent_resend_seconds"], 120)
+        clock, bodies = [0.0], []
+
+        def send(title, body, cfg, prio="default", **kw):     # a channel is configured and takes nothing: an outage
+            bodies.append((clock[0], "SELL 10 BBB" in body, "SELL 10 SPY" in body))
+            return []
+        scored = lambda batch, model: {x["key"]: {"score": 9, "why": "test"} for x in batch}   # noqa: E731
+        hold(self.nt); self.prices["BBB"] = 48.0              # under its stop of 48.50: sold by the look at 0 s
+        with mock.patch.object(news_live.notify, "send", send), mock.patch.object(news_live.time, "monotonic", lambda: clock[0]):
+            step(self.nt)                                      # 0 s: the look's message and the closing message
+            clock[0] = 30.0
+            step(self.nt, items(1), scored)                    # 30 s: a line of its own (the quote is not live), not BBB's
+            clock[0] = 60.0
+            hold(self.nt, "SPY", 520.0)                        # under its stop of 504.40: a new line at 60 s
+            step(self.nt)
+            clock[0] = 120.0
+            step(self.nt)                                      # 120 s: BBB's line is due again, SPY's not yet
+        self.assertEqual(bodies, [(0, True, False), (0, True, False), (30, False, False), (60, False, True), (60, False, True),
+                                  (120, True, False)])
+        self.assertEqual(len(self.nt._unsent), 2)              # never taken: both still owed
+
+    # 4. the start's sends and writes (review m5, m6, m10; critic N8, N9)
+    def test_a_start_whose_alert_cannot_be_sent_still_ends_with_its_code(self):
+        news_live.ERRORS_SAID.clear()                          # what this process already put in news_errors.jsonl
+        raising = lambda: mock.patch.object(news_live.notify, "send", side_effect=OSError(28, "No space left on device"))  # noqa: E731
+        with raising(), mock.patch.object(journal, "calendar_covers", lambda day: False):
+            self.assertEqual(self.start(), 5)                  # the calendar does not cover today: its alert
+        journal.append("news_trades.jsonl", BUY_AAA)
+        journal._path("news_book.json").write_text("{not json")
+        with raising():
+            self.assertEqual(self.start(), 6)                  # trades and no readable book: R5d
+        journal.save_json("news_book.json", self.nt.book.state)
+        with raising(), mock.patch.object(journal, "broken_chains", lambda names=None: ["news_trades.jsonl"]):
+            self.assertEqual(self.start(), 4)                  # a broken chain at the start: its alert
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")],
+                         [("calendar_line", "OSError"), ("book_line", "OSError"), ("chain_line", "OSError")])
+
+    def test_a_lock_file_that_cannot_be_signed_or_a_death_signal_that_cannot_be_asked_for_costs_no_start(self):
+        news_live.ERRORS_SAID.clear()
+        real_open, held = open, []
+
+        def full_disk(path, *a, **k):                          # the lock file opens and locks; the holder's name is not written
+            f = real_open(path, *a, **k)
+            f.write = mock.Mock(side_effect=OSError(28, "No space left on device"))
+            return f
+
+        def a_round(nt):                                       # a round of the loop: is the book's lock held meanwhile?
+            with real_open(journal._path("news_engine.lock")) as other:
+                try:
+                    fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    held.append(False)
+                except BlockingIOError:
+                    held.append(True)
+            return []
+        with self.quick(), mock.patch.object(news_live.NewsTrader, "step", a_round):
+            with mock.patch.object(news_live, "open", full_disk, create=True):
+                self.assertEqual(news_live.run("23:59", 0.0005, prime=False), 0)
+            self.assertEqual((set(held), journal._path("news_engine.lock").read_text()), ({True}, ""))
+            del held[:]
+            with mock.patch.object(news_live, "_set_pdeathsig", side_effect=OSError(1, "Operation not permitted")):
+                self.assertEqual(news_live.run("23:59", 0.0005, prime=False, supervised=os.getppid()), 0)
+        self.assertEqual((set(held), news_live.read_heartbeat()["supervised"]), ({True}, True))   # its loop ran, supervised
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")], [("lock_file", "OSError")])
+        self.assertEqual(len([line for line in self.out.getvalue().splitlines() if "die with its parent" in line]), 1)
+
+    # 5. the wait's slice (critic N6, review m2)
+    def test_a_wait_slice_that_is_not_a_positive_number_is_replaced_by_the_default_and_said_once(self):
+        self.cfg["news"]["poll_seconds"] = 1                   # a wait of one second between the steps: two slices of 0.5
+        slept = []
+
+        def sleep(seconds):                                    # a wait that would never end is ended from here
+            slept.append(seconds)
+            if len(slept) >= 10_000:
+                news_live.STOP.set()
+        for bad in (0, -1, "0.5"):
+            del slept[:]
+            self.cfg["news"]["sleep_slice_seconds"] = bad
+            self.assertEqual(self.start(sleep=sleep), 0, bad)  # the clock ended the loop, not the stop above
+            self.assertEqual(set(slept), {news_live.DEFAULTS["sleep_slice_seconds"]}, bad)
+            news_live.STOP.clear()
+        self.assertEqual([e["where"] for e in journal.read("news_errors.jsonl")], ["config"] * 3)   # one row a start
+
+    # 6. a planned stop waits on nothing (review m1, m3, m4; critic N4)
+    def test_after_a_planned_stop_the_last_drain_of_the_trial_checks_waits_for_nothing(self):
+        news_live.market_open_now = lambda: False              # after the close: a run that the clock ended waits one call's time
+        waits = []
+        with mock.patch.object(news_live.NewsTrader, "drain_trial", lambda nt, wait=0.0: waits.append(wait)):
+            self.assertEqual(self.start(sleep=lambda s: news_live.request_stop(signal.SIGTERM, None)), 143)
+            stopped = waits[-1]
+            news_live.STOP.clear()
+            self.assertEqual(self.start(), 0)
+        self.assertEqual((stopped, waits[-1]), (0, self.nt.n["verify_timeout_seconds"]))
+
+    def test_after_a_planned_stop_the_priming_poll_takes_no_more_feed_results_and_waits_for_none(self):
+        self.nt.universe = [f"S{i:02d}" for i in range(16)]
+        out = threading.Event()                                # set: the feeds still out answer
+        self.addCleanup(out.set)
+
+        def feed(sym, session):                                # S00 answers at once; every other feed is still out
+            if sym != "S00":
+                out.wait(2)
+            return [{"key": f"key-{sym}", "symbol": sym, "title": f"{sym} news", "link": "", "published": journal.now_utc(),
+                     "description": ""}]
+        beat = self.nt._beat
+
+        def then_stop(phase):                                  # the signal comes right after the first feed result was read
+            beat(phase)
+            news_live.STOP.set()
+        t0 = time.monotonic()
+        with mock.patch.object(news_live, "_feed", feed), mock.patch.object(self.nt, "_beat", then_stop):
+            self.nt.poll_headlines(prime=True)
+        took = time.monotonic() - t0
+        out.set()
+        self.assertEqual(sorted(self.nt.seen), ["key-S00"])   # only what was read is primed
+        self.assertLess(took, 1.0)                             # and the feeds still out were not waited for
+
+    def test_a_batch_that_failed_while_a_planned_stop_was_asked_is_unseen_again_like_a_batch_never_started(self):
+        self.nt.n["batch_max"] = 1
+        new = [{**x, "key": f"k{i}"} for i, x in enumerate(items(3), 1)]
+
+        def poll():
+            self.nt.seen.update({x["key"]: journal.now_utc() for x in new})
+            return list(new)
+
+        def scorer(batch, model):                              # every call fails; the second one is a call a group signal ended
+            out = news_live.Scores()
+            out.facts.update(model=model, prompt=news_live.PROMPT_ID, sent=len(batch), error="JSONDecodeError")
+            if batch[0]["key"] == "k2":
+                news_live.STOP.set()
+            return out
+        with mock.patch.object(self.nt, "poll_headlines", poll), mock.patch.object(news_live, "score_batch", scorer):
+            self.nt.step()
+        self.assertEqual((sorted(self.nt.seen), sorted(journal.load_json("news_seen.json"))), (["k1"], ["k1"]))
+        self.assertEqual([(r["key"], r["outcome"]) for r in journal.read("news_seen_log.jsonl")], [("k1", "scorer_failed")])
+        self.assertEqual(len(journal.read("news_scorer_calls.jsonl")), 2)   # both calls stay on record
+
+    # 7. three beats (critic N12)
+    def test_the_benchmark_quote_of_a_scoring_has_a_beat_after_it(self):
+        asked, price = [], news_live.live_price
+        with written() as beats:
+            news_live.live_price = lambda sym: asked.append((sym, len(beats))) or price(sym)   # tearDown puts the real one back
+            self.nt.handle_scored([self._item()], {"k1": {"score": 5, "why": "x"}}, [])   # a 5: no buy, no sale
+            after = len(beats)
+        self.assertEqual((asked, after), ([("SPY", 0)], 1))
+
+    def test_the_closing_send_of_a_step_has_a_beat_after_it_also_when_no_channel_took_it(self):
+        hold(self.nt); self.prices["BBB"] = 48.0              # under its stop: the look's message, then the closing message
+        sends = []
+        with written() as beats, mock.patch.object(news_live.notify, "send", lambda *a, **kw: sends.append(len(beats)) or []):
+            step(self.nt)
+            after = len(beats)
+        self.assertEqual(len(sends), 2)
+        self.assertGreater(after, sends[-1])
+
+    def test_the_live_quote_that_stands_in_for_the_opening_bar_has_a_beat_before_the_quote_of_the_move(self):
+        self.nt.queue = [{"symbol": "AAA", "score": 9, "why": "x", "queued_at": journal.now_utc(), "id": "q1",
+                          "second_check": "passed"}]
+        asked, price = [], news_live.live_price
+        with written() as beats, mock.patch.object(news_live, "official_opens", lambda syms, day: {}), \
+                mock.patch.object(self.nt, "_quote_is_live", lambda *a, **k: True):   # no 09:30 bar; a live quote
+            news_live.live_price = lambda sym: asked.append(len(beats)) or price(sym)
+            self.nt.run_queue_at_open([])
+        self.assertEqual((len(asked), list(self.nt.book.positions)), (2, ["AAA"]))   # the live quote, then the move
+        self.assertGreater(asked[1], asked[0])
+
+    # 8. SKILL.md 3ב
+    def test_the_skill_says_how_to_stop_an_engine_and_what_to_do_on_e1(self):
+        text = (Path(__file__).resolve().parents[1] / "skills" / "trader" / "SKILL.md").read_text(encoding="utf-8")
+        section = text[text.index("## 3ב."):text.index("## 4.")]
+        self.assertNotIn("`kill <pid>`, ואז מפעילים", section)   # a start right after the kill exits 3
+        for words in ("SIGTERM", "143", '"stopping"', "kill -9", "E1 (התיק לא תואם ליומן העסקאות)",
+                      "python3 -m aitrader verify", "כסף נייר"):
+            self.assertIn(words, section, words)

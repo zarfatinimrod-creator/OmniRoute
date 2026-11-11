@@ -25,6 +25,18 @@ def in_quiet_hours(cfg: dict, now: str | None = None) -> bool:
     return (a <= t < b) if a <= b else (t >= a or t < b)
 
 
+def channels(cfg: dict) -> list[str]:
+    """The channels send would try, from the environment variables config.json's alerts block names: "ntfy" when the
+    topic is set, "telegram" when the token and the chat both are. [] = none is configured, and send only prints (the
+    Claude session relays what is printed). Only whether a variable is set is read: no value leaves here."""
+    a = cfg.get("alerts", {})
+    out = ["ntfy"] if os.environ.get(a.get("ntfy_topic_env", "AITRADER_NTFY_TOPIC")) else []
+    if (os.environ.get(a.get("telegram_token_env", "AITRADER_TELEGRAM_TOKEN"))
+            and os.environ.get(a.get("telegram_chat_env", "AITRADER_TELEGRAM_CHAT"))):
+        out.append("telegram")
+    return out
+
+
 def send(title: str, body: str, cfg: dict, priority: str = "default", force: bool = False) -> list[str]:
     if not force and in_quiet_hours(cfg):  # waits in alert_queue.json for the morning summary
         queue = journal.load_json("alert_queue.json", []) or []
