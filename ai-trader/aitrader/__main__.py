@@ -14,6 +14,8 @@
                                           3 not delivered); without --book crypto it refuses (exit 1)
   verify                                  check the tamper-evident hash chains
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
+  news-live --supervised PARENT_PID       the same engine under a parent process: it dies with that parent and exits 143
+                                          when its parent is another pid; SIGTERM is a planned stop (exit 143) either way
   news-live --check                       the checks of an engine start and the news hash chains, read-only (no lock, nothing
                                           written or sent): exit 0, or 5 calendar, 7 git merge in progress, 6 book, 4 chains
   news-score [--n 8]                      score recent headlines without trading (scorer check)
@@ -93,6 +95,8 @@ def main(argv=None) -> int:
     nl.add_argument("--minutes", type=float, default=None)
     nl.add_argument("--check", action="store_true", help="run the start checks and the chain check and exit with their code;"
                                                          " takes no lock, starts no engine, writes and sends nothing")
+    nl.add_argument("--supervised", type=int, default=None, metavar="PARENT_PID",
+                    help="the engine of a parent process: it dies with that parent, and does not start under another")
     ns = sub.add_parser("news-score")
     ns.add_argument("--n", type=int, default=8)
     ns.add_argument("--minutes", type=int, default=120)
@@ -301,7 +305,7 @@ def _run(a: argparse.Namespace) -> int:
     elif a.cmd == "news-live":
         from .news_live import run
 
-        return run(a.until, a.minutes, check=a.check) or 0  # the code says why it ended (news_live.run): 3 = the book is held
+        return run(a.until, a.minutes, check=a.check, supervised=a.supervised) or 0  # the code says why it ended (news_live.run): 3 = the book is held
     elif a.cmd == "news-score":  # score recent headlines without trading (a check of the scorer)
         from datetime import datetime, timedelta, timezone
 

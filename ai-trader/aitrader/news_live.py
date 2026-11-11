@@ -23,14 +23,17 @@ validated (symbol must match, score clamped to 1..10); nothing in a headline can
 
 from __future__ import annotations
 
+import ctypes
 import fcntl
 import hashlib
 import html
 import json
 import os
 import re
+import signal
 import statistics
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -54,6 +57,7 @@ DEFAULTS = {
     "sell_on_score_at_most": 2, "max_hold_days": 5, "max_gross": 1.0, "slippage_bps": 10, "starting_cash": 100000,
     "model": "claude-haiku-5-5", "trade_outside_hours": False, "batch_max": 12, "stop_blind_alert_seconds": 300,
     "block_buys_until_loss_reviewed": True,
+    "sleep_slice_seconds": 0.5,
     "health_log_seconds": 300, "exits_lock_wait_seconds": 1.0, "exits_lock_retry_seconds": 0.05, "seen_keep_days": 3,
     # entry and exit guards added after the MU loss of 2026-11-10 (state/postmortems.jsonl). Each one can only
     # refuse a buy or bring a sale forward; none can add a position, enlarge one or hold back a sale.
@@ -78,6 +82,23 @@ def owner_line(cfg: dict, line_id: str, **fields) -> str:
     line of that table that the engine sends goes through here."""
     sup = cfg["supervisor"]
     return ownerlines.render(line_id, max_bytes=sup["max_line_bytes"], free_chars=sup["free_text_max_chars"], **fields)
+
+
+STOP = threading.Event()  # a planned stop was asked for: the loop ends at its next look at this, and the engine exits 143
+
+
+def request_stop(signum=None, frame=None) -> None:
+    """The handler of SIGTERM and SIGINT (run installs it): it only sets STOP. The call the engine is in goes on to
+    its end, and a second signal changes nothing."""
+    STOP.set()
+
+
+def _set_pdeathsig() -> None:
+    """Asks the kernel to send this process SIGKILL when its parent dies (Linux: prctl(PR_SET_PDEATHSIG)), so that an
+    engine never outlives the parent that started it and keeps the lock. Elsewhere nothing: there the engine notices
+    a lost parent at the top of its next round. A seam: in-process tests replace it."""
+    if sys.platform == "linux":
+        ctypes.CDLL(None).prctl(1, signal.SIGKILL)  # 1 = PR_SET_PDEATHSIG (linux/prctl.h)
 
 
 ERRORS_SAID: set[tuple] = set()  # (where, error type, New York day) already in news_errors.jsonl from this process
@@ -1463,12 +1484,16 @@ class NewsTrader:
         self._beat("poll")
         is_open = market_open_now()
         for x in new:
+            if STOP.is_set():  # a planned stop: no further quote for a headline
+                break
             x["price"], move = live_price(x["symbol"])
             # outside the session the regular-session move leaves out the after-hours reaction: it is not "so far today"
             x["day_move_pct"] = move if is_open else None
             x["price_at"] = QUOTE_TIME.get(x["symbol"])  # the quote's own time (None = unknown = not live)
             self._beat("quotes")  # fifty new headlines are fifty quotes: the loop is busy, not hung
         for i in range(0, len(new), self.n["batch_max"]):
+            if STOP.is_set():  # a planned stop: the batch that came back was handled, and no further one is started
+                break
             chunk = new[i:i + self.n["batch_max"]]
             scores, facts = self._scored(chunk)
             self._beat("score")
@@ -1477,11 +1502,17 @@ class NewsTrader:
                 why_not = ("scorer_failed" if "error" in facts else
                            "symbol_mismatch" if x["key"] in facts.get("symbol_mismatch", ()) else "scorer_no_answer")
                 self._seen_row(self._pending.pop(x["key"], x), "scored" if x["key"] in scores else why_not)
-            if i + self.n["batch_max"] < len(new) and market_open_now():
+            if i + self.n["batch_max"] < len(new) and market_open_now() and not STOP.is_set():
                 # between batches: several slow scorer calls in a row must not blind the stops. Guarded: a look that
                 # fails here must not cost the batches still to be scored (the look at the end reports its own failure)
                 self._look_at_stops(events, guarded=True)
-        if market_open_now():
+        if STOP.is_set():
+            # what was polled and not handed to the scorer is unseen again, and off the record of headlines with no
+            # outcome yet: the next engine polls it, scores it and writes its one row (no "step_failed" row here)
+            for key in self._pending:
+                self.seen.pop(key, None)
+            self._pending = {}
+        if market_open_now():  # also on a planned stop: the stops are looked at until the end
             self._look_at_stops(events)
         self.drain_trial()
         self.save()
@@ -1542,7 +1573,8 @@ class NewsTrader:
     def _beat(self, phase: str) -> None:
         """The heartbeat, state/news_heartbeat.json: written here and nowhere else, after every call that leaves the
         process, so that whoever watches the file can tell an engine that hangs in a call from one that is busy.
-        phase: where the loop is ("boot", "stops", "queue", "poll", "quotes", "score", "idle").
+        phase: where the loop is ("boot", "stops", "queue", "poll", "quotes", "score", "idle"), and "stopping" in
+        the last beat of a planned stop.
         Only the beat at the end of a step ("idle") works out headlines_seen, stops_checked_at and buys_blocked;
         every other beat repeats the last values. stops_checked_at keeps its meaning (the oldest live look over the
         held names), and until this process has made a look of its own it is the stamp the run before left.
@@ -1578,7 +1610,7 @@ class NewsTrader:
                 "blind_since": {sym: v[0].astimezone(timezone.utc).isoformat() for sym, v in blind.items()},
                 "blind_told": [sym for sym, v in blind.items() if v[1]],
                 "told_through": self.told_through, "mismatch_told": getattr(self, "_mismatch_told", None),
-                "supervised": False})
+                "supervised": getattr(self, "supervised", False)})
         except Exception as e:  # noqa: BLE001
             self._note_error(e, "heartbeat")
 
@@ -1671,36 +1703,57 @@ def _lock_holder(lock) -> tuple:
         return "unknown", "unknown"
 
 
-def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool = True, check: bool = False) -> int:
+def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool = True, check: bool = False,
+        supervised: int | None = None) -> int:
     """One engine per book: two would trade it twice and interleave the chained journals. The lock is held for the
     life of the loop and freed when it ends, however it ends (a killed engine leaves no lock behind). The holder
     writes its pid and start time into the lock file: for the start it refuses, and for whoever asks who is running.
     Returns what the loop returns, or 3 when another engine holds the book and this one did not start: the caller
     must not take that for a run. The codes: 0 the clock reached the end, 3 the lock is held, 4 a broken journal,
-    5 the calendar does not cover today, 6 the book cannot be read, 7 a merge or rebase in progress.
+    5 the calendar does not cover today, 6 the book cannot be read, 7 a merge or rebase in progress, 143 a planned
+    stop.
+    A planned stop: for the time of this call SIGTERM and SIGINT only set STOP (request_stop), and the loop ends
+    after the work it is in. Only on the main thread: Python lets no other thread set a handler.
+    supervised=PID (news-live --supervised PID): the engine of a parent process. Before the lock is taken it asks to
+    be killed with its parent (_set_pdeathsig), and it leaves with 143 when its parent is not PID: that parent died
+    before the request was made, and nobody would end this engine or free its lock.
     check=True (news-live --check) starts nothing and takes no lock: _check."""
     if check:
         return _check()
-    with open(journal._path("news_engine.lock"), "a+") as lock:  # "a+": a refused start leaves the holder's name in the file
-        locked = True
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            pid, started = _lock_holder(lock)
-            print(f"[news] another news engine holds the book (pid {pid}, started {started}): this one does not start"
-                  " (exit 3)", flush=True)
-            return 3
-        except OSError as e:  # the lock itself does not work here: an engine with no lock still checks the stops
-            print(f"[news] the engine lock could not be taken ({type(e).__name__}): running without it", flush=True)
-            locked = False
-        if locked:  # one line, the holder's own; an engine that got no lock leaves the file to whoever holds it
-            lock.truncate(0)
-            lock.write(json.dumps({"pid": os.getpid(), "started_at": journal.now_utc()}) + "\n")
-            lock.flush()
-        return _run(until_ny, max_minutes, prime, locked=locked)
+    STOP.clear()  # a stop asked of an earlier run in this process is not this run's
+    earlier = {}
+    if threading.current_thread() is threading.main_thread():
+        earlier = {sig: signal.signal(sig, request_stop) for sig in (signal.SIGTERM, signal.SIGINT)}
+    try:
+        if supervised is not None:
+            _set_pdeathsig()
+            if os.getppid() != supervised:
+                print(f"[news] the parent process is not pid {supervised}: this engine does not start (exit 143)", flush=True)
+                return 143
+        with open(journal._path("news_engine.lock"), "a+") as lock:  # "a+": a refused start leaves the holder's name in the file
+            locked = True
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                pid, started = _lock_holder(lock)
+                print(f"[news] another news engine holds the book (pid {pid}, started {started}): this one does not start"
+                      " (exit 3)", flush=True)
+                return 3
+            except OSError as e:  # the lock itself does not work here: an engine with no lock still checks the stops
+                print(f"[news] the engine lock could not be taken ({type(e).__name__}): running without it", flush=True)
+                locked = False
+            if locked:  # one line, the holder's own; an engine that got no lock leaves the file to whoever holds it
+                lock.truncate(0)
+                lock.write(json.dumps({"pid": os.getpid(), "started_at": journal.now_utc()}) + "\n")
+                lock.flush()
+            return _run(until_ny, max_minutes, prime, locked=locked, supervised=supervised)
+    finally:
+        for sig, handler in earlier.items():  # None: a handler that was not set from Python cannot be named here
+            signal.signal(sig, signal.SIG_DFL if handler is None else handler)
 
 
-def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool = True) -> int:
+def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool = True,
+         supervised: int | None = None) -> int:
     """One engine process, from its start to its exit code (run's docstring lists the codes). The order of a start
     (supervisor spec 5.1) is fixed, because a restart after a kill is exactly when a stop may be waiting:
       1. the config, the start checks (5, 7 and 6 end here), the trader;
@@ -1709,7 +1762,10 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
       4. when the market is open, the first look at the stops, whose own lines go out from the look; a beat ("stops");
       5. the lines that can wait, each a send of up to 15 s a channel: no lock, a book mismatch, what was not said;
       6. the code stamp (git), priming, and the loop.
-    No git call, no feed and no line that can wait stands before the first look."""
+    No git call, no feed and no line that can wait stands before the first look.
+    A planned stop (STOP: a signal, or under supervised=PID a parent that is no longer PID) is seen at the top of a
+    round and between the slices of the wait: the step in progress ends as always, with its look at the stops and its
+    save, then the last beat ("stopping") and 143. A first look in progress is finished first."""
     cfg = load_config()
     code, why, mismatch = start_checks(cfg)  # before the trader is built: a book that cannot be read is not built on
     if code == 5:
@@ -1719,11 +1775,12 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
         return code
     if code:
         print(f"[news] start refused: {why} (exit {code})", flush=True)
-        if code == 6:  # said here: no parent process exists yet to say it, and a start made again would refuse in silence
+        if code == 6 and supervised is None:  # the bare engine says it itself; under a parent, the parent does
             notify.send("AI Trader - תקלה", owner_line(cfg, "R5d"), cfg, "urgent")
         return code
     nt = NewsTrader(cfg)
     nt.locked = locked  # in every heartbeat: False = this engine runs with no lock on the book
+    nt.supervised = supervised is not None  # in every heartbeat: a parent process started this engine
     nt.book_mismatch = mismatch  # not None: the stops of the book there is are checked, and no position is opened
     nt.adopt_previous(read_heartbeat())  # what the process before this one left, before this one writes over it
     nt._beat("boot")  # before the first look: a slow first look is not taken for a hang
@@ -1779,6 +1836,11 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
     t0 = time.time()
     fails = 0
     while True:
+        if supervised is not None and os.getppid() != supervised:  # the parent is gone: nobody is left to stop this engine
+            STOP.set()
+        if STOP.is_set():
+            code = 143
+            break
         now = datetime.now(NY)
         if (now.hour, now.minute) >= (hh, mm) or (max_minutes and (time.time() - t0) / 60 >= max_minutes):
             break
@@ -1804,10 +1866,15 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
                          else "הסטופים של פוזיציות החדשות לא נבדקים")
                 notify.send("AI Trader - תקלה", f"מנוע החדשות נכשל {fails} סיבובים ברצף ({type(e).__name__}): {stops}"
                             " (כסף נייר)", cfg, "urgent")
-        time.sleep(max(1.0, nt.n["poll_seconds"] - (time.time() - start)))
+        left = max(1.0, nt.n["poll_seconds"] - (time.time() - start))
+        while left > 0 and not STOP.is_set():  # in slices: a planned stop does not wait for the whole of it
+            time.sleep(min(left, nt.n["sleep_slice_seconds"]))
+            left -= nt.n["sleep_slice_seconds"]
     nt.save()
     # a trial answer still out is only a record. While the market is open the next engine must not wait for it (the
     # lock is held until this returns, and no stop is looked at meanwhile); after the close one call's time is given
     nt.drain_trial(wait=0 if market_open_now() else nt.n["verify_timeout_seconds"])
+    if code == 143:
+        nt._beat("stopping")  # the last beat of a planned stop: whoever reads the file knows this engine was not killed
     print("[news] stopped", flush=True)
     return code

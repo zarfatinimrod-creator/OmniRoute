@@ -8,8 +8,10 @@ import io
 import json
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
@@ -70,7 +72,7 @@ class TheLoopsAnswer(_Engine):
         got = []
         with mock.patch.object(news_live, "_run", lambda *a, **k: got.append(k) or 7):
             self.assertEqual(news_live.run(max_minutes=0.001), 7)   # not always 0: the loop gets exit codes of its own
-        self.assertEqual(got, [{"locked": True}])
+        self.assertEqual(got, [{"locked": True, "supervised": None}])
         holder = json.loads(journal._path("news_engine.lock").read_text())
         self.assertEqual((holder["pid"], holder["started_at"][-6:]), (os.getpid(), "+00:00"))
 
@@ -586,7 +588,10 @@ class WhatAStartFinds(_Starts):
         got = []
         with mock.patch.object(news_live, "run", lambda until, minutes, **k: got.append((until, minutes, k)) or 0):
             self.assertEqual((cli.main(["news-live", "--check"]), cli.main(["news-live", "--minutes", "2"])), (0, 0))
-        self.assertEqual(got, [("16:05", None, {"check": True}), ("16:05", 2.0, {"check": False})])
+            self.assertEqual(cli.main(["news-live", "--supervised", "41"]), 0)   # the pid of the parent that started it
+        self.assertEqual(got, [("16:05", None, {"check": True, "supervised": None}),
+                               ("16:05", 2.0, {"check": False, "supervised": None}),
+                               ("16:05", None, {"check": False, "supervised": 41})])
 
 
 def trade(sym, side="SELL", day=None, **more):
@@ -990,3 +995,132 @@ class TheOrderOfAStart(_WatchedStarts):
                 step(self.nt)
         self.assertEqual(self.sent, [("urgent", f"{in_a_step.exception} (כסף נייר)")])
         self.assertIn(f"[news] {in_a_step.exception}\n", self.out.getvalue())
+
+
+class PlannedStop(_Engine):
+    """SIGTERM and SIGINT ask for a planned stop (news_live.STOP), and an engine under a parent leaves when that
+    parent is not the one it was started by (supervisor spec 5.3)."""
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(news_live.STOP.clear)        # no test leaves a stop asked for behind it
+
+    def stopped_step(self):
+        """One step with batch_max 1 whose poll marks k1, k2, k3 seen and returns them, and whose scorer stand-in
+        notes the key it was asked for and sets STOP: the keys that were handed to the scorer."""
+        self.nt.n["batch_max"] = 1
+        new, scored = [{**x, "key": f"k{i}"} for i, x in enumerate(items(3), 1)], []
+
+        def poll():
+            self.nt.seen.update({x["key"]: journal.now_utc() for x in new})
+            return list(new)
+
+        def scorer(batch, model):
+            scored.extend(x["key"] for x in batch)
+            news_live.STOP.set()
+            return {}
+        with mock.patch.object(self.nt, "poll_headlines", poll), mock.patch.object(news_live, "score_batch", scorer):
+            self.nt.step()
+        return scored
+
+    def test_a_wrong_parent_pid_leaves_with_143_before_the_lock(self):
+        with mock.patch.object(news_live, "_set_pdeathsig", lambda: None), \
+                mock.patch.object(news_live, "NewsTrader", mock.Mock(side_effect=AssertionError("must not be built"))), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(news_live.run(max_minutes=0.001, supervised=1), 143)
+        self.assertFalse(journal._path("news_engine.lock").exists())
+        self.assertEqual(out.getvalue().count("\n"), 1)                        # one line in the engine's log says why
+
+    def test_a_stop_between_batches_scores_no_more_and_leaves_the_rest_unseen(self):
+        scored = self.stopped_step()
+        self.assertEqual(scored, ["k1"])
+        self.assertEqual(sorted(self.nt.seen), ["k1"])
+
+    def test_a_headline_taken_back_is_in_no_file_so_the_next_engine_logs_it_once(self):
+        self.stopped_step()
+        self.assertEqual(sorted(journal.load_json("news_seen.json")), ["k1"])   # the step's own save, as always
+        # k2 and k3 have no row, not even "step_failed": the engine that polls them again writes their one row
+        self.assertEqual([r["key"] for r in journal.read("news_seen_log.jsonl")], ["k1"])
+        self.assertEqual(news_live.read_heartbeat()["phase"], "idle")           # the step ran to its end
+
+    def test_a_stop_before_the_quotes_asks_no_headline_quote_and_makes_the_end_of_step_look(self):
+        hold(self.nt)                                                           # BBB held: every look asks its quote
+        asked, price = [], news_live.live_price
+        news_live.live_price = lambda sym: asked.append(sym) or price(sym)      # _Engine's tearDown puts the real one back
+        news_live.STOP.set()
+        step(self.nt, items(2), scorer=mock.Mock(side_effect=AssertionError("no batch is started")))
+        self.assertEqual(asked, ["BBB", "BBB"])                                 # the look at the top and the one at the end
+        self.assertEqual(self.nt.seen, {})
+
+    def test_a_supervised_engine_leaves_the_missing_book_line_to_its_parent(self):
+        journal.append("news_trades.jsonl", BUY_AAA)                            # one BUY row and no book file
+        with mock.patch.object(news_live, "_set_pdeathsig", lambda: None), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg), \
+                mock.patch.object(news_live, "NewsTrader", mock.Mock(side_effect=AssertionError("must not be built"))), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(news_live.run(max_minutes=0.001, supervised=os.getppid()), 6)
+        self.assertEqual(self.sent, [])
+        self.assertIn("[news] start refused: book (exit 6)", out.getvalue())
+
+    def test_run_takes_the_two_signals_for_its_own_time_only_and_begins_with_no_stop_asked(self):
+        both = (signal.SIGTERM, signal.SIGINT)
+        before, during = [signal.getsignal(s) for s in both], []
+        news_live.STOP.set()                         # left over from whatever ran in this process before
+
+        def loop(*a, **k):
+            during.append(([signal.getsignal(s) for s in both], news_live.STOP.is_set()))
+            return 0
+        with mock.patch.object(news_live, "_run", loop):
+            self.assertEqual(news_live.run(max_minutes=0.001), 0)
+            self.assertEqual([signal.getsignal(s) for s in both], before)       # put back when it returned
+            elsewhere = threading.Thread(target=news_live.run, kwargs={"max_minutes": 0.001})   # not the main thread:
+            elsewhere.start(); elsewhere.join(10)                               # Python lets no other thread set a handler
+        self.assertEqual(during, [([news_live.request_stop] * 2, False), (before, False)])
+        news_live.request_stop(signal.SIGTERM, None)
+        news_live.request_stop(signal.SIGTERM, None)                            # Review Focus 2: a second signal changes nothing
+        self.assertTrue(news_live.STOP.is_set())
+
+
+class PlannedStopOfTheLoop(_WatchedStarts):
+    """The loop itself: BBB is held, and the start's poll, git and config are stand-ins."""
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(news_live.STOP.clear)
+
+    def test_a_parent_that_is_gone_ends_the_loop_with_143_and_the_last_beat_says_stopping(self):
+        self.assertEqual(self.start(supervised=os.getppid() + 1), 143)          # the pid it was started by is not its parent now
+        b = news_live.read_heartbeat()
+        self.assertEqual((b["phase"], b["supervised"], b["step"]), ("stopping", True, 0))
+        self.assertIn("positions", journal.load_json("news_book.json"))
+        news_live.STOP.clear()                                                  # as run does for every start
+        self.assertEqual(self.start(supervised=os.getppid()), 0)                # under its own parent it runs to its end,
+        self.assertEqual([news_live.read_heartbeat()[k] for k in ("phase", "supervised")], ["idle", True])   # and says whose it is
+        self.assertGreater(news_live.read_heartbeat()["step"], 0)
+
+    def test_the_wait_between_steps_is_slept_in_slices_and_a_stop_ends_it_at_the_next_slice(self):
+        self.cfg["news"].update(poll_seconds=20, sleep_slice_seconds=0.25)
+        slept = []
+
+        def sleep(seconds):                          # the third slice is the one a signal comes in
+            slept.append(seconds)
+            if len(slept) == 3:
+                news_live.request_stop(signal.SIGTERM, None)
+        with mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda nt, *a, **k: []), \
+                mock.patch.object(news_live, "code_stamp", self.stamp), \
+                mock.patch.object(news_live.time, "sleep", sleep), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg):
+            self.assertEqual(news_live._run("23:59", 0.0005, False), 143)
+        self.assertEqual(slept, [0.25] * 3)          # of the 80 slices of a 20 s wait
+        self.assertEqual((news_live.read_heartbeat()["phase"], news_live.read_heartbeat()["step"]), ("stopping", 1))
+
+    def test_an_uninterrupted_wait_is_as_long_as_before(self):
+        self.cfg["news"].update(poll_seconds=2, sleep_slice_seconds=0.75)       # a wait the slice does not divide
+        slept = []
+        with mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda nt, *a, **k: []), \
+                mock.patch.object(news_live, "code_stamp", self.stamp), \
+                mock.patch.object(news_live.time, "sleep", slept.append), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg):
+            self.assertEqual(news_live._run("23:59", 0.0005, False), 0)
+        self.assertEqual((slept[:2], slept[3]), ([0.75, 0.75], 0.75))           # two whole slices, and the next round's first
+        self.assertAlmostEqual(sum(slept[:3]), 2.0, delta=0.2)                  # poll_seconds less the time the step took

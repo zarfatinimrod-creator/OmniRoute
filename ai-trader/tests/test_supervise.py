@@ -4,6 +4,7 @@ the model, the live state or the owner's phone."""
 
 from helpers import no_phone  # noqa: F401  (first: a test run must never reach the owner's phone)
 
+import fcntl
 import json
 import os
 import shutil
@@ -284,6 +285,76 @@ class SaidBeforeTheKill(Procs):
         self.wait_for(lambda: self.beat().get("phase") == "quotes")
         p.kill()
         self.assertEqual(sum("SELL 10 BBB" in r["body"] for r in self.sent_rows()), 1)
+
+
+# A parent of its own for one engine (argv: the state directory, the scenario file): it starts engine_child.py with
+# --supervised <its own pid>, prints the child's pid and sleeps. The engine's end is 24:00, which never comes.
+PARENT = f"""import os, subprocess, sys, time
+child = subprocess.Popen([sys.executable, {str(ENGINE_CHILD)!r}, "--state-dir", sys.argv[1], "--scenario", sys.argv[2], "--sent", os.path.join(os.path.dirname(sys.argv[1]), "sent.jsonl"), "--until", "24:00", "--supervised", str(os.getpid())], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+print(child.pid, flush=True); time.sleep(600)"""
+
+
+class EngineStop(Procs):
+    """A planned stop and a lost parent, on real processes (supervisor spec 5.3)."""
+
+    def test_sigterm_in_the_sleep_exits_143_within_1_s_with_the_book_saved(self):
+        p = self.start_engine({"session": "open", "news": {"poll_seconds": 30}}, "--minutes", "5")
+        self.wait_for(lambda: self.beat().get("phase") == "idle")
+        p.send_signal(signal.SIGTERM)
+        self.assertEqual(p.wait(timeout=1), 143)
+        self.assertIn("positions", json.loads((self.state / "news_book.json").read_text()))
+        self.assertEqual(self.beat()["phase"], "stopping")
+
+    def test_sigterm_during_a_slow_scorer_finishes_that_batch_and_leaves_the_next_unseen(self):
+        polls = [[{"key": "k1", "symbol": "AAA", "title": "AAA one"}, {"key": "k2", "symbol": "BBB", "title": "BBB two"}]]
+        p = self.start_engine({"session": "open", "polls": polls, "score_delay_s": 1.5, "news": {"batch_max": 1, "poll_seconds": 30}}, "--minutes", "5")
+        self.wait_for(lambda: self.beat().get("phase") == "quotes")
+        time.sleep(0.3); p.send_signal(signal.SIGTERM)
+        time.sleep(0.2); p.send_signal(signal.SIGTERM)             # Review Focus 2: a second signal changes nothing
+        self.assertEqual(p.wait(timeout=10), 143)
+        self.assertEqual([r["id"] for r in self.rows("news_scores.jsonl")], ["k1"])
+        seen = json.loads((self.state / "news_seen.json").read_text())
+        self.assertEqual(("k1" in seen, "k2" in seen), (True, False))
+
+    def test_sigterm_during_the_first_look_finishes_the_look(self):       # Review Focus 2
+        self.write_book({"BBB": 50.0})                                    # BBB held; its quote takes 1.5 s
+        p = self.start_engine({"session": "open", "quote_delay_s": 1.5, "news": {"poll_seconds": 30}}, "--minutes", "5")
+        self.wait_for(lambda: self.beat().get("phase") == "boot")
+        p.send_signal(signal.SIGTERM)                                     # the signal goes out while the phase is "boot"
+        self.assertEqual(p.wait(timeout=10), 143)
+        self.assertIsNotNone(self.beat()["held"]["BBB"]["checked_at"])
+
+    def test_kill_9_of_its_parent_takes_the_engine_with_it_and_frees_the_lock(self):
+        parent = subprocess.Popen([sys.executable, "-c", PARENT, str(self.state), self.scenario({"news": {"poll_seconds": 30}})],
+                                  stdout=subprocess.PIPE, text=True, env=no_phone.clean_env())
+        self.addCleanup(parent.stdout.close)
+        self.addCleanup(parent.wait)
+        self.addCleanup(parent.kill)                               # whatever becomes of the test: the parent first,
+        child = int(parent.stdout.readline())
+        self.addCleanup(self.end_engine_child, child)              # then its engine, should it have outlived it
+        self.wait_for(lambda: self.beat().get("pid") == child)
+        parent.kill(); parent.wait()
+        end = time.monotonic() + 1                                 # spec 5.3: gone within 1 s, and the lock is free
+        self.wait_for(lambda: self.dead(child), timeout=1)
+        # The kernel shows the engine's main thread as a zombie a moment (0.2 ms, measured) before the process's other
+        # threads (numpy starts three) have let go of its open files, and the lock with them: asked until that second ends.
+        self.wait_for(self.lock_is_free, timeout=max(0.0, end - time.monotonic()))
+
+    def lock_is_free(self) -> bool:
+        with open(self.state / "news_engine.lock", "a+") as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return False
+        return True
+
+    def end_engine_child(self, pid: int) -> None:
+        """SIGKILL to an engine child that a parent of a test started, and only to that: never to a pid that was reused."""
+        try:
+            if str(ENGINE_CHILD).encode() in Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0"):
+                os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
 
 
 # One forbidden call each, in a process of its own behind the tripwire alone (argv: the tripwire's file, tests/). The
