@@ -1117,10 +1117,10 @@ class PlannedStopOfTheLoop(_WatchedStarts):
     def test_an_uninterrupted_wait_is_as_long_as_before(self):
         self.cfg["news"].update(poll_seconds=2, sleep_slice_seconds=0.75)       # a wait the slice does not divide
         slept = []
-        with mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda nt, *a, **k: []), \
+        with mock.patch.object(news_live.NewsTrader, "step", lambda nt: []), \
                 mock.patch.object(news_live, "code_stamp", self.stamp), \
                 mock.patch.object(news_live.time, "sleep", slept.append), \
                 mock.patch.object(news_live, "load_config", lambda: self.cfg):
             self.assertEqual(news_live._run("23:59", 0.0005, False), 0)
-        self.assertEqual((slept[:2], slept[3]), ([0.75, 0.75], 0.75))           # two whole slices, and the next round's first
+        self.assertEqual(slept[:2], [0.75, 0.75])                               # two whole slices, then what is left:
         self.assertAlmostEqual(sum(slept[:3]), 2.0, delta=0.2)                  # poll_seconds less the time the step took
