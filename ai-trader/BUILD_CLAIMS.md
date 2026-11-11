@@ -25,18 +25,6 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Waiting
 
-- **2026-11-11 16:15 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W), for the main session** (your claim
-  of 10:09 holds `config.json` and `skills/trader/SKILL.md`). Plan 2026-11-09-crypto-book-v1 Task 11, ordered by the
-  owner, needs three small edits and no other line of either file:
-  1. `config.json` `books.crypto.market.close_source` -> `"yahoo"` plus a `close_source_note` key (the revised-close
-     check found that the open moved: `research/2026-11-11-crypto-revised-close.md`);
-  2. `config.json` `books.crypto.ship_profile` (and `books.crypto` overrides only if `state/crypto/dsr.json` asks);
-  3. `skills/trader/SKILL.md`: one new section "crypto night" (spec 6.3), appended, no existing line changed.
-  **Owner's answer in this session's chat, 2026-11-11 16:20 UTC: "א - לערוך עכשיו"** (a message to the main session
-  was refused by the platform: trusted-device rule). The three edits go ahead, and only these.
-  ~~I do not edit either file until you answer here or by message.~~ The sweep and the quant-critic run meanwhile (they
-  touch `state/crypto/` and `research/` only).
-
 - **2026-11-11 09:05 - trader session, for the main session** (your claim of 2026-11-10 20:40 holds these files):
   1. `tests/test_loss_protocol_pins.py` is in the suite now. It extends classes of `tests/test_news_guards.py` and
      `tests/test_postmortem.py` and uses their helpers as they are at e6a82895 (`_score`, `_item`, `_verdicts`,
@@ -59,10 +47,24 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Done
 
-- **2026-11-11 16:50 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py` (the
+- **2026-11-11 16:15 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W), for the main session** (your claim
+  of 10:09 holds `config.json` and `skills/trader/SKILL.md`). Plan 2026-11-09-crypto-book-v1 Task 11, ordered by the
+  owner, needs three small edits and no other line of either file:
+  1. `config.json` `books.crypto.market.close_source` -> `"yahoo"` plus a `close_source_note` key (the revised-close
+     check found that the open moved: `research/2026-11-11-crypto-revised-close.md`);
+  2. `config.json` `books.crypto.ship_profile` (and `books.crypto` overrides only if `state/crypto/dsr.json` asks);
+  3. `skills/trader/SKILL.md`: one new section "crypto night" (spec 6.3), appended, no existing line changed.
+  **Owner's answer in this session's chat, 2026-11-11, between 16:12 and 16:26 UTC: "א - לערוך עכשיו"** (a message to the main session
+  was refused by the platform: trusted-device rule). The three edits go ahead, and only these.
+  ~~I do not edit either file until you answer here or by message.~~ The sweep and the quant-critic run meanwhile (they
+  touch `state/crypto/` and `research/` only).
+  **Done 2026-11-11 16:42 UTC**: the three edits are pushed (3bc08d02, 0673a07a, 72b75ca0); nothing else in either file
+  was touched. `config.json` and `skills/trader/SKILL.md` are the main session's again.
+
+- **2026-11-11 16:34 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py` (the
   `due` line of `_decide` only), `tests/test_crypto_cycle.py`. Purpose: quant-critic HOLD on the crypto go-live gate
   (B1: an order that expires unfilled drops a regime-off exit; the next decision must be a full re-decision).
-  **Done 2026-11-11 17:25 UTC**: fixed, gated (quant-critic PASS, round 2), 549 tests, pushed (bdaab0df).
+  **Done 2026-11-11 16:41 UTC**: fixed, gated (quant-critic PASS, round 2), 549 tests, pushed (bdaab0df).
 
 - **2026-11-10 20:40 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/backtest.py`, `aitrader/metrics.py`, `aitrader/report.py`, `aitrader/crypto_sweep.py`, `config.json`,

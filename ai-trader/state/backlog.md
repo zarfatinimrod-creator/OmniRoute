@@ -221,6 +221,19 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     public). Until it exists nothing calls the SEC. Next: the design spec (being written from the roadmap), his
     approval, a plan, then the build in the one-at-a-time queue. The source moves no money until it has a forward
     record and passes rule 4 (Basic law 2, item 3).
+66. [crypto][gate] Deferred by the quant-critic at the go-live gate of 2026-11-11 (PASS, round 2;
+    `logs/2026-11-11-crypto-go-live.md`). None is blocking for paper.
+    - N1: after an expired order the next decision is a full rebalance even when the expired one was exits-only
+      (`aitrader/cycle.py` `redo`). Inside caps and vol target, but the backtest always fills, so it is a live/replay
+      difference. Narrower option: `expiring and old.rebalance`. Needs its own gate.
+    - N2: a veto or shrink on an expired decision date does not carry to the decision that replaces it (within the
+      rules); say so in the expiry alert.
+    - N3: no live-cycle test on crypto_base beyond the expiry test (regime-on entry, -50% flat and re-entry through
+      the cycle); `costs.exec_delay_bps` 10 is an assumption - measure it from the first fills (the backtest fills at
+      open[D+1], which Yahoo rewrites to close[D]); dust below one lot is dropped without credit (under $0.10).
+    - Not measured: whether Yahoo's close of bar D is final at 00:12 UTC. The R6 audit
+      (`market.revised_close_alert_bps` 5) checks every decision; read `close_audit` in `state/crypto/pending.json`
+      and `revised_close` rows in `state/crypto/decisions.jsonl` after the first week.
 
 ## Done
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
