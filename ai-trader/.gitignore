@@ -4,6 +4,7 @@ __pycache__/
 state/news_heartbeat.json
 state/news_seen.json
 state/news_engine.lock
+state/news_errors.jsonl
 # the supervisor's own (spec 4.1): its lock and state file, the dead-man's and the relay's files. state/uptime.jsonl is tracked
 state/news_supervisor.lock
 state/news_supervisor.json

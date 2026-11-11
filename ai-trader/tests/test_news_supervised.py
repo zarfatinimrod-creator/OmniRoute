@@ -846,11 +846,25 @@ class WhoWasTold(_Starts):
         hold(self.nt); self.nt.save()
         trade("GONE")
         journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
-        with mock.patch.object(news_live.notify, "send", side_effect=OSError("no network")):
-            self.assertEqual(self.start(), 0)
-        # a row each time the late line is tried: at the start and after each step (task 9b)
-        self.assertEqual({(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")}, {("late_line", "OSError")})
-        self.assertIsNone(news_live.read_heartbeat()["told_through"])   # still owed: the next start of the day says it
+        self.addCleanup(news_live.STOP.clear)
+        real_step, steps = news_live.NewsTrader.step, []
+
+        def three(nt):                               # three steps, milliseconds apart; the third asks for a planned stop
+            steps.append(nt)
+            if len(steps) == 3:
+                news_live.STOP.set()
+            return real_step(nt)
+        with mock.patch.object(news_live.notify, "send", side_effect=OSError("no network")), \
+                mock.patch.object(news_live.NewsTrader, "step", three), \
+                mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda self, *a, **k: []), \
+                mock.patch.object(news_live.time, "sleep", lambda s: None), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg):
+            self.assertEqual(news_live._run("23:59", None, False), 143)   # the start went on: its loop made its steps
+        # a row each time the late line is tried: at the start, and after the first step (task 9b). The two steps after
+        # it come within news.unsent_resend_seconds of that try, so they do not try (task 9c)
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")], [("late_line", "OSError")] * 2)
+        # and the row is still owed: the next start of the day says it
+        self.assertEqual((len(steps), news_live.read_heartbeat()["told_through"]), (3, None))
 
     def test_a_start_says_what_the_run_before_left_unsaid_and_the_next_start_says_nothing(self):
         hold(self.nt); self.nt.save()                # BBB stays above its stop: the look has nothing to say
@@ -1286,8 +1300,9 @@ class FollowUps(_Engine):
             return got
         with mock.patch.object(news_live.NewsTrader, "poll_headlines", primed):   # start()'s priming poll calls it
             self.assertEqual(self.start(locked=False, prime=True), 0)
-        # three sends, code_stamp, thirty feed calls; then the late line again after each step (task 9b)
-        self.assertEqual(len(seen), 3 + 1 + 30 + news_live.read_heartbeat()["step"])
+        # three sends, code_stamp, thirty feed calls; then the late line again after the first step (task 9b), and not
+        # after the steps that follow it within news.unsent_resend_seconds (task 9c)
+        self.assertEqual(len(seen), 3 + 1 + 30 + 1)
         self.assertEqual(seen[:4], sorted(set(seen[:4])))   # a beat between any two of the sends and git
         self.assertGreater(min(seen[4:]), seen[3])    # and between git and the first feed call
         # the feeds are asked side by side: at least one beat per feed call while the priming poll runs, and one after
@@ -1326,8 +1341,9 @@ class FollowUps(_Engine):
             return []
         news_live.notify.send = send
         self.assertEqual(self.start(), 0)
-        # the late line only, at the start and again after each step (task 9b), never in the closing message too
-        self.assertEqual(sum("SELL" in b for _, b in calls), 1 + news_live.read_heartbeat()["step"])
+        # the late line only, at the start and again after the first step (task 9b; the steps after it come within
+        # news.unsent_resend_seconds, task 9c), never in the closing message too
+        self.assertEqual(sum("SELL" in b for _, b in calls), 1 + 1)
         self.assertTrue(calls[0][1].startswith("דווח באיחור: SELL 10 BBB"))
         b = news_live.read_heartbeat()                # and the loop made steps, each one with a closing message to build
         self.assertEqual((b["step"] > 0, b["told_through"]), (True, None))
@@ -1385,7 +1401,9 @@ class GateFollowUps(_Engine):
     """What the quant-critic and the review of rollout step 1 owed before step 2 (task 9b): the late line is said
     again, no channel configured counts as said to the log, a line sent again backs off, the start's sends and writes
     never turn a code into a traceback, the wait's slice is clamped, a planned stop waits on nothing, three more
-    beats, and the two procedures of SKILL.md 3ב."""
+    beats, and the two procedures of SKILL.md 3ב. Then what task 9b's review left (task 9c): the late line said again
+    by the steps backs off, the loop's two alerts are guarded, a cut first priming primes again, the guards put the
+    error's class on record and never its text, and the blind-quote alert follows the channel rule."""
 
     def setUp(self):
         super().setUp()
@@ -1659,6 +1677,15 @@ class GateFollowUps(_Engine):
         for words in ("SIGTERM", "143", '"stopping"', "kill -9", "E1 (התיק לא תואם ליומן העסקאות)",
                       "python3 -m aitrader verify", "כסף נייר"):
             self.assertIn(words, section, words)
+        flat = " ".join(section.split())                       # the lines of the file wrap mid-sentence
+        kill = flat[flat.index("`kill <pid>` שולח SIGTERM"):flat.index("- קודי יציאה")]   # the kill procedure
+        for words in ("עד כשתי דקות", "`kill -9` רק אם התהליך עדיין שם אחרי שתי דקות"):   # its two-minute bound
+            self.assertIn(words, kill, words)
+        e1 = flat[flat.index("**E1 ("):flat.index("**עצירת קניות")]   # the E1 paragraph: its message, question and advice
+        for words in ('"כסף נייר"', "א - לשחזר את הפוזיציה לפי השורה ביומן",
+                      "ב - להשאיר את התיק כמו שהוא ולסמן את השורה כנבדקה", "ג - להשאיר את הקניות עצורות ולבדוק שוב מחר",
+                      "ההמלצה: ג."):
+            self.assertIn(words, e1, words)
 
     # 9. the temporary file of an atomic save (review m9 of step 1, in the ledger's 9b list)
     def test_the_temporary_file_of_an_atomic_save_is_never_a_file_git_takes_in_either_book(self):
@@ -1674,3 +1701,151 @@ class GateFollowUps(_Engine):
         tmp = Path("news_heartbeat.json").with_suffix(".tmp").name   # what journal.save_json writes beside the file
         self.assertEqual([ignored(p) for p in (f"state/{tmp}", f"state/crypto/{tmp}")], [True, True])
         self.assertEqual([ignored(p) for p in ("state/news_book.json", "state/crypto/trials.jsonl")], [False, False])
+
+    # task 9c, 1. the late line said again by the steps backs off (Ruling 28)
+    def test_the_steps_say_the_late_line_again_at_most_once_every_unsent_resend_seconds(self):
+        gone = trade("GONE")                                   # of the run before, and nobody was told of it
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        nt = news_live.NewsTrader(self.cfg)
+        nt.adopt_previous(news_live.read_heartbeat())
+        self.assertEqual(nt.n["unsent_resend_seconds"], 120)  # the times below are read against it
+        clock, tried = [0.0], []
+
+        def send(title, body, cfg, prio="default", **kw):     # a channel is configured and takes nothing (an outage),
+            tried.append(clock[0])                           # until it takes the line at 240 s
+            return ["ntfy"] if clock[0] >= 240 else []
+        with mock.patch.object(news_live.notify, "send", send), mock.patch.object(news_live.time, "monotonic", lambda: clock[0]):
+            for t in (0.0, 30.0, 120.0, 150.0, 240.0, 400.0):  # nothing held and no headline: the late line is each send
+                clock[0] = t
+                step(nt)
+        # tried at 0 s; not at 30 s; again at 120 s; not at 150 s; taken at 240 s; owed no longer at 400 s
+        self.assertEqual(tried, [0.0, 120.0, 240.0])
+        self.assertEqual((nt.told_through, nt._unsent, nt._late, news_live.read_heartbeat()["told_through"]),
+                         (gone, [], [], gone))
+
+    # task 9c, 2. the loop's two alerts never turn a code into a traceback
+    def test_a_broken_chain_in_the_loop_whose_alert_cannot_be_sent_still_ends_with_4(self):
+        news_live.ERRORS_SAID.clear()                          # what this process already put in news_errors.jsonl
+        reads = []
+
+        def chains(names=None):                                # whole at the start; broken when the first step reads it
+            reads.append(names)
+            return ["news_trades.jsonl"] if len(reads) > 1 else []
+        with mock.patch.object(news_live.notify, "send", side_effect=RuntimeError("ntfy is down")), \
+                mock.patch.object(journal, "broken_chains", chains):
+            self.assertEqual(self.start(), 4)
+        self.assertEqual(len(reads), 2)                        # the start's chain check, then the step's
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")],
+                         [("loop_chain_line", "RuntimeError")])
+
+    def test_a_loop_whose_alert_after_errors_cannot_be_sent_takes_its_next_step(self):
+        news_live.ERRORS_SAID.clear()
+        self.cfg["news"]["alert_after_errors"] = 2
+        steps = []
+
+        def failing(nt):                                       # every step fails; the third asks for a planned stop
+            steps.append(nt)
+            if len(steps) == 3:
+                news_live.STOP.set()
+            raise RuntimeError("a step that fails")
+        with self.quick(), mock.patch.object(news_live.notify, "send", side_effect=RuntimeError("ntfy is down")), \
+                mock.patch.object(news_live.NewsTrader, "step", failing):
+            self.assertEqual(news_live._run("23:59", None, False), 143)   # only the stop of the third step ends it
+        self.assertEqual(len(steps), 3)                        # the alert after the second failure did not end the loop
+        self.assertEqual([(e.get("where"), e["error"]) for e in journal.read("news_errors.jsonl")],
+                         [(None, "RuntimeError"), (None, "RuntimeError"), ("loop_fails_line", "RuntimeError"),
+                          (None, "RuntimeError")])
+
+    # task 9c, 4. a cut priming primes again
+    def test_a_planned_stop_that_cuts_the_first_priming_leaves_the_next_start_to_prime_again(self):
+        out, cut, primed = threading.Event(), [True], []       # out set: a feed still out answers
+        self.addCleanup(out.set)
+
+        def feed(sym, session):                                # the first start: AAA answers, and a planned stop comes
+            if cut[0] and sym == "AAA":                        # with it; BBB's feed is still out
+                news_live.STOP.set()
+            elif cut[0]:
+                out.wait(2)
+            return [{"key": f"key-{sym}", "symbol": sym, "title": f"{sym} news", "link": "", "published": journal.now_utc(),
+                     "description": ""}]
+        poll = news_live.NewsTrader.poll_headlines
+
+        def polled(nt, prime=False):                           # the priming poll is the real one; a step's finds nothing
+            if not prime:
+                return []
+            primed.append(nt)
+            return poll(nt, prime=True)
+        with mock.patch.object(news_live, "_feed", feed), mock.patch.object(news_live.NewsTrader, "poll_headlines", polled), \
+                mock.patch.object(news_live, "code_stamp", lambda: {"commit": "abc1234", "dirty": False, "started": "now"}), \
+                mock.patch.object(news_live.time, "sleep", lambda s: None), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg):
+            self.assertEqual(news_live._run("23:59", 0.0005, True), 143)   # a first start: news_seen.json is not there
+            left = journal.load_json("news_seen.json", {})
+            out.set(); cut[0] = False; news_live.STOP.clear()
+            self.assertEqual(news_live._run("23:59", 0.0005, True), 0)     # the next start, on the state the first left
+        self.assertEqual(len(primed), 2)                       # it primed again, and this time read every feed
+        self.assertEqual((left, sorted(journal.load_json("news_seen.json"))), ({}, ["key-AAA", "key-BBB"]))
+
+    # task 9c, 5. the guards' rows name the error's class and never hold its text
+    def test_a_guard_whose_line_cannot_go_out_puts_the_class_of_the_error_on_record_and_never_its_text(self):
+        news_live.ERRORS_SAID.clear()
+        secret = "https://ntfy.example/secret-topic"           # what the error of a send can carry: its URL, and the topic
+        raising = lambda: mock.patch.object(news_live.notify, "send", side_effect=RuntimeError(secret))  # noqa: E731
+        with raising(), mock.patch.object(journal, "calendar_covers", lambda day: False):
+            self.assertEqual(self.start(), 5)                  # the calendar alert
+        trade("GONE")                                          # a sale of a name the book does not hold: no mismatch
+        journal._path("news_book.json").write_text("{not json")
+        with raising():
+            self.assertEqual(self.start(), 6)                  # trades and no readable book: R5d
+        journal.save_json("news_book.json", self.nt.book.state)
+        with raising(), mock.patch.object(journal, "broken_chains", lambda names=None: ["news_trades.jsonl"]):
+            self.assertEqual(self.start(), 4)                  # a broken chain at the start: its alert
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})   # GONE's line is owed
+        reads = []
+
+        def chains(names=None):                                # whole at the start; broken when the first step reads it
+            reads.append(names)
+            return ["news_trades.jsonl"] if len(reads) > 1 else []
+        with raising(), mock.patch.object(journal, "broken_chains", chains):   # the late line, at the start and after
+            self.assertEqual(self.start(), 4)                  # the step; the alert of the step's broken chain
+        real_open, steps = open, []
+
+        def full_disk(path, *a, **k):                          # the lock file opens and locks; the holder's name is not written
+            f = real_open(path, *a, **k)
+            f.write = mock.Mock(side_effect=OSError(28, secret))
+            return f
+
+        def failing(nt):                                       # every step fails; the second asks for a planned stop
+            steps.append(nt)
+            if len(steps) == 2:
+                news_live.STOP.set()
+            raise RuntimeError("a step that fails")
+        self.cfg["news"]["alert_after_errors"] = 1
+        with raising(), self.quick(), mock.patch.object(news_live, "open", full_disk, create=True), \
+                mock.patch.object(news_live.NewsTrader, "step", failing):
+            self.assertEqual(news_live.run("23:59", None, prime=False), 143)   # the lock file; the alert after errors
+        guards = {"calendar_line", "book_line", "chain_line", "late_line", "loop_chain_line", "lock_file", "loop_fails_line"}
+        rows = [e for e in journal.read("news_errors.jsonl") if e.get("where") in guards]
+        self.assertEqual({e["where"] for e in rows}, guards)   # each guard wrote its row
+        for e in rows:
+            self.assertEqual((sorted(e), e["error"]), (["at", "error", "where"], "OSError" if e["where"] == "lock_file"
+                                                       else "RuntimeError"), e)
+        self.assertNotIn("secret-topic", journal._path("news_errors.jsonl").read_text())
+        # and the file itself stays out of git: older rows still carry the text of their errors
+        self.assertIn("state/news_errors.jsonl", (Path(__file__).resolve().parents[1] / ".gitignore").read_text().split())
+
+    # task 9c, 6. the blind-quote alert follows the channel rule
+    def test_a_blind_quote_alert_counts_as_said_with_no_channel_configured_and_is_tried_again_when_one_failed(self):
+        hold(self.nt)                                          # BBB held; it has no live quote at any look below
+        window, t0 = self.nt.n["stop_blind_alert_seconds"], datetime(2026, 11, 10, 15, 0, tzinfo=NY)
+        for channels, alerts, told in ((self.real_channels, 1, True), (news_live.notify.channels, 3, False)):   # none; one
+            self.nt._blind, self.sent[:] = {}, []
+            with mock.patch.object(news_live.notify, "channels", channels), \
+                    mock.patch.object(news_live.notify, "send", self.nobody):
+                for k in range(4):                             # blind from t0, then one more window each time
+                    self.nt._stop_sight("BBB", False, t0 + timedelta(seconds=k * (window + 1)))
+                said = [b for _, b in self.sent if b.startswith("אין מחיר עדכני ל-BBB")]
+                self.assertEqual((len(said), self.nt._blind["BBB"][1]), (alerts, told), channels)
+                self.nt._stop_sight("BBB", True, t0 + timedelta(seconds=4 * (window + 1)))   # the price is back
+            back = [b for _, b in self.sent if b.startswith("המחיר של BBB חזר")]
+            self.assertEqual(len(back), 1 if told else 0, channels)   # said only after an alert that was taken

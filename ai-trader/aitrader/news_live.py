@@ -107,15 +107,17 @@ def _set_pdeathsig() -> None:
 ERRORS_SAID: set[tuple] = set()  # (where, error type, New York day) already in news_errors.jsonl from this process
 
 
-def error_once(where: str, e: Exception) -> None:
+def error_once(where: str, e: Exception, detail: bool = True) -> None:
     """One news_errors.jsonl row per place, error type and New York day: a fault that comes back every 20 seconds must
-    not bury the journal. It never raises: its callers are measurements, which must never cost a price or a step."""
+    not bury the journal. It never raises: its callers are measurements, which must never cost a price or a step.
+    detail=False: the error's class only, never its text, which may carry a URL and the topic in it (the guards of a
+    send; the repository is public)."""
     try:
         said = (where, type(e).__name__, datetime.now(NY).date())
         if said in ERRORS_SAID:
             return
-        journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__, "detail": str(e)[:300],
-                                             "where": where})
+        journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__,
+                                             **({"detail": str(e)[:300]} if detail else {}), "where": where})
         ERRORS_SAID.add(said)  # only once it is written: a fault the journal could not take is tried again the next time
     except Exception as e2:  # noqa: BLE001 - nowhere left to write it
         print(f"[news] error not journaled ({where}: {type(e).__name__}): {type(e2).__name__}", flush=True)
@@ -610,6 +612,7 @@ class NewsTrader:
         self._unsent: list = []  # hashes of the rows whose line no channel has taken yet, oldest first
         self._carried_at: dict = {}  # row hash -> when a step's closing message last carried its line (monotonic)
         self._late: list = []  # today's rows that the run before left with no line taken; say_late says them
+        self._late_tried_at = None  # when a step last tried the late line again (monotonic): unsent_resend_seconds apart
         self._last_row = None  # the hash of the journal's last row, as far as this process has read
         self._told_lines: set = set()  # the places, in the running step's lines, that a look's own message delivered
         self._phase = "boot"  # where the loop is: the phase of the last beat, and "stops" from the start of every look
@@ -761,8 +764,8 @@ class NewsTrader:
         prime=True (the first start) marks everything already out as seen under ONE summary row."""
         t0, h = time.monotonic(), self._tally()  # before the feeds are asked: a first window covers its first poll
         ex = ThreadPoolExecutor(max_workers=8)
-        asked = [ex.submit(_feed, s, self.session) for s in self.universe]
         try:
+            asked = [ex.submit(_feed, s, self.session) for s in self.universe]
             if prime:  # this thread, never a worker, beats after each feed call it gets back: a start whose feeds are
                 for _ in as_completed(asked):  # slow is busy, not hung (a step's poll has its one beat after the poll)
                     self._beat(self._phase)
@@ -1201,17 +1204,19 @@ class NewsTrader:
                 self._beat("stops")  # a send that no channel took has taken its time all the same
         return looked
 
-    def _note_error(self, e: Exception, where: str):
+    def _note_error(self, e: Exception, where: str, detail: bool = True):
+        """One news_errors.jsonl row; detail=False: the class only, as in error_once."""
         try:
             journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__,
-                                                 "detail": str(e)[:300], "where": where})
+                                                 **({"detail": str(e)[:300]} if detail else {}), "where": where})
         except Exception:  # noqa: BLE001
             pass
 
     def _stop_sight(self, sym: str, seeing: bool, now: datetime):
         """A stop is only as good as the price it sees. A held name with no fresh quote for
         stop_blind_alert_seconds gets one urgent alert, and one more line when the price is back. An alert that no
-        channel took is tried again after another window, and "the price is back" follows only a delivered alert."""
+        channel took is tried again after another window, and "the price is back" follows only a delivered alert. With
+        no channel configured at all the engine's log took it (notify.channels, as in _say)."""
         if seeing:
             if self._blind.pop(sym, [now, False])[1]:
                 notify.send("AI Trader - חדשות", f"המחיר של {sym} חזר. הסטופ שוב רואה מחיר עדכני (כסף נייר)", self.cfg, "high")
@@ -1228,7 +1233,8 @@ class NewsTrader:
             last = f" המחיר האחרון שהתקבל הוא מ-{t.strftime('%H:%M' if t.date() == now.date() else '%d.%m %H:%M')} שעון ניו יורק."
         since[1] = bool(notify.send(
             "AI Trader - תקלה", f"אין מחיר עדכני ל-{sym} כבר לפחות {int(gap // 60)} דקות (Yahoo).{last} הסטופ רואה רק מחיר ישן"
-            " (או לא רואה מחיר בכלל) ולא יגיב לירידה עד שהמחיר יתעדכן (כסף נייר)", self.cfg, "urgent"))
+            " (או לא רואה מחיר בכלל) ולא יגיב לירידה עד שהמחיר יתעדכן (כסף נייר)", self.cfg, "urgent")
+        ) or not notify.channels(self.cfg)  # with no channel configured, the log it was printed to took it (_say)
         self._beat("stops")  # after the send, and with the told flag in the file at once
 
     def _log_trade(self, f: dict, events: list):
@@ -1495,8 +1501,9 @@ class NewsTrader:
     def say_late(self) -> None:
         """The trades of today that the run before made and no channel took the line of, in one message. Only rows
         that were on disk when this process started (adopt_previous): its own trades are said by its own looks and
-        steps. A message nobody took leaves them owed: each step of this process says it again (step), and else the
-        next start of the day does. With no channel configured the log took it (_say). Never raises."""
+        steps. A message nobody took leaves them owed: the steps of this process say it again, at most once every
+        news.unsent_resend_seconds (step), and else the next start of the day does. With no channel configured the log
+        took it (_say). Never raises."""
         if not self._late:
             return
         try:
@@ -1507,7 +1514,7 @@ class NewsTrader:
                 self._mark_told([t["hash"] for t in self._late])
                 self._late = []
         except Exception as e:  # noqa: BLE001 - a line that cannot be built or sent must not cost the start
-            self._note_error(e, "late_line")
+            self._note_error(e, "late_line", detail=False)
 
     def step(self) -> list[str]:
         events: list[str] = []
@@ -1539,9 +1546,9 @@ class NewsTrader:
                     self._note_error(e, "step_alert")
             if owed:
                 told = False
-                carried = earlier + self._unsent[mine:]  # every row whose line this message carries
-                self._carried_at.update(dict.fromkeys(carried, time.monotonic()))
                 try:
+                    carried = earlier + self._unsent[mine:]  # every row whose line this message carries
+                    self._carried_at.update(dict.fromkeys(carried, time.monotonic()))
                     told = self._say(owed)
                     if told:
                         self._mark_told(carried)
@@ -1549,7 +1556,11 @@ class NewsTrader:
                     self._note_error(e, "step_alert")
                 if not told:
                     self._beat(self._phase)  # a send that nothing took has taken its time all the same
-            if getattr(self, "_late", None):  # the run before's trades that no channel took the line of: said again
+            # the run before's trades that no channel took the line of: said again, at most once every
+            # unsent_resend_seconds (in an outage each try costs up to 15 s a channel, before the next step's first look)
+            if getattr(self, "_late", None) and (self._late_tried_at is None or
+                                                 time.monotonic() - self._late_tried_at >= self.n["unsent_resend_seconds"]):
+                self._late_tried_at = time.monotonic()
                 self.say_late()
                 self._beat(self._phase)  # after its send, taken or not, as at a start
             self._step_measured(time.monotonic() - t0)  # measurement only, after the alert, and it never raises
@@ -1845,7 +1856,7 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
                     lock.write(json.dumps({"pid": os.getpid(), "started_at": journal.now_utc()}) + "\n")
                     lock.flush()
                 except OSError as e:  # the name is only for whoever asks (a full disk): the lock is held all the same
-                    error_once("lock_file", e)
+                    error_once("lock_file", e, detail=False)
             return _run(until_ny, max_minutes, prime, locked=locked, supervised=supervised)
     finally:
         for sig, handler in earlier.items():  # None: a handler that was not set from Python cannot be named here
@@ -1867,7 +1878,8 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
     No git call, no feed and no line that can wait stands before the first look.
     A planned stop (STOP: a signal, or under supervised=PID a parent that is no longer PID) is seen at the top of a
     round and between the slices of the wait: the step in progress ends as always, with its look at the stops and its
-    save, then the last beat ("stopping") and 143. A first look in progress is finished first."""
+    save, then the last beat ("stopping") and 143. A first look in progress is finished first. A stop that cuts the
+    priming of a first start keeps none of its marks: the next start primes again."""
     cfg = load_config()
     code, why, mismatch = start_checks(cfg)  # before the trader is built: a book that cannot be read is not built on
     if code == 5:
@@ -1876,7 +1888,7 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
                         " treats every day as closed: it will not trade and will NOT check stops on open news positions until"
                         " the NYSE holidays are added (כסף נייר)", cfg, "urgent")
         except Exception as e:  # noqa: BLE001
-            error_once("calendar_line", e)
+            error_once("calendar_line", e, detail=False)
         return code
     if code:
         print(f"[news] start refused: {why} (exit {code})", flush=True)
@@ -1884,7 +1896,7 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
             try:  # as above
                 notify.send("AI Trader - תקלה", owner_line(cfg, "R5d"), cfg, "urgent")
             except Exception as e:  # noqa: BLE001
-                error_once("book_line", e)
+                error_once("book_line", e, detail=False)
         return code
     nt = NewsTrader(cfg)
     nt.locked = locked  # in every heartbeat: False = this engine runs with no lock on the book
@@ -1906,7 +1918,7 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
         try:  # as above: the code is 4 whatever becomes of the line
             notify.send("AI Trader - תקלה", f"{e} (כסף נייר)", cfg, "urgent")
         except Exception as e2:  # noqa: BLE001
-            error_once("chain_line", e2)
+            error_once("chain_line", e2, detail=False)
         return 4
     except Exception as e:  # noqa: BLE001 - not a crash: it goes on record, and the first step of the loop looks again
         nt._note_error(e, "first_look")
@@ -1945,8 +1957,12 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
           + (" + uncommitted changes" if nt.code["dirty"] else "") + f", guards {nt.n['guards']}", flush=True)
     if prime and not nt.seen:  # first start: mark everything already out as seen, act only on what comes next
         nt.poll_headlines(prime=True)
-        nt.save()
-        print(f"[news] primed {len(nt.seen)} existing headlines")
+        if STOP.is_set():  # a planned stop cut it: no mark is kept, so the next start primes again. Else the feeds it did
+            nt.seen = {}   # not read would go unprimed there, and their fresh headlines be scored (and, once no hold, bought)
+            print("[news] a planned stop cut the priming: nothing is kept, the next start primes again", flush=True)
+        else:
+            nt.save()
+            print(f"[news] primed {len(nt.seen)} existing headlines")
     hh, mm = (int(x) for x in until_ny.split(":"))
     t0 = time.time()
     fails = 0
@@ -1967,7 +1983,10 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
                 print(f"[news {now.strftime('%H:%M:%S')} NY] " + " | ".join(ev), flush=True)
         except ChainBroken as e:  # not survivable: stop trading and tell the owner
             print(f"[news] {e}", flush=True)
-            notify.send("AI Trader - תקלה", f"{e} (כסף נייר)", cfg, "urgent")
+            try:  # as at the start: the code is 4 whatever becomes of the line
+                notify.send("AI Trader - תקלה", f"{e} (כסף נייר)", cfg, "urgent")
+            except Exception as e2:  # noqa: BLE001
+                error_once("loop_chain_line", e2, detail=False)
             code = 4  # for whoever started this engine: not a day that ended, and not to be started again as it is
             break
         except Exception as e:  # noqa: BLE001 - the loop must survive a bad cycle; the error is logged, not hidden
@@ -1979,8 +1998,11 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
             if fails == nt.n.get("alert_after_errors", 5):  # say what is true of the stops: the top of the step may still run
                 stops = ("הסטופים עדיין נבדקים בתחילת כל סיבוב; כותרות וקניות לא עובדות" if getattr(nt, "_early_look", None)
                          else "הסטופים של פוזיציות החדשות לא נבדקים")
-                notify.send("AI Trader - תקלה", f"מנוע החדשות נכשל {fails} סיבובים ברצף ({type(e).__name__}): {stops}"
-                            " (כסף נייר)", cfg, "urgent")
+                try:  # the loop goes on whatever becomes of the line: its next step looks at the stops again
+                    notify.send("AI Trader - תקלה", f"מנוע החדשות נכשל {fails} סיבובים ברצף ({type(e).__name__}): {stops}"
+                                " (כסף נייר)", cfg, "urgent")
+                except Exception as e2:  # noqa: BLE001
+                    error_once("loop_fails_line", e2, detail=False)
         left = max(1.0, nt.n["poll_seconds"] - (time.time() - start))
         while left > 0 and not STOP.is_set():  # in slices: a planned stop does not wait for the whole of it
             time.sleep(min(left, nt.n["sleep_slice_seconds"]))

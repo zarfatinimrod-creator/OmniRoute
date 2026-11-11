@@ -335,7 +335,8 @@ class BlindStop(HeldOnAClock):
         self.assertIn("מ-09.11 16:00 שעון ניו יורק", self._alerts()[0])
 
     def test_an_alert_that_did_not_go_out_is_tried_again_after_another_window(self):
-        self.delivered = []  # no channel took it (ntfy down, nothing configured)
+        self.delivered = []  # a configured channel took nothing (ntfy down); with none configured the log takes it (9c)
+        self.enterContext(mock.patch.object(news_live.notify, "channels", lambda cfg: ["ntfy"]))
         self._check(0, None)
         self._check(5, None)  # tried, not delivered: the clock restarts
         self._check(9, None)
@@ -348,7 +349,8 @@ class BlindStop(HeldOnAClock):
         self.assertEqual(len(self._alerts()), 2)  # delivered: said once
 
     def test_no_price_is_back_line_for_an_alert_that_never_went_out(self):
-        self.delivered = []
+        self.delivered = []  # and a channel is configured, as above
+        self.enterContext(mock.patch.object(news_live.notify, "channels", lambda cfg: ["ntfy"]))
         self._check(0, None)
         self._check(5, None)
         self._check(6, 100.0, quote_age_s=20)
