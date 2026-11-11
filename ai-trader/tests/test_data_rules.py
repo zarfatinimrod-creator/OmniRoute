@@ -364,6 +364,7 @@ class CryptoRun(unittest.TestCase):
         self.assertEqual(journal_json(state, "pending.json")["decision_date"], str(d.date()))
 
     def test_next_open_close_source_and_missing_row(self):
+        self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
         p, d = self.p, self.idx[self.I]
         nxt = self.idx[self.I + 1]
         panel = {k: v.iloc[:self.I + 2] for k, v in p.items()}
@@ -419,6 +420,7 @@ class CryptoRun(unittest.TestCase):
         return float(self.p["open"].iloc[self.idx.get_loc(pd.Timestamp(day)) + 1][sym])
 
     def test_coinbase_breach_exits_only(self):
+        self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
         held = {"BTC-USD": 0.10, "ETH-USD": 0.50}
         _, pend, dec = self.decide(self.I, held, self.agree)
         self.assertEqual(dec["diag"]["coinbase_guard"]["status"], "ok")

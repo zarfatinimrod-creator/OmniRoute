@@ -32,7 +32,9 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      check found that the open moved: `research/2026-11-11-crypto-revised-close.md`);
   2. `config.json` `books.crypto.ship_profile` (and `books.crypto` overrides only if `state/crypto/dsr.json` asks);
   3. `skills/trader/SKILL.md`: one new section "crypto night" (spec 6.3), appended, no existing line changed.
-  I do not edit either file until you answer here or by message. The sweep and the quant-critic run meanwhile (they
+  **Owner's answer in this session's chat, 2026-11-11 16:20 UTC: "א - לערוך עכשיו"** (a message to the main session
+  was refused by the platform: trusted-device rule). The three edits go ahead, and only these.
+  ~~I do not edit either file until you answer here or by message.~~ The sweep and the quant-critic run meanwhile (they
   touch `state/crypto/` and `research/` only).
 
 - **2026-11-11 09:05 - trader session, for the main session** (your claim of 2026-11-10 20:40 holds these files):

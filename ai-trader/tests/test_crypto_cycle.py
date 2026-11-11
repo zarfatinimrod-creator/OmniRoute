@@ -442,6 +442,7 @@ class Rulings(CryptoBook):
     def test_revised_close_audit_alerts_above_bps(self):
         """R6: the close the last decision used against the history value for that bar, once that bar is no longer
         the decision bar; above market.revised_close_alert_bps an event, a decisions.jsonl record and an alert."""
+        self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
         self.assertEqual(self.cfg["market"]["revised_close_alert_bps"], 5)
         self.assertNotIn("revised_close_alert_bps", data.load_config("stocks")["market"])
         self.decide()
@@ -545,9 +546,21 @@ class Rulings(CryptoBook):
         self.assertTrue(any("SPY" in e and str(idx[FIRST_BAR].date()) in e for e in out["events"]))
         self.assertTrue(sent)
 
+    def test_shipped_close_source_is_yahoo_and_decides_without_the_next_row(self):
+        """Task 11 revised-close check: the open of the D+1 row is what Yahoo rewrites, so the book ships
+        close_source "yahoo": the 00:12 run decides on D from Yahoo's close of D, with no D+1 row and no next_open log."""
+        self.assertEqual(self.cfg["market"]["close_source"], "yahoo")
+        out = self.at(I, self.ts(I + 1, 0, 12))  # rows up to D = I only
+        self.assertTrue(out["decided_now"])
+        pend = self.pending()
+        self.assertEqual(pend["decision_date"], self.day(I))
+        self.assertEqual(pend["decision_close"], {s: float(self.p["close"].iloc[I][s]) for s in self.coins})
+        self.assertNotIn("close_source", read_jsonl(self.state, "decisions.jsonl")[-1]["diag"])
+
     def test_dropped_decision_bar_fill_path(self):
         """R9c: at D+1 00:12 Yahoo has no D+1 row yet (next_open drops bar D): no decision, no crash, and the pending
         order of D-1 still fills at its exec_ts hour."""
+        self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
         self.decide(I - 1)  # decides D-1 = I-1 at I 00:12; exec_ts I 01:00
         for with_bars in (False, True):
             if with_bars:
@@ -609,6 +622,7 @@ class FinalReview(CryptoBook):
         self.assertIn("ETH-USD", book["blocked"])
 
     def test_fill_walk_capped_at_fill_max_wait_hours(self):
+        self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
         self.assertEqual(self.cfg["market"]["fill_max_wait_hours"], 24)
         self.assertNotIn("fill_max_wait_hours", data.load_config("stocks")["market"])
         self.decide()  # exec_ts I+1 01:00
