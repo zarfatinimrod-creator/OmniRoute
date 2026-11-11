@@ -5,10 +5,6 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-11 16:50 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py` (the
-  `due` line of `_decide` only), `tests/test_crypto_cycle.py`. Purpose: quant-critic HOLD on the crypto go-live gate
-  (B1: an order that expires unfilled drops a regime-off exit; the next decision must be a full re-decision).
-
 - **2026-11-11 10:09 - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
@@ -62,6 +58,11 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
+
+- **2026-11-11 16:50 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py` (the
+  `due` line of `_decide` only), `tests/test_crypto_cycle.py`. Purpose: quant-critic HOLD on the crypto go-live gate
+  (B1: an order that expires unfilled drops a regime-off exit; the next decision must be a full re-decision).
+  **Done 2026-11-11 17:25 UTC**: fixed, gated (quant-critic PASS, round 2), 549 tests, pushed (bdaab0df).
 
 - **2026-11-10 20:40 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/backtest.py`, `aitrader/metrics.py`, `aitrader/report.py`, `aitrader/crypto_sweep.py`, `config.json`,

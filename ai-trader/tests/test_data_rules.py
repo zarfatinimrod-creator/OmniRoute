@@ -140,7 +140,7 @@ class StaleSymbolsAndBarEnd(unittest.TestCase):
         self.assertEqual(data.stale_symbols({"close": close}, idx[-1], end), {"B"})  # ruling R1: no times = fresh
 
     def test_bar_end_stock_1605_new_york_even_on_early_close_crypto_0005_utc(self):
-        stock, coins = cfg_for(load_panel()), data.load_config("crypto")
+        stock, coins = cfg_for(load_panel()), data.load_config("crypto", "crypto")
         friday = pd.Timestamp("2026-11-27")  # the day after Thanksgiving closes at 13:00; bar_end stays 16:05
         self.assertEqual(cycle._bar_end_utc(friday, stock), datetime(2026, 11, 27, 21, 5, tzinfo=UTC))
         self.assertEqual(cycle._bar_end_utc(pd.Timestamp("2026-07-02"), stock), datetime(2026, 7, 2, 20, 5, tzinfo=UTC))
@@ -294,7 +294,7 @@ class CryptoRun(unittest.TestCase):
     def setUp(self):
         self.p = crypto_panel()
         self.idx = self.p["close"].index
-        self.cfg = data.load_config("crypto")
+        self.cfg = data.load_config("crypto", "crypto")
         self.dirs: list[Path] = []
 
     def tearDown(self):

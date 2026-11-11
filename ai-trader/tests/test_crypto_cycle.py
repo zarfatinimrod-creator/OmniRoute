@@ -65,7 +65,7 @@ class CryptoBook(unittest.TestCase):
     def setUp(self):
         self.p = settled_panel()
         self.idx = self.p["close"].index
-        self.cfg = data.load_config("crypto")
+        self.cfg = data.load_config("crypto", "crypto")
         self.coins = sorted(self.cfg["universe"])
         self.state = self.mkdtemp()
         self.reports = self.mkdtemp()

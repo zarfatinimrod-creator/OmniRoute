@@ -52,7 +52,7 @@ class Env(unittest.TestCase):
         c = mock.patch.object(journal, "now_utc", lambda: self.clock)
         c.start()
         self.addCleanup(c.stop)
-        self.crypto = data.load_config("crypto")
+        self.crypto = data.load_config("crypto", "crypto")
         self.stock = data.load_config("stocks")
 
     def send_crypto(self, title="t", body="b", **kw):
@@ -231,7 +231,11 @@ class Summary(Env):
                 self.assertEqual((code, out["urgent"]), (0, []))
         (d / "dsr.json").write_text(json.dumps({"profile": "crypto_base", "value": 0.4, "n": 160, "config_change_needed": True,
                                                 "overrides": {"risk.atr_stop_mult": 0.0}}))
-        code, out = self.run_cli()  # books.crypto.ship_profile is "crypto": trading a profile the sweep did not ship
+        code, out = self.run_cli()  # books.crypto.ship_profile is "crypto_base" since Task 11: config and sweep agree
+        self.assertEqual((code, out["urgent"]), (0, []))
+        real = data.load_config  # ship_profile "crypto" (an explicit fixture): trading a profile the sweep did not ship
+        with mock.patch.object(data, "load_config", lambda book=None, profile=None: real(book or "crypto", profile or "crypto")):
+            code, out = self.run_cli()
         self.assertEqual(code, 2)
         self.assertTrue(any("crypto_base" in u for u in out["urgent"]), out["urgent"])
         self.assertFalse(any("risk.atr_stop_mult" in u for u in out["urgent"]))  # the candidate's change is moot

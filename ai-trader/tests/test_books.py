@@ -99,7 +99,7 @@ class Profiles(unittest.TestCase):
         self.assertEqual(data.load_config()["risk"], raw["risk"])
 
     def test_crypto_universe_and_priors(self):
-        c = data.load_config("crypto")
+        c = data.load_config("crypto", "crypto")
         self.assertEqual(set(c["universe"]), {"BTC-USD", "ETH-USD"})
         self.assertEqual(set(c["prior_weights"]), set(REGISTRY))
         self.assertAlmostEqual(sum(c["prior_weights"].values()), 1.0, delta=1e-3)
@@ -121,7 +121,8 @@ class Profiles(unittest.TestCase):
         self.assertEqual(c["risk"]["max_position_pct_by_symbol"], {"BTC-USD": 1.0, "ETH-USD": 0.6, "XRP-USD": 0.6})
         self.assertNotIn("books", c)
         ship = raw_config()["books"]["crypto"]["ship_profile"]
-        self.assertEqual(c, data.load_config("crypto", ship))  # the profile defaults to ship_profile
+        self.assertEqual(ship, "crypto_base")  # Task 11: the sweep of 2026-11-11 shipped crypto_base (state/crypto/dsr.json)
+        self.assertEqual(data.load_config("crypto"), data.load_config("crypto", ship))  # the profile defaults to ship_profile
 
     def test_crypto_risk_lists_every_key(self):
         books = raw_config()["books"]
@@ -151,7 +152,7 @@ class Profiles(unittest.TestCase):
         self.assertEqual(b["risk"]["target_vol_annual"], 0.30)
 
     def test_account_merge(self):
-        c = data.load_config("crypto")
+        c = data.load_config("crypto", "crypto")
         self.assertEqual(c["account"]["cash_yield_annual"], 0)
         self.assertEqual(c["account"]["starting_cash"], 100000)
         self.assertIs(c["account"]["paper_only"], True)  # key by key: the rest of the stock block stays
