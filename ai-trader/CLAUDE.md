@@ -250,6 +250,9 @@ Work on Opus; switch to Fable 5.2 when something is built or created.
   trader session and the crypto session stay on the model he last set (Fable 5.2).
 - If a usage limit stops a session or an agent, say so to Nimrod at once (what stopped, at which step). Do not fall
   back to another model on your own.
+- **Temporary (Nimrod, 2026-11-11, answer א):** the Fable 5.2 limit was reached at about 16:45 UTC on 2026-11-11.
+  Until Fable is available again, Opus (`claude-opus-5-5`) also builds and creates, with the same separate reviewers;
+  he switches the trading sessions to Opus himself. When Fable is back, the rule above applies again without asking.
 - Not covered until he decides: the headline scorer inside the bot (`config.json` `news.model`). It is a trading
   parameter, so it changes only through rule 4, with a measured comparison of accuracy and delay.
 
