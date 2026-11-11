@@ -586,3 +586,238 @@ class WhatAStartFinds(_Starts):
         with mock.patch.object(news_live, "run", lambda until, minutes, **k: got.append((until, minutes, k)) or 0):
             self.assertEqual((cli.main(["news-live", "--check"]), cli.main(["news-live", "--minutes", "2"])), (0, 0))
         self.assertEqual(got, [("16:05", None, {"check": True}), ("16:05", 2.0, {"check": False})])
+
+
+def trade(sym, side="SELL", day=None, **more):
+    """One row in news_trades.jsonl, of today (New York) unless `day` names another date; the row's hash."""
+    journal.append("news_trades.jsonl", {"date": day or datetime.now(NY).date().isoformat(), "symbol": sym, "side": side,
+                                         "qty": 1, "price": 9.0, "reason": "x", **more})
+    return journal.read("news_trades.jsonl")[-1]["hash"]
+
+
+class SaidAtOnce(_Engine):
+    def test_a_sale_at_the_top_of_a_step_is_sent_before_the_scorer_and_only_once(self):
+        hold(self.nt); self.prices["BBB"] = 48.0     # under its stop of 48.50
+        at_scorer = []                               # one AAA headline in the poll: what was sent by the time it is scored
+        step(self.nt, items(1), lambda batch, model: at_scorer.append([b for _, b in self.sent]) or {})
+        self.assertTrue(any("SELL 10 BBB" in b for b in at_scorer[0]))
+        self.assertEqual(sum("SELL 10 BBB" in b for _, b in self.sent), 1)
+        self.assertEqual(news_live.read_heartbeat()["told_through"], journal.read("news_trades.jsonl")[-1]["hash"])
+
+    def test_a_look_whose_send_failed_is_in_the_closing_message_and_told_only_then(self):
+        hold(self.nt); self.prices["BBB"] = 48.0     # no headline
+        calls = []
+
+        def send(title, body, cfg, prio="default", **kw):   # no channel takes the first message; one takes the later ones
+            calls.append((body, self.nt.told_through))
+            return ["ntfy"] if len(calls) > 1 else []
+        with mock.patch.object(news_live.notify, "send", send):
+            step(self.nt)
+        self.assertEqual([("SELL 10 BBB" in b, t) for b, t in calls], [(True, None), (True, None)])
+        self.assertEqual(self.nt.told_through, journal.read("news_trades.jsonl")[-1]["hash"])
+
+    def test_a_sale_nobody_got_is_not_passed_by_a_later_message_and_is_said_once_at_the_next_start(self):
+        hold(self.nt); self.prices["BBB"] = 48.0
+        ok, news_live.notify.send = news_live.notify.send, lambda *a, **k: []
+        step(self.nt)                                # the look's send and the closing send both fail
+        news_live.notify.send = ok
+        self.nt._mark_told([]); self.nt._beat("idle")          # as after some later message that a channel took
+        self.assertIsNone(news_live.read_heartbeat()["told_through"])
+        for _ in range(2):
+            nt = news_live.NewsTrader(self.cfg)
+            nt.adopt_previous(news_live.read_heartbeat()); nt.say_late(); nt._beat("boot")
+        late = [b for _, b in self.sent if b.startswith("דווח באיחור:")]
+        self.assertEqual((len(late), "SELL 10 BBB" in late[0]), (1, True))
+
+    def test_with_no_heartbeat_nothing_is_said_late(self):
+        trade("BBB", qty=10, price=48.0)             # one SELL row of today on disk, no heartbeat file
+        nt = news_live.NewsTrader(self.cfg)
+        nt.adopt_previous(None); nt.say_late()
+        self.assertEqual(self.sent, [])
+
+
+class WhoWasTold(_Starts):
+    """What the four tests above leave open: what each of a step's messages carries, when the mark in the heartbeat
+    moves, what a start takes over from the file it finds, and the late line itself."""
+
+    def setUp(self):
+        super().setUp()
+        self.cfg["news"]["stop_catchup"] = self.nt.n["stop_catchup"] = "off"   # whether a bar read is due depends on the hour
+
+    def test_the_look_says_its_own_lines_with_the_book_line_and_the_closing_message_says_only_the_rest(self):
+        hold(self.nt); self.prices["BBB"] = 48.0     # sold at a loss by the first look: the AAA buy that follows is refused
+        with mock.patch.object(self.nt, "_quote_is_live", lambda *a, **k: True):
+            step(self.nt, items(1), lambda batch, model: {x["key"]: {"score": 9, "why": "test"} for x in batch})
+        self.assertEqual([p for p, _ in self.sent], ["high", "high"])
+        bodies = [b for _, b in self.sent]           # the look's message, then the step's closing message
+        self.assertEqual([("SELL 10 BBB" in b, "נמכר בהפסד" in b, "AAA ציון 9: לא קונים" in b) for b in bodies],
+                         [(True, True, False), (False, False, True)])
+        for b in bodies:                             # each one as the owner gets it: the book line last, and its last words
+            last = b.splitlines()[-1]
+            self.assertTrue(last.startswith("תיק חדשות (נייר): $") and last.endswith("%). כסף נייר"), b)
+        # what a look delivered is forgotten with its step: the next step's lines are counted from its own first one
+        with mock.patch.object(self.nt, "_quote_is_live", lambda *a, **k: True):
+            step(self.nt, items(2)[1:], lambda batch, model: {x["key"]: {"score": 9, "why": "test"} for x in batch})
+        self.assertEqual(["AAA ציון 9: לא קונים" in b for _, b in self.sent], [False, True, True])
+
+    def test_a_delivered_look_does_not_move_the_mark_past_a_buy_whose_line_is_still_to_come(self):
+        hold(self.nt)
+        self.nt.n.update(batch_max=1, verify_buys=False)   # two batches, and no look inside the buy itself
+        at_scorer = []
+
+        def scorer(batch, model):                    # k0 is bought; from then on BBB is under its stop
+            at_scorer.append(news_live.read_heartbeat()["told_through"])
+            self.prices["BBB"] = 48.0
+            return {x["key"]: {"score": 9, "why": "test"} for x in batch if x["key"] == "k0"}
+        with mock.patch.object(self.nt, "_quote_is_live", lambda *a, **k: True):
+            step(self.nt, items(2), scorer)
+        buy, sell = journal.read("news_trades.jsonl")
+        self.assertEqual((buy["side"], buy["symbol"], sell["side"], sell["symbol"]), ("BUY", "AAA", "SELL", "BBB"))
+        # the look between the batches said the sale at once; the buy before it waits for the closing message
+        self.assertEqual([("SELL 10 BBB" in b, "BUY" in b) for _, b in self.sent], [(True, False), (False, True)])
+        self.assertEqual(at_scorer, [None, None])    # so at the second batch the mark had not passed the buy
+        self.assertEqual((self.nt.told_through, news_live.read_heartbeat()["told_through"], self.nt._unsent),
+                         (sell["hash"], sell["hash"], []))
+
+    def test_a_look_whose_send_raises_leaves_its_lines_to_the_closing_message_and_a_row_on_record(self):
+        hold(self.nt); self.prices["BBB"] = 48.0
+        bodies = []
+
+        def send(title, body, cfg, prio="default", **kw):
+            bodies.append(body)
+            if len(bodies) == 1:
+                raise OSError("no network")
+            return ["ntfy"]
+        with mock.patch.object(news_live.notify, "send", send):
+            step(self.nt)
+        self.assertEqual(["SELL 10 BBB" in b for b in bodies], [True, True])
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")], [("look_alert", "OSError")])
+        self.assertEqual(self.nt.told_through, journal.read("news_trades.jsonl")[-1]["hash"])
+
+    def test_the_looks_message_goes_out_after_the_looks_save_and_its_beat(self):
+        hold(self.nt); self.nt.save()                # BBB stays above its stop of 48.50 at the live quote
+        now = datetime(2026, 11, 10, 9, 45, tzinfo=NY)   # a fixed clock in a session: the test says the same at any hour
+        self.nt.n["stop_catchup"] = "alert"          # the bars of the ten minutes nobody looked are read: one closed under
+        self.nt.adopt_previous({"stops_checked_at": (now - timedelta(minutes=10)).astimezone(timezone.utc).isoformat()})
+        bars = [(now - timedelta(minutes=m), 48.0 if m == 5 else 49.5, 48.2 if m == 5 else 49.8) for m in range(10, 0, -1)]
+        at_send = []
+
+        def send(title, body, cfg, prio="default", **kw):   # what the two files hold when each message goes out
+            saved = journal.load_json("news_book.json")["positions"]["BBB"]
+            beat = ((news_live.read_heartbeat() or {}).get("held") or {}).get("BBB") or {}
+            at_send.append((prio, "stop_breach" in saved, beat.get("checked_at") is not None))
+            return ["ntfy"]
+        with mock.patch.object(news_live, "bars_since", lambda sym, since, now: bars), \
+                mock.patch.object(news_live.notify, "send", send):
+            self.nt._look_at_stops([], now=now)
+        # the catch-up's own alert goes out at once, as before; the look's message only once the mark is on disk
+        self.assertEqual(at_send, [("urgent", False, False), ("high", True, True)])
+
+    def test_the_mark_is_in_the_file_as_soon_as_a_channel_took_the_looks_message(self):
+        hold(self.nt); self.prices["BBB"] = 48.0
+        self.nt._look_at_stops([])                   # a look outside any step, as the first look of a start
+        b = news_live.read_heartbeat()
+        self.assertEqual((b["phase"], b["told_through"], self.nt._unsent),
+                         ("stops", journal.read("news_trades.jsonl")[-1]["hash"], []))
+
+    def test_a_row_whose_hash_cannot_be_read_back_costs_its_place_in_the_count_and_never_the_sale(self):
+        hold(self.nt); self.prices["BBB"] = 48.0
+        with mock.patch.object(journal, "read", side_effect=OSError(5, "Input/output error")):
+            self.nt.check_stops([])
+        self.assertEqual([(t["side"], t["symbol"]) for t in journal.read("news_trades.jsonl")], [("SELL", "BBB")])
+        self.assertEqual((journal.load_json("news_book.json")["positions"], self.nt._unsent), ({}, []))
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")], [("trade_hash", "OSError")])
+
+    def test_a_start_takes_the_mark_from_the_heartbeat_and_owes_todays_rows_after_it(self):   # Review Focus 1 and 4
+        self.assertEqual((self.nt.told_through, self.nt._unsent, self.nt._late), (None, [], []))   # never adopted: nothing
+        yesterday = (datetime.now(NY).date() - timedelta(days=1)).isoformat()
+        old = trade("OLD", day=yesterday)
+        a, b, c = trade("AAA"), trade("BBB"), trade("CCC")
+        with open(journal._path("news_trades.jsonl"), "a") as f:
+            f.write('7\n{"torn')                     # lines that are no rows: the last row is still CCC
+        for prev, mark, owed in ((None, c, []),                                     # no heartbeat: nothing is said again
+                                 ({"at": journal.now_utc()}, c, []),                # one from before the mark existed
+                                 ({"told_through": None}, None, ["AAA", "BBB", "CCC"]),   # nothing told yet: today's rows
+                                 ({"told_through": old}, old, ["AAA", "BBB", "CCC"]),
+                                 ({"told_through": a}, a, ["BBB", "CCC"]), ({"told_through": b}, b, ["CCC"]),
+                                 ({"told_through": c}, c, []),
+                                 ({"told_through": "f" * 64}, c, []),               # a hash this journal does not hold
+                                 ({"told_through": 5}, c, []), ({"told_through": [a]}, c, [])):
+            nt = news_live.NewsTrader(self.cfg)
+            nt.adopt_previous(prev)
+            self.assertEqual((nt.told_through, [t["symbol"] for t in nt._late]), (mark, owed), prev)
+            self.assertEqual(nt._unsent, [t["hash"] for t in nt._late], prev)
+            nt._beat("boot")                         # and the boot beat repeats the mark it took over
+            self.assertEqual(news_live.read_heartbeat()["told_through"], mark, prev)
+        with mock.patch.object(journal, "read", side_effect=OSError(5, "Input/output error")):
+            nt = news_live.NewsTrader(self.cfg)
+            nt.adopt_previous({"told_through": a})   # a journal that cannot be read costs the late line, never the start
+        self.assertEqual((nt.told_through, nt._unsent, nt._late), (None, [], []))
+
+    def test_the_late_line_names_each_row_and_is_said_until_a_channel_took_it_and_then_never_again(self):
+        trade("BBB", qty=10, price=47.952, reason="stop -3% (entry 50.00, now 48.00)")
+        journal.append("news_trades.jsonl", {"date": datetime.now(NY).date().isoformat(), "symbol": "AAA", "side": "BUY",
+                                             "qty": 5, "price": 100.0})   # a row written by hand, with no reason
+        last = journal.read("news_trades.jsonl")[-1]["hash"]
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        nt = news_live.NewsTrader(self.cfg)
+        nt.adopt_previous(news_live.read_heartbeat())
+        with mock.patch.object(news_live.notify, "send", lambda title, body, cfg, prio="default", **kw: []):
+            nt.say_late()                            # no channel takes it: nothing is marked, and the file is as it was
+        self.assertEqual((nt.told_through, len(nt._unsent), news_live.read_heartbeat().get("phase")), (None, 2, None))
+        nt.say_late()
+        self.assertEqual(self.sent, [("high", "דווח באיחור: SELL 10 BBB @ 47.952 - stop -3% (entry 50.00, now 48.00)"
+                                              " | BUY 5 AAA @ 100.0 - ?. כסף נייר")])
+        b = news_live.read_heartbeat()               # the mark is in the file at once, for the next start to read
+        self.assertEqual((nt.told_through, nt._unsent, b["told_through"], b["phase"]), (last, [], last, "boot"))
+        nt.say_late()                                # said: not again by this process
+        again = news_live.NewsTrader(self.cfg)
+        again.adopt_previous(news_live.read_heartbeat()); again.say_late()   # nor by the next one
+        self.assertEqual(len(self.sent), 1)
+
+    def test_a_sale_of_this_process_is_not_in_the_late_line_and_the_mark_waits_for_the_late_line(self):
+        hold(self.nt); self.nt.save()
+        gone = trade("GONE")                         # of the run before: no channel took its line
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        nt = news_live.NewsTrader(self.cfg)
+        nt.adopt_previous(news_live.read_heartbeat())
+        self.prices["BBB"] = 48.0
+        nt._look_at_stops([])                        # this process's first look sells BBB and says so
+        self.assertEqual((nt.told_through, nt._unsent), (None, [gone]))   # delivered, but the row before it is still owed
+        nt.say_late()
+        late = [b for _, b in self.sent if b.startswith("דווח באיחור:")]
+        self.assertEqual((len(late), "GONE" in late[0], "BBB" in late[0]), (1, True, False))
+        self.assertEqual((nt.told_through, sum("SELL 10 BBB" in b for _, b in self.sent)),
+                         (journal.read("news_trades.jsonl")[-1]["hash"], 1))
+
+    def test_a_steps_closing_message_does_not_tell_the_rows_of_the_run_before(self):
+        hold(self.nt); self.nt.save()
+        gone = trade("GONE")
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        nt = news_live.NewsTrader(self.cfg)
+        nt.adopt_previous(news_live.read_heartbeat())   # and the late line has not gone out yet
+        self.prices["BBB"] = 48.0
+        bodies = []
+
+        def send(title, body, cfg, prio="default", **kw):   # no channel takes the look's message; one takes the closing one
+            bodies.append(body)
+            return ["ntfy"] if len(bodies) > 1 else []
+        with mock.patch.object(news_live.notify, "send", send):
+            step(nt)
+        self.assertEqual((["SELL 10 BBB" in b for b in bodies], nt.told_through, nt._unsent), ([True, True], None, [gone]))
+
+    def test_a_late_line_that_cannot_be_sent_costs_a_row_and_never_the_start(self):
+        hold(self.nt); self.nt.save()
+        trade("GONE")
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        with mock.patch.object(news_live.notify, "send", side_effect=OSError("no network")):
+            self.assertEqual(self.start(), 0)
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")], [("late_line", "OSError")])
+        self.assertIsNone(news_live.read_heartbeat()["told_through"])   # still owed: the next start of the day says it
+
+    def test_a_start_says_what_the_run_before_left_unsaid_and_the_next_start_says_nothing(self):
+        hold(self.nt); self.nt.save()                # BBB stays above its stop: the look has nothing to say
+        trade("GONE")
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        self.assertEqual((self.start(), self.start()), (0, 0))
+        self.assertEqual(self.sent, [("high", "דווח באיחור: SELL 1 GONE @ 9.0 - x. כסף נייר")])

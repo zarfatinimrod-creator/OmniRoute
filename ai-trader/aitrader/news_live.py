@@ -545,6 +545,11 @@ _NO_MOVE = object()  # _buy's "the caller has no move to be checked on" (not the
 _UNSET = object()  # "the caller did not say" (not the same as None = not known)
 
 
+def _trade_line(f: dict) -> str:
+    """A trade as the owner reads it: in the message of the look or step that made it, or in a later start's late line."""
+    return f"{f['side']} {f['qty']} {f['symbol']} @ {f['price']} - {f['reason']}"
+
+
 class NewsTrader:
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -563,6 +568,13 @@ class NewsTrader:
         self._unseen_lows: dict = {}  # held name -> prints at or under its stop in stretches nobody was looking
         self._trial: list = []  # second checks on trial, asked in the background: (box, item, score)
         self._trial_gate = None  # at most verify_parallel of them out at a time
+        # who was told of a trade (_mark_told). Until adopt_previous is called nothing is told, unsent or late
+        self.told_through = None  # every news_trades.jsonl row up to this hash had its line taken by a channel
+        self._unsent: list = []  # hashes of the rows whose line no channel has taken yet, oldest first
+        self._late: list = []  # today's rows that the run before left with no line taken; say_late says them
+        self._last_row = None  # the hash of the journal's last row, as far as this process has read
+        self._told_lines: set = set()  # the places, in the running step's lines, that a look's own message delivered
+        self._phase = "boot"  # the phase of the last beat
         for key, known, safe in (("stop_catchup", ("alert", "sell", "off"), "alert"), ("guards", ("log", "enforce"), "log")):
             if self.n[key] not in known:  # a word the code does not know is read as the safe side, and said out loud
                 notify.send("AI Trader - תקלה", f"בהגדרות (config.json) כתוב news.{key} = {self.n[key]!r}, וזה לא ערך מוכר"
@@ -1071,8 +1083,11 @@ class NewsTrader:
         comes before a sale. Then, for the names still held, the minute bars of any stretch in which a name's stop
         was not looked at. A sale goes to disk at once. guarded: a failure of the live look is put on record and
         the step goes on (the look at the end of the step is still to come and reports its own failure); otherwise
-        it is raised, as a failed step. Returns whether the live look ran."""
+        it is raised, as a failed step. Returns whether the live look ran.
+        The lines the look added are said to the owner here, when the look is over and saved: a sale does not wait
+        for the poll and the scorer, and a kill in between does not lose its line. Never before a sale."""
         seen, n, looked = dict(self._covered), len(events), True
+        mine = len(self._unsent)  # the trade rows this look appends come after these
         if not hasattr(self, "_prev_look"):
             # what the run before this one left. It stays the stamp of every name this run has not looked at yet: the
             # loop's own clock moves at every look, also for a name that had no live quote and no bars all along
@@ -1096,6 +1111,13 @@ class NewsTrader:
             # this look stamped a held name, and a name is stamped only after the beat of its own quote or bar read:
             # the file gets the look's stamps now, not with whatever comes next (a slow poll)
             self._beat("stops")
+        if len(events) > n:
+            try:
+                if self._say(events[n:]):
+                    self._told_lines.update(range(n, len(events)))  # the step's closing message leaves these out
+                    self._mark_told(self._unsent[mine:])
+            except Exception as e:  # noqa: BLE001 - not said here: the lines stay for the step's closing message
+                self._note_error(e, "look_alert")
         return looked
 
     def _note_error(self, e: Exception, where: str):
@@ -1128,7 +1150,7 @@ class NewsTrader:
 
     def _log_trade(self, f: dict, events: list):
         journal.append("news_trades.jsonl", {**f, "logged_at": journal.now_utc()})
-        events.append(f"{f['side']} {f['qty']} {f['symbol']} @ {f['price']} - {f['reason']}")
+        events.append(_trade_line(f))
         if f["side"] == "SELL" and f.get("realized_pnl", 0) < 0 and self.n["block_buys_until_loss_reviewed"]:
             # said at the moment it starts, not at the next refused headline, which may be days away
             events.append("נמכר בהפסד: מעכשיו אין קניות חדשות בתיק החדשות עד שההפסד יתוחקר (חוק היסוד, סעיף 3)."
@@ -1137,6 +1159,11 @@ class NewsTrader:
             self.save(seen=False)  # trade the book does not know (a buy with no stop, or a sale that is then made twice)
         except Exception as e:  # noqa: BLE001 - the save at the end of the step tries again and reports its own failure
             self._note_error(e, "save_after_trade")
+        try:  # which row that was, read back: its line is owed to the owner until a channel has taken it (_mark_told)
+            self._last_row = journal.read("news_trades.jsonl")[-1]["hash"]
+            self._unsent.append(self._last_row)
+        except Exception as e:  # noqa: BLE001 - the trade is made and saved; only the count of who was told misses it
+            self._note_error(e, "trade_hash")
 
     def _quote_is_live(self, price_at: str | None, published: str | None = None, now: datetime | None = None) -> bool:
         """A quote counts as live only if it printed in today's session, after the headline came out, and is
@@ -1359,19 +1386,55 @@ class NewsTrader:
                 self.queue.remove(q)
                 self._beat("queue")
 
+    def _say(self, lines: list[str]) -> bool:
+        """One message to the owner: these lines, then the book line. Whether a channel took it."""
+        eq = self.book.equity(self._marks())
+        body = ("\n".join(lines) + f"\nתיק חדשות (נייר): ${eq:,.0f} ({eq / self.n['starting_cash'] - 1:+.2%})"
+                ". כסף נייר")  # the last words of every message the owner gets: a trade, a refused buy
+        return bool(notify.send("AI Trader - חדשות", body, self.cfg, "high"))
+
+    def _mark_told(self, hashes: list[str]) -> None:
+        """After a message that a channel took and that carried the lines of these trade rows: they are owed no
+        longer. told_through moves only when no row at all is still owed, and then to the journal's last row: it
+        never passes a row whose line nobody got, whatever was delivered after it (a start reads it to know what
+        to say late: adopt_previous). Then a beat with the phase the loop is in, so that the file has it at once."""
+        self._unsent = [h for h in self._unsent if h not in hashes]
+        if not self._unsent and self._last_row:
+            self.told_through = self._last_row
+        self._beat(self._phase)
+
+    def say_late(self) -> None:
+        """The trades of today that the run before made and no channel took the line of, in one message. Only rows
+        that were on disk when this process started (adopt_previous): its own trades are said by its own looks and
+        steps. A message nobody took leaves them owed, for the next start of the day. Never raises."""
+        if not self._late:
+            return
+        try:
+            # a row written by hand may lack a field: it is said with a question mark, not left out
+            rows = [{**dict.fromkeys(("side", "qty", "symbol", "price", "reason"), "?"), **t} for t in self._late]
+            body = "דווח באיחור: " + " | ".join(_trade_line(t) for t in rows) + ". כסף נייר"
+            if notify.send("AI Trader - חדשות", body, self.cfg, "high"):
+                self._mark_told([t["hash"] for t in self._late])
+                self._late = []
+        except Exception as e:  # noqa: BLE001 - a line that cannot be built or sent must not cost the start
+            self._note_error(e, "late_line")
+
     def step(self) -> list[str]:
         events: list[str] = []
         self.last_events = events  # the loop prints them also when the step fails after a trade
+        self._told_lines = set()
+        # the trade rows this step appends come after these. getattr: nothing a step needs before its chain check may
+        # depend on how the trader was built (tests/test_audit_fixes.py builds one with no __init__ and expects ChainBroken)
+        mine = len(getattr(self, "_unsent", ()))
         t0 = time.monotonic()
         try:
             self._step(events)
         finally:  # whatever fails further down, what the step already did is said: a sale at its top is never lost
-            if events:
+            owed = [line for i, line in enumerate(events) if i not in self._told_lines]  # what no look's message delivered
+            if owed:
                 try:
-                    eq = self.book.equity(self._marks())
-                    body = ("\n".join(events) + f"\nתיק חדשות (נייר): ${eq:,.0f} ({eq / self.n['starting_cash'] - 1:+.2%})"
-                            ". כסף נייר")  # the last words of every message the owner gets: a trade, a refused buy
-                    notify.send("AI Trader - חדשות", body, self.cfg, "high")
+                    if self._say(owed):
+                        self._mark_told(self._unsent[mine:])  # this step's rows that were still owed
                 except Exception as e:  # noqa: BLE001 - the alert must not hide the error of the step itself
                     self._note_error(e, "step_alert")
             self._step_measured(time.monotonic() - t0)  # measurement only, after the alert, and it never raises
@@ -1424,7 +1487,7 @@ class NewsTrader:
 
     def adopt_previous(self, prev: dict | None) -> None:
         """What the engine process before this one left in its last heartbeat, taken over before this process writes
-        its own first beat (which would write over it). Three things, and none may cost the start: a file that
+        its own first beat (which would write over it). Four things, and none may cost the start: a file that
         cannot be used costs only what it held.
         The last stop look: until this process has looked at the stops itself, the run before's stamp is the one the
         catch-up reads the minute bars from and the one every beat repeats. With no heartbeat, or none with a stamp
@@ -1433,7 +1496,10 @@ class NewsTrader:
         told, when the heartbeat is of today (New York). A restart does not put the alert off by another window and
         does not send it twice, and "the price is back" still follows an alert that was delivered.
         The mismatch already said: {"day", "symbol"} of a line E1 that a channel took today (New York), so that the
-        day's later starts do not say it again (_run). One of another day is dropped."""
+        day's later starts do not say it again (_run). One of another day is dropped.
+        Who was told: told_through as the file has it, and today's trade rows after that row (all of today's when
+        it is null) are owed their line: say_late. With no heartbeat, one from before this field, or a mark that is
+        no row of the journal, it is the journal's last row: nothing is said late."""
         prev = prev or {}
         told = prev.get("mismatch_told")
         self._mismatch_told = told if isinstance(told, dict) and told.get("day") == datetime.now(NY).date().isoformat() else None
@@ -1451,6 +1517,21 @@ class NewsTrader:
                                if sym in self.book.positions}
         except Exception as e:  # noqa: BLE001
             self._note_error(e, "adopt_previous")
+        try:
+            rows = [t for t in journal.read("news_trades.jsonl") if isinstance(t, dict)]  # a torn or foreign line is no row
+            hashes = [t.get("hash") for t in rows]
+            self._last_row = hashes[-1] if hashes else None
+            mark = prev.get("told_through")
+            if "told_through" not in prev or (mark is not None and mark not in hashes):
+                mark, after = self._last_row, []  # and nothing can be placed after a row the journal does not hold
+            else:
+                after = rows if mark is None else rows[hashes.index(mark) + 1:]
+            today = datetime.now(NY).date().isoformat()
+            self._late = [t for t in after if t.get("date") == today and t.get("hash")]
+            self._unsent = [t["hash"] for t in self._late]
+            self.told_through = mark
+        except Exception as e:  # noqa: BLE001
+            self._note_error(e, "adopt_previous")
 
     def _beat(self, phase: str) -> None:
         """The heartbeat, state/news_heartbeat.json: written here and nowhere else, after every call that leaves the
@@ -1460,6 +1541,7 @@ class NewsTrader:
         every other beat repeats the last values. stops_checked_at keeps its meaning (the oldest live look over the
         held names), and until this process has made a look of its own it is the stamp the run before left.
         A record only: it never raises, so a beat that cannot be written costs no sale and no step."""
+        self._phase = phase
         try:
             before = getattr(self, "_prev_look", None)
             if phase == "idle":
@@ -1489,7 +1571,8 @@ class NewsTrader:
                 "blind": list(blind),
                 "blind_since": {sym: v[0].astimezone(timezone.utc).isoformat() for sym, v in blind.items()},
                 "blind_told": [sym for sym, v in blind.items() if v[1]],
-                "told_through": None, "mismatch_told": getattr(self, "_mismatch_told", None), "supervised": False})
+                "told_through": self.told_through, "mismatch_told": getattr(self, "_mismatch_told", None),
+                "supervised": False})
         except Exception as e:  # noqa: BLE001
             self._note_error(e, "heartbeat")
 
@@ -1657,6 +1740,7 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
                 nt._beat("boot")  # into the file at once, for the next start to read
         except Exception as e:  # noqa: BLE001 - as above: the stops of the book there is still need this engine
             error_once("mismatch_line", e)
+    nt.say_late()  # the trades of today that the run before made and nobody was told of
     hh, mm = (int(x) for x in until_ny.split(":"))
     t0 = time.time()
     fails = 0

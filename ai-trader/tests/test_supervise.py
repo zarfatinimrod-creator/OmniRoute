@@ -276,6 +276,16 @@ class PullBesideRestarts(Procs):
             self.assertEqual(journal.verify_chain("news_trades.jsonl"), (True, 2))
 
 
+class SaidBeforeTheKill(Procs):
+    def test_the_line_of_a_sale_is_out_before_a_scorer_that_never_returns_and_a_kill_9(self):
+        self.write_book({"BBB": 50.0})
+        p = self.start_engine({"session": "open", "prices": {"BBB": [48.0]}, "score_delay_s": "never",
+                               "polls": [[{"key": "k1", "symbol": "AAA", "title": "AAA one"}]]}, "--minutes", "5")
+        self.wait_for(lambda: self.beat().get("phase") == "quotes")
+        p.kill()
+        self.assertEqual(sum("SELL 10 BBB" in r["body"] for r in self.sent_rows()), 1)
+
+
 # One forbidden call each, in a process of its own behind the tripwire alone (argv: the tripwire's file, tests/). The
 # targets cannot answer, so a tripwire that failed to stop one of them would still reach nobody.
 BEHIND_THE_WIRE = ("import sys; sys.path.insert(0, sys.argv[2]); from helpers import engine_child;"
