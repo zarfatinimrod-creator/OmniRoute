@@ -79,7 +79,9 @@ background or in a separate session, so that no watchdog slot waits behind it.
      at once only in log mode, through rule 4: it writes down what it would have refused and changes no trade, so
      its forward record starts on day one. Until the rule is decided Claude may only use the levers that can only
      reduce risk: `veto`, `shrink`, `news-exit`, `news-hold`. Each use is written in the review. A `veto` or a
-     `shrink` applies to one decision date and is not carried to the next. A `news-exit` is not undone. A `news-hold` is lifted only on Nimrod's
+     `shrink` applies to one decision date and is not carried to the next. A `news-exit` is not undone by Claude: a request
+     that is still waiting is taken back (`news-exit SYMBOL --cancel`) only on Nimrod's word, and the cancel is written
+     down with his words (his decision of 2026-11-11). A `news-hold` is lifted only on Nimrod's
      word, whatever condition was written next to it. A `news-hold` that is to outlast the review is set and pushed
      before the review is recorded: the record frees the buys at once.
    - **A planned loss inside the rules:** nothing changes, and the review says so and why.
@@ -150,7 +152,8 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
    or env vars - never in files, logs, reports or commit messages.
 3. **Claude can only reduce risk.** Overrides (`python3 -m aitrader veto|shrink`; in the news book `news-hold`
    and `news-exit`) may veto new entries, shrink sizes or ask for an exit; never add names, never increase size,
-   never disable stops or the drawdown breaker. A `news-hold` is lifted only on Nimrod's word.
+   never disable stops or the drawdown breaker. A `news-hold` is lifted, and a waiting `news-exit` is cancelled, only on
+   Nimrod's word.
 4. **Every change to strategy/risk/learning** goes through the time machine sweep before and after, the
    `quant-critic` agent, and `python3 -m unittest discover -s tests` (from `ai-trader/`). No exceptions.
    - **Owner's ruling (Nimrod, 2026-11-11):** a change that touches only how the news engine is run, supervised or

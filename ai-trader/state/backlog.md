@@ -201,6 +201,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     rule 4.
 63. [news][owner] The law says a news-exit is not undone, and the merge added `news-exit --cancel`. One sentence in
     CLAUDE.md and SKILL.md 3ב: a waiting request is cancelled only on the owner's word, and the cancel is logged.
+    **Owner's decision (Nimrod, 2026-11-11, answer א):** the command stays; a waiting request is cancelled only on
+    his word and the cancel is written down. In CLAUDE.md since 2026-11-11 (the loss protocol and hard rule 3).
+    Still to build (queued after Task 8b of the supervisor plan, same gate): `--cancel` refuses without
+    `--said TEXT` (his words) and writes a row to `state/news_exit_cancels.jsonl`; the SKILL.md 3ב lines with it.
 
 ## Done
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
