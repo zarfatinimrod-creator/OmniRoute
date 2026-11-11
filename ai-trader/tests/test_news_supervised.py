@@ -24,7 +24,7 @@ class Lock(_Engine):
                 mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda self, *a, **k: []), \
                 mock.patch.object(news_live.time, "sleep", lambda s: None), \
                 mock.patch.object(news_live, "load_config", lambda: self.cfg), contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(news_live.run(max_minutes=0.0005, prime=False), 0)
+            self.assertEqual(news_live.run("23:59", max_minutes=0.0005, prime=False), 0)
         self.assertEqual([p for p, b in self.sent if b.startswith("מנוע החדשות רץ בלי נעילה")], ["urgent"])
         self.assertIs(journal.load_json("news_heartbeat.json")["lock"], False)
         self.assertEqual(journal._path("news_engine.lock").read_text(), "")   # it holds no lock, so it signs no lock file
@@ -48,6 +48,6 @@ class Unlocked(_Engine):
                 mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda self, *a, **k: []), \
                 mock.patch.object(news_live.time, "sleep", lambda s: None), \
                 mock.patch.object(news_live, "load_config", lambda: self.cfg), contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(news_live.run(max_minutes=0.0005, prime=False), 0)
+            self.assertEqual(news_live.run("23:59", max_minutes=0.0005, prime=False), 0)
         self.assertIs(journal.load_json("news_heartbeat.json")["lock"], False)   # it ran, and its heartbeat still says how
         self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")], [("lock_line", "KeyError")])
