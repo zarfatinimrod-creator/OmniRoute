@@ -160,6 +160,13 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
      the time machine loads (`backtest.py`, `strategy.py`, `signals.py`, `learn.py`, `metrics.py`, `broker.py`,
      `data.py`, the `risk`/`signals`/`costs` blocks of `config.json`). A change that does touch one of them gets the
      sweep before and after, as written.
+   - **Owner's second ruling (Nimrod, 2026-11-11):** a change to the trading rules of the news engine itself (when it
+     buys, sells or holds) skips the sweep too, for the same reason: the time machine never runs the news engine and
+     cannot measure it. In its place, all three: the quant-critic, the unit suite, and a forward measurement written
+     down with the change - what the journals showed before (the count and the file) and what will be read after
+     (which rows, in which file, from which date). The critic's verdict must again say that the diff touches no file
+     on the list above. A change that touches the stock book, or any file on that list, still gets the sweep before
+     and after.
 5. **Assumptions live in `config.json`.** Never hard-code a number in the logic.
 6. **Evidence discipline.** Every number in a report or lesson cites where it came from (a file in
    `state/`, a backtest run, or a URL). Never present an estimate as a measurement. Never claim the bot
