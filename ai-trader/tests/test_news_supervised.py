@@ -1,5 +1,5 @@
-"""The news engine as a supervised process (supervisor spec, section 5): what the engine itself does about its lock
-and its heartbeat."""
+"""The news engine as a supervised process (supervisor spec, section 5): what the engine itself does about its lock,
+its heartbeat and the checks of a start."""
 
 from helpers import no_phone  # noqa: F401  (first: a test run must never reach the owner's phone)
 
@@ -7,10 +7,14 @@ import contextlib
 import io
 import json
 import os
+import shutil
+import tempfile
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest import mock
 from zoneinfo import ZoneInfo
 
+from aitrader import __main__ as cli
 from aitrader import journal, news_live
 from test_news_guards import _Engine
 
@@ -316,3 +320,260 @@ class EveryCallAndEveryStart(_Engine):
                              (datetime(2026, 11, 10, 14, 36, tzinfo=timezone.utc), {}, "boot"), prev)
         nt.adopt_previous({"stops_checked_at": "2026-11-10T14:35:00"})          # a stamp written without a zone is UTC
         self.assertEqual(nt._prev_look, datetime(2026, 11, 10, 14, 35, tzinfo=timezone.utc))
+
+
+BUY_AAA = {"date": "2026-11-10", "symbol": "AAA", "side": "BUY", "qty": 5, "price": 100.0}
+E1_AAA = "ביומן העסקאות יש קנייה של AAA"
+
+
+class _Starts(_Engine):
+    """A start of the engine loop on the temporary state, with what it prints kept in self.out."""
+
+    def setUp(self):
+        super().setUp()
+        quiet = contextlib.redirect_stdout(io.StringIO())   # the engine's own log lines, and journal.read's
+        self.out = quiet.__enter__()
+        self.addCleanup(quiet.__exit__, None, None, None)
+
+    def start(self, until="23:59"):
+        with mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda self, *a, **k: []), \
+                mock.patch.object(news_live.time, "sleep", lambda s: None), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg):
+            return news_live._run(until, 0.0005, False)
+
+    def files(self):
+        return {p.name: p.read_bytes() for p in self.tmp.iterdir()}
+
+
+class StartChecks(_Starts):
+    def test_a_calendar_that_does_not_cover_today_ends_the_engine_with_5(self):
+        with mock.patch.object(journal, "calendar_covers", lambda day: False):
+            self.assertEqual(news_live.start_checks(self.cfg)[:2], (5, "calendar"))
+            self.assertEqual(self.start(), 5)
+        self.assertEqual([p for p, _ in self.sent], ["urgent"])
+
+    def test_a_pull_in_progress_is_7_and_sends_nothing(self):
+        for name in ("rebase-merge", "rebase-apply", "MERGE_HEAD"):
+            root = Path(tempfile.mkdtemp()); state = root / "ai-trader" / "state"
+            self.addCleanup(shutil.rmtree, root, True)
+            state.mkdir(parents=True); (root / ".git").mkdir()
+            self.assertFalse(news_live.tree_busy(state))
+            (root / ".git" / name).mkdir()
+            self.assertTrue(news_live.tree_busy(state), name)
+        with mock.patch.object(news_live, "tree_busy", lambda start=None: True), contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(news_live.start_checks(self.cfg)[:2], (7, "tree_busy"))
+            self.assertEqual(self.start(), 7)
+        self.assertEqual((self.sent, "[news] start refused: tree_busy (exit 7)" in out.getvalue()), ([], True))
+
+    def test_trades_with_no_readable_book_is_6_said_once_and_the_file_is_not_written_over(self):
+        journal.append("news_trades.jsonl", BUY_AAA)
+        self.assertEqual(news_live.start_checks(self.cfg)[:2], (6, "book"))               # no book file
+        journal._path("news_book.json").write_text("{not json")
+        self.assertEqual(self.start(), 6)
+        self.assertEqual(journal._path("news_book.json").read_text(), "{not json")
+        self.assertEqual([(p, b.startswith("קובץ התיק של מנוע החדשות חסר או לא קריא")) for p, b in self.sent], [("urgent", True)])
+
+    def test_a_buy_the_book_does_not_know_blocks_buys_says_e1_once_a_day_and_the_stops_go_on(self):
+        hold(self.nt); self.nt.save(); self.prices["BBB"] = 48.0
+        journal.append("news_trades.jsonl", {"date": "2026-11-10", "symbol": "AAA", "side": "BUY", "qty": 5, "price": 100.0})
+        with open(journal._path("news_trades.jsonl"), "a") as f:
+            f.write('{"torn')                                       # Review Focus 4: the last readable row is the BUY
+        self.assertEqual(news_live.start_checks(self.cfg), (0, "", {"side": "BUY", "symbol": "AAA"}))
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(journal.read("news_trades.jsonl")[-1]["side"], "SELL")          # BBB was under its stop
+        self.assertIn("book_mismatch", [e.get("where") for e in journal.read("news_errors.jsonl")])
+        self.assertEqual(news_live.read_heartbeat()["buys_blocked"], "book_mismatch")
+        # a second start on the same day, again with a BUY of AAA as the last row: E1 is not said twice
+        journal.append("news_trades.jsonl", {"date": "2026-11-10", "symbol": "AAA", "side": "BUY", "qty": 5, "price": 100.0})
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(len([b for _, b in self.sent if b.startswith("ביומן העסקאות יש קנייה של AAA")]), 1)
+
+    def test_check_takes_no_lock_writes_nothing_and_returns_the_code(self):
+        before = sorted(p.name for p in self.tmp.iterdir())
+        # a --check that started the engine would run it here on the real config, feeds and scorer: it must fail first
+        with mock.patch.object(news_live, "NewsTrader", mock.Mock(side_effect=AssertionError("must not be built"))):
+            self.assertEqual(cli.main(["news-live", "--check"]), 0)
+            with mock.patch.object(journal, "broken_chains", lambda names=None: ["news_trades.jsonl"]):
+                self.assertEqual(cli.main(["news-live", "--check"]), 4)
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), before)
+
+
+class WhatAStartFinds(_Starts):
+    """What the five tests above leave open: every row of the start table read from real files (spec 5.4), what a
+    refused start leaves alone, when E1 is said again, and what --check prints."""
+
+    def test_the_last_trade_row_is_read_against_the_book(self):
+        self.assertEqual(news_live.start_checks(self.cfg), (0, "", None))     # no book and no trade: a first start
+        hold(self.nt); self.nt.save()                                         # the book holds 10 BBB
+        self.assertEqual(news_live.start_checks(self.cfg), (0, "", None))     # a book and no trade journal
+        for row, found in (({"side": "BUY", "symbol": "BBB", "qty": 10}, None),       # bought, and held
+                           ({"side": "SELL", "symbol": "AAA", "qty": 5}, None),       # sold, and gone
+                           ({"side": "SELL", "symbol": "BBB", "qty": 4}, None),       # a sale is the whole position: not that kill
+                           ({"side": "SELL", "symbol": "BBB", "qty": 10}, {"side": "SELL", "symbol": "BBB"}),
+                           ({"side": "BUY", "symbol": "AAA", "qty": 5}, {"side": "BUY", "symbol": "AAA"}),
+                           ({"side": "BUY", "symbol": ["AAA"]}, None), ({"note": "a row that is no trade"}, None)):
+            journal.append("news_trades.jsonl", {"date": "2026-11-10", "price": 1.0, **row})
+            self.assertEqual(news_live.start_checks(self.cfg), (0, "", found), row)
+        journal.append("news_trades.jsonl", BUY_AAA)
+        with open(journal._path("news_trades.jsonl"), "a") as f:
+            f.write('7\n[1]\n{"torn')                                         # Review Focus 4: lines that are no rows at all
+        self.assertEqual(news_live.start_checks(self.cfg), (0, "", {"side": "BUY", "symbol": "AAA"}))
+
+    def test_a_book_file_that_is_no_book_is_6_and_an_absent_one_only_when_there_are_trades(self):
+        book = journal._path("news_book.json")
+        for text in ("{not json", "", "[]", "{}", '{"cash": 1, "positions": []}'):
+            book.write_text(text)
+            self.assertEqual(news_live.start_checks(self.cfg)[:2], (6, "book"), text)
+        book.write_text("null")                                               # as good as no file: nothing to write over
+        self.assertEqual(news_live.start_checks(self.cfg), (0, "", None))
+        journal.append("news_trades.jsonl", BUY_AAA)
+        self.assertEqual(news_live.start_checks(self.cfg)[:2], (6, "book"))
+
+    def test_a_refused_start_builds_no_trader_and_changes_no_file_and_the_checks_keep_their_order(self):
+        journal.append("news_trades.jsonl", BUY_AAA)                          # trades and no book: 6 when nothing else refuses
+        no_cover = mock.patch.object(journal, "calendar_covers", lambda day: False)
+        busy = mock.patch.object(news_live, "tree_busy", lambda start=None: True)
+        for code, why, refusing in ((5, "calendar", (no_cover, busy)), (7, "tree_busy", (busy,)), (6, "book", ())):
+            before = self.files()
+            with contextlib.ExitStack() as on:
+                for stand_in in refusing:
+                    on.enter_context(stand_in)
+                on.enter_context(mock.patch.object(news_live, "NewsTrader", mock.Mock(side_effect=AssertionError("must not be built"))))
+                self.assertEqual(news_live.start_checks(self.cfg), (code, why, None))
+                self.assertEqual(self.start(), code)
+            self.assertEqual(self.files(), before, why)                       # no heartbeat, no row, and the book as it was
+        self.assertEqual([line for line in self.out.getvalue().splitlines() if "start refused" in line],
+                         ["[news] start refused: tree_busy (exit 7)", "[news] start refused: book (exit 6)"])
+        self.assertEqual([p for p, _ in self.sent], ["urgent", "urgent"])     # the calendar and the book; a pull says nothing
+
+    def test_the_git_directory_is_the_first_one_above_the_state_directory_also_through_a_gitdir_file(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        real, tree = root / "main" / ".git" / "worktrees" / "wt", root / "wt"
+        state = tree / "ai-trader" / "state"
+        real.mkdir(parents=True); state.mkdir(parents=True)
+        (tree / ".git").write_text(f"gitdir: {real}\n")                      # a linked worktree: the file names its directory
+        self.assertFalse(news_live.tree_busy(state))
+        (real / "MERGE_HEAD").write_text("0" * 40 + "\n")
+        self.assertTrue(news_live.tree_busy(state))
+        (tree / ".git").write_text("gitdir: ../main/.git/worktrees/wt\n")    # a path from the folder that holds the file
+        self.assertTrue(news_live.tree_busy(state))
+        with mock.patch.object(journal, "STATE", state):                      # no start given: the state directory
+            self.assertTrue(news_live.tree_busy())
+        (state / ".git").write_text("not a git file\n")                       # neither a directory nor a gitdir file: not a .git
+        self.assertTrue(news_live.tree_busy(state))
+        (tree / "ai-trader" / ".git").mkdir()                                 # a checkout of its own nearer by: that one decides
+        self.assertFalse(news_live.tree_busy(state))
+        self.assertFalse(news_live.tree_busy())                               # this test's state directory is in no checkout
+
+    def test_a_broken_chain_ends_the_engine_with_4_and_nothing_is_sold(self):
+        hold(self.nt); self.nt.save(); self.prices["BBB"] = 48.0              # under its stop of 48.50
+        journal._path("news_scores.jsonl").write_text('{"hash": "x", "prev_hash": "genesis", "score": 9}\n')
+        self.assertEqual(self.start(), 4)
+        self.assertEqual((journal.read("news_trades.jsonl"), ["hash chain broken" in b for _, b in self.sent]), ([], [True]))
+
+    def test_e1_is_said_again_after_a_send_nobody_took_on_another_day_and_for_another_name(self):
+        hold(self.nt); self.nt.save()
+        journal.append("news_trades.jsonl", BUY_AAA)
+        today = datetime.now(NY).date().isoformat()
+
+        def said(prefix=E1_AAA):
+            return len([b for _, b in self.sent if b.startswith(prefix)])
+
+        def nobody(title, body, cfg, prio="default", **kw):                   # the phone stand-in when no channel takes a line
+            self.sent.append((prio, body))
+            return []
+        with mock.patch.object(news_live.notify, "send", nobody):
+            self.assertEqual(self.start(), 0)
+        self.assertEqual((said(), news_live.read_heartbeat()["mismatch_told"]), (1, None))
+        self.assertEqual(self.start(), 0)                                     # so the next start says it again
+        self.assertEqual((said(), news_live.read_heartbeat()["mismatch_told"]), (2, {"day": today, "symbol": "AAA"}))
+        self.assertEqual((self.start(), said()), (0, 2))                      # told today: not again
+        self.assertEqual(news_live.read_heartbeat()["mismatch_told"], {"day": today, "symbol": "AAA"})   # it stays in the file
+        beat = journal._path("news_heartbeat.json")
+        for left in ({"day": (datetime.now(NY).date() - timedelta(days=1)).isoformat(), "symbol": "AAA"}, "AAA", ["AAA"]):
+            beat.write_text(json.dumps({**news_live.read_heartbeat(), "mismatch_told": left}))
+            before = said()
+            self.assertEqual((self.start(), said() - before), (0, 1), left)   # yesterday's, or no pair at all: said
+        journal.append("news_trades.jsonl", {**BUY_AAA, "symbol": "CCC"})
+        self.assertEqual((self.start(), said("ביומן העסקאות יש קנייה של CCC"), said()), (0, 1, 5))   # another name: its own line
+        self.assertEqual(len([e for e in journal.read("news_errors.jsonl") if e.get("where") == "book_mismatch"]), 7)   # a row per start
+
+    def test_only_a_pair_of_today_is_taken_over_from_the_heartbeat_before(self):   # Review Focus 1
+        today = datetime.now(NY).date()
+        for left, kept in (({"day": today.isoformat(), "symbol": "AAA"}, True),
+                           ({"day": (today - timedelta(days=1)).isoformat(), "symbol": "AAA"}, False),
+                           ("AAA", False), (["AAA"], False), (None, False)):
+            nt = news_live.NewsTrader(self.cfg)
+            nt.adopt_previous({"at": journal.now_utc(), "mismatch_told": left})
+            nt._beat("boot")                                                  # and what it kept is what its own beats say
+            self.assertEqual(news_live.read_heartbeat()["mismatch_told"], left if kept else None, left)
+
+    def test_the_pair_is_in_the_file_as_soon_as_a_channel_took_the_line_also_when_no_step_follows(self):
+        hold(self.nt); self.nt.save()
+        journal.append("news_trades.jsonl", BUY_AAA)
+        self.assertEqual(self.start(until="00:00"), 0)                        # 00:00 has always passed: the loop makes no step
+        b = news_live.read_heartbeat()
+        self.assertEqual((b["phase"], b["step"], b["mismatch_told"]),
+                         ("boot", 0, {"day": datetime.now(NY).date().isoformat(), "symbol": "AAA"}))
+        self.assertEqual((self.start(), len([b for _, b in self.sent if b.startswith(E1_AAA)])), (0, 1))
+
+    def test_a_sale_the_book_does_not_show_is_said_with_its_own_word_and_the_name_stays_under_its_stop(self):
+        hold(self.nt); self.nt.save()
+        journal.append("news_trades.jsonl", {"date": "2026-11-10", "symbol": "BBB", "side": "SELL", "qty": 10, "price": 48.0})
+        self.assertEqual(self.start(), 0)
+        self.assertEqual([p for p, b in self.sent if b.startswith("ביומן העסקאות יש מכירה של BBB")], ["urgent"])
+        b = news_live.read_heartbeat()
+        self.assertEqual((list(b["held"]), b["buys_blocked"]), (["BBB"], "book_mismatch"))   # still held, still looked at
+
+    def test_an_e1_that_cannot_be_built_does_not_cost_the_start(self):
+        news_live.ERRORS_SAID.clear()   # what this process already put in news_errors.jsonl
+        hold(self.nt); self.nt.save(); self.prices["BBB"] = 48.0
+        journal.append("news_trades.jsonl", BUY_AAA)
+        with mock.patch.object(news_live, "owner_line", side_effect=KeyError("supervisor")):
+            self.assertEqual(self.start(), 0)
+        self.assertEqual(journal.read("news_trades.jsonl")[-1]["side"], "SELL")   # the stop was looked at all the same
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")],
+                         [("book_mismatch", "BookMismatch"), ("mismatch_line", "KeyError")])
+
+    def test_a_mismatch_answers_before_the_loss_review_and_a_refused_buy_carries_its_sentence(self):
+        sentence = "התיק לא תואם ליומן העסקאות. עד שסשן הסוחר מיישב את זה אין קניות חדשות. סטופים ומכירות עובדים כרגיל"
+        self.nt.book_mismatch = {"side": "BUY", "symbol": "BBB"}
+        with mock.patch.object(news_live.postmortem, "pending", lambda book: ["a loss with no review"]):
+            self.assertEqual(self.nt._buys_blocked(), ("book_mismatch", sentence))
+        events = self._score(self._item())                                    # a headline that would be bought
+        self.assertEqual((dict(self.nt.book.positions), events), ({}, [f"AAA ציון 9: לא קונים. {sentence}"]))
+        self.nt.book_mismatch = None
+        self.assertIsNone(self.nt._buys_blocked())
+
+    def test_check_prints_a_line_per_check_and_returns_the_first_code_that_fails(self):
+        def check(*stand_ins):
+            """news-live --check: (its code, the lines it printed), with nothing built, written or sent."""
+            before, at = self.files(), len(self.out.getvalue())
+            with contextlib.ExitStack() as on:
+                for stand_in in stand_ins:
+                    on.enter_context(stand_in)
+                on.enter_context(mock.patch.object(news_live, "NewsTrader", mock.Mock(side_effect=AssertionError("must not be built"))))
+                code = cli.main(["news-live", "--check"])
+            self.assertEqual((self.files(), self.sent), (before, []))
+            return code, [line.removeprefix("[news] check ") for line in self.out.getvalue()[at:].splitlines()]
+        ok = ["calendar: ok", "tree_busy: ok", "book: ok", "book_mismatch: ok", "chains: ok"]
+        self.assertEqual(check(), (0, ok))
+        self.assertEqual(check(mock.patch.object(journal, "calendar_covers", lambda day: False)), (5, ["calendar: failed (exit 5)"]))
+        self.assertEqual(check(mock.patch.object(news_live, "tree_busy", lambda start=None: True)),
+                         (7, ok[:1] + ["tree_busy: failed (exit 7)"]))
+        journal.append("news_trades.jsonl", BUY_AAA)
+        self.assertEqual(check(), (6, ok[:2] + ["book: failed (exit 6)"]))
+        hold(self.nt); self.nt.save()
+        code, lines = check()                                                 # a mismatch is printed, and the engine may start
+        self.assertEqual((code, lines[:3], lines[4:], "BUY of AAA" in lines[3]), (0, ok[:3], ok[4:], True))
+        journal._path("news_scores.jsonl").write_text('{"hash": "x", "prev_hash": "genesis", "score": 9}\n')
+        code, lines = check()
+        self.assertEqual((code, lines[4]), (4, "chains: failed (exit 4): news_scores.jsonl"))
+        self.assertFalse(journal._path("news_engine.lock").exists())           # and no lock was ever asked for
+
+    def test_the_command_line_hands_check_to_run_by_keyword(self):
+        got = []
+        with mock.patch.object(news_live, "run", lambda until, minutes, **k: got.append((until, minutes, k)) or 0):
+            self.assertEqual((cli.main(["news-live", "--check"]), cli.main(["news-live", "--minutes", "2"])), (0, 0))
+        self.assertEqual(got, [("16:05", None, {"check": True}), ("16:05", 2.0, {"check": False})])

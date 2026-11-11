@@ -14,6 +14,8 @@
                                           3 not delivered); without --book crypto it refuses (exit 1)
   verify                                  check the tamper-evident hash chains
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
+  news-live --check                       the checks of an engine start and the news hash chains, read-only (no lock, nothing
+                                          written or sent): exit 0, or 5 calendar, 7 git merge in progress, 6 book, 4 chains
   news-score [--n 8]                      score recent headlines without trading (scorer check)
   news-status                             news book, last trades, news scorecard
   news-exit SYMBOL --reason TEXT          ask the news engine to sell a held name at its next live quote (never buys);
@@ -89,6 +91,8 @@ def main(argv=None) -> int:
     nl = sub.add_parser("news-live")
     nl.add_argument("--until", default="16:05", help="New York time to stop")
     nl.add_argument("--minutes", type=float, default=None)
+    nl.add_argument("--check", action="store_true", help="run the start checks and the chain check and exit with their code;"
+                                                         " takes no lock, starts no engine, writes and sends nothing")
     ns = sub.add_parser("news-score")
     ns.add_argument("--n", type=int, default=8)
     ns.add_argument("--minutes", type=int, default=120)
@@ -297,7 +301,7 @@ def _run(a: argparse.Namespace) -> int:
     elif a.cmd == "news-live":
         from .news_live import run
 
-        return run(a.until, a.minutes) or 0  # 3 = another engine holds the book and this one did not start
+        return run(a.until, a.minutes, check=a.check) or 0  # the code says why it ended (news_live.run): 3 = the book is held
     elif a.cmd == "news-score":  # score recent headlines without trading (a check of the scorer)
         from datetime import datetime, timedelta, timezone
 

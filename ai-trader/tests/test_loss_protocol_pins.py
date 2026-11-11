@@ -535,7 +535,7 @@ class OneEngine_(_ChecksOver, g.OneEngine):
                 mock.patch.object(news_live.time, "sleep", lambda s: None), \
                 mock.patch.object(news_live, "code_stamp", lambda: {"commit": "x", "dirty": False, "started": "now"}), \
                 mock.patch.object(news_live, "load_config", lambda: self.cfg), contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(news_live.run("24:00", 1, prime=False), 0)  # "24:00" never comes: the step is reached at any hour
+            self.assertEqual(news_live.run("24:00", 1, prime=False), 4)  # "24:00" never comes: the step is reached at any hour
         self.assertEqual(tried, ["refused", "refused"])  # the engine's own lock is exclusive
 
 
@@ -592,7 +592,7 @@ class NothingSlowBeforeASale_(_ChecksOver, g.NothingSlowBeforeASale):
                 mock.patch.object(news_live.time, "sleep", lambda s: None), \
                 mock.patch.object(news_live, "code_stamp", lambda: {"commit": "abc1234", "dirty": False, "started": "now"}), \
                 mock.patch.object(news_live, "load_config", lambda: self.cfg), contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(news_live.run("24:00", 1, prime=False), 0)  # through the front door; "24:00" never comes
+            self.assertEqual(news_live.run("24:00", 1, prime=False), 4)  # through the front door; "24:00" never comes
         self.assertEqual(journal.load_json("news_heartbeat.json")["code"]["commit"], "abc1234")
 
     def test_what_a_failing_engine_says_of_the_stops_is_what_its_own_steps_saw(self):
@@ -619,7 +619,7 @@ class NothingSlowBeforeASale_(_ChecksOver, g.NothingSlowBeforeASale):
                 on.enter_context(mock.patch.object(news_live.time, "sleep", lambda s: None))
                 if stops:
                     on.enter_context(mock.patch.object(news_live.NewsTrader, "check_stops", stops))
-                self.assertEqual(news_live.run("24:00", 1, prime=False), 0)  # "24:00" never comes
+                self.assertEqual(news_live.run("24:00", 1, prime=False), 4)  # "24:00" never comes
             (alert,) = [body for prio, body in self.sent if "סיבובים ברצף" in body]  # told once: at the first failed round
             return alert
 
@@ -671,7 +671,7 @@ class SaidWhateverHappens_(_ChecksOver, g.SaidWhateverHappens):
                 mock.patch.object(news_live.time, "sleep", lambda s: None), \
                 mock.patch.object(news_live, "code_stamp", lambda: {"commit": "x", "dirty": False, "started": "now"}), \
                 mock.patch.object(news_live, "load_config", lambda: self.cfg), contextlib.redirect_stdout(out):
-            self.assertEqual(news_live.run("24:00", 1, prime=False), 0)  # "24:00" never comes
+            self.assertEqual(news_live.run("24:00", 1, prime=False), 4)  # "24:00" never comes
         self.assertIn("RuntimeError", out.getvalue())
         self.assertIn("SELL 10 BBB", out.getvalue())  # the engine's log still says what was sold
         self.assertEqual([t["side"] for t in journal.read("news_trades.jsonl")], ["SELL"])

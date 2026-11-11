@@ -12,6 +12,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ from pathlib import Path
 from unittest import mock
 from zoneinfo import ZoneInfo
 
+from aitrader import journal
 from aitrader.broker import PaperBroker
 
 TESTS = Path(__file__).resolve().parent
@@ -181,6 +183,97 @@ class EngineLock(Procs):
         self.assertEqual([(t["side"], t["symbol"]) for t in self.rows("news_trades.jsonl")], [("BUY", "BBB")])
         self.assertEqual([r["id"] for r in self.rows("news_scores.jsonl")], ["k1"])
         self.assertEqual([r["priority"] for r in self.sent_rows()], ["high"])
+
+
+# Every git call of the tests below: the user's signing, hooks and identity must not be used.
+GIT_ENV = {**no_phone.clean_env(), "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
+           **{f"GIT_{who}_{what}": "test" for who in ("AUTHOR", "COMMITTER") for what in ("NAME", "EMAIL")}}
+
+
+class PullBesideRestarts(Procs):
+    """The engine beside the trader session's git work in the same checkout (spec 5.4, check 2). A bare "origin", a
+    clone whose ai-trader/state/ is the engine's state directory (a committed book with one position and a trade
+    journal of two rows), and a second clone that pushes what the first one then fetches and merges."""
+
+    def setUp(self):
+        super().setUp()
+        origin, self.clone, self.second = (self.tmp / name for name in ("origin.git", "clone", "second"))
+        self.git(self.tmp, "init", "--bare", "--initial-branch=main", str(origin))
+        self.git(self.tmp, "init", "--initial-branch=main", str(self.clone))
+        self.git(self.clone, "remote", "add", "origin", str(origin))
+        self.state = self.clone / "ai-trader" / "state"   # inside the checkout, as the live state directory is
+        self.state.mkdir(parents=True)
+        self.write_book({"BBB": 50.0})
+        with mock.patch.object(journal, "STATE", self.state):
+            for qty in (6, 4):                            # the last row is a buy the book holds: no mismatch
+                journal.append("news_trades.jsonl", {"date": "2026-11-10", "symbol": "BBB", "side": "BUY", "qty": qty, "price": 50.0})
+        self.commit(self.clone, "notes.txt", "one\n")
+        self.git(self.clone, "push", "origin", "HEAD:main")
+        self.git(self.tmp, "clone", str(origin), str(self.second))
+
+    def git(self, where: Path, *args: str, ok: tuple = (0,)) -> subprocess.CompletedProcess:
+        p = subprocess.run(["git", *args], cwd=where, env=GIT_ENV, capture_output=True, text=True, timeout=30)
+        if p.returncode not in ok:
+            raise AssertionError(f"git {' '.join(args)} in {where.name}: exit {p.returncode}: {(p.stderr or p.stdout)[-400:]}")
+        return p
+
+    def commit(self, where: Path, name: str, text: str) -> None:
+        (where / name).write_text(text)
+        self.git(where, "add", "-A")
+        self.git(where, "commit", "-m", f"{name}: {text.strip()}")
+
+    def merge(self, ok: tuple = (0,)) -> subprocess.CompletedProcess:
+        """The first clone takes what origin has, the way a turn of the trader session does (never a rebase)."""
+        self.git(self.clone, "fetch", "origin", "main")
+        return self.git(self.clone, "merge", "--no-edit", "origin/main", ok=ok)
+
+    def test_a_merge_left_open_refuses_the_start_with_7_and_the_book_is_untouched(self):
+        self.commit(self.second, "notes.txt", "two\n")
+        self.git(self.second, "push", "origin", "HEAD:main")
+        self.commit(self.clone, "notes.txt", "three\n")
+        self.merge(ok=(1,))                              # it stops on the conflict in notes.txt
+        self.assertTrue((self.clone / ".git" / "MERGE_HEAD").exists())
+        book = (self.state / "news_book.json").read_bytes()
+        p = self.start_engine({}, "--minutes", "0.002")
+        self.assertEqual(p.wait(timeout=10), 7)
+        self.assertEqual((self.state / "news_book.json").read_bytes(), book)
+        self.assertIn("[news] start refused: tree_busy (exit 7)", p.stdout.read())
+        self.assertEqual((self.beat(), self.sent_rows()), ({}, []))   # no trader was built, and nobody was told
+        self.git(self.clone, "merge", "--abort")
+        self.assertEqual(self.start_engine({}, "--minutes", "0.002").wait(timeout=10), 0)
+        self.assertEqual(self.beat()["positions"], 1)
+
+    def test_a_restart_loop_beside_a_fetch_and_merge_leaves_book_and_chains_as_they_were(self):
+        held = json.loads((self.state / "news_book.json").read_text())["positions"]
+        # a commit of its own in the first clone, as the trader session has its state commits: each merge below is then
+        # a real merge, which writes MERGE_HEAD for a moment, and a start that falls into that moment answers 7
+        self.commit(self.clone, "mine.txt", "mine\n")
+        go, failed = threading.Semaphore(0), []
+
+        def rounds():
+            try:
+                for n in range(5):
+                    if not go.acquire(timeout=60):
+                        raise AssertionError(f"round {n} was never let go")
+                    self.commit(self.second, "other.txt", f"{n}\n")
+                    self.git(self.second, "push", "origin", "HEAD:main")
+                    self.merge()
+            except BaseException as e:  # noqa: BLE001 - a thread's failure is the test's
+                failed.append(e)
+        beside = threading.Thread(target=rounds, daemon=True)
+        beside.start()
+        codes = []
+        for n in range(10):
+            p = self.start_engine({}, "--minutes", "0.002")
+            if n % 2 == 0:
+                go.release()                             # a round at every second start, while that engine runs
+            codes.append(p.wait(timeout=20))
+        beside.join(timeout=60)
+        self.assertEqual((failed, beside.is_alive(), (self.clone / "other.txt").read_text()), ([], False, "4\n"))
+        self.assertEqual((set(codes) - {0, 7}, 0 in codes), (set(), True), codes)   # every start returned 0 or 7
+        self.assertEqual(json.loads((self.state / "news_book.json").read_text())["positions"], held)
+        with mock.patch.object(journal, "STATE", self.state):
+            self.assertEqual(journal.verify_chain("news_trades.jsonl"), (True, 2))
 
 
 # One forbidden call each, in a process of its own behind the tripwire alone (argv: the tripwire's file, tests/). The

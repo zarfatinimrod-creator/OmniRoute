@@ -7,7 +7,8 @@ Loop every few seconds:
      max_position_pct (5%) of the account per trade, SELL mechanically when price <= entry * (1 - 3%);
   4. every score is logged as a forward-graded prediction (news_predictions.jsonl -> news_grades.jsonl).
   5. what holds a buy back, and nothing here ever holds back a sale: a realized news loss with no review yet
-     (Basic law, item 3), the trader session's hold (news-hold), and an unknown move of the stock today. Three
+     (Basic law, item 3), the trader session's hold (news-hold), a book that did not agree with the trade journal
+     when this engine started (start_checks), and an unknown move of the stock today. Three
      newer checks (no chase, a second look at the headline, no re-buy on the day of a stop) are on trial: with
      news.guards = "log" they only write to news_checks.jsonl what they would have refused.
 
@@ -715,6 +716,9 @@ class NewsTrader:
     def _buys_blocked(self, log: bool = True) -> tuple[str, str] | None:
         """Why the book opens no position right now, as (guard, text for the owner), or None. Sales are never held
         back by any of this. log=False: the heartbeat's look every step, which must not fill the error journal."""
+        if getattr(self, "book_mismatch", None):  # start check 4: this process opens nothing on a book it cannot trust
+            return ("book_mismatch", "התיק לא תואם ליומן העסקאות. עד שסשן הסוחר מיישב את זה אין קניות חדשות."
+                                     " סטופים ומכירות עובדים כרגיל")
         if self.n["block_buys_until_loss_reviewed"]:  # Basic law, item 3: a loss is studied before money is risked again
             try:
                 if postmortem.pending("news"):
@@ -1419,15 +1423,19 @@ class NewsTrader:
 
     def adopt_previous(self, prev: dict | None) -> None:
         """What the engine process before this one left in its last heartbeat, taken over before this process writes
-        its own first beat (which would write over it). Two things, and neither may cost the start: a file that
+        its own first beat (which would write over it). Three things, and none may cost the start: a file that
         cannot be used costs only what it held.
         The last stop look: until this process has looked at the stops itself, the run before's stamp is the one the
         catch-up reads the minute bars from and the one every beat repeats. With no heartbeat, or none with a stamp
         that can be read, it is the last point of the equity curve.
         The blind clocks: a held name that had no live quote keeps the time it went blind and whether the owner was
         told, when the heartbeat is of today (New York). A restart does not put the alert off by another window and
-        does not send it twice, and "the price is back" still follows an alert that was delivered."""
+        does not send it twice, and "the price is back" still follows an alert that was delivered.
+        The mismatch already said: {"day", "symbol"} of a line E1 that a channel took today (New York), so that the
+        day's later starts do not say it again (_run). One of another day is dropped."""
         prev = prev or {}
+        told = prev.get("mismatch_told")
+        self._mismatch_told = told if isinstance(told, dict) and told.get("day") == datetime.now(NY).date().isoformat() else None
         try:
             self._prev_look = _utc(prev["stops_checked_at"])
         except Exception:  # noqa: BLE001
@@ -1480,9 +1488,86 @@ class NewsTrader:
                 "blind": list(blind),
                 "blind_since": {sym: v[0].astimezone(timezone.utc).isoformat() for sym, v in blind.items()},
                 "blind_told": [sym for sym, v in blind.items() if v[1]],
-                "told_through": None, "mismatch_told": None, "supervised": False})
+                "told_through": None, "mismatch_told": getattr(self, "_mismatch_told", None), "supervised": False})
         except Exception as e:  # noqa: BLE001
             self._note_error(e, "heartbeat")
+
+
+def tree_busy(start: Path | None = None) -> bool:
+    """Is a merge or a rebase half done in the checkout that holds `start` (default: the state directory)? Then git is
+    in the middle of changing the files under the engine. A look at files only, no git command: from `start` upward
+    to the first .git - a directory, or the "gitdir: <path>" file of a worktree, which names the directory - and true
+    when that holds rebase-merge, rebase-apply or MERGE_HEAD. It starts at the state directory and never at this
+    package: a run on a state directory elsewhere must not answer for the checkout the code happens to lie in."""
+    here = Path(journal.STATE if start is None else start).resolve()
+    for folder in (here, *here.parents):
+        git = folder / ".git"
+        if git.is_file():
+            named = git.read_text(encoding="utf-8", errors="replace").strip()
+            if not named.startswith("gitdir:"):
+                continue
+            git = folder / named[len("gitdir:"):].strip()
+        elif not git.is_dir():
+            continue
+        return any((git / mark).exists() for mark in ("rebase-merge", "rebase-apply", "MERGE_HEAD"))
+    return False
+
+
+def start_checks(cfg: dict) -> tuple[int, str, dict | None]:
+    """What a start has to know before the trader is built (supervisor spec 5.4), as (exit code, the check that
+    refused, a book mismatch). It only reads and decides: it sends nothing and writes nothing, and its caller acts
+    (_run for a start, _check for news-live --check). In this order:
+      5 "calendar"   config.json's calendar does not cover today: every day would read as closed, and no stop be checked.
+      7 "tree_busy"  a merge or a rebase is half done in the checkout (tree_busy).
+      6 "book"       news_book.json cannot be read as a book, or it is not there while news_trades.jsonl has rows: an
+                     engine that started here would fail on the file, or put a new and empty book in its place.
+      0 and {"side", "symbol"}: the last readable row of news_trades.jsonl is a BUY of a name the book does not hold,
+                     or a SELL of a name it still holds in the same quantity. The journal is written before the book,
+                     and the engine was killed between the two. The start goes on, on the book there is.
+      0 and None     nothing in the way.
+    `cfg` is not read today: the calendar is config.json's own (journal.calendar_covers)."""
+    if not journal.calendar_covers(datetime.now(NY).date()):
+        return 5, "calendar", None
+    if tree_busy():
+        return 7, "tree_busy", None
+    trades = [t for t in journal.read("news_trades.jsonl") if isinstance(t, dict)]  # a torn or foreign line is no row
+    try:
+        book = journal.load_json("news_book.json")
+    except Exception:  # noqa: BLE001 - OSError, bad JSON: whatever is wrong with the file, it is not to be built on
+        return 6, "book", None
+    if book is None:  # no file: a first start, unless trades were made on a book that is gone
+        return (6, "book", None) if trades else (0, "", None)
+    held = book.get("positions") if isinstance(book, dict) else None
+    if not isinstance(held, dict):
+        return 6, "book", None
+    last = trades[-1] if trades else {}
+    side, sym = last.get("side"), last.get("symbol")
+    if isinstance(sym, str):
+        pos = held.get(sym)
+        if (side == "BUY" and pos is None) or (side == "SELL" and isinstance(pos, dict) and pos.get("qty") == last.get("qty")):
+            return 0, "", {"side": side, "symbol": sym}
+    return 0, "", None
+
+
+def _check() -> int:
+    """news-live --check: the checks of a start and then the chain check, with no lock, no trader, nothing written and
+    nothing sent. One line per check; the code of the first one that fails (5, 7, 6, 4), else 0. A book mismatch is
+    printed and is no failure: the engine starts on it. The chains are read here although a start reads them in its
+    first step: whoever clears a halt on this command's 0 must not clear one over a journal that is still broken."""
+    code, why, mismatch = start_checks(load_config())
+    for name in ("calendar", "tree_busy", "book"):
+        if name == why:
+            break
+        print(f"[news] check {name}: ok")
+    if code:
+        print(f"[news] check {why}: failed (exit {code})")
+        return code
+    print("[news] check book_mismatch: " + (
+        f"the last row of news_trades.jsonl is a {mismatch['side']} of {mismatch['symbol']} that news_book.json does not"
+        " show: the engine starts, checks its stops and opens no position" if mismatch else "ok"))
+    bad = journal.broken_chains(journal.NEWS_CHAINED)
+    print("[news] check chains: " + ("failed (exit 4): " + ", ".join(bad) if bad else "ok"))
+    return 4 if bad else 0
 
 
 def _lock_holder(lock) -> tuple:
@@ -1496,12 +1581,16 @@ def _lock_holder(lock) -> tuple:
         return "unknown", "unknown"
 
 
-def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool = True) -> int:
+def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool = True, check: bool = False) -> int:
     """One engine per book: two would trade it twice and interleave the chained journals. The lock is held for the
     life of the loop and freed when it ends, however it ends (a killed engine leaves no lock behind). The holder
     writes its pid and start time into the lock file: for the start it refuses, and for whoever asks who is running.
     Returns what the loop returns, or 3 when another engine holds the book and this one did not start: the caller
-    must not take that for a run."""
+    must not take that for a run. The codes: 0 the clock reached the end, 3 the lock is held, 4 a broken journal,
+    5 the calendar does not cover today, 6 the book cannot be read, 7 a merge or rebase in progress.
+    check=True (news-live --check) starts nothing and takes no lock: _check."""
+    if check:
+        return _check()
     with open(journal._path("news_engine.lock"), "a+") as lock:  # "a+": a refused start leaves the holder's name in the file
         locked = True
         try:
@@ -1523,8 +1612,20 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
 
 def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool = True) -> int:
     cfg = load_config()
+    code, why, mismatch = start_checks(cfg)  # before the trader is built: a book that cannot be read is not built on
+    if code == 5:
+        notify.send("AI Trader - תקלה", f"config.json calendar does not cover {datetime.now(NY).year}: the news engine"
+                    " treats every day as closed: it will not trade and will NOT check stops on open news positions until the"
+                    " NYSE holidays are added (כסף נייר)", cfg, "urgent")
+        return code
+    if code:
+        print(f"[news] start refused: {why} (exit {code})", flush=True)
+        if code == 6:  # said here: no parent process exists yet to say it, and a start made again would refuse in silence
+            notify.send("AI Trader - תקלה", owner_line(cfg, "R5d"), cfg, "urgent")
+        return code
     nt = NewsTrader(cfg)
     nt.locked = locked  # in every heartbeat: False = this engine runs with no lock on the book
+    nt.book_mismatch = mismatch  # not None: the stops of the book there is are checked, and no position is opened
     nt.adopt_previous(read_heartbeat())  # what the process before this one left, before this one writes over it
     nt._beat("boot")  # before git and priming: a slow start is not taken for a hang
     nt.code = code_stamp()
@@ -1534,15 +1635,27 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
         nt.poll_headlines(prime=True)
         nt.save()
         print(f"[news] primed {len(nt.seen)} existing headlines")
-    if not journal.calendar_covers(datetime.now(NY).date()):
-        notify.send("AI Trader - תקלה", f"config.json calendar does not cover {datetime.now(NY).year}: the news engine"
-                    " treats every day as closed: it will not trade and will NOT check stops on open news positions until the"
-                    " NYSE holidays are added (כסף נייר)", cfg, "urgent")
     if not locked:  # said once per start. A line that cannot be built or sent must not cost the book its only engine
         try:
             notify.send("AI Trader - תקלה", owner_line(cfg, "E2"), cfg, "urgent")
         except Exception as e:  # noqa: BLE001
             error_once("lock_line", e)
+    if mismatch:  # on record at every start; said once per New York day and name, not at each of the day's launches
+        try:
+            journal.append("news_errors.jsonl", {
+                "at": journal.now_utc(), "error": "BookMismatch",
+                "detail": f"the last row of news_trades.jsonl is a {mismatch['side']} of {mismatch['symbol']} that"
+                          " news_book.json does not show: no position is opened by this process", "where": "book_mismatch"})
+        except Exception:  # noqa: BLE001 - a record that cannot be written must not cost the start either
+            pass
+        try:
+            told = {"day": datetime.now(NY).date().isoformat(), "symbol": mismatch["symbol"]}
+            if nt._mismatch_told != told and notify.send("AI Trader - תקלה", owner_line(
+                    cfg, "E1", side=ownerlines.WORDS["E1.side"][mismatch["side"]], sym=mismatch["symbol"]), cfg, "urgent"):
+                nt._mismatch_told = told  # only once a channel took it: a line nobody got is said by the next start
+                nt._beat("boot")  # into the file at once, for the next start to read
+        except Exception as e:  # noqa: BLE001 - as above: the stops of the book there is still need this engine
+            error_once("mismatch_line", e)
     hh, mm = (int(x) for x in until_ny.split(":"))
     t0 = time.time()
     fails = 0
@@ -1559,6 +1672,7 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
         except ChainBroken as e:  # not survivable: stop trading and tell the owner
             print(f"[news] {e}", flush=True)
             notify.send("AI Trader - תקלה", f"{e} (כסף נייר)", cfg, "urgent")
+            code = 4  # for whoever started this engine: not a day that ended, and not to be started again as it is
             break
         except Exception as e:  # noqa: BLE001 - the loop must survive a bad cycle; the error is logged, not hidden
             print(f"[news] cycle error: {type(e).__name__}: {str(e)[:200]}", flush=True)
@@ -1577,4 +1691,4 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
     # lock is held until this returns, and no stop is looked at meanwhile); after the close one call's time is given
     nt.drain_trial(wait=0 if market_open_now() else nt.n["verify_timeout_seconds"])
     print("[news] stopped", flush=True)
-    return 0
+    return code
