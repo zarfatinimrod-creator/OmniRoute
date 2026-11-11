@@ -4,6 +4,8 @@ __pycache__/
 state/news_heartbeat.json
 state/news_seen.json
 state/news_engine.lock
+# journal.save_json / write_all write <name>.tmp beside the file and rename it over; both books (state/crypto/ too)
+state/**/*.tmp
 # time-machine run records (~1.2 MB gzip per registered sweep): same-machine working files; trials.jsonl keeps the hashes
 state/trial_runs/
 state/crypto/trial_runs/

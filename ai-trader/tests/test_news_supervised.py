@@ -1659,3 +1659,18 @@ class GateFollowUps(_Engine):
         for words in ("SIGTERM", "143", '"stopping"', "kill -9", "E1 (התיק לא תואם ליומן העסקאות)",
                       "python3 -m aitrader verify", "כסף נייר"):
             self.assertIn(words, section, words)
+
+    # 9. the temporary file of an atomic save (review m9 of step 1, in the ledger's 9b list)
+    def test_the_temporary_file_of_an_atomic_save_is_never_a_file_git_takes_in_either_book(self):
+        here = Path(tempfile.mkdtemp())                       # a repository of its own holding only this .gitignore
+        self.addCleanup(shutil.rmtree, here, True)
+        shutil.copy(Path(__file__).resolve().parents[1] / ".gitignore", here / ".gitignore")
+        env = no_phone.clean_env(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1")
+        subprocess.run(["git", "init", "-q"], cwd=here, env=env, check=True, capture_output=True, timeout=30)
+
+        def ignored(path):
+            return subprocess.run(["git", "check-ignore", "-q", path], cwd=here, env=env, timeout=30).returncode == 0
+
+        tmp = Path("news_heartbeat.json").with_suffix(".tmp").name   # what journal.save_json writes beside the file
+        self.assertEqual([ignored(p) for p in (f"state/{tmp}", f"state/crypto/{tmp}")], [True, True])
+        self.assertEqual([ignored(p) for p in ("state/news_book.json", "state/crypto/trials.jsonl")], [False, False])
