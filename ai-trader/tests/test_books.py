@@ -37,7 +37,7 @@ CRYPTO_MARKET = {
     "calendar": "utc_daily", "periods_per_year": 365, "history": "max", "vix": False, "earnings_blackout": False,
     "overlays": False, "corporate_actions": False, "news_engine": False, "fill_regime_on_no_picks": True,
     "equity_mark_per_bar": True, "delete_proposal_on_decision": True, "grading": "absolute",
-    "stale_skips_run": True, "close_source": "next_open", "coinbase_guard_pct": 0.01, "report_dir": "reports/crypto",
+    "stale_skips_run": True, "close_source": "yahoo", "coinbase_guard_pct": 0.01, "report_dir": "reports/crypto",
     "intraday_alert_pct": 0.08, "latest_max_age_hours": 26, "state_subdir": "crypto", "etf_groups": [],
     "quiet_hours": {"tz": "Asia/Jerusalem", "from": "23:00", "to": "08:00"},
     "revised_close_alert_bps": 5,  # ruling R6 (Task 6): crypto only
@@ -99,7 +99,7 @@ class Profiles(unittest.TestCase):
         self.assertEqual(data.load_config()["risk"], raw["risk"])
 
     def test_crypto_universe_and_priors(self):
-        c = data.load_config("crypto")
+        c = data.load_config("crypto", "crypto")
         self.assertEqual(set(c["universe"]), {"BTC-USD", "ETH-USD"})
         self.assertEqual(set(c["prior_weights"]), set(REGISTRY))
         self.assertAlmostEqual(sum(c["prior_weights"].values()), 1.0, delta=1e-3)
@@ -109,7 +109,10 @@ class Profiles(unittest.TestCase):
         self.assertEqual(set(c["signals"]), set(REGISTRY))  # replaced whole, every registered signal explicit
         self.assertEqual((c["signals"]["tsmom"], c["signals"]["trend"], c["signals"]["breakout"]),
                          ({"lookback": 365, "skip": 30}, {"fast": 50, "slow": 200}, {"lookback": 80}))
-        self.assertEqual(c["market"], CRYPTO_MARKET)
+        market = dict(c["market"])
+        # Task 11 revised-close check (research/2026-11-11-crypto-revised-close.md): the open moved, so yahoo
+        self.assertIn("the open moved", market.pop("close_source_note"))
+        self.assertEqual(market, CRYPTO_MARKET)
         self.assertEqual(c["costs"], {"slippage_bps": 5, "commission_per_share": 0.0, "fee_bps": 50,
                                       "exec_delay_bps": 10, "qty_step": 1e-6})
         self.assertEqual({k: c["learning"][k] for k in ("enabled", "default_horizon", "horizons_days")},
@@ -118,7 +121,8 @@ class Profiles(unittest.TestCase):
         self.assertEqual(c["risk"]["max_position_pct_by_symbol"], {"BTC-USD": 1.0, "ETH-USD": 0.6, "XRP-USD": 0.6})
         self.assertNotIn("books", c)
         ship = raw_config()["books"]["crypto"]["ship_profile"]
-        self.assertEqual(c, data.load_config("crypto", ship))  # the profile defaults to ship_profile
+        self.assertEqual(ship, "crypto_base")  # Task 11: the sweep of 2026-11-11 shipped crypto_base (state/crypto/dsr.json)
+        self.assertEqual(data.load_config("crypto"), data.load_config("crypto", ship))  # the profile defaults to ship_profile
 
     def test_crypto_risk_lists_every_key(self):
         books = raw_config()["books"]
@@ -148,7 +152,7 @@ class Profiles(unittest.TestCase):
         self.assertEqual(b["risk"]["target_vol_annual"], 0.30)
 
     def test_account_merge(self):
-        c = data.load_config("crypto")
+        c = data.load_config("crypto", "crypto")
         self.assertEqual(c["account"]["cash_yield_annual"], 0)
         self.assertEqual(c["account"]["starting_cash"], 100000)
         self.assertIs(c["account"]["paper_only"], True)  # key by key: the rest of the stock block stays

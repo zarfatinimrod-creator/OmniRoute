@@ -399,10 +399,14 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     last_reb = m.state.get("last_rebalance")
     days_since = (close.index.get_loc(dec) - close.index.get_loc(pd.Timestamp(last_reb))) if last_reb and pd.Timestamp(last_reb) in close.index else 10**6
     risk_changed = (prev_regime is not None and prev_regime != diag.get("regime")) or (prev_dd is not None and prev_dd != diag.get("dd_state"))
-    due = force_rebalance or days_since >= r.get("rebalance_every_days", 5) or risk_changed or diag.get("dd_state") == "flat"
-    stopped = diag.get("stopped", [])
     old = (journal.load_json("pending.json") or {}) if utc else {}
     expiring = old.get("status") == "pending" and old.get("decision_date") != ds  # decision 12: unfilled, replaced now
+    # An expiring order never traded, but the regime and drawdown state it acted on were saved when it was decided,
+    # so risk_changed cannot see them again: the decision that replaces it is a full one, never exits-only (which
+    # would hold a book that a regime-off order had to sell). A proposal for an already decided date repeats it.
+    redo = expiring or (old.get("decision_date") == ds and bool(old.get("rebalance")))
+    due = force_rebalance or days_since >= r.get("rebalance_every_days", 5) or risk_changed or diag.get("dd_state") == "flat" or redo
+    stopped = diag.get("stopped", [])
     carried = sh_carried = []
     if expiring:  # basic law, never wait out a stop: what the expiring order had to sell is sold at the next fill
         sells = set(old.get("stopped") or [])
