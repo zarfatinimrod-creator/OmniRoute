@@ -170,6 +170,12 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
      (which rows, in which file, from which date). The critic's verdict must again say that the diff touches no file
      on the list above. A change that touches the stock book, or any file on that list, still gets the sweep before
      and after.
+   - **Owner's third ruling (Nimrod, 2026-11-11), the general rule:** the two rulings above hold for every change,
+     not only for the news engine. A change that touches no file on the list above (the dashboard publisher and its
+     `dashboard_push` config block, the supervisor, the alerts, the page) skips the sweep and is gated by the
+     quant-critic and the unit suite; a change to a trading rule adds its forward measurement. The critic's verdict
+     always says whether the diff touches a file on the list. Only a change that touches the stock book, or a file
+     on the list, gets the sweep before and after.
 5. **Assumptions live in `config.json`.** Never hard-code a number in the logic.
 6. **Evidence discipline.** Every number in a report or lesson cites where it came from (a file in
    `state/`, a backtest run, or a URL). Never present an estimate as a measurement. Never claim the bot
