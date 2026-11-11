@@ -12,6 +12,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
@@ -1241,14 +1242,15 @@ class FollowUps(_Engine):
         journal.append("news_trades.jsonl", {**BUY_AAA, "date": datetime.now(NY).date().isoformat()})
         journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})   # nobody was told of it
         self.cfg["universe"] = {f"S{i:02d}": "Tech" for i in range(30)}
-        seen = []
+        seen, returned, priming = [], [], []         # returned: the count read by each feed call as it returns
 
         def mark():
             seen.append(self.writes())
 
-        def feed(sym):                                # a feed call takes a moment, as a real one does: two feeds asked
-            mark()                                    # side by side would both see the same count
+        def feed(sym):                                # a feed call takes a moment, as a real one does
+            mark()
             threading.Event().wait(0.005)
+            returned.append(self.writes())
             return []
         price = news_live.live_price
         news_live.live_price = lambda sym: mark() or price(sym)
@@ -1256,9 +1258,41 @@ class FollowUps(_Engine):
         # and no channel takes a line, so that no beat of a delivered one (_mark_told) stands in for the beat after a send
         news_live.notify.send = lambda title, body, cfg, prio="default", **kw: mark() or []
         self.stamp, self.feed = lambda: mark() or {"commit": "abc1234", "dirty": False, "started": "now"}, feed
-        self.assertEqual(self.start(locked=False, prime=True), 0)
+        poll = news_live.NewsTrader.poll_headlines
+
+        def primed(nt, prime=False):                  # the count before the priming poll and the count once it returned
+            before = self.writes()
+            got = poll(nt, prime=prime)
+            priming.append((before, self.writes()))
+            return got
+        with mock.patch.object(news_live.NewsTrader, "poll_headlines", primed):   # start()'s priming poll calls it
+            self.assertEqual(self.start(locked=False, prime=True), 0)
         self.assertEqual(len(seen), 3 + 1 + 30)       # three sends, code_stamp, thirty feed calls
-        self.assertEqual(seen, sorted(set(seen)))     # a beat between any two of them
+        self.assertEqual(seen[:4], sorted(set(seen[:4])))   # a beat between any two of the sends and git
+        self.assertGreater(min(seen[4:]), seen[3])    # and between git and the first feed call
+        # the feeds are asked side by side: at least one beat per feed call while the priming poll runs, and one after
+        # the last feed call returned
+        (before, after), = priming
+        self.assertGreaterEqual(after - before, 30)
+        self.assertLess(max(returned), after)
+
+    def test_priming_asks_its_feeds_in_parallel(self):
+        self.nt.universe = [f"S{i:02d}" for i in range(16)]
+        writers, beat = [], self.nt._beat             # writers: the thread that wrote each beat
+
+        def feed(sym, session):                       # 0.2 s a feed call: one at a time, 16 of them take 3.2 s
+            threading.Event().wait(0.2)
+            return []
+
+        def counted(phase):
+            writers.append(threading.current_thread())
+            beat(phase)
+        before, t0 = self.writes(), time.monotonic()
+        with mock.patch.object(news_live, "_feed", feed), mock.patch.object(self.nt, "_beat", counted):
+            self.nt.poll_headlines(prime=True)
+        self.assertLess(time.monotonic() - t0, 1.6)   # eight at a time: about 0.4 s
+        self.assertGreaterEqual(self.writes() - before, 16)
+        self.assertEqual(set(writers), {threading.current_thread()})   # every beat from this thread, none from a worker
 
     def test_rows_of_the_run_before_are_left_to_the_late_line(self):
         # one SELL row of today on disk, heartbeat with told_through None; this run trades nothing

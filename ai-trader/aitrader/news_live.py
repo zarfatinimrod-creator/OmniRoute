@@ -40,7 +40,7 @@ import sys
 import tempfile
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -752,14 +752,12 @@ class NewsTrader:
         """The fresh headlines not seen before. Every other new one is too old to act on and leaves a "stale" row;
         prime=True (the first start) marks everything already out as seen under ONE summary row."""
         t0, h = time.monotonic(), self._tally()  # before the feeds are asked: a first window covers its first poll
-
-        def fed(sym):  # the priming poll of a start asks one feed at a time and beats after each: a start whose feeds
-            got = _feed(sym, self.session)  # are slow is busy, not hung (a step's poll has its one beat after the poll)
-            if prime:
-                self._beat(self._phase)
-            return got
-        with ThreadPoolExecutor(max_workers=1 if prime else 8) as ex:
-            batches = list(ex.map(fed, self.universe))
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            asked = [ex.submit(_feed, s, self.session) for s in self.universe]
+            if prime:  # this thread, never a worker, beats after each feed call it gets back: a start whose feeds are
+                for _ in as_completed(asked):  # slow is busy, not hung (a step's poll has its one beat after the poll)
+                    self._beat(self._phase)
+            batches = [f.result() for f in asked]
         answered = sum(b is not None for b in batches)
         h["poll_s"].append(time.monotonic() - t0)
         h["feeds_min"] = answered if h["feeds_min"] is None else min(h["feeds_min"], answered)
