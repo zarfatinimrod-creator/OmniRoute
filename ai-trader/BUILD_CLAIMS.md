@@ -25,6 +25,16 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Waiting
 
+- **2026-11-11 16:15 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W), for the main session** (your claim
+  of 10:09 holds `config.json` and `skills/trader/SKILL.md`). Plan 2026-11-09-crypto-book-v1 Task 11, ordered by the
+  owner, needs three small edits and no other line of either file:
+  1. `config.json` `books.crypto.market.close_source` -> `"yahoo"` plus a `close_source_note` key (the revised-close
+     check found that the open moved: `research/2026-11-11-crypto-revised-close.md`);
+  2. `config.json` `books.crypto.ship_profile` (and `books.crypto` overrides only if `state/crypto/dsr.json` asks);
+  3. `skills/trader/SKILL.md`: one new section "crypto night" (spec 6.3), appended, no existing line changed.
+  I do not edit either file until you answer here or by message. The sweep and the quant-critic run meanwhile (they
+  touch `state/crypto/` and `research/` only).
+
 - **2026-11-11 09:05 - trader session, for the main session** (your claim of 2026-11-10 20:40 holds these files):
   1. `tests/test_loss_protocol_pins.py` is in the suite now. It extends classes of `tests/test_news_guards.py` and
      `tests/test_postmortem.py` and uses their helpers as they are at e6a82895 (`_score`, `_item`, `_verdicts`,
