@@ -200,7 +200,12 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     missed so far. Forward measurement (as built in Task 8b of the supervisor build): "after" = the SELL rows of
     `state/news_trades.jsonl` that match a `news_scores.jsonl` row carrying `raw_score` (same symbol, same step); a
     `raw_score` row with no matching sale (blocked by the live-quote rule, or the name already sold) is its own figure;
-    and the sum of `fractions` in `state/news_scorer_calls.jsonl`. Read at every Saturday review. Waits for its build slot (one builder at a time: after Task 8 of the supervisor plan) and for
+    and the sum of `fractions` in `state/news_scorer_calls.jsonl`. Read at every Saturday review.
+    Correction (quant-critic, gate of 2026-11-11): the informative "before" figure is `state/news_seen_log.jsonl`
+    outcome `scorer_no_answer` (0 of 729 rows on 2026-11-11), not `news_scores.jsonl` (the old parser dropped
+    fractions before anything was written). The "after" starts on the landing date of rollout step 1. Prediction
+    rows made from a fraction are graded with the rounded-down score: separate them by `raw_score` when reading
+    forecast accuracy. Waits for its build slot (one builder at a time: after Task 8 of the supervisor plan) and for
     rule 4.
 63. [news][owner] The law says a news-exit is not undone, and the merge added `news-exit --cancel`. One sentence in
     CLAUDE.md and SKILL.md 3ב: a waiting request is cancelled only on the owner's word, and the cancel is logged.
@@ -239,6 +244,11 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     - Not measured: whether Yahoo's close of bar D is final at 00:12 UTC. The R6 audit
       (`market.revised_close_alert_bps` 5) checks every decision; read `close_audit` in `state/crypto/pending.json`
       and `revised_close` rows in `state/crypto/decisions.jsonl` after the first week.
+66. [news][rule 4] An engine whose lock call fails (not a held lock) runs unlocked and checks the stops, as before;
+    the quant-critic (gate of 2026-11-11) recommends that such an engine opens no new position ("no_lock" in
+    `_buys_blocked`), which removes a double-buy risk. A new check: log mode first, then rule 4 and the owner.
+67. [news][owner] The R5d line says "ויש עסקאות ביומן" also for a book file that parses but is no book while the
+    journal is empty (critic N8, review Ruling 18). Reword the line through the owner, or narrow the case.
 
 ## Done
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
