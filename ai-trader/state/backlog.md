@@ -221,6 +221,8 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     public). Until it exists nothing calls the SEC. Next: the design spec (being written from the roadmap), his
     approval, a plan, then the build in the one-at-a-time queue. The source moves no money until it has a forward
     record and passes rule 4 (Basic law 2, item 3).
+    **Spec approved by the owner on 2026-11-11 (answer א):** `research/specs/2026-11-11-sec-filings-feed-design.md`.
+    Next: its implementation plan; the build joins the one-at-a-time queue after the supervisor and the trading room.
 66. [crypto][gate] Deferred by the quant-critic at the go-live gate of 2026-11-11 (PASS, round 2;
     `logs/2026-11-11-crypto-go-live.md`). None is blocking for paper.
     - N1: after an expired order the next decision is a full rebalance even when the expired one was exits-only
