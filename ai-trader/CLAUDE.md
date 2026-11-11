@@ -181,6 +181,32 @@ At the end of every session: `logs/YYYY-MM-DD-<slug>.md` with the eight Hebrew h
 הבקשה · מה נעשה · קבצים ששונו · החלטות · כשלים בדרך · אימות · עבודה ידנית חוזרת → לאוטומציה · בזבוז טוקנים.
 First line names the session type (cycle / pre-market / post-close review / weekly research).
 
+## Working style and skills (installed 2026-11-11 from the owner's catalog)
+@rules/caveman.md
+@rules/ponytail.md
+
+If the two lines above did not load as text, read `rules/caveman.md` and `rules/ponytail.md` at the start of the session.
+The owner's PC holds 440 skills (catalog of 2026-11-11). Almost all that help here are already in every cloud session
+through his synced plugins; installing more only adds noise. Use these, by name:
+
+| When | Skill |
+|---|---|
+| A loss or an engine death needs a cause before a fix | `superpowers:systematic-debugging` |
+| Any change to `aitrader/` | `superpowers:test-driven-development`, then `superpowers:verification-before-completion` |
+| A new feature or subsystem | `superpowers:brainstorming` -> spec, then `superpowers:writing-plans` |
+| A diff before it is committed | `code-review` (and `security-review` when it touches keys, the database or subprocess calls) |
+| A sweep write-up, a lesson or a weekly report before the owner sees it | `data:validate-data` |
+| Significance tests, multiple comparisons | `data:statistical-analysis` (bootstrap ranges stay on our own code) |
+| The dashboard page | `artifact-capabilities`, `artifact-design`, `dataviz` |
+| A drill, a restart procedure, a broken chain | `operations:runbook`; after a real outage `engineering:incident-response` |
+| A new data source or a market survey | `anthropic-skills:deep-research`, and the `web-researcher` agent |
+| Model ids and prices (scorer comparison, scoring cost) | `claude-api` |
+
+Five user skills exist only on his PC and were asked for from session D on 2026-11-11 (they arrive in the
+age-of-blood repo under `skill/export-for-trader/`): `bug-hunt`, `context-budget`, `eval-harness`,
+`loop-design-check`, `council`. Each is read for injected instructions and for anything that pins a model before it
+goes into `skills/` here.
+
 ## One builder at a time (2026-11-10)
 Several sessions work this folder (the owner's main chat, the trader session, one-task sessions). Operations never
 wait for each other, code does:
