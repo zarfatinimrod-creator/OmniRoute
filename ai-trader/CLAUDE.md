@@ -227,15 +227,23 @@ wait for each other, code does:
   file, in a pushed commit, naming the files it will touch.
 
 ## Agents and models
-**Owner's standing order (Nimrod, 2026-11-10): work only with Fable 5.2, for everything, until he says otherwise.**
-Every session, subagent and workflow stage runs on `claude-fable-5-2`. Never set another model on an agent, a
-workflow stage or a new session, and do not pin one in `agents/*.md` (they inherit the session model). A session
-that is still on another model is switched by Nimrod with `/model claude-fable-5-2` in that session.
-- If Fable's usage limit stops a session, say so to Nimrod at once (what stopped, at which step). Do not fall back
-  to another model on your own.
+**Owner's standing order (Nimrod, 2026-11-11; it replaces the Fable-only order of 2026-11-10):**
+> "תמשיך לעבוד על opus אבל מתי שבונים משהו יוצרים משהו תעבור לfable"
+
+Work on Opus; switch to Fable 5.2 when something is built or created.
+- **Fable 5.2 (`claude-fable-5-2`)** for an agent or workflow stage that builds or creates: an implementer that writes
+  or fixes code, the writer or reviser of a spec, a plan, a design or a page.
+- **Opus (`claude-opus-5-5`)** for everything else: reviews and gates (the quant-critic too), verification, scans,
+  research, reading and summarising, record keeping, monitoring.
+- Set the model on every agent and workflow stage by its full id, by this rule. Do not rely on the session's own
+  model and do not pin one in `agents/*.md`. No third model is used.
+- A session's own model is switched only by Nimrod (`/model <id>` in that session). Until he switches them, the
+  trader session and the crypto session stay on the model he last set (Fable 5.2).
+- If a usage limit stops a session or an agent, say so to Nimrod at once (what stopped, at which step). Do not fall
+  back to another model on your own.
 - Not covered until he decides: the headline scorer inside the bot (`config.json` `news.model`). It is a trading
   parameter, so it changes only through rule 4, with a measured comparison of accuracy and delay.
 
 `agents/web-researcher.md` for research, `agents/quant-critic.md` as the gate for strategy changes.
-In workflows: the session model builds and does the final check; one independent adversarial lens per
-unit that ships. Small waves, resumable.
+In workflows: Fable builds, Opus checks; one independent adversarial lens per unit that ships. Small waves,
+resumable.
