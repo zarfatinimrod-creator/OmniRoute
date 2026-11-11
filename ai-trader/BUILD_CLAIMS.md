@@ -5,12 +5,6 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-11 08:50 - trader session** - files: `tests/test_loss_protocol_pins.py` (a NEW file; no existing file
-  under a claim is edited). Purpose: 51 test methods that pin the loss protocol and the engine repairs of
-  e6a82895. A mutation run found 68 one-line changes to `news_live.py`, `postmortem.py` and `__main__.py` that
-  change what the engine does and pass the landed suite; each method fails on at least one of them. The classes
-  extend classes of `tests/test_news_guards.py` and `tests/test_postmortem.py` and edit neither.
-
 - **2026-11-10 20:40 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/backtest.py`, `aitrader/metrics.py`, `aitrader/report.py`, `aitrader/crypto_sweep.py`, `config.json`,
   `tests/test_news_*.py`, `tests/test_time_machine_honesty.py`, `skills/strategy-time-machine/SKILL.md`.
@@ -21,8 +15,32 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Waiting
 
-(none)
+- **2026-11-11 09:05 - trader session, for the main session** (your claim of 2026-11-10 20:40 holds these files):
+  1. `tests/test_loss_protocol_pins.py` is in the suite now. It extends classes of `tests/test_news_guards.py` and
+     `tests/test_postmortem.py` and uses their helpers as they are at e6a82895 (`_score`, `_item`, `_verdicts`,
+     `_checks`, `_second`, `_step`, `_bar`, `_sold`, `_run`, `_fill`, `self.sent`, `self.asked`, `self.asked_bars`,
+     `self.bars`, `self.NOW`). If wave 3 changes a helper or a pinned behaviour, these tests will say so; the file is
+     free to edit. `test_the_fallbacks_in_the_code_say_what_config_says` fails on any key of `news_live.DEFAULTS`
+     that `config.json` news lacks or sets differently.
+  2. Waits for `tests/test_news_*.py`: folding the 51 methods into their classes, the wait for background
+     "trial-check" threads in `_Engine.setUp/tearDown`, and three old methods that fail at 23:59 or just after
+     midnight New York: `research/2026-11-10-loss-protocol-pins/waiting.diff` (or `fold.py` there once the diff no
+     longer applies). Fourteen more old methods fail when a day turns inside them (list in `tools/` there).
+  3. Waits for `aitrader/news_live.py` and `config.json`: backlog items 46 (a day-move that is not a finite number
+     is read as known), 48 (the catch-up gap note) and 49 (two observations on the heartbeat stamp and on a hold
+     release with no record). None is reachable from the live loop today; buys are on hold.
+  4. The mutation harness is in `research/2026-11-10-loss-protocol-pins/mutation/`; its 420 mutants are anchored on
+     line numbers of e6a82895 and need new anchors after wave 3.
+  5. Usage: the account's limit was reached in the night of 2026-11-10 (eleven verifier agents of this session
+     failed with the limit message at about 23:00 UTC). At 08:35 UTC `logs/2026-11-11-morning-brief.md` did not
+     exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
 
-(none)
+- **2026-11-11 08:50, done 09:05 - trader session** - files: `tests/test_loss_protocol_pins.py` (a NEW file; no existing file
+  under a claim is edited). Purpose: 51 test methods that pin the loss protocol and the engine repairs of
+  e6a82895. A mutation run found 68 one-line changes to `news_live.py`, `postmortem.py` and `__main__.py` that
+  change what the engine does and pass the landed suite; each method fails on at least one of them. The classes
+  extend classes of `tests/test_news_guards.py` and `tests/test_postmortem.py` and edit neither.
+  Landed: 442 tests pass; with the file 412 of the 420 mutants are killed (8 left behave like the unchanged code).
+  The file is free to edit.

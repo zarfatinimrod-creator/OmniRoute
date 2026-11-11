@@ -152,8 +152,35 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     (bull, bear, one rebuttal each, the inversion lens, the risk team) and its cost guard says three. The COP desk
     of 2026-11-10 used six, about 120k tokens each, most of it context. Decide which is meant, and give the roles
     only the brief. The skill file is under the one-builder rule (BUILD_CLAIMS.md): claim it first.
+46. [news][defect] A day-move that is not a finite number is read as known. `_buy` treats only None as "not
+    known": on trial the moves '5.8', 'n/a', NaN, [5.8] and True are all bought, and NaN and True are bought even
+    with the guards enforced (probe in research/2026-11-10-loss-protocol-pins/NOTES.md, section 8). Not reachable
+    from the live loop today (`live_price` gives a rounded float or None, and any error becomes None), and buys
+    are on hold. Fix: read anything that is not a finite number as None, before `if move is None`; rule 4. The
+    file is under the main session's claim.
+47. [tests] Fold `tests/test_loss_protocol_pins.py` into the classes it extends and delete it
+    (research/2026-11-10-loss-protocol-pins/waiting.diff or fold.py), with the wait for background "trial-check"
+    threads in `_Engine.setUp/tearDown`. Old tests that fail by the clock and are still in the suite: three at 23:59
+    or just after midnight New York (in the diff), fourteen when a day turns inside them (eleven in CatchUpStop at
+    UTC midnight: one fixed day in its setUp closes them; list in tools/ there). `tests/test_audit_fixes.py` starts
+    git once a run; the Checker tests leave an empty aitrader-scorer directory in the temp directory.
+48. [news][docs] config.json `news._note_guards`: with stop_catchup_gap_seconds 90 under stop_catchup_min_seconds
+    120 the minimum decides alone when minute bars are read back (any gap from 0 to 119 behaves the same). The 90
+    is in force in a second role the note does not name: how close to the closing bell the last look of an earlier
+    day must be for no "not checked since" alert. Say both in the note.
+49. [news] Two observations from the review of the pins, not yet looked into: (a) in the default catch-up mode a
+    held name with no live quote and unreadable minute bars still gets a "looked at" stamp in the heartbeat (the
+    owner is told once), so a restart does not read that stretch back; (b) `news-hold --release` takes effect even
+    when its record in news_holds.jsonl cannot be written (the command says so and exits 1): decide whether the
+    record should come first.
+50. [process] The mutation harness (research/2026-11-10-loss-protocol-pins/mutation/) is not wired to anything and
+    its 420 mutants are anchored on line numbers of e6a82895. After the next change to news_live.py, postmortem.py
+    or __main__.py: re-anchor them, run them, and treat a survivor in a guard, a sale or a stop look as a missing
+    test. Eight survivors behave like the unchanged code (K14, K22, K27, PM64, PM75, X02, X03, BY1).
 
 ## Done
+- 2026-11-11 (after the MU loss review): 51 test pins for the loss protocol and the engine repairs landed as
+  tests/test_loss_protocol_pins.py (442 tests; 412 of 420 mutants killed, 76 survived the suite before). Tests only.
 - 2026-11-10 (loss review, MU -137.70; commit e6a82895): the loss protocol is law (CLAUDE.md, skills/trader/SKILL.md
   3א-3ב) and has a tool (`postmortem`, state/postmortems.jsonl) wired into the five trading slots and the weekly
   one; news buys wait for the review of a news loss; `news-hold`; no buy on an unknown move, and a day missing from

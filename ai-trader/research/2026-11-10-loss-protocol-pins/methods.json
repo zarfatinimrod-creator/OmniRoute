@@ -1,0 +1,963 @@
+[
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_a_hold_holds_back_no_kind_of_sale",
+  "kills": [
+   "S06",
+   "S08",
+   "S09",
+   "S10"
+  ],
+  "version": "B (honesty)",
+  "note": "B S13: one line added (a review waits from the first sale on). Integrator: a fixed entry date instead of today's, and one day for the planted breach mark and the look that reads it (it failed when UTC midnight fell between the two).",
+  "also_fails_on": [
+   "S04",
+   "S05",
+   "S07",
+   "S11",
+   "C01",
+   "SH2",
+   "SH3",
+   "PM05",
+   "PM10"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_a_hold_and_a_waiting_review_stop_a_buy_outside_the_hours_too",
+  "kills": [
+   "Y16"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: the refusal is read from news_checks.jsonl instead of a Hebrew word.",
+  "also_fails_on": [
+   "B01",
+   "B03",
+   "B06",
+   "B10",
+   "R05",
+   "R06",
+   "R07",
+   "Y06",
+   "Y11",
+   "Y12",
+   "Y14",
+   "H10",
+   "H11",
+   "K05",
+   "SH2",
+   "SH3",
+   "PM05",
+   "PM10",
+   "CJ03"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_the_hold_stops_buys_also_when_the_wait_for_the_review_is_switched_off",
+  "kills": [
+   "B11"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: the news_checks.jsonl row instead of the private _buys_blocked().",
+  "also_fails_on": [
+   "B06",
+   "B07",
+   "R05",
+   "R06",
+   "R07",
+   "Y11",
+   "Y12",
+   "H11",
+   "K05",
+   "SH2",
+   "SH3"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_only_null_or_an_empty_object_is_no_hold",
+  "kills": [
+   "BH2"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "B06",
+   "Y11",
+   "Y12",
+   "BH3"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_a_hold_file_nested_too_deep_to_parse_is_a_hold_not_a_failed_step",
+  "kills": [
+   "BH6"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "B03",
+   "B06",
+   "B07",
+   "Y11",
+   "Y12",
+   "T08",
+   "BH1",
+   "BH5"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_a_hold_that_could_not_be_fully_written_says_which_state_it_is_in",
+  "kills": [
+   "M28",
+   "M29"
+  ],
+  "version": "B (honesty)",
+  "note": "B S5: the message must agree with the state; the order of the two writes of a release is no longer pinned.",
+  "also_fails_on": [
+   "SH2",
+   "SH3",
+   "SH4"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_the_heartbeat_and_the_record_name_a_waiting_review_as_the_reason_not_a_hold",
+  "kills": [
+   "B10"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "B01",
+   "B03",
+   "R05",
+   "R07",
+   "Y11",
+   "Y12",
+   "Y14",
+   "H11",
+   "K05",
+   "T08",
+   "PM05",
+   "PM10",
+   "CJ03"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_a_ledger_that_cannot_be_read_blocks_even_when_that_cannot_be_written_down",
+  "kills": [
+   "B09"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: the news_checks.jsonl row instead of a Hebrew phrase.",
+  "also_fails_on": [
+   "B01",
+   "B04",
+   "B08",
+   "R05",
+   "R07",
+   "Y11",
+   "Y12",
+   "H11",
+   "K05",
+   "CJ03"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_verify_survives_a_hold_it_cannot_judge",
+  "kills": [
+   "M08"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: one word (RuntimeError) instead of the exact sentence. B had not applied or run this one; applied and checked here.",
+  "also_fails_on": [
+   "M06"
+  ]
+ },
+ {
+  "class": "Hold_",
+  "parent": "g.Hold",
+  "name": "test_verify_shows_a_hold_and_a_waiting_loss_together_and_still_does_not_stop_the_session",
+  "kills": [
+   "M24"
+  ],
+  "version": "C (second opinion)",
+  "note": "C, as written.",
+  "also_fails_on": [
+   "SH2",
+   "SH3",
+   "PM10",
+   "M02",
+   "M06",
+   "M07",
+   "M33"
+  ]
+ },
+ {
+  "class": "OnTrial_",
+  "parent": "g.OnTrial",
+  "name": "test_on_trial_the_buy_is_made_at_the_quote_the_scorer_saw_and_no_newer_quote_is_asked_for",
+  "kills": [
+   "H04"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B. With the method below in SecondCheck_ it is what still kills H04 after B's S4 method was dropped.",
+  "also_fails_on": [
+   "D10",
+   "B03",
+   "H01",
+   "H02"
+  ]
+ },
+ {
+  "class": "OnTrial_",
+  "parent": "g.OnTrial",
+  "name": "test_in_the_live_loop_a_move_that_is_not_known_stays_not_known_for_the_scorer_and_for_the_buy",
+  "kills": [
+   "T14"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: the Hebrew line dropped. A B5 (its background check answered into the next test) is met by the wait in setUp/tearDown, not in the method.",
+  "also_fails_on": [
+   "D11",
+   "R02",
+   "R05",
+   "R07",
+   "R08",
+   "Y06",
+   "Y07",
+   "Y08",
+   "H09",
+   "H10",
+   "CJ04"
+  ]
+ },
+ {
+  "class": "OnTrial_",
+  "parent": "g.OnTrial",
+  "name": "test_the_fallbacks_in_the_code_say_what_config_says",
+  "kills": [
+   "D04",
+   "D06",
+   "D07",
+   "D09",
+   "D14",
+   "D23",
+   "CJ20"
+  ],
+  "version": "B (honesty)",
+  "note": "B S1: every key of DEFAULTS, not a list of 19 kept by hand; a DEFAULTS key that config.json lacks now fails it.",
+  "also_fails_on": [
+   "D01",
+   "D02",
+   "D03",
+   "D05",
+   "D08",
+   "D10",
+   "CJ01",
+   "CJ02",
+   "CJ03",
+   "CJ04",
+   "CJ05",
+   "CJ06",
+   "CJ07",
+   "CJ09",
+   "CJ10",
+   "CJ11",
+   "CJ12",
+   "CJ13",
+   "D30",
+   "D31",
+   "D32",
+   "D33",
+   "D34",
+   "CJ16",
+   "CJ17",
+   "CJ18",
+   "CJ19"
+  ]
+ },
+ {
+  "class": "OnTrial_",
+  "parent": "g.OnTrial",
+  "name": "test_with_the_check_switched_off_nothing_is_asked_on_trial_either",
+  "kills": [
+   "H23"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: the private _trial dropped. A B6 (a stray thread's call was counted) is met by the wait in setUp.",
+  "also_fails_on": [
+   "B03"
+  ]
+ },
+ {
+  "class": "SecondCheck_",
+  "parent": "g.SecondCheck",
+  "name": "test_a_move_that_is_no_longer_known_after_the_check_is_not_bought",
+  "kills": [
+   "H16"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: the Hebrew line dropped.",
+  "also_fails_on": [
+   "D15",
+   "R05",
+   "R07",
+   "Y06",
+   "Y07",
+   "Y08",
+   "H01",
+   "H05",
+   "H11",
+   "K05",
+   "CJ04",
+   "CJ07"
+  ]
+ },
+ {
+  "class": "SecondCheck_",
+  "parent": "g.SecondCheck",
+  "name": "test_the_rescore_goes_to_the_scorer_itself_and_both_calls_get_the_timeout_from_config",
+  "kills": [
+   "K17",
+   "K20",
+   "K21",
+   "K28"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "D15",
+   "B03",
+   "H11",
+   "K03",
+   "K05",
+   "CJ07",
+   "CJ11"
+  ]
+ },
+ {
+  "class": "SecondCheck_",
+  "parent": "g.SecondCheck",
+  "name": "test_with_the_check_switched_off_an_enforced_buy_is_made_at_the_scored_quote",
+  "kills": [
+   "H04",
+   "H24"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "B03"
+  ]
+ },
+ {
+  "class": "SecondCheck_",
+  "parent": "g.SecondCheck",
+  "name": "test_outside_the_session_the_enforced_check_is_not_followed_by_a_look_at_the_stops",
+  "kills": [
+   "H26"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "H11",
+   "K05",
+   "CJ13"
+  ]
+ },
+ {
+  "class": "SecondCheck_",
+  "parent": "g.SecondCheck",
+  "name": "test_a_look_at_the_stops_that_fails_after_the_enforced_check_costs_neither_the_buy_nor_the_batch",
+  "kills": [
+   "H19"
+  ],
+  "version": "B (honesty)",
+  "note": "B S6: two items in the batch, so that 'nor the batch' can fail.",
+  "also_fails_on": [
+   "D15",
+   "B03",
+   "LS4",
+   "LS8",
+   "H01",
+   "H11",
+   "H18",
+   "K05",
+   "CJ07"
+  ]
+ },
+ {
+  "class": "SecondCheck_",
+  "parent": "g.SecondCheck",
+  "name": "test_a_call_that_does_not_come_back_is_an_answer_that_fails_and_the_check_ends_on_time",
+  "kills": [
+   "DT5"
+  ],
+  "version": "C (second opinion), rewritten by the integrator",
+  "note": "C's method waited 5 s of real time behind a 9 s bound. This one waits for nothing: calls that never answer and the engine's clock are the test's own, and it counts the time each wait is given. The numbers it rests on are set in the test.",
+  "also_fails_on": [
+   "D15",
+   "R01",
+   "R04",
+   "R05",
+   "R07",
+   "R08",
+   "H01",
+   "H11",
+   "H12",
+   "K02",
+   "K11",
+   "K28",
+   "CJ07"
+  ]
+ },
+ {
+  "class": "StopCooldown_",
+  "parent": "g.StopCooldown",
+  "name": "test_the_cooldown_is_one_session_and_is_counted_from_the_latest_stop",
+  "kills": [
+   "Y02",
+   "Y05"
+  ],
+  "version": "as first written (mutation run), changed by the integrator",
+  "note": "Clean for A and B, but it read today's date twice and failed when New York midnight fell inside it. The engine's clock now stands at a fixed Tuesday, and the cooldown of one session is set in the test.",
+  "also_fails_on": [
+   "D15",
+   "B03",
+   "R01",
+   "R04",
+   "R07",
+   "R08",
+   "Y01",
+   "Y03",
+   "Y17",
+   "H01",
+   "H11",
+   "K05",
+   "PM02"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_a_price_exactly_at_the_stop_is_through_it",
+  "kills": [
+   "U07",
+   "U08"
+  ],
+  "version": "B (honesty)",
+  "note": "B S10: a new engine instead of clearing three private attributes. Integrator: one day all through (UTC midnight inside it failed it).",
+  "also_fails_on": [
+   "S05",
+   "C01",
+   "U10",
+   "U11"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_a_last_look_written_without_a_zone_is_read_as_utc",
+  "kills": [
+   "L05"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "L02",
+   "U02",
+   "U17",
+   "U18",
+   "CJ09"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_in_the_selling_mode_a_breach_found_by_a_look_is_sold_by_that_same_look",
+  "kills": [
+   "LS6",
+   "LS9",
+   "LS10"
+  ],
+  "version": "A and B (the same change)",
+  "note": "A B3 and B S8 both give the look the fixture's own time. B's shorter form: A's assertion on the look's return value is not needed for the kills. Integrator: one day all through.",
+  "also_fails_on": [
+   "C01",
+   "LS2"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_the_alert_says_whether_it_is_known_that_nobody_was_looking",
+  "kills": [
+   "U28"
+  ],
+  "version": "B (honesty)",
+  "note": "B S10: a new engine and a heartbeat instead of private attributes; two Hebrew words instead of two phrases.",
+  "also_fails_on": [
+   "L02",
+   "U01",
+   "U02",
+   "U11",
+   "U14",
+   "A07",
+   "CJ09"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_a_breach_found_by_a_look_is_on_disk_before_the_step_goes_on_and_the_next_engine_sells_on_it",
+  "kills": [
+   "LS3"
+  ],
+  "version": "C (second opinion)",
+  "note": "C. Integrator: one day for both engines (UTC midnight between the two looks failed it).",
+  "also_fails_on": [
+   "C01",
+   "U12",
+   "U15",
+   "LS2"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_a_breach_the_owner_was_told_about_is_not_told_again_by_the_next_engine",
+  "kills": [
+   "LS3"
+  ],
+  "version": "C (second opinion)",
+  "note": "C. Integrator: one day for both engines.",
+  "also_fails_on": [
+   "U01",
+   "U04",
+   "U12",
+   "U14",
+   "U15",
+   "LS2"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_a_row_the_feed_sends_twice_is_one_print_not_two",
+  "kills": [
+   "U27"
+  ],
+  "version": "C (second opinion)",
+  "note": "C, without its line on the private _unseen_lows.",
+  "also_fails_on": [
+   "C03",
+   "U09",
+   "CJ16"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_minutes_yahoo_had_not_published_are_read_at_the_next_look_whatever_the_age_of_the_quote",
+  "kills": [
+   "A02"
+  ],
+  "version": "C (second opinion)",
+  "note": "C; two small functions instead of two lambdas.",
+  "also_fails_on": [
+   "L02",
+   "U01",
+   "U02",
+   "U12",
+   "U14",
+   "U17",
+   "U18",
+   "U25",
+   "LS2",
+   "LS9",
+   "A03",
+   "A05",
+   "CJ09"
+  ]
+ },
+ {
+  "class": "CatchUpStop_",
+  "parent": "g.CatchUpStop",
+  "name": "test_the_gap_that_counts_as_not_looked_at_is_its_own_number_in_config",
+  "kills": [
+   "U03"
+  ],
+  "version": "C (second opinion), adapted",
+  "note": "C's method set the private _stops_checked_at and asserted the shipped 90 and 120. This one passes the last look to catch_up_stops (its own parameter) and sets both numbers itself.",
+  "also_fails_on": [
+   "U02"
+  ]
+ },
+ {
+  "class": "StopsFirst_",
+  "parent": "g.StopsFirst",
+  "name": "test_after_a_stalled_step_the_gap_of_a_name_with_a_live_quote_is_still_read",
+  "kills": [
+   "LS9"
+  ],
+  "version": "B (honesty), chosen over A",
+  "note": "Both rewrote it. A B3: a fixed time, private stamps set by hand, bars that come back empty. B S8: three looks of the engine at fixed times, bars that are there, no private attribute, and the 'cannot read' alert that A's fixture set off is asserted absent.",
+  "also_fails_on": [
+   "U01",
+   "U02",
+   "U17",
+   "U18",
+   "U24",
+   "LS1",
+   "LS2",
+   "CJ09",
+   "X25"
+  ]
+ },
+ {
+  "class": "Bars_",
+  "parent": "g.Bars",
+  "name": "test_the_minute_still_trading_is_left_out_even_when_its_row_sits_on_the_minute",
+  "kills": [
+   "A04"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "A10"
+  ]
+ },
+ {
+  "class": "Bars_",
+  "parent": "g.Bars",
+  "name": "test_the_quote_row_is_left_out_however_old_the_quote_is",
+  "kills": [
+   "A02"
+  ],
+  "version": "C (second opinion)",
+  "note": "C, as written.",
+  "also_fails_on": [
+   "A03",
+   "A05"
+  ]
+ },
+ {
+  "class": "OneEngine_",
+  "parent": "g.OneEngine",
+  "name": "test_while_an_engine_runs_nobody_else_can_take_the_book_not_even_to_share_it",
+  "kills": [
+   "RL2"
+  ],
+  "version": "A (flakiness), chosen over B",
+  "note": "Both rewrote it. A B1: the step ends the loop (ChainBroken), 24:00, no git. B B1: 24:00 with a 60 ms budget, git still started. A's, as the rule for a loop's end asks.",
+  "also_fails_on": [
+   "RL3",
+   "RL4",
+   "RL7"
+  ]
+ },
+ {
+  "class": "PauseSaidAtOnce_",
+  "parent": "g.PauseSaidAtOnce",
+  "name": "test_a_sale_with_neither_gain_nor_loss_starts_no_pause_and_is_not_called_a_loss",
+  "kills": [
+   "P01"
+  ],
+  "version": "B (honesty)",
+  "note": "B S11: the engine's own path (a time exit at the entry price) instead of two private calls.",
+  "also_fails_on": [
+   "D15",
+   "B03",
+   "H11",
+   "K05",
+   "PM02"
+  ]
+ },
+ {
+  "class": "NothingSlowBeforeASale_",
+  "parent": "g.NothingSlowBeforeASale",
+  "name": "test_a_step_does_not_wait_for_a_trial_check_that_has_not_answered",
+  "kills": [
+   "K29",
+   "K30"
+  ],
+  "version": "A and B, merged",
+  "note": "A B4: no wall-clock bound; the wait the step gives drain_trial is recorded. B S12: the line on the private _trial dropped.",
+  "also_fails_on": [
+   "B03",
+   "H01",
+   "H02",
+   "H03",
+   "H21",
+   "K05",
+   "K13",
+   "K24",
+   "K26",
+   "CJ07",
+   "X22",
+   "DT1"
+  ]
+ },
+ {
+  "class": "NothingSlowBeforeASale_",
+  "parent": "g.NothingSlowBeforeASale",
+  "name": "test_the_engine_says_which_code_it_started_on",
+  "kills": [
+   "RN1"
+  ],
+  "version": "A and B, merged",
+  "note": "A B2: the loop is ended by the step (ChainBroken), not by a 30 ms budget. B S9: through run(), the public door.",
+  "also_fails_on": [
+   "T10"
+  ]
+ },
+ {
+  "class": "NothingSlowBeforeASale_",
+  "parent": "g.NothingSlowBeforeASale",
+  "name": "test_what_a_failing_engine_says_of_the_stops_is_what_its_own_steps_saw",
+  "kills": [
+   "T13",
+   "X21"
+  ],
+  "version": "B (honesty), loop end changed by the integrator",
+  "note": "B S2 replaces test_a_step_keeps_whether_its_first_look_at_the_stops_ran (a private attribute) by the alert the owner gets, from the real step. B ended each run by a two-minute budget on a skewed clock; here three rounds and ChainBroken.",
+  "also_fails_on": [
+   "LS5",
+   "T01",
+   "T11",
+   "T15",
+   "X19"
+  ]
+ },
+ {
+  "class": "SaidWhateverHappens_",
+  "parent": "g.SaidWhateverHappens",
+  "name": "test_a_move_that_cannot_be_compared_never_fails_the_batch_and_is_no_buy_when_enforced",
+  "kills": [
+   "Y42"
+  ],
+  "version": "B (honesty)",
+  "note": "B B2 (binding): no test pins a BUY on a move the engine cannot read. Replaces test_a_move_that_cannot_be_compared_changes_nothing_on_trial_and_refuses_when_enforced.",
+  "also_fails_on": [
+   "R01",
+   "R04",
+   "R08",
+   "Y06",
+   "Y18",
+   "H10",
+   "Y43"
+  ]
+ },
+ {
+  "class": "SaidWhateverHappens_",
+  "parent": "g.SaidWhateverHappens",
+  "name": "test_the_loop_prints_what_a_failed_step_had_already_done",
+  "kills": [
+   "ST4"
+  ],
+  "version": "A and B, merged",
+  "note": "B S9: the real step (it sells at its top, then the feeds fail it), one word of the error. A B2: the loop is ended by ChainBroken at the second round, not by a 30 ms budget. Through run().",
+  "also_fails_on": [
+   "T01",
+   "ST2"
+  ]
+ },
+ {
+  "class": "SaidWhateverHappens_",
+  "parent": "g.SaidWhateverHappens",
+  "name": "test_the_heartbeat_has_no_stamp_while_a_held_name_has_had_no_quote_and_no_bars_read",
+  "kills": [
+   "HB3"
+  ],
+  "version": "B (honesty), clock changed by the integrator",
+  "note": "B S3: the name says the condition, and the look back is at work (alert), not switched off. B read the wall clock and patched the calendar to open 'this minute' (that version failed when the spring clock change fell inside it); here every look of the step is given a fixed 09:31.",
+  "also_fails_on": [
+   "C07",
+   "U21",
+   "HB2"
+  ]
+ },
+ {
+  "class": "SaidWhateverHappens_",
+  "parent": "g.SaidWhateverHappens",
+  "name": "test_the_wait_for_answers_still_out_is_one_wait_in_all_not_one_for_each",
+  "kills": [
+   "DT2"
+  ],
+  "version": "A and B, merged",
+  "note": "A S1: the time is counted on a clock the test owns (no 1.0 s bound). B S12: what is asserted at the end is the record, not the private _trial. The private boxes are still touched: only they carry the wait.",
+  "also_fails_on": [
+   "H01",
+   "H02",
+   "H03",
+   "H21",
+   "K13",
+   "K26",
+   "CJ07",
+   "DT1"
+  ]
+ },
+ {
+  "class": "SaidWhateverHappens_",
+  "parent": "g.SaidWhateverHappens",
+  "name": "test_a_trial_check_that_raised_leaves_a_row_that_says_so_and_never_one_that_reads_as_a_pass",
+  "kills": [
+   "DT3"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: the line on the private _trial dropped.",
+  "also_fails_on": [
+   "D17",
+   "B03",
+   "R01",
+   "R05",
+   "R07",
+   "H01",
+   "H02",
+   "H03",
+   "H21",
+   "CJ07"
+  ]
+ },
+ {
+  "class": "SaidWhateverHappens_",
+  "parent": "g.SaidWhateverHappens",
+  "name": "test_trial_checks_wait_their_turn_when_config_says_one_at_a_time",
+  "kills": [
+   "VP1"
+  ],
+  "version": "A and B, merged",
+  "note": "A S2: an event instead of a poll, and the pool itself is asked (the one deterministic sign). B S7: the numbers are set in the test, either headline may go first, the end is read from the record. CJ20 is now killed by the fallbacks test alone; its 'kill' of DT2 was a thread of the neighbouring test (A B6, B S7).",
+  "also_fails_on": [
+   "H01",
+   "H02",
+   "H03",
+   "H21",
+   "K02",
+   "K13",
+   "CJ07",
+   "X22"
+  ]
+ },
+ {
+  "class": "SaidWhateverHappens_",
+  "parent": "g.SaidWhateverHappens",
+  "name": "test_a_score_for_another_ticker_than_the_items_own_is_dropped",
+  "kills": [
+   "SB2"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": []
+ },
+ {
+  "class": "QueueAndRecord_",
+  "parent": "g.QueueAndRecord",
+  "name": "test_with_the_check_switched_off_an_enforced_engine_fills_a_queued_name_that_was_never_checked",
+  "kills": [
+   "Q09"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "B03",
+   "Q04"
+  ]
+ },
+ {
+  "class": "Ledger_",
+  "parent": "p.Ledger",
+  "name": "test_a_key_that_fits_two_fills_names_neither",
+  "kills": [
+   "PM14"
+  ],
+  "version": "B (honesty)",
+  "note": "B S12: the exact message dropped. B had not applied or run this one; applied and checked here.",
+  "also_fails_on": [
+   "PM05",
+   "PM10",
+   "PM34",
+   "PM35",
+   "PM49",
+   "PM50",
+   "PM52",
+   "PM72"
+  ]
+ },
+ {
+  "class": "Ledger_",
+  "parent": "p.Ledger",
+  "name": "test_the_shortest_key_comes_from_config_and_no_setting_makes_the_books_name_a_key",
+  "kills": [
+   "PM81",
+   "PM83"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "PM10",
+   "PM60",
+   "PM62",
+   "CJ15",
+   "PM80"
+  ]
+ },
+ {
+  "class": "Ledger_",
+  "parent": "p.Ledger",
+  "name": "test_the_summary_counts_reviews_not_ledger_lines",
+  "kills": [
+   "PM74"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "PM10"
+  ]
+ },
+ {
+  "class": "Ledger_",
+  "parent": "p.Ledger",
+  "name": "test_a_journal_line_that_is_not_a_fill_is_skipped_and_the_losses_are_still_listed",
+  "kills": [
+   "PM71"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "PM05",
+   "PM10"
+  ]
+ },
+ {
+  "class": "Cli_",
+  "parent": "p.Cli",
+  "name": "test_news_status_lists_only_the_news_books_own_waiting_losses",
+  "kills": [
+   "M09"
+  ],
+  "version": "as first written (mutation run)",
+  "note": "Clean for A and B.",
+  "also_fails_on": [
+   "PM04",
+   "PM05",
+   "PM10",
+   "M11"
+  ]
+ }
+]
