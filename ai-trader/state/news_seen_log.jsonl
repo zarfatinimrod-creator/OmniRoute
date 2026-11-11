@@ -1099,3 +1099,4 @@
 {"key": "c68fb09646a20b32", "symbol": "NVDA", "published": "2026-11-11T19:50:02+00:00", "first_seen": "2026-11-11T20:57:59.230181+00:00", "outcome": "stale"}
 {"key": "5f79295506f215e0", "symbol": "MS", "published": "2026-11-11T19:50:02+00:00", "first_seen": "2026-11-11T20:57:59.230851+00:00", "outcome": "stale"}
 {"key": "2daa9725f088faf5", "symbol": "IBM", "published": "2026-11-11T20:39:46+00:00", "first_seen": "2026-11-11T20:57:59.230552+00:00", "outcome": "scored"}
+{"key": "311989e00429bdd4", "symbol": "NOW", "published": "2026-11-11T20:50:02+00:00", "first_seen": "2026-11-11T20:59:19.203609+00:00", "outcome": "scored"}
