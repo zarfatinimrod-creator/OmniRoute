@@ -4,7 +4,9 @@ Loop every few seconds:
   1. poll each universe stock's Yahoo Finance RSS feed (and nothing else needs a key);
   2. new, fresh headlines -> Claude scores each 1-10 (10 = likely to rise, 1 = likely to fall), via `claude -p`;
   3. owner's rules, enforced in code: BUY only if score > buy_min_score (default 8 -> 9 or 10), at most
-     max_position_pct (5%) of the account per trade, SELL mechanically when price <= entry * (1 - 3%);
+     max_position_pct (5%) of the account per trade, SELL mechanically when price <= entry * (1 - 3%); a score
+     that is a fraction never buys, and sells a held name when it is at or under sell_on_score_at_most (owner,
+     2026-11-11);
   4. every score is logged as a forward-graded prediction (news_predictions.jsonl -> news_grades.jsonl).
   5. what holds a buy back, and nothing here ever holds back a sale: a realized news loss with no review yet
      (Basic law, item 3), the trader session's hold (news-hold), a book that did not agree with the trade journal
@@ -28,6 +30,7 @@ import fcntl
 import hashlib
 import html
 import json
+import math
 import os
 import re
 import signal
@@ -201,11 +204,14 @@ class Scores(dict):
     journal (score_batch itself writes nothing): model, prompt (PROMPT_ID), sent, wall_s, the CLI's own time, cost
     and token counts when its envelope carries them (also when the answer in it cannot be read), answered and the
     keys answered under another ticker (symbol_mismatch) - or, on failure, the error type instead of the answer
-    count. No items, no call: no facts."""
+    count. No items, no call: no facts. In `fractions`, {key: {raw, why}} for every row whose score was a finite
+    number that is not whole: no score here, read only by the engine for the bad-news exit of a held name
+    (NewsTrader._scored)."""
 
     def __init__(self):
         super().__init__()
         self.facts: dict = {}
+        self.fractions: dict = {}
 
 
 def score_batch(items: list[dict], model: str, timeout: int = 90) -> Scores:
@@ -213,7 +219,9 @@ def score_batch(items: list[dict], model: str, timeout: int = 90) -> Scores:
     it); empty on failure.
     It never raises on a reply, whatever its shape: an error out of here fails the step. A row is skipped when its
     id is no index or its score is not a whole number (null, text, 8.6; 9.0 is 9). A fraction is not rounded: 9 from
-    8.6 would be a buy the scorer did not call."""
+    8.6 would be a buy the scorer did not call. It is noted in `.fractions` instead, with its count in the facts
+    (`fractions`, when there is one): the owner's decision of 2026-11-11 lets the engine read it for the bad-news
+    exit of a held name only, compared as it is with sell_on_score_at_most (1.6 sells, 2.4 does not)."""
     out = Scores()
     if not items:
         return out
@@ -247,6 +255,9 @@ def score_batch(items: list[dict], model: str, timeout: int = 90) -> Scores:
                 off.append(x["key"])
                 continue
             sc = row.get("score", 5)
+            if isinstance(sc, float) and math.isfinite(sc) and not sc.is_integer():
+                out.fractions[x["key"]] = {"raw": sc, "why": _clean(str(row.get("why", "")), 120)}
+                continue  # a fraction: no score here either, only noted (nan and inf are no number: skipped below)
             if isinstance(sc, bool) or not (isinstance(sc, int) or isinstance(sc, float) and sc.is_integer()):
                 continue  # not a whole number: no score for this headline ("scorer_no_answer"), never an error
             out[x["key"]] = {"score": int(max(1, min(10, sc))), "why": _clean(str(row.get("why", "")), 120)}
@@ -254,6 +265,8 @@ def score_batch(items: list[dict], model: str, timeout: int = 90) -> Scores:
             continue
     if "error" not in facts:
         facts["answered"] = len(out)
+    if out.fractions:
+        facts["fractions"] = len(out.fractions)
     if off:
         facts["symbol_mismatch"] = off
     return out
@@ -654,21 +667,35 @@ class NewsTrader:
 
     def _scored(self, chunk: list[dict]) -> tuple[dict, dict]:
         """One scorer call for the loop: (its scores, the facts of the call). The call goes on record whatever became
-        of it. A stand-in scorer that answers with a plain dict (the tests) made no call and leaves no row."""
+        of it, with how many rows answered with a fraction (0 too: the count is read forward). A stand-in scorer that
+        answers with a plain dict (the tests) made no call, leaves no row and has no fractions.
+        The owner's decision of 2026-11-11 (state/backlog.md, item 62): a fraction counts only for the bad-news exit.
+        On a held name, at or under sell_on_score_at_most compared as it is, it becomes the whole number under it
+        (never below 1) with what the scorer really said in raw_score, and is handled from here on as that whole low
+        score is. Every other fraction stays no score: it never buys, never queues and never reaches a second check."""
         try:
             scores = score_batch(chunk, self.n["model"])
         except Exception:  # noqa: BLE001 - score_batch never raises on a reply; whatever did, the call is on record
             self.scorer_called({"model": self.n["model"], "prompt": PROMPT_ID, "sent": len(chunk)})
             raise
         facts = getattr(scores, "facts", {})
+        if facts:
+            facts.setdefault("fractions", 0)
         self.scorer_called(facts)
+        fractions = getattr(scores, "fractions", {})
+        for x in chunk:
+            f = fractions.get(x["key"])
+            if (f and x["key"] not in scores and x["symbol"] in self.book.positions
+                    and f["raw"] <= self.n["sell_on_score_at_most"]):
+                scores[x["key"]] = {"score": max(1, math.floor(f["raw"])), "why": f["why"], "raw_score": f["raw"]}
         return scores, facts
 
     def _seen_row(self, x: dict, outcome: str):
         """news_seen_log.jsonl: one row per new headline, with what became of it: "scored", or why it was not -
         "stale" (older than fresh_minutes at first sight), "scorer_failed" (the call failed), "scorer_no_answer" (the
-        answer had no row for it, or one whose score is not a whole number), "symbol_mismatch" (answered under another
-        ticker), "step_failed" (the step broke before it had an outcome). One more row, at a first start:
+        answer had no row for it, or one whose score is not a whole number and is not a low fraction on a held name,
+        _scored), "symbol_mismatch" (answered under another ticker), "step_failed" (the step broke before it had an
+        outcome). One more row, at a first start:
         {"outcome": "primed", "count": N}. A headline older than seen_keep_days leaves no row: it cannot be told from
         one the engine saw and has forgotten."""
         self._record("news_seen_log.jsonl", {"key": x["key"], "symbol": x["symbol"], "published": x["published"],
@@ -1241,8 +1268,9 @@ class NewsTrader:
             rec = {"date": datetime.now(NY).date().isoformat(), "logged_at": journal.now_utc(), "price_at": x.get("price_at"),
                    "id": x["key"], "symbol": x["symbol"],
                    "headline": x["title"], "published": x["published"], "link": x.get("link") or None,
-                   "description": x.get("description") or None, "score": s["score"], "why": s["why"],
-                   "model": self.n["model"], "prompt": PROMPT_ID, "context": context_id(),
+                   "description": x.get("description") or None, "score": s["score"],
+                   **({"raw_score": s["raw_score"]} if "raw_score" in s else {}),  # a fraction's own value (_scored)
+                   "why": s["why"], "model": self.n["model"], "prompt": PROMPT_ID, "context": context_id(),
                    "price": px, "bench_price": bench_px if live else None, "day_move_pct": x.get("day_move_pct"),
                    "latency_s": round((datetime.now(timezone.utc) - datetime.fromisoformat(x["published"])).total_seconds())}
             journal.append("news_scores.jsonl", rec)
