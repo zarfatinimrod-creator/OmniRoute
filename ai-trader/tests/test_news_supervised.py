@@ -1301,8 +1301,8 @@ class FollowUps(_Engine):
         with mock.patch.object(news_live.NewsTrader, "poll_headlines", primed):   # start()'s priming poll calls it
             self.assertEqual(self.start(locked=False, prime=True), 0)
         # three sends, code_stamp, thirty feed calls; then the late line again after the first step (task 9b), and not
-        # after the steps that follow it within news.unsent_resend_seconds (task 9c)
-        self.assertEqual(len(seen), 3 + 1 + 30 + 1)
+        # after the steps that follow it within news.unsent_resend_seconds (task 9c); none if the loop made no step
+        self.assertEqual(len(seen), 3 + 1 + 30 + min(1, news_live.read_heartbeat()["step"]))
         self.assertEqual(seen[:4], sorted(set(seen[:4])))   # a beat between any two of the sends and git
         self.assertGreater(min(seen[4:]), seen[3])    # and between git and the first feed call
         # the feeds are asked side by side: at least one beat per feed call while the priming poll runs, and one after
@@ -1343,7 +1343,7 @@ class FollowUps(_Engine):
         self.assertEqual(self.start(), 0)
         # the late line only, at the start and again after the first step (task 9b; the steps after it come within
         # news.unsent_resend_seconds, task 9c), never in the closing message too
-        self.assertEqual(sum("SELL" in b for _, b in calls), 1 + 1)
+        self.assertEqual(sum("SELL" in b for _, b in calls), 1 + min(1, news_live.read_heartbeat()["step"]))
         self.assertTrue(calls[0][1].startswith("דווח באיחור: SELL 10 BBB"))
         b = news_live.read_heartbeat()                # and the loop made steps, each one with a closing message to build
         self.assertEqual((b["step"] > 0, b["told_through"]), (True, None))
@@ -1403,7 +1403,8 @@ class GateFollowUps(_Engine):
     never turn a code into a traceback, the wait's slice is clamped, a planned stop waits on nothing, three more
     beats, and the two procedures of SKILL.md 3ב. Then what task 9b's review left (task 9c): the late line said again
     by the steps backs off, the loop's two alerts are guarded, a cut first priming primes again, the guards put the
-    error's class on record and never its text, and the blind-quote alert follows the channel rule."""
+    error's class on record and never its text, and the blind-quote alert follows the channel rule. Then task 9d: the
+    loop's own row for a failed step is guarded too."""
 
     def setUp(self):
         super().setUp()
@@ -1706,9 +1707,9 @@ class GateFollowUps(_Engine):
     def test_the_steps_say_the_late_line_again_at_most_once_every_unsent_resend_seconds(self):
         gone = trade("GONE")                                   # of the run before, and nobody was told of it
         journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        self.cfg["news"]["unsent_resend_seconds"] = 120        # the times below are read against it, whatever config.json says
         nt = news_live.NewsTrader(self.cfg)
         nt.adopt_previous(news_live.read_heartbeat())
-        self.assertEqual(nt.n["unsent_resend_seconds"], 120)  # the times below are read against it
         clock, tried = [0.0], []
 
         def send(title, body, cfg, prio="default", **kw):     # a channel is configured and takes nothing (an outage),
@@ -1756,6 +1757,30 @@ class GateFollowUps(_Engine):
                          [(None, "RuntimeError"), (None, "RuntimeError"), ("loop_fails_line", "RuntimeError"),
                           (None, "RuntimeError")])
 
+    # task 9d, 4. the loop's own row for a failed step is guarded like the other guards
+    def test_a_failed_steps_row_that_cannot_be_written_costs_no_traceback_and_the_loop_takes_its_next_step(self):
+        news_live.ERRORS_SAID.clear()
+        steps, refused, append = [], [], journal.append
+
+        def failing(nt):                                       # every step fails; the second asks for a planned stop
+            steps.append(nt)
+            if len(steps) == 2:
+                news_live.STOP.set()
+            raise RuntimeError("a step that fails")
+
+        def full_disk(name, row):                              # the loop's own row (no "where") of the first failed step
+            if name == "news_errors.jsonl" and "where" not in row and not refused:   # cannot be written, once; every
+                refused.append(row)                            # other row can
+                raise OSError(28, "No space left on device")
+            return append(name, row)
+        with self.quick(), mock.patch.object(news_live.NewsTrader, "step", failing), \
+                mock.patch.object(journal, "append", full_disk):
+            self.assertEqual(news_live._run("23:59", None, False), 143)   # only the stop of the second step ends it
+        self.assertEqual((len(steps), [r["error"] for r in refused]), (2, ["RuntimeError"]))   # it took its next step
+        self.assertEqual([(e.get("where"), e["error"]) for e in journal.read("news_errors.jsonl")], [(None, "RuntimeError")])
+        said = [line for line in self.out.getvalue().splitlines() if "not journaled" in line]
+        self.assertEqual(said, ["[news] error not journaled (cycle: RuntimeError): OSError"])   # one line, classes only
+
     # task 9c, 4. a cut priming primes again
     def test_a_planned_stop_that_cuts_the_first_priming_leaves_the_next_start_to_prime_again(self):
         out, cut, primed = threading.Event(), [True], []       # out set: a feed still out answers
@@ -1786,33 +1811,68 @@ class GateFollowUps(_Engine):
         self.assertEqual(len(primed), 2)                       # it primed again, and this time read every feed
         self.assertEqual((left, sorted(journal.load_json("news_seen.json"))), ({}, ["key-AAA", "key-BBB"]))
 
-    # task 9c, 5. the guards' rows name the error's class and never hold its text
-    def test_a_guard_whose_line_cannot_go_out_puts_the_class_of_the_error_on_record_and_never_its_text(self):
+    # task 9c, 5. the guards' rows name the error's class and never hold its text. One test per start (task 9d): a start
+    # that fails no longer hides whether the guards of the starts after it hold
+    SECRET = "https://ntfy.example/secret-topic"               # what the error of a send can carry: its URL, and the topic
+    GUARDS = frozenset({"calendar_line", "book_line", "chain_line", "late_line", "loop_chain_line", "lock_file",
+                        "loop_fails_line"})
+
+    def raising(self):
+        """notify.send failing with an error whose text holds the secret."""
+        return mock.patch.object(news_live.notify, "send", side_effect=RuntimeError(self.SECRET))
+
+    def assert_guard_rows(self, wrote):
+        """The guards in `wrote`, and no other guard, put their row on record: the class of the error, never its text."""
+        rows = [e for e in journal.read("news_errors.jsonl") if e.get("where") in self.GUARDS]
+        self.assertEqual({e["where"] for e in rows}, wrote)    # each guard wrote its row
+        for e in rows:
+            self.assertEqual((sorted(e), e["error"]), (["at", "error", "where"], "OSError" if e["where"] == "lock_file"
+                                                       else "RuntimeError"), e)
+        self.assertNotIn("secret-topic", journal._path("news_errors.jsonl").read_text())
+
+    def test_a_guard_whose_line_cannot_go_out_puts_the_class_of_the_error_on_record_and_never_its_text_calendar_line(self):
         news_live.ERRORS_SAID.clear()
-        secret = "https://ntfy.example/secret-topic"           # what the error of a send can carry: its URL, and the topic
-        raising = lambda: mock.patch.object(news_live.notify, "send", side_effect=RuntimeError(secret))  # noqa: E731
-        with raising(), mock.patch.object(journal, "calendar_covers", lambda day: False):
+        with self.raising(), mock.patch.object(journal, "calendar_covers", lambda day: False):
             self.assertEqual(self.start(), 5)                  # the calendar alert
-        trade("GONE")                                          # a sale of a name the book does not hold: no mismatch
+        self.assert_guard_rows({"calendar_line"})
+
+    def test_a_guard_whose_line_cannot_go_out_puts_the_class_of_the_error_on_record_and_never_its_text_book_line(self):
+        news_live.ERRORS_SAID.clear()
+        trade("GONE")
         journal._path("news_book.json").write_text("{not json")
-        with raising():
+        with self.raising():
             self.assertEqual(self.start(), 6)                  # trades and no readable book: R5d
+        self.assert_guard_rows({"book_line"})
+
+    def test_a_guard_whose_line_cannot_go_out_puts_the_class_of_the_error_on_record_and_never_its_text_chain_line(self):
+        news_live.ERRORS_SAID.clear()
+        trade("GONE")                                          # a sale of a name the book does not hold: no mismatch
         journal.save_json("news_book.json", self.nt.book.state)
-        with raising(), mock.patch.object(journal, "broken_chains", lambda names=None: ["news_trades.jsonl"]):
+        with self.raising(), mock.patch.object(journal, "broken_chains", lambda names=None: ["news_trades.jsonl"]):
             self.assertEqual(self.start(), 4)                  # a broken chain at the start: its alert
+        self.assert_guard_rows({"chain_line"})
+
+    def test_a_guard_whose_line_cannot_go_out_puts_the_class_of_the_error_on_record_and_never_its_text_late_line_and_loop_chain_line(self):
+        news_live.ERRORS_SAID.clear()
+        trade("GONE")                                          # a sale of a name the book does not hold: no mismatch
+        journal.save_json("news_book.json", self.nt.book.state)
         journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})   # GONE's line is owed
         reads = []
 
         def chains(names=None):                                # whole at the start; broken when the first step reads it
             reads.append(names)
             return ["news_trades.jsonl"] if len(reads) > 1 else []
-        with raising(), mock.patch.object(journal, "broken_chains", chains):   # the late line, at the start and after
-            self.assertEqual(self.start(), 4)                  # the step; the alert of the step's broken chain
+        with self.raising(), mock.patch.object(journal, "broken_chains", chains):   # the late line, at the start and
+            self.assertEqual(self.start(), 4)                  # after the step; the alert of the step's broken chain
+        self.assert_guard_rows({"late_line", "loop_chain_line"})
+
+    def test_a_guard_whose_line_cannot_go_out_puts_the_class_of_the_error_on_record_and_never_its_text_lock_file_and_loop_fails_line(self):
+        news_live.ERRORS_SAID.clear()
         real_open, steps = open, []
 
         def full_disk(path, *a, **k):                          # the lock file opens and locks; the holder's name is not written
             f = real_open(path, *a, **k)
-            f.write = mock.Mock(side_effect=OSError(28, secret))
+            f.write = mock.Mock(side_effect=OSError(28, self.SECRET))
             return f
 
         def failing(nt):                                       # every step fails; the second asks for a planned stop
@@ -1821,17 +1881,13 @@ class GateFollowUps(_Engine):
                 news_live.STOP.set()
             raise RuntimeError("a step that fails")
         self.cfg["news"]["alert_after_errors"] = 1
-        with raising(), self.quick(), mock.patch.object(news_live, "open", full_disk, create=True), \
+        with self.raising(), self.quick(), mock.patch.object(news_live, "open", full_disk, create=True), \
                 mock.patch.object(news_live.NewsTrader, "step", failing):
             self.assertEqual(news_live.run("23:59", None, prime=False), 143)   # the lock file; the alert after errors
-        guards = {"calendar_line", "book_line", "chain_line", "late_line", "loop_chain_line", "lock_file", "loop_fails_line"}
-        rows = [e for e in journal.read("news_errors.jsonl") if e.get("where") in guards]
-        self.assertEqual({e["where"] for e in rows}, guards)   # each guard wrote its row
-        for e in rows:
-            self.assertEqual((sorted(e), e["error"]), (["at", "error", "where"], "OSError" if e["where"] == "lock_file"
-                                                       else "RuntimeError"), e)
-        self.assertNotIn("secret-topic", journal._path("news_errors.jsonl").read_text())
-        # and the file itself stays out of git: older rows still carry the text of their errors
+        self.assert_guard_rows({"lock_file", "loop_fails_line"})
+
+    def test_a_guard_whose_line_cannot_go_out_puts_the_class_of_the_error_on_record_and_never_its_text_in_a_file_git_ignores(self):
+        # the file itself stays out of git: older rows still carry the text of their errors
         self.assertIn("state/news_errors.jsonl", (Path(__file__).resolve().parents[1] / ".gitignore").read_text().split())
 
     # task 9c, 6. the blind-quote alert follows the channel rule

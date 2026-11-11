@@ -1993,7 +1993,10 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
             print(f"[news] cycle error: {type(e).__name__}: {str(e)[:200]}", flush=True)
             if getattr(nt, "last_events", None):  # what the step did before it failed (a sale at its top) is still said
                 print(f"[news {now.strftime('%H:%M:%S')} NY] " + " | ".join(nt.last_events), flush=True)
-            journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__, "detail": str(e)[:300]})
+            try:  # as the other guards: a row the journal cannot take (a full disk) is said here, and the loop goes on
+                journal.append("news_errors.jsonl", {"at": journal.now_utc(), "error": type(e).__name__, "detail": str(e)[:300]})
+            except Exception as e2:  # noqa: BLE001
+                print(f"[news] error not journaled (cycle: {type(e).__name__}): {type(e2).__name__}", flush=True)
             fails += 1
             if fails == nt.n.get("alert_after_errors", 5):  # say what is true of the stops: the top of the step may still run
                 stops = ("הסטופים עדיין נבדקים בתחילת כל סיבוב; כותרות וקניות לא עובדות" if getattr(nt, "_early_look", None)
