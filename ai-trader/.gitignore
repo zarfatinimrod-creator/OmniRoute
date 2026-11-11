@@ -4,6 +4,11 @@ __pycache__/
 state/news_heartbeat.json
 state/news_seen.json
 state/news_engine.lock
+# the supervisor's own (spec 4.1): its lock and state file, the dead-man's and the relay's files. state/uptime.jsonl is tracked
+state/news_supervisor.lock
+state/news_supervisor.json
+state/news_deadman.json
+state/news_relayed.json
 # journal.save_json / write_all write <name>.tmp beside the file and rename it over; both books (state/crypto/ too)
 state/**/*.tmp
 # time-machine run records (~1.2 MB gzip per registered sweep): same-machine working files; trials.jsonl keeps the hashes

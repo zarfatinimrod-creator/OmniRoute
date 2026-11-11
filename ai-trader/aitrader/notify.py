@@ -50,7 +50,7 @@ def send(title: str, body: str, cfg: dict, priority: str = "default", force: boo
     if topic:
         try:
             prio = {"min": 1, "low": 2, "default": 3, "high": 4, "urgent": 5}.get(priority, 3)
-            r = requests.post("https://ntfy.sh/", timeout=15,  # JSON publish keeps Hebrew intact
+            r = requests.post(a.get("ntfy_base_url", "https://ntfy.sh") + "/", timeout=15,  # JSON publish keeps Hebrew intact
                               json={"topic": topic, "title": title, "message": body, "priority": prio, "tags": ["chart_with_upwards_trend"]})
             if r.ok:
                 sent.append("ntfy")

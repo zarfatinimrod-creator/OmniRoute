@@ -1,12 +1,17 @@
 """Real processes (supervisor spec 11.1): the news engine started as a process of its own, on a temporary state
-directory, behind the stand-ins and the tripwire of tests/helpers/engine_child.py. Nothing here reaches the network,
-the model, the live state or the owner's phone."""
+directory, behind the stand-ins and the tripwire of tests/helpers/engine_child.py; and the supervisor's parent process
+(aitrader/supervise.py) with its stand-in child, tests/helpers/dummy_child.py. Nothing here reaches the network, the
+model, the live state or the owner's phone."""
 
 from helpers import no_phone  # noqa: F401  (first: a test run must never reach the owner's phone)
 
+import contextlib
 import fcntl
+import functools
+import io
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -16,16 +21,17 @@ import tempfile
 import threading
 import time
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 from zoneinfo import ZoneInfo
 
-from aitrader import journal
+from aitrader import journal, notify, ownerlines, supervise
 from aitrader.broker import PaperBroker
 
 TESTS = Path(__file__).resolve().parent
 ENGINE_CHILD = TESTS / "helpers" / "engine_child.py"
+DUMMY_CHILD = TESTS / "helpers" / "dummy_child.py"
 
 
 def _lines(path: Path) -> list:
@@ -474,3 +480,142 @@ class Harness(Procs):
                             self.scenario({}), "--sent", str(self.sent_file), "--minutes", "5"],
                            capture_output=True, text=True, env=no_phone.clean_env(), timeout=20)
         self.assertEqual((p.returncode, p.stdout), (0, '["news-live", "--minutes", "5"]\n'), p.stderr[-400:])
+
+
+# Spec section 10 at its defaults: every key of the supervisor block but `slots` (Task 23), `watcher.drill_from`
+# (Task 25) and the five switches, plus until_ny and free_text_max_chars, the two keys this plan adds.
+SPEC = {"loop_seconds": 0.5, "healthy_seconds": 60, "backoff_first_seconds": 1, "backoff_max_seconds": 60, "max_restarts": 5,
+        "restart_window_seconds": 600, "max_restarts_day": 20, "hang_seconds": 180, "start_grace_seconds": 60,
+        "hang_term_grace_seconds": 5, "planned_stop_grace_seconds": 120, "lock_wait_seconds": 150,
+        "stops_stale_seconds": 120, "up_hb_max_seconds": 60, "mark_gap_max_seconds": 150, "parent_stale_seconds": 180,
+        "outage_report_seconds": 180, "end_of_day_slack_seconds": 60, "max_alerts_per_hour": 6, "alert_retry_seconds": 60,
+        "alert_retry_minutes": 15, "send_timeout_seconds": 5, "held_names_in_line": 6, "max_line_bytes": 1200,
+        "owner_tz": "Asia/Jerusalem", "launch_from_ny": "08:00", "launch_until_ny": "16:00",
+        "handover_times_ny": ["09:18", "10:48", "12:28", "14:17"], "min_leg_minutes": 20, "max_leg_minutes": 110,
+        "handover_target_seconds": 60, "long_timeout_ms": 32400000, "uptime_keep_days": 30,
+        "receipts_keep_days": 30, "uptime_target": 0.99, "report_days": 14, "until_ny": "16:05", "free_text_max_chars": 200}
+DEADMAN = {"ping_seconds": 180, "delay_seconds": 360, "handover_delay_seconds": 600, "fresh_seconds": 90,
+           "retry_seconds": 30, "daily_limit_retry_after_seconds": 600, "reserve_messages": 15, "disarm_after_close_seconds": 60,
+           "cancel_tries": 3, "cancel_retry_seconds": 20, "seq_margin_seconds": 20}
+WATCHER = {"lookback_hours": 24, "ntfy_since": "35m", "stale_minutes": 90,
+           "engine_window_ny": ["08:07", "16:01"], "quiet_hours": {"tz": "Asia/Jerusalem", "from": "23:00", "to": "08:00"},
+           "max_cost_share": 0.2}
+SWITCHES = [("hang_kill_enabled",), ("long_timeout_proven",), ("deadman", "enabled"), ("watcher", "fire_enabled"), ("watcher", "notify_enabled")]
+SWITCHES_ON: list = []      # a rollout step that turns a switch on adds its path here, in the same commit as config.json
+
+
+class Foundations(unittest.TestCase):
+    """The parent's config, its own calendar, the uptime log, the state file (supervisor spec 4.3, 4.5, 4.6, 10) and the
+    stand-in child its process tests start."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def test_the_supervisor_block_carries_the_defaults_of_spec_section_10(self):       # every key but the five switches
+        cfg = supervise.load_cfg(); sup = cfg["supervisor"]
+        self.assertEqual(({k: sup[k] for k in SPEC}, {k: sup["deadman"][k] for k in DEADMAN}, {k: sup["watcher"][k] for k in WATCHER}),
+                         (SPEC, DEADMAN, WATCHER))
+        self.assertEqual(cfg["alerts"]["ntfy_base_url"], "https://ntfy.sh")
+
+    def test_a_switch_is_on_only_when_its_rollout_step_said_so(self):
+        sup = supervise.load_cfg()["supervisor"]
+        for path in SWITCHES:
+            self.assertIs(functools.reduce(lambda d, k: d[k], path, sup), path in SWITCHES_ON, path)
+
+    def test_the_owner_lines_say_the_numbers_the_config_holds(self):   # controller ruling 11: DM1, DM2 and R8 say them in words
+        sup = supervise.load_cfg()["supervisor"]
+
+        def said(line_id: str, pattern: str) -> int:
+            return int(re.search(pattern, ownerlines.LINES[line_id][1]).group(1))
+        self.assertEqual((sup["deadman"]["delay_seconds"], sup["deadman"]["handover_delay_seconds"], sup["long_timeout_ms"],
+                          len(sup["handover_times_ny"])),
+                         (said("DM1", r"יותר מ-(\d+) דקות") * 60, said("DM2", r"כבר (\d+) דקות") * 60,
+                          said("R8", r"ההגדרה של (\d+) שעות") * 3600 * 1000, said("R8", r"מתוכננת (\d+) פעמים ביום")))
+
+    def test_the_parents_calendar_equals_journal_session_hours_for_every_day_of_2026_and_2027(self):
+        cal = supervise.load_cfg()["calendar"]
+        for i in range(730):
+            d = date(2026, 1, 1) + timedelta(days=i)
+            self.assertEqual(supervise.session_hours(d, cal), journal.session_hours(d), d)
+        # a weekday of the first year the calendar does not list is closed, as journal says (fail closed)
+        after = next(d for d in (date(max(cal["years"]) + 1, 1, k) for k in range(2, 9)) if d.weekday() < 5)
+        self.assertEqual((supervise.session_hours(after, cal), journal.session_hours(after)), (None, None))
+
+    def test_an_append_after_a_torn_line_starts_a_new_line_and_the_reader_skips_the_torn_one(self):   # the file ends with '{"t": "x'
+        path = self.tmp / "uptime.jsonl"
+        path.write_text('{"t": "x')
+        row = supervise.append_row(path, 4242, "mark", datetime(2026, 11, 12, 10, 0, 7, 900000, tzinfo=ZoneInfo("America/New_York")), hb=1.5)
+        self.assertEqual([r["ev"] for r in supervise.read_rows(path)], ["mark"])
+        self.assertEqual((supervise.read_rows(path), row),     # the row as returned and as read: t in UTC, whole seconds
+                         ([row], {"t": "2026-11-12T15:00:07+00:00", "ev": "mark", "sup": 4242, "hb": 1.5}))
+
+    def test_rows_older_than_the_keep_days_are_dropped(self):                     # rows 31 and 29 days old, keep 30
+        path, now = self.tmp / "uptime.jsonl", datetime(2026, 11, 12, 15, 0, tzinfo=timezone.utc)
+        for days in (31, 29):
+            supervise.append_row(path, 4242, "mark", now - timedelta(days=days))
+        supervise.prune_rows(path, 30, now)
+        self.assertEqual(len(supervise.read_rows(path)), 1)
+        self.assertEqual((supervise.read_rows(path)[0]["t"], sorted(p.name for p in self.tmp.iterdir())),
+                         ("2026-10-14T15:00:00+00:00", ["uptime.jsonl"]))   # the younger row, and no tmp file left
+
+    def test_a_state_file_of_another_day_keeps_the_halt_only_and_garbage_is_a_new_day(self):   # Review Focus 1 and 4
+        path = self.tmp / "news_supervisor.json"
+        supervise.save_state(path, {"day": "2026-11-11", "restarts_today": 7, "trips_today": 2,
+                                    "halt": {"code": 4, "why": "halt", "at": "2026-11-11T15:20:00+00:00"},
+                                    "alerts": {"hour": "2026-11-11T15", "sent": 6, "capped": 2},
+                                    "reported_through": "2026-11-11T16:00:00+00:00", "last_commit": "aaa1111",
+                                    "handover": {"at": "2026-11-11T19:17:00+00:00", "last_look": "2026-11-11T19:16:58+00:00"}})
+        st = supervise.load_state(path, "2026-11-12")            # the file: day 2026-11-11, restarts_today 7, trips_today 2, a halt with code 4, a handover
+        self.assertEqual((st["day"], st["restarts_today"], st["trips_today"], st["halt"]["code"], st["handover"]), ("2026-11-12", 0, 0, 4, None))
+        self.assertEqual((st["alerts"], st["reported_through"], st["last_commit"]),
+                         ({"hour": None, "sent": 0, "capped": 0}, "2026-11-11T16:00:00+00:00", "aaa1111"))
+        path.write_text("{not json")
+        self.assertEqual((supervise.load_state(path, "2026-11-12")["restarts_today"], supervise.load_state(path, "2026-11-12")["halt"]), (0, None))
+
+    def test_a_state_file_that_does_not_parse_is_named_by_its_error_class_and_a_good_one_is_not(self):   # ruling P18(c)
+        path = self.tmp / "news_supervisor.json"
+        path.write_text('{"day": "2026-11-12", "restarts_today": 3, "halt": {"code": 4, "why": "halt", "at": "x"}')   # torn
+        self.assertEqual(supervise.load_state(path, "2026-11-12")["load_error"], "JSONDecodeError")   # the class, never the text
+        st = supervise.load_state(path, "2026-11-12")
+        del st["load_error"]                                     # as main does before its first save
+        supervise.save_state(path, {**st, "restarts_today": 3})
+        good = supervise.load_state(path, "2026-11-12")
+        self.assertEqual((good["restarts_today"], "load_error" in good), (3, False))
+        path.unlink()                                            # no file: a first start, not a damaged file
+        self.assertNotIn("load_error", supervise.load_state(path, "2026-11-12"))
+
+    def test_supervise_imports_no_pandas_no_requests_and_no_engine_module(self):
+        code = ("import sys, aitrader.supervise; sys.exit(1 if [m for m in ('pandas', 'requests', 'aitrader.journal',"
+                " 'aitrader.notify', 'aitrader.news_live') if m in sys.modules] else 0)")
+        self.assertEqual(subprocess.run([sys.executable, "-c", code], env=no_phone.clean_env()).returncode, 0)
+
+    def test_notify_posts_to_the_configured_address(self):                        # requests.post replaced; the topic set for this call only
+        cfg = supervise.load_cfg()
+        cfg["alerts"]["ntfy_base_url"] = "http://127.0.0.1:9"
+        posted_urls = []
+
+        def post(url, **kw):
+            posted_urls.append(url)
+            return mock.Mock(ok=True)
+        with mock.patch.object(notify.requests, "post", post), \
+                mock.patch.dict(os.environ, {cfg["alerts"]["ntfy_topic_env"]: "t0p1c-under-test"}), \
+                contextlib.redirect_stdout(io.StringIO()):     # send prints every line it sends: not into the test output
+            self.assertEqual(notify.send("a title", "a body", cfg, "high"), ["ntfy"])
+        self.assertEqual(posted_urls, ["http://127.0.0.1:9/"])
+
+    def test_the_dummy_child_plays_run_n_at_start_n_and_never_ends_on_until(self):   # ruling P1 (it takes --until, ignores it)
+        script, beat = self.tmp / "script.json", self.tmp / "news_heartbeat.json"
+        script.write_text(json.dumps([{"beats": 0, "then": "exit", "code": 5},
+                                      {"beats": 3, "every_s": 0.05, "then": "exit", "code": 6, "held": {"BBB": 48.5},
+                                       "stop_age_s": [[300, 2], [7, 1]], "blind": ["BBB"], "commit": "bbb2222"}]))
+        # 00:00 New York has passed at every hour of the day: a child that ended on --until would end at once with 0
+        cmd = [sys.executable, str(DUMMY_CHILD), "--heartbeat", str(beat), "--script", str(script), "--until", "00:00"]
+        codes = [subprocess.run(cmd, env=no_phone.clean_env(), capture_output=True, timeout=20).returncode for _ in range(3)]
+        self.assertEqual((codes, Path(f"{script}.n").read_text().split()), ([5, 6, 6], ["3"]))   # the last run repeats
+        hb = json.loads(beat.read_text())                        # the third beat of the third start
+        at = datetime.fromisoformat(hb["at"])
+        self.assertEqual((hb["phase"], hb["step"], hb["market_open"], hb["blind"], hb["code"]["commit"], hb["supervised"]),
+                         ("idle", 3, True, ["BBB"], "bbb2222", False))
+        self.assertEqual((hb["held"]["BBB"]["stop"], at - datetime.fromisoformat(hb["held"]["BBB"]["checked_at"])),
+                         (48.5, timedelta(seconds=7)))
