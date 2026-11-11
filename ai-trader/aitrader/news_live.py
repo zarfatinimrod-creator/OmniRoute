@@ -725,8 +725,14 @@ class NewsTrader:
         """The fresh headlines not seen before. Every other new one is too old to act on and leaves a "stale" row;
         prime=True (the first start) marks everything already out as seen under ONE summary row."""
         t0, h = time.monotonic(), self._tally()  # before the feeds are asked: a first window covers its first poll
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            batches = list(ex.map(lambda s: _feed(s, self.session), self.universe))
+
+        def fed(sym):  # the priming poll of a start asks one feed at a time and beats after each: a start whose feeds
+            got = _feed(sym, self.session)  # are slow is busy, not hung (a step's poll has its one beat after the poll)
+            if prime:
+                self._beat(self._phase)
+            return got
+        with ThreadPoolExecutor(max_workers=1 if prime else 8) as ex:
+            batches = list(ex.map(fed, self.universe))
         answered = sum(b is not None for b in batches)
         h["poll_s"].append(time.monotonic() - t0)
         h["feeds_min"] = answered if h["feeds_min"] is None else min(h["feeds_min"], answered)
@@ -1066,6 +1072,7 @@ class NewsTrader:
                             f"{pos['stop_breach']['at']} שעון ניו יורק (לפי Yahoo). {what} (כסף נייר)")
                     events.append(text)
                     notify.send("AI Trader - סטופ שלא נבדק", text, self.cfg, "urgent")
+                    self._beat("stops")  # after the send: a send of up to 15 s a channel is a call like a bar read
             except Exception as e:  # noqa: BLE001 - a failure here must never cost the normal stop check its turn
                 self._note_error(e, "catch_up_stops")
                 try:
@@ -1111,6 +1118,8 @@ class NewsTrader:
         The lines the look added are said to the owner here, when the look is over and saved: a sale does not wait
         for the poll and the scorer, and a kill in between does not lose its line. Never before a sale."""
         seen, n, looked = dict(self._covered), len(events), True
+        blind = lambda: set(getattr(self, "_blind", {})) & set(self.book.positions)  # noqa: E731 - the file's "blind"
+        was_blind = blind()
         mine = len(self._unsent)  # the trade rows this look appends come after these
         self._phase = "stops"  # for the beat after the look's own message, also when the look asked no quote (nothing held)
         if not hasattr(self, "_prev_look"):
@@ -1132,17 +1141,22 @@ class NewsTrader:
             self._note_error(e, "catch_up_stops")
         if len(events) > n:
             self.save(seen=False)  # what was sold is on disk before anything slower can fail
-        if any(self._covered.get(sym) != seen.get(sym) for sym in self.book.positions):
-            # this look stamped a held name, and a name is stamped only after the beat of its own quote or bar read:
-            # the file gets the look's stamps now, not with whatever comes next (a slow poll)
+        if blind() != was_blind or any(self._covered.get(sym) != seen.get(sym) for sym in self.book.positions):
+            # this look stamped a held name, or changed which held names are blind: a name is stamped, and its blind
+            # clock set or cleared, only after the beat of its own quote or bar read. The file gets them now, not
+            # with whatever comes next (a slow poll)
             self._beat("stops")
         if len(events) > n:
+            told = False
             try:
-                if self._say(events[n:]):
+                told = self._say(events[n:])
+                if told:
                     self._told_lines.update(range(n, len(events)))  # the step's closing message leaves these out
-                    self._mark_told(self._unsent[mine:])
+                    self._mark_told(self._unsent[mine:])  # with its beat
             except Exception as e:  # noqa: BLE001 - not said here: the lines stay for the step's closing message
                 self._note_error(e, "look_alert")
+            if not told:
+                self._beat("stops")  # a send that no channel took has taken its time all the same
         return looked
 
     def _note_error(self, e: Exception, where: str):
@@ -1159,6 +1173,7 @@ class NewsTrader:
         if seeing:
             if self._blind.pop(sym, [now, False])[1]:
                 notify.send("AI Trader - חדשות", f"המחיר של {sym} חזר. הסטופ שוב רואה מחיר עדכני (כסף נייר)", self.cfg, "high")
+                self._beat("stops")  # after each send of a look: twelve names are twelve sends, busy and not hung
             return
         since = self._blind.setdefault(sym, [now, False])
         gap = (now - since[0]).total_seconds()
@@ -1172,6 +1187,7 @@ class NewsTrader:
         since[1] = bool(notify.send(
             "AI Trader - תקלה", f"אין מחיר עדכני ל-{sym} כבר לפחות {int(gap // 60)} דקות (Yahoo).{last} הסטופ רואה רק מחיר ישן"
             " (או לא רואה מחיר בכלל) ולא יגיב לירידה עד שהמחיר יתעדכן (כסף נייר)", self.cfg, "urgent"))
+        self._beat("stops")  # after the send, and with the told flag in the file at once
 
     def _log_trade(self, f: dict, events: list):
         journal.append("news_trades.jsonl", {**f, "logged_at": journal.now_utc()})
@@ -1452,16 +1468,29 @@ class NewsTrader:
         self._told_lines = set()
         # the trade rows this step appends come after these. getattr: nothing a step needs before its chain check may
         # depend on how the trader was built (tests/test_audit_fixes.py builds one with no __init__ and expects ChainBroken)
-        mine = len(getattr(self, "_unsent", ()))
+        unsent = getattr(self, "_unsent", ())
+        mine = len(unsent)
+        # and before them, oldest first, this process's trades of before this step that no channel took the line of
+        # (a sale of a start's first look, which is in no step). The run before's are the late line's: say_late
+        late = {t.get("hash") for t in getattr(self, "_late", ())}
+        earlier = [h for h in unsent if h not in late]
         t0 = time.monotonic()
         try:
             self._step(events)
         finally:  # whatever fails further down, what the step already did is said: a sale at its top is never lost
             owed = [line for i, line in enumerate(events) if i not in self._told_lines]  # what no look's message delivered
+            if earlier:
+                try:  # their lines as the journal has them; a journal that cannot be read leaves them to the next step
+                    rows = {t.get("hash"): t for t in journal.read("news_trades.jsonl") if isinstance(t, dict)}
+                    earlier = [h for h in earlier if h in rows]
+                    owed = [_trade_line(rows[h]) for h in earlier] + owed
+                except Exception as e:  # noqa: BLE001
+                    earlier = []
+                    self._note_error(e, "step_alert")
             if owed:
                 try:
                     if self._say(owed):
-                        self._mark_told(self._unsent[mine:])  # this step's rows that were still owed
+                        self._mark_told(earlier + self._unsent[mine:])  # every row whose line this message carried
                 except Exception as e:  # noqa: BLE001 - the alert must not hide the error of the step itself
                     self._note_error(e, "step_alert")
             self._step_measured(time.monotonic() - t0)  # measurement only, after the alert, and it never raises
@@ -1762,6 +1791,8 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
       4. when the market is open, the first look at the stops, whose own lines go out from the look; a beat ("stops");
       5. the lines that can wait, each a send of up to 15 s a channel: no lock, a book mismatch, what was not said;
       6. the code stamp (git), priming, and the loop.
+    A beat follows each send of 5, the code stamp and each feed call of the priming poll: no stretch of a start goes
+    beyond one call that leaves the process without a beat.
     No git call, no feed and no line that can wait stands before the first look.
     A planned stop (STOP: a signal, or under supervised=PID a parent that is no longer PID) is seen at the top of a
     round and between the slices of the wait: the step in progress ends as always, with its look at the stops and its
@@ -1808,6 +1839,7 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
             notify.send("AI Trader - תקלה", owner_line(cfg, "E2"), cfg, "urgent")
         except Exception as e:  # noqa: BLE001
             error_once("lock_line", e)
+        nt._beat(nt._phase)  # after each send of a start: the next slow call does not begin without a beat between
     if mismatch:  # on record at every start; said once per New York day and name, not at each of the day's launches
         try:
             journal.append("news_errors.jsonl", {
@@ -1821,11 +1853,13 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
             if nt._mismatch_told != told and notify.send("AI Trader - תקלה", owner_line(
                     cfg, "E1", side=ownerlines.WORDS["E1.side"][mismatch["side"]], sym=mismatch["symbol"]), cfg, "urgent"):
                 nt._mismatch_told = told  # only once a channel took it: a line nobody got is said by the next start
-                nt._beat(nt._phase)  # into the file at once, for the next start to read
         except Exception as e:  # noqa: BLE001 - as above: the stops of the book there is still need this engine
             error_once("mismatch_line", e)
+        nt._beat(nt._phase)  # after the send, taken or not: a pair a channel took is in the file for the next start
     nt.say_late()  # the trades of today that the run before made and nobody was told of
+    nt._beat(nt._phase)  # after its send, taken or not
     nt.code = code_stamp()
+    nt._beat(nt._phase)  # two git calls of up to 15 s each; and from here on the file names the code
     print(f"[news] engine started on commit {nt.code['commit']}"
           + (" + uncommitted changes" if nt.code["dirty"] else "") + f", guards {nt.n['guards']}", flush=True)
     if prime and not nt.seen:  # first start: mark everything already out as seen, act only on what comes next

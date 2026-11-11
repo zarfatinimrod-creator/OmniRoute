@@ -158,7 +158,8 @@ class EveryCallAndEveryStart(_Engine):
         self.nt.n["stop_catchup"] = "off"   # whether a bar read is due depends on the hour the test runs at
         with written() as beats:
             step(self.nt)
-        self.assertEqual(beats, ["stops", "stops", "poll", "stops", "stops", "idle"])
+        # the first look made both names blind (no live quote), so it ends with its closing beat; the second changed nothing
+        self.assertEqual(beats, ["stops", "stops", "stops", "poll", "stops", "stops", "idle"])
 
     def test_a_look_that_stamped_a_held_name_ends_with_a_beat_so_the_file_has_the_stamp_at_once(self):
         t0 = datetime(2026, 11, 10, 9, 45, tzinfo=NY)       # a fixed clock: the test says the same at any hour
@@ -1124,3 +1125,178 @@ class PlannedStopOfTheLoop(_WatchedStarts):
             self.assertEqual(news_live._run("23:59", 0.0005, False), 0)
         self.assertEqual(slept[:2], [0.75, 0.75])                               # two whole slices, then what is left:
         self.assertAlmostEqual(sum(slept[:3]), 2.0, delta=0.2)                  # poll_seconds less the time the step took
+
+
+class FollowUps(_Engine):
+    """Four follow-ups of the reviews of Tasks 4-7: a beat after every send of a stop look and of a start, the blind
+    list in the file as soon as a look changed it, and a trade line of this process that no channel took carried by
+    the closing message of the next step."""
+
+    def setUp(self):
+        super().setUp()
+        self.cfg["news"]["stop_catchup"] = self.nt.n["stop_catchup"] = "off"   # whether a bar read is due depends on the hour
+        self.beats, save = [], journal.save_json      # the phase of every heartbeat written, in the order of the writes
+
+        def counted(name, obj):
+            if name == "news_heartbeat.json":
+                self.beats.append(obj.get("phase"))
+            save(name, obj)
+        for stand_in in (mock.patch.object(journal, "save_json", counted), contextlib.redirect_stdout(io.StringIO())):
+            stand_in.__enter__()                      # and the engine's own log lines stay out of the test output
+            self.addCleanup(stand_in.__exit__, None, None, None)
+        self.feed = lambda sym: []                    # what start()'s stand-ins for one feed call and for git answer
+        self.stamp = lambda: {"commit": "abc1234", "dirty": False, "started": "now"}
+
+    def writes(self):
+        """How many heartbeats were written so far."""
+        return len(self.beats)
+
+    def start(self, locked=True, prime=False):
+        """_run on the temporary state, with a loop of 30 ms as the other starts of this file: the config, git and the
+        wait are stand-ins and the poll of a step finds nothing. The priming poll (prime=True) is the real one, so each
+        of its feed calls reaches the _feed stand-in (self.feed)."""
+        poll = news_live.NewsTrader.poll_headlines
+        with mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda nt, prime=False: poll(nt, prime=True) if prime else []), \
+                mock.patch.object(news_live, "_feed", lambda sym, session: self.feed(sym)), \
+                mock.patch.object(news_live, "code_stamp", lambda: self.stamp()), \
+                mock.patch.object(news_live.time, "sleep", lambda s: None), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg):
+            return news_live._run("23:59", 0.0005, prime, locked=locked)
+
+    def test_every_alert_of_a_stop_look_is_followed_by_a_beat(self):
+        # 12 names held, none with a live quote, each blind for longer than news.stop_blind_alert_seconds.
+        names = [f"N{i:02d}" for i in range(12)]
+        long_ago = datetime.now(NY) - timedelta(seconds=self.nt.n["stop_blind_alert_seconds"] + 60)
+        for sym in names:
+            hold(self.nt, sym)                        # not in self.prices: its quote brings no price
+        self.nt._blind = {sym: [long_ago, False] for sym in names}
+        # The notify.send stand-in appends the number of heartbeat writes so far to `seen` and returns ["ntfy"].
+        seen = []
+        news_live.notify.send = lambda title, body, cfg, prio="default", **kw: seen.append(self.writes()) or ["ntfy"]
+        self.nt.check_stops([])                       # as the other tests of this file call a look
+        writes_after_the_look = self.writes()
+        self.assertEqual(len(seen), 12)
+        self.assertEqual(seen, sorted(set(seen)))     # strictly rising: a beat stands between any two sends
+        self.assertGreater(writes_after_the_look, seen[-1])   # and one follows the last send
+
+    def test_a_look_that_only_changes_who_is_blind_leaves_a_closing_beat(self):
+        live = [True]                                 # whether BBB's quote is live at the next look
+        self.nt._quote_is_live = lambda *a, **k: live[0]
+        hold(self.nt)                                 # first look: BBB has a live quote and is stamped
+        self.nt._look_at_stops([], guarded=True)
+        stamp = news_live.read_heartbeat()["held"]["BBB"]["checked_at"]
+        # second look: no live quote for BBB, so no stamp changes and BBB turns blind
+        live[0] = False
+        self.nt._look_at_stops([], guarded=True)
+        b = news_live.read_heartbeat()
+        self.assertEqual((b["phase"], b["blind"], list(b["blind_since"])), ("stops", ["BBB"], ["BBB"]))
+        self.assertEqual(b["held"]["BBB"]["checked_at"], stamp)   # the blind list alone made that beat
+        # third look: the quote is back; the list empties and the file says so at once
+        live[0] = True
+        self.nt._look_at_stops([], guarded=True)
+        self.assertEqual(news_live.read_heartbeat()["blind"], [])
+
+    def test_a_look_that_changes_nothing_writes_no_closing_beat(self):       # nothing held
+        before = self.writes()
+        self.nt._look_at_stops([], guarded=True)
+        self.assertEqual(self.writes(), before)
+
+    def test_a_first_look_line_nobody_took_is_in_the_first_steps_closing_message(self):
+        hold(self.nt); self.nt.save(); self.prices["BBB"] = 48.0
+        # notify.send stand-in: the first call returns [] (the look's own send fails), every later call ["ntfy"]
+        calls = []
+
+        def send(title, body, cfg, prio="default", **kw):
+            took = ["ntfy"] if calls else []
+            calls.append((bool(took), body))
+            return took
+        news_live.notify.send = send
+        self.assertEqual(self.start(), 0)             # start() as in class FirstLook: _run with one short step
+        self.assertEqual((calls[0][0], "SELL 10 BBB" in calls[0][1]), (False, True))   # the first look's own send
+        told = [b for ok, b in calls if ok and "SELL 10 BBB" in b]
+        self.assertEqual(len(told), 1)                # said once, by the step's closing message, in this same run
+        self.assertEqual(news_live.read_heartbeat()["told_through"], journal.read("news_trades.jsonl")[-1]["hash"])
+
+    def test_a_line_no_message_took_is_carried_step_after_step_oldest_first_and_once_in_each_message(self):
+        hold(self.nt); hold(self.nt, "AAA", 100.0)
+        bodies = []
+
+        def send(title, body, cfg, prio="default", **kw):   # no channel takes the first three messages; one takes the fourth
+            bodies.append(body)
+            return ["ntfy"] if len(bodies) > 3 else []
+        news_live.notify.send = send
+        self.prices["BBB"] = 48.0                     # under its stop of 48.50: sold by the first step's first look
+        step(self.nt)                                 # the look's message and the closing message: nobody takes either
+        self.prices["AAA"] = 96.0                     # under its stop of 97.00: sold by the second step's first look
+        step(self.nt)                                 # the look's message (nobody), then the closing message (taken)
+        self.assertEqual([(b.count("SELL 10 BBB"), b.count("SELL 10 AAA")) for b in bodies], [(1, 0), (1, 0), (0, 1), (1, 1)])
+        self.assertLess(bodies[3].index("SELL 10 BBB"), bodies[3].index("SELL 10 AAA"))   # the oldest first
+        self.assertEqual((self.nt.told_through, self.nt._unsent), (journal.read("news_trades.jsonl")[-1]["hash"], []))
+
+    def test_a_start_beats_after_every_send_git_call_and_priming_feed(self):
+        # no lock (E2), a mismatch (E1) and one unsent row (the late line); priming on, 30 symbols in the universe;
+        # every outside call's stand-in appends the number of heartbeat writes so far to `seen`
+        self.nt.save()                                # a book that holds nothing, so the BUY of AAA below is a mismatch
+        journal.append("news_trades.jsonl", {**BUY_AAA, "date": datetime.now(NY).date().isoformat()})
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})   # nobody was told of it
+        self.cfg["universe"] = {f"S{i:02d}": "Tech" for i in range(30)}
+        seen = []
+
+        def mark():
+            seen.append(self.writes())
+
+        def feed(sym):                                # a feed call takes a moment, as a real one does: two feeds asked
+            mark()                                    # side by side would both see the same count
+            threading.Event().wait(0.005)
+            return []
+        price = news_live.live_price
+        news_live.live_price = lambda sym: mark() or price(sym)
+        news_live.bars_since = lambda sym, since, now: mark() or []
+        # and no channel takes a line, so that no beat of a delivered one (_mark_told) stands in for the beat after a send
+        news_live.notify.send = lambda title, body, cfg, prio="default", **kw: mark() or []
+        self.stamp, self.feed = lambda: mark() or {"commit": "abc1234", "dirty": False, "started": "now"}, feed
+        self.assertEqual(self.start(locked=False, prime=True), 0)
+        self.assertEqual(len(seen), 3 + 1 + 30)       # three sends, code_stamp, thirty feed calls
+        self.assertEqual(seen, sorted(set(seen)))     # a beat between any two of them
+
+    def test_rows_of_the_run_before_are_left_to_the_late_line(self):
+        # one SELL row of today on disk, heartbeat with told_through None; this run trades nothing
+        self.nt.save()                                # a book that holds nothing: the SELL is of a name already gone
+        trade("BBB", qty=10, price=48.0)
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        calls = []
+
+        def send(title, body, cfg, prio="default", **kw):   # no channel takes anything: the row stays owed all run long
+            calls.append((False, body))
+            return []
+        news_live.notify.send = send
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(sum("SELL" in b for _, b in calls), 1)              # the late line only, not the closing message too
+        self.assertTrue(calls[0][1].startswith("דווח באיחור: SELL 10 BBB"))
+        b = news_live.read_heartbeat()                # and the loop made steps, each one with a closing message to build
+        self.assertEqual((b["step"] > 0, b["told_through"]), (True, None))
+
+    def test_the_catch_up_alert_the_price_back_line_and_the_looks_own_message_are_each_followed_by_a_beat(self):
+        now = datetime(2026, 11, 10, 9, 45, tzinfo=NY)   # a fixed clock in a session: the test says the same at any hour
+        self.nt.n["stop_catchup"] = "alert"           # the ten minutes since the last look of the run before are read
+        self.nt.adopt_previous({"stops_checked_at": (now - timedelta(minutes=10)).astimezone(timezone.utc).isoformat()})
+        hold(self.nt); hold(self.nt, "AAA", 100.0)    # both above their stops at the live quote
+        self.nt._blind = {"AAA": [now - timedelta(minutes=6), True]}   # AAA had no live quote, and the owner was told
+        minutes = range(10, 0, -1)                    # one BBB bar closed under its stop of 48.50; AAA's all above 97.00
+        bars = {"BBB": [(now - timedelta(minutes=m), 48.0 if m == 5 else 49.5, 48.2 if m == 5 else 49.8) for m in minutes],
+                "AAA": [(now - timedelta(minutes=m), 99.5, 99.8) for m in minutes]}
+        calls = []                                    # every call of the look that leaves the process: (what, beats so far)
+        price = news_live.live_price
+        news_live.live_price = lambda sym: calls.append(("quote", self.writes())) or price(sym)
+        news_live.bars_since = lambda sym, since, now: calls.append(("bars", self.writes())) or bars[sym]
+
+        def send(title, body, cfg, prio="default", **kw):   # the look's own message is the one no channel takes
+            calls.append(("send", self.writes()))
+            return [] if "תיק חדשות (נייר)" in body else ["ntfy"]
+        news_live.notify.send = send
+        with mock.patch.object(self.nt, "_quote_is_live", lambda *a, **k: True):
+            self.nt._look_at_stops([], now=now)
+        # the price is back for AAA, BBB's stop traded through while unwatched, and the look's own message of that
+        self.assertEqual([what for what, _ in calls], ["quote", "quote", "send", "bars", "send", "bars", "send"])
+        beats = [n for _, n in calls] + [self.writes()]
+        self.assertEqual(beats, sorted(set(beats)))   # a beat after each call, the three sends included
