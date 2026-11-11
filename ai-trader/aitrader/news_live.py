@@ -426,6 +426,22 @@ def market_open_now() -> bool:
     return hours is not None and hours[0] <= (now.hour, now.minute) < hours[1]
 
 
+def _utc(stamp: str) -> datetime:
+    """A time that a state file holds as ISO text, as an aware UTC time. One written without a zone is read as UTC."""
+    at = datetime.fromisoformat(stamp)
+    return at.replace(tzinfo=timezone.utc) if at.tzinfo is None else at.astimezone(timezone.utc)
+
+
+def read_heartbeat() -> dict | None:
+    """state/news_heartbeat.json as an engine process last wrote it (NewsTrader._beat is its only writer); None when
+    there is no file or it cannot be read as an object."""
+    try:
+        beat = journal.load_json("news_heartbeat.json")
+    except Exception:  # noqa: BLE001 - OSError, bad JSON: all the same to whoever asks, there is no heartbeat to go by
+        return None
+    return beat if isinstance(beat, dict) else None
+
+
 def _exits_file() -> dict | None:
     """state/news_exits.json as it stands; None when it cannot be read or is not an object."""
     try:
@@ -848,6 +864,7 @@ class NewsTrader:
             px, _ = live_price(sym)
             sight[sym] = px
             if not px:
+                self._beat("stops")
                 continue
             used[sym] = (QUOTE_TIME.get(sym), time.monotonic())
             pos["last_price"] = px
@@ -873,6 +890,7 @@ class NewsTrader:
                 f = self._sell(sym, px, reason)
                 if f:
                     self._log_trade(f, events)
+            self._beat("stops")  # one per quote, after whatever the quote led to: a sale never waits for its own beat
         self._stops_checked_at = now.astimezone(timezone.utc)  # every held name was looked at (a name with no quote alerts below)
         bad = ("ExitRequests", wrong) if wrong else None
         try:  # the requests file is tidied after the sales: a failure here must not cost them their save and their report
@@ -982,6 +1000,7 @@ class NewsTrader:
                 since = since.replace(second=0, microsecond=0)
                 stop = pos.get("stop_price", pos["avg_cost"] * (1 - self.n["stop_loss_pct"]))
                 bars = bars_since(sym, since, now)
+                self._beat("stops")  # three held names can be three slow bar reads in a row
                 minutes = int((now - since).total_seconds() // 60)
                 if bars is not None and minutes >= self.n["stop_catchup_min_minutes"] and (
                         len(bars) < minutes * self.n["stop_catchup_min_bar_share"]):
@@ -1069,6 +1088,10 @@ class NewsTrader:
             self._note_error(e, "catch_up_stops")
         if len(events) > n:
             self.save(seen=False)  # what was sold is on disk before anything slower can fail
+        if any(self._covered.get(sym) != seen.get(sym) for sym in self.book.positions):
+            # this look stamped a held name, and a name is stamped only after the beat of its own quote or bar read:
+            # the file gets the look's stamps now, not with whatever comes next (a slow poll)
+            self._beat("stops")
         return looked
 
     def _note_error(self, e: Exception, where: str):
@@ -1164,6 +1187,7 @@ class NewsTrader:
                     checked = None  # what the second check said, when it was asked before the buy
                     if enforce and self.n["verify_buys"]:
                         checked = "refused" if self._second_check(x, s, events) else "passed"
+                        self._beat("score")
                         if is_open:  # the check took seconds: the stops are looked at before anything else is done
                             self._look_at_stops(events, guarded=True)
                     if checked == "refused":
@@ -1308,12 +1332,14 @@ class NewsTrader:
             return
         today = datetime.now(NY).date()
         opens = official_opens([q["symbol"] for q in self.queue], today)
+        self._beat("queue")
         for q in list(self.queue):
             px, how = opens.get(q["symbol"]), "the 09:30 open"
             if not px:  # no 09:30 bar yet (delayed opening / lagging minute data): only a live quote will do
                 lp = live_price(q["symbol"])[0]
                 px, how = (lp, "the first live quote") if lp and self._quote_is_live(QUOTE_TIME.get(q["symbol"])) else (None, "")
             if not px:
+                self._beat("queue")
                 continue  # stays queued; tried again next step
             try:
                 if self.n["guards"] == "enforce" and self.n["verify_buys"] and q.get("second_check") != "passed":
@@ -1327,6 +1353,7 @@ class NewsTrader:
                         self._log_trade(f, events)
             finally:  # bought or turned down once: whatever went wrong, the buy is not tried again every step
                 self.queue.remove(q)
+                self._beat("queue")
 
     def step(self) -> list[str]:
         events: list[str] = []
@@ -1346,6 +1373,7 @@ class NewsTrader:
         return events
 
     def _step(self, events: list):
+        self._steps = getattr(self, "_steps", 0) + 1  # the steps this process has begun: in every heartbeat
         if time.time() - getattr(self, "_chain_checked", 0.0) >= self.n.get("chain_check_seconds", 300):
             bad = journal.broken_chains(journal.NEWS_CHAINED)
             if bad:  # fail closed, like the quant cycle: no trading on a corrupted journal
@@ -1358,15 +1386,18 @@ class NewsTrader:
         self.run_queue_at_open(events)
         new = self.poll_headlines()
         self._pending = {x["key"]: x for x in new}  # no outcome on record yet (news_seen_log.jsonl)
+        self._beat("poll")
         is_open = market_open_now()
         for x in new:
             x["price"], move = live_price(x["symbol"])
             # outside the session the regular-session move leaves out the after-hours reaction: it is not "so far today"
             x["day_move_pct"] = move if is_open else None
             x["price_at"] = QUOTE_TIME.get(x["symbol"])  # the quote's own time (None = unknown = not live)
+            self._beat("quotes")  # fifty new headlines are fifty quotes: the loop is busy, not hung
         for i in range(0, len(new), self.n["batch_max"]):
             chunk = new[i:i + self.n["batch_max"]]
             scores, facts = self._scored(chunk)
+            self._beat("score")
             self.handle_scored(chunk, scores, events)
             for x in chunk:  # after its score is journaled; a headline a failing step leaves behind gets "step_failed"
                 why_not = ("scorer_failed" if "error" in facts else
@@ -1380,22 +1411,78 @@ class NewsTrader:
             self._look_at_stops(events)
         self.drain_trial()
         self.save()
-        checked = getattr(self, "_stops_checked_at", None)
-        if self.book.positions and checked is not None:
-            # per name: a name with no live quote all this time was not looked at, whatever the loop's own clock says
-            marks = [self._covered.get(sym, getattr(self, "_prev_look", None)) for sym in self.book.positions]
-            checked = None if any(m is None for m in marks) else min(marks)
-        blocked = self._buys_blocked(log=False)
-        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "headlines_seen": len(self.seen),
-                                                  "positions": len(self.book.positions), "queue": len(self.queue),
-                                                  "stops_checked_at": checked.isoformat() if checked else None,
-                                                  "buys_blocked": blocked[0] if blocked else None,
-                                                  "code": getattr(self, "code", None),
-                                                  "lock": getattr(self, "locked", True)})
+        self._beat("idle")
         if market_open_now() and time.time() - self._eq_logged >= self.n.get("equity_log_seconds", 300):
             self._eq_logged = time.time()  # equity curve for the dashboard, one point per 5 minutes in session
             journal.write_all("news_equity.jsonl", journal.read("news_equity.jsonl")[-5000:] + [
                 {"at": journal.now_utc(), "equity": round(self.book.equity(self._marks()), 2), "positions": len(self.book.positions)}])
+
+    def adopt_previous(self, prev: dict | None) -> None:
+        """What the engine process before this one left in its last heartbeat, taken over before this process writes
+        its own first beat (which would write over it). Two things, and neither may cost the start: a file that
+        cannot be used costs only what it held.
+        The last stop look: until this process has looked at the stops itself, the run before's stamp is the one the
+        catch-up reads the minute bars from and the one every beat repeats. With no heartbeat, or none with a stamp
+        that can be read, it is the last point of the equity curve.
+        The blind clocks: a held name that had no live quote keeps the time it went blind and whether the owner was
+        told, when the heartbeat is of today (New York). A restart does not put the alert off by another window and
+        does not send it twice, and "the price is back" still follows an alert that was delivered."""
+        prev = prev or {}
+        try:
+            self._prev_look = _utc(prev["stops_checked_at"])
+        except Exception:  # noqa: BLE001
+            self._prev_look = self._last_stop_check()
+        # what a beat repeats until the end of this process's first step: the last values the file held
+        self._beat_kept = {"headlines_seen": prev.get("headlines_seen"), "stops_checked_at": self._prev_look,
+                           "buys_blocked": prev.get("buys_blocked")}
+        try:
+            if prev.get("at") and _utc(prev["at"]).astimezone(NY).date() == datetime.now(NY).date():
+                told = prev.get("blind_told") or ()
+                self._blind = {sym: [_utc(since), sym in told] for sym, since in (prev.get("blind_since") or {}).items()
+                               if sym in self.book.positions}
+        except Exception as e:  # noqa: BLE001
+            self._note_error(e, "adopt_previous")
+
+    def _beat(self, phase: str) -> None:
+        """The heartbeat, state/news_heartbeat.json: written here and nowhere else, after every call that leaves the
+        process, so that whoever watches the file can tell an engine that hangs in a call from one that is busy.
+        phase: where the loop is ("boot", "stops", "queue", "poll", "quotes", "score", "idle").
+        Only the beat at the end of a step ("idle") works out headlines_seen, stops_checked_at and buys_blocked;
+        every other beat repeats the last values. stops_checked_at keeps its meaning (the oldest live look over the
+        held names), and until this process has made a look of its own it is the stamp the run before left.
+        A record only: it never raises, so a beat that cannot be written costs no sale and no step."""
+        try:
+            before = getattr(self, "_prev_look", None)
+            if phase == "idle":
+                checked = getattr(self, "_stops_checked_at", None)
+                if checked is None:
+                    checked = before
+                elif self.book.positions:
+                    # per name: a name with no live quote all this time was not looked at, whatever the loop's own clock says
+                    marks = [self._covered.get(sym, before) for sym in self.book.positions]
+                    checked = None if any(m is None for m in marks) else min(marks)
+                blocked = self._buys_blocked(log=False)
+                self._beat_kept = {"headlines_seen": len(self.seen), "stops_checked_at": checked,
+                                   "buys_blocked": blocked[0] if blocked else None}
+            kept = getattr(self, "_beat_kept", None) or {"stops_checked_at": before}
+            checked = kept["stops_checked_at"]
+            blind = {sym: v for sym, v in getattr(self, "_blind", {}).items() if sym in self.book.positions}
+            journal.save_json("news_heartbeat.json", {
+                "at": journal.now_utc(), "headlines_seen": kept.get("headlines_seen"),
+                "positions": len(self.book.positions), "queue": len(self.queue),
+                "stops_checked_at": checked.isoformat() if checked else None,
+                "buys_blocked": kept.get("buys_blocked"), "code": getattr(self, "code", None),
+                "lock": getattr(self, "locked", True), "pid": os.getpid(), "step": getattr(self, "_steps", 0),
+                "phase": phase, "market_open": bool(market_open_now()),
+                "held": {sym: {"stop": pos.get("stop_price", pos["avg_cost"] * (1 - self.n["stop_loss_pct"])),
+                               "checked_at": self._covered[sym].isoformat() if self._covered.get(sym) else None}
+                         for sym, pos in self.book.positions.items()},
+                "blind": list(blind),
+                "blind_since": {sym: v[0].astimezone(timezone.utc).isoformat() for sym, v in blind.items()},
+                "blind_told": [sym for sym, v in blind.items() if v[1]],
+                "told_through": None, "mismatch_told": None, "supervised": False})
+        except Exception as e:  # noqa: BLE001
+            self._note_error(e, "heartbeat")
 
 
 def _lock_holder(lock) -> tuple:
@@ -1437,8 +1524,10 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
 def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool = True) -> int:
     cfg = load_config()
     nt = NewsTrader(cfg)
-    nt.code = code_stamp()
     nt.locked = locked  # in every heartbeat: False = this engine runs with no lock on the book
+    nt.adopt_previous(read_heartbeat())  # what the process before this one left, before this one writes over it
+    nt._beat("boot")  # before git and priming: a slow start is not taken for a hang
+    nt.code = code_stamp()
     print(f"[news] engine started on commit {nt.code['commit']}"
           + (" + uncommitted changes" if nt.code["dirty"] else "") + f", guards {nt.n['guards']}", flush=True)
     if prime and not nt.seen:  # first start: mark everything already out as seen, act only on what comes next

@@ -446,7 +446,13 @@ class OperatorExit(HeldOnAClock):
 
     def test_without_a_live_quote_the_request_waits_and_the_stop_still_fires(self):
         self._ask()
-        with mock.patch.object(journal, "save_json", side_effect=AssertionError("news_exits.json rewritten unchanged")):
+        save = journal.save_json
+
+        def refused(name, obj):  # the heartbeat is the one file a look that sells nothing writes: every other save fails
+            if name != "news_heartbeat.json":
+                raise AssertionError("news_exits.json rewritten unchanged")
+            return save(name, obj)
+        with mock.patch.object(journal, "save_json", refused):
             self._check(0, 100.0, quote_age_s=600)  # a ten-minute-old price is not a price to sell at
             self._check(1, None)
         self.assertIn("AAA", self.nt.book.positions)
@@ -603,7 +609,9 @@ class OperatorExit(HeldOnAClock):
             self._check(0, 100.0, quote_age_s=20)
         # a crash between the two writes must not bring the sold name back with its request gone. The book goes to disk
         # with the trade (the queue file is written beside it, by the same save) and the request is cleared last
-        self.assertEqual([name for name, _ in saves if name != "news_queue.json"], ["news_book.json", "news_exits.json"])
+        # (the look's heartbeat is written between the two, after the sale: a record of its own, not part of this order)
+        self.assertEqual([name for name, _ in saves if name not in ("news_queue.json", "news_heartbeat.json")],
+                         ["news_book.json", "news_exits.json"])
         self.assertEqual((saves[0][0], saves[0][1]["positions"], saves[-1][0]), ("news_book.json", {}, "news_exits.json"))
 
     def test_a_stop_sale_is_on_disk_at_once(self):
