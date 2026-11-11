@@ -5,15 +5,18 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-11 10:20 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
-  `aitrader/notify.py`, `config.json`, new `aitrader/ownerlines.py`, `aitrader/supervise.py`, `aitrader/deadman.py`,
-  `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `scripts/drill_supervisor.py`, `tests/helpers/`,
-  new `tests/test_ownerlines.py`, `tests/test_news_supervised.py`, `tests/test_supervise.py`, `tests/test_uptime.py`,
-  `tests/test_slots.py`, `tests/test_watch.py`, `tests/test_slot_files.py`, `skills/trader/SKILL.md`,
-  `skills/trader/slots/`. Purpose: the supervisor ("always on the air"), plan
-  `research/plans/2026-11-10-supervisor.md`, approved by the owner on 2026-11-11. Build tasks 2-8 first (engine
-  changes); nothing reaches the live engine before its gate. Tests-only additions to other test files are welcome
-  from any session: say so under "Waiting" first so the two do not collide.
+- **2026-11-11 10:09 - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
+  `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
+  `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
+  `skills/trader/SKILL.md`, `skills/trader/slots/`, `scripts/drill_supervisor.py`, `tests/helpers/`,
+  `tests/fixtures/ntfy/`, `tests/fixtures/list_triggers_sample.json`, `tests/test_news_supervised.py`,
+  `tests/test_supervise.py`, `tests/test_ownerlines.py`, `tests/test_uptime.py`, `tests/test_slots.py`,
+  `tests/test_watch.py`, `tests/test_slot_files.py`, `tests/test_news_guards.py` (class `OneEngine` only).
+  Purpose: supervisor: spec 2026-11-10-supervisor-design, plan 2026-11-10-supervisor (approved by the owner on
+  2026-11-11). The time above is the last refresh; the claim was opened earlier the same day, in the commit that
+  closed the wave-3 claim. Build tasks 2-8 first (engine changes); nothing reaches the live engine before its
+  gate. Tests-only additions to other test files are welcome from any session: say so under "Waiting" first so
+  the two do not collide.
 
 ## Waiting
 
