@@ -57,15 +57,6 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
 24. [crypto] Parked and deferred minors from the crypto build (6 parked, 20 open minors, rulings R1-R19):
     research/2026-11-09-crypto-deferred-and-rulings.txt.
 25. [alerts] Engine alerts are written in English; the owner reads Hebrew. Translate the urgent ones.
-26. [news][ops] news-exit follow-ups from the gate of 2026-11-10 (PASS with should-fix). Until they land, do not
-    rely on an exit request made off-hours: the engine must not wait without limit on the requests lock (non-blocking
-    lock with a bounded retry); save the book right after a sale and before the request is cleared; an unreadable
-    requests file must reach the owner as an event, not only news_errors.jsonl; add `news-exit SYMBOL --cancel`;
-    validate the symbol; document the lever in the skill and in the config note; test a re-request made during the
-    price loop.
-27. [news][measurement] Mark every score and prediction with the scorer model and a hash of the prompt. The forward
-    record now pools three scorer versions (broken input on 2026-11-09, fixed input, session-gated null), so
-    "before and after" can only be told apart by timestamp.
 28. [news][risk] The priced-in rule now really softens negative scores on a stock that already fell, so the
     bad-news exit (score <= 2) on a held name fires less. Owner/critic decision: never soften a negative score.
 29. [news][signal] Before the open and after the close the scorer gets no move (null), and in session the brake uses
@@ -73,11 +64,6 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     pre-market move and the benchmark's move; ties to item 15.
 30. [news][model] Compare scorer models on the same headlines (agreement, delay, cost). Haiku 5.5 today; the owner's
     standing order is Fable 5.2 for all work, and the scorer is his decision with these numbers.
-31. [tests] The suite leaves its temporary state directories in /tmp (13,155 found on 2026-11-10): remove them in
-    tearDown.
-32. [news] Small ones from the gate: a non-numeric quote time still loses the price; a reply with no quote time
-    keeps the previous stamp; news-score should gate the move like the engine does; the "price is back" line still
-    says the stop "is checked again"; a failed move calculation leaves no record.
 
 33. [news][defect] Seal the scorer call. `score_batch` starts `claude -p` in the project directory with the default
     tools, so the project's instruction files are part of every scoring call: the same headline and input gave a 9
@@ -177,8 +163,72 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     its 420 mutants are anchored on line numbers of e6a82895. After the next change to news_live.py, postmortem.py
     or __main__.py: re-anchor them, run them, and treat a survivor in a guard, a sale or a stop look as a missing
     test. Eight survivors behave like the unchanged code (K14, K22, K27, PM64, PM75, X02, X03, BY1).
+51. [news][measurement] Health row: a stop-check gap still open when the row is cut is not in it, and the open
+    window is lost when the engine stops (second gate: 4 s with no check read stop_gap_max_s 0.0; 4 steps, 0 rows).
+52. [news][measurement] A headline whose score is already journaled gets "step_failed" when a later write in the
+    same chunk fails (second gate): write its "scored" row right after its news_scores row.
+53. [news] Small ones (second gate): a book save that fails before a request is cleared is journaled with where
+    "news_exits"; a headline older than seen_keep_days leaves no news_seen_log row; an undated quote leaves the
+    blind-stop alert without its price time.
+54. [review] No gate round is on record for the fix commits after the gates' last round (made on base 0215537a as
+    cf2b2832 and 3f88543a), nor for the merge of wave 3 onto e6a82895 (the three engine commits are one there; the
+    tests of both sides pass). The fixer's list: requests matched by the sale's reason; `except Exception` round the
+    scorer call; first health window. From the merge: the facts of a scorer call ride on its answer (Scores.facts);
+    the health row's stop gap reads _stops_checked_at; the book save before a request is cleared is save(seen=False).
+55. [tests] tests/test_crypto_sweep.py and tests/test_books.py run real git through backtest.code_commit (16 and 4
+    calls per suite run, measured 2026-11-10; local, read-only, 10 s timeout): patch code_commit in their setUp.
+56. [time-machine] Probabilities print 0.000 and 1.000, which 2,000 resamples cannot show: print "<0.001" and
+    ">0.999". Keep numpy.__version__ in the run record (gate of 2026-11-10, the part of its finding not done).
+57. [time-machine] "prior weights (no learning)" equals the base on all 2,224 days of the gate's run: one of the 12
+    counted variants is a duplicate inside the Deflated Sharpe spread. Find why the learner changes nothing in replay.
+58. [time-machine] The ranges floor (bootstrap.min_blocks 40) is a margin, not a measured threshold: the fixer's and
+    the gate's coverage differ at 250 and 500 days, neither script is in the repo. block_days stays fixed meanwhile.
+59. [crypto] The crypto sweep's ranges section and run record have unit tests only: no real crypto sweep has run
+    with them (research/2026-11-10-time-machine-honesty.md, Limits). Read them at the next crypto sweep.
+60. [news][measurement] The calls of the second check are in no cost journal: two checker calls and one re-score for
+    every headline over the buy line that reaches a buy or the queue (in the background while the guards are on
+    trial). news_scorer_calls.jsonl holds the loop's scorer calls and the news-score check only (seen at the merge
+    of wave 3 onto e6a82895).
+61. [news] `news-exit` now fails when config.json cannot be read (it reads the two lock numbers first): on any
+    error fall back to the defaults and still write the request. One test. (merge gate of 2026-11-11)
+62. [news][owner] A scorer answer that is not a whole number is skipped. For buys that is the safe side; for the
+    bad-news exit it is not: a score of 1.6 on a held name no longer sells (the stop still holds). Accept
+    whole-number text ("1", "9") as that number, and decide with the owner what a fraction at the low end does.
+63. [news][owner] The law says a news-exit is not undone, and the merge added `news-exit --cancel`. One sentence in
+    CLAUDE.md and SKILL.md 3ב: a waiting request is cancelled only on the owner's word, and the cancel is logged.
 
 ## Done
+- 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
+  two documented changes in behaviour on bad input, both toward safety. With a quote whose time cannot be read, the
+  stop and the time exit now act on the price (before, that name had no stop check in that step) while buys and
+  operator exits treat it as not live; a scorer answer that is not a whole number (text, null, 9.5) is no longer
+  taken as a score.
+- 2026-11-10 (third wave, item 26): news-exit follow-ups. The engine waits at most news.exits_lock_wait_seconds
+  (1.0) on the requests lock, after its sales; the book is on disk before a request is cleared (a save that fails
+  keeps the request); an unusable requests file reaches the owner once; `news-exit SYMBOL --cancel`; the symbol is
+  checked; a request made during the price loop stays (tested); the lever is in the config note and in
+  skills/trader/SKILL.md 3ב.
+- 2026-11-10 (third wave, item 27): news_predictions rows carry the scorer's model and prompt stamp under the names
+  the score rows use (`context` stays on the score row). Three measurement files, outside the hash chains:
+  news_scorer_calls.jsonl (per call: sent, answered or error type, time, cost, tokens), news_seen_log.jsonl (what
+  became of every new headline), news_health.jsonl (the engine's own speed, one row per news.health_log_seconds).
+  Covers the journaling half of item 17 and the cost half of item 18.
+- 2026-11-10 (third wave, item 31): the suite removes its temporary state and report directories. One run of the
+  495 tests in an isolated TMPDIR left one entry: the second check's own empty directory (aitrader-scorer), which
+  is kept on purpose.
+- 2026-11-10 (third wave, item 32): the price is kept when the quote time is odd; an undated price drops the old
+  stamp; news-score gates the move by the session; "price is back" wording; a failed move calculation is journaled
+  once per day per error type. Also: no scorer reply can fail a step any more. Trading changes, on bad input only:
+  an undated price buys nothing and fires no bad-news or operator exit (the stop still fires on any price); a score
+  that is not a whole number is skipped ("9" as text, 8.6, 9.5 and true used to be read as 9, 8, 9 and 1).
+- 2026-11-10 (third wave, time machine): every sweep row prints a seeded 95% block-bootstrap range and paired
+  probabilities against SPY and the base (config "bootstrap"; none under min_blocks x block_days days); the
+  Deflated Sharpe is printed in both readings and on every base phase; a registered sweep keeps a run record under
+  state/trial_runs/ (out of git) for `backtest --compare`; `backtest --drift` lists every live fill against the
+  open a replay fills at (read-only). No registered number or existing column changed
+  (research/2026-11-10-time-machine-honesty.md).
+- 2026-11-10 (third wave, a gate finding closed by e6a82895): a step that fails after its stop check no longer
+  loses the sale's report. The step says what it already did also when it fails.
 - 2026-11-11 (after the MU loss review): 51 test pins for the loss protocol and the engine repairs landed as
   tests/test_loss_protocol_pins.py (442 tests; 412 of 420 mutants killed, 76 survived the suite before). Tests only.
 - 2026-11-10 (loss review, MU -137.70; commit e6a82895): the loss protocol is law (CLAUDE.md, skills/trader/SKILL.md

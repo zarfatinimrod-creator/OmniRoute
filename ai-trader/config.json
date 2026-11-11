@@ -277,6 +277,7 @@
     "stop_catchup_min_bar_share": 0.5,
     "verify_parallel": 1,
     "health_log_seconds": 300,
+    "seen_keep_days": 3,
     "exits_lock_wait_seconds": 1.0,
     "exits_lock_retry_seconds": 0.05
   },

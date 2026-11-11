@@ -5,13 +5,15 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-10 20:40 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
-  `aitrader/backtest.py`, `aitrader/metrics.py`, `aitrader/report.py`, `aitrader/crypto_sweep.py`, `config.json`,
-  `tests/test_news_*.py`, `tests/test_time_machine_honesty.py`, `skills/strategy-time-machine/SKILL.md`.
-  Purpose: bring wave 3 (the engine records its own speed, cost and misses; exit-lever follow-ups; time machine
-  ranges and run records - 9 local commits made on base 0215537a, gated there) on top of e6a82895 (the loss
-  protocol and engine repairs). Until this line is marked done, other sessions do not edit these files; operations,
-  state, logs, lessons and postmortem records go on as usual.
+- **2026-11-11 10:20 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
+  `aitrader/notify.py`, `config.json`, new `aitrader/ownerlines.py`, `aitrader/supervise.py`, `aitrader/deadman.py`,
+  `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `scripts/drill_supervisor.py`, `tests/helpers/`,
+  new `tests/test_ownerlines.py`, `tests/test_news_supervised.py`, `tests/test_supervise.py`, `tests/test_uptime.py`,
+  `tests/test_slots.py`, `tests/test_watch.py`, `tests/test_slot_files.py`, `skills/trader/SKILL.md`,
+  `skills/trader/slots/`. Purpose: the supervisor ("always on the air"), plan
+  `research/plans/2026-11-10-supervisor.md`, approved by the owner on 2026-11-11. Build tasks 2-8 first (engine
+  changes); nothing reaches the live engine before its gate. Tests-only additions to other test files are welcome
+  from any session: say so under "Waiting" first so the two do not collide.
 
 ## Waiting
 
@@ -36,6 +38,15 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
+
+- **2026-11-10 20:40 - main session ("בוט סוחר למניות")** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
+  `aitrader/backtest.py`, `aitrader/metrics.py`, `aitrader/report.py`, `aitrader/crypto_sweep.py`, `config.json`,
+  `tests/test_news_*.py`, `tests/test_time_machine_honesty.py`, `skills/strategy-time-machine/SKILL.md`.
+  Purpose: bring wave 3 (the engine records its own speed, cost and misses; exit-lever follow-ups; time machine
+  ranges and run records - 9 local commits made on base 0215537a, gated there) on top of e6a82895 (the loss
+  protocol and engine repairs). Until this line is marked done, other sessions do not edit these files; operations,
+  state, logs, lessons and postmortem records go on as usual.
+  **Done 2026-11-11 10:20 UTC**: merged and gated (PASS), 546 tests, pushed.
 
 - **2026-11-11 08:50, done 09:05 - trader session** - files: `tests/test_loss_protocol_pins.py` (a NEW file; no existing file
   under a claim is edited). Purpose: 51 test methods that pin the loss protocol and the engine repairs of
