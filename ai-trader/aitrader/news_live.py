@@ -323,10 +323,13 @@ def context_id() -> str | None:
 def code_stamp() -> dict:
     """Which code this engine loaded: the commit, and whether the engine's code or config had uncommitted changes
     at that moment. The engine reads its code once, at start, so the checkout can move on without it; the stamp is
-    in the heartbeat so that anyone can see which one is trading. A record only: it never stops a start."""
+    in the heartbeat so that anyone can see which one is trading. A record only: it never stops a start.
+    Both git calls run with GIT_OPTIONAL_LOCKS=0: `git status` then leaves the index alone and takes no lock on it,
+    so the engine cannot collide with a git command of the session that works in the same checkout."""
     out = {"commit": None, "dirty": None, "started": journal.now_utc()}
     try:
-        git = lambda *a: subprocess.run(["git", *a], cwd=journal.ROOT, capture_output=True, text=True, timeout=15)  # noqa: E731
+        git = lambda *a: subprocess.run(["git", *a], cwd=journal.ROOT, capture_output=True, text=True, timeout=15,  # noqa: E731
+                                        env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
         out["commit"] = git("rev-parse", "--short", "HEAD").stdout.strip() or None
         if out["commit"]:
             out["dirty"] = bool(git("status", "--porcelain", "--", "aitrader", "config.json").stdout.strip())
@@ -1698,6 +1701,15 @@ def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool =
 
 
 def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool = True) -> int:
+    """One engine process, from its start to its exit code (run's docstring lists the codes). The order of a start
+    (supervisor spec 5.1) is fixed, because a restart after a kill is exactly when a stop may be waiting:
+      1. the config, the start checks (5, 7 and 6 end here), the trader;
+      2. what the process before this one left in the heartbeat, then this one's first beat ("boot");
+      3. the chain check (a broken journal: the alert, and 4);
+      4. when the market is open, the first look at the stops, whose own lines go out from the look; a beat ("stops");
+      5. the lines that can wait, each a send of up to 15 s a channel: no lock, a book mismatch, what was not said;
+      6. the code stamp (git), priming, and the loop.
+    No git call, no feed and no line that can wait stands before the first look."""
     cfg = load_config()
     code, why, mismatch = start_checks(cfg)  # before the trader is built: a book that cannot be read is not built on
     if code == 5:
@@ -1714,14 +1726,26 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
     nt.locked = locked  # in every heartbeat: False = this engine runs with no lock on the book
     nt.book_mismatch = mismatch  # not None: the stops of the book there is are checked, and no position is opened
     nt.adopt_previous(read_heartbeat())  # what the process before this one left, before this one writes over it
-    nt._beat("boot")  # before git and priming: a slow start is not taken for a hang
-    nt.code = code_stamp()
-    print(f"[news] engine started on commit {nt.code['commit']}"
-          + (" + uncommitted changes" if nt.code["dirty"] else "") + f", guards {nt.n['guards']}", flush=True)
-    if prime and not nt.seen:  # first start: mark everything already out as seen, act only on what comes next
-        nt.poll_headlines(prime=True)
-        nt.save()
-        print(f"[news] primed {len(nt.seen)} existing headlines")
+    nt._beat("boot")  # before the first look: a slow first look is not taken for a hang
+    events: list[str] = []
+    try:
+        bad = journal.broken_chains(journal.NEWS_CHAINED)
+        if bad:  # as at the top of a step, and in its words: no stop is sold on a journal that cannot be trusted
+            raise ChainBroken("news hash chain broken: " + ", ".join(bad) + " - news engine stopped, nothing traded;"
+                              " stops on open news positions are NOT being checked until it is repaired")
+        if market_open_now() and not nt._look_at_stops(events, guarded=True):
+            nt._note_error(RuntimeError("the live look at the stops did not run: the early_stops row before this one"
+                                        " says why. The first step looks again"), "first_look")
+    except ChainBroken as e:
+        print(f"[news] {e}", flush=True)
+        notify.send("AI Trader - תקלה", f"{e} (כסף נייר)", cfg, "urgent")
+        return 4
+    except Exception as e:  # noqa: BLE001 - not a crash: it goes on record, and the first step of the loop looks again
+        nt._note_error(e, "first_look")
+    if events:  # the look itself sent these to the owner; the engine's log gets them here, as it gets a step's
+        print(f"[news {datetime.now(NY).strftime('%H:%M:%S')} NY] " + " | ".join(events), flush=True)
+    # the first look is over, or the market is closed and none was due: what follows can be slow (sends, git, priming)
+    nt._beat("stops")
     if not locked:  # said once per start. A line that cannot be built or sent must not cost the book its only engine
         try:
             notify.send("AI Trader - תקלה", owner_line(cfg, "E2"), cfg, "urgent")
@@ -1740,10 +1764,17 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool 
             if nt._mismatch_told != told and notify.send("AI Trader - תקלה", owner_line(
                     cfg, "E1", side=ownerlines.WORDS["E1.side"][mismatch["side"]], sym=mismatch["symbol"]), cfg, "urgent"):
                 nt._mismatch_told = told  # only once a channel took it: a line nobody got is said by the next start
-                nt._beat("boot")  # into the file at once, for the next start to read
+                nt._beat(nt._phase)  # into the file at once, for the next start to read
         except Exception as e:  # noqa: BLE001 - as above: the stops of the book there is still need this engine
             error_once("mismatch_line", e)
     nt.say_late()  # the trades of today that the run before made and nobody was told of
+    nt.code = code_stamp()
+    print(f"[news] engine started on commit {nt.code['commit']}"
+          + (" + uncommitted changes" if nt.code["dirty"] else "") + f", guards {nt.n['guards']}", flush=True)
+    if prime and not nt.seen:  # first start: mark everything already out as seen, act only on what comes next
+        nt.poll_headlines(prime=True)
+        nt.save()
+        print(f"[news] primed {len(nt.seen)} existing headlines")
     hh, mm = (int(x) for x in until_ny.split(":"))
     t0 = time.time()
     fails = 0

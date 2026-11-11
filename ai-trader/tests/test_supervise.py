@@ -351,13 +351,14 @@ class Harness(Procs):
         polls = [[{"key": "k1", "symbol": "AAA", "title": "AAA one"}], [{"key": "k2", "symbol": "AAA", "title": "AAA two"}]]
         self.start_engine({"session": "open", "universe": {"AAA": "Tech", "BBB": "Tech", "CCC": "Tech", "SPY": "Index"},
                            "news": {"slippage_bps": 0}, "opens": {"CCC": 42.0}, "polls": polls, "scores": {"k2": 7},
-                           "prices": {"BBB": [51.0, 48.0], "AAA": [10.0, 20.0]}}, "--minutes", "5")
+                           "prices": {"BBB": [51.0, 51.0, 48.0], "AAA": [10.0, 20.0]}}, "--minutes", "5")
         self.wait_for(lambda: len(self.rows("news_scores.jsonl")) == 2)      # the second poll came, a step later
         # a list per poll, a price per call, a score per key (5 for a key the scenario does not hold)
         self.assertEqual([(r["id"], r["price"], r["score"]) for r in self.rows("news_scores.jsonl")],
                          [("k1", 10.0, 5), ("k2", 20.0, 7)])
-        # CCC from the queue at its official open; BBB seen at 51.00 by the first look and at 48.00, under its stop of
-        # 48.50, by the look after it. No slippage: the scenario's news keys are merged over config.json's
+        # CCC from the queue at its official open; BBB seen at 51.00 by the first look of the start and by the look at
+        # the top of the first step, and at 48.00, under its stop of 48.50, by the look at that step's end. No slippage:
+        # the scenario's news keys are merged over config.json's
         self.assertEqual([(t["side"], t["symbol"], t["price"]) for t in self.rows("news_trades.jsonl")],
                          [("BUY", "CCC", 42.0), ("SELL", "BBB", 48.0)])
         self.assertEqual(sum("SELL 10 BBB" in r["body"] for r in self.sent_rows()), 1)

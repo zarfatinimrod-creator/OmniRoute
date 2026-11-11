@@ -8,6 +8,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -513,9 +514,9 @@ class WhatAStartFinds(_Starts):
         hold(self.nt); self.nt.save()
         journal.append("news_trades.jsonl", BUY_AAA)
         self.assertEqual(self.start(until="00:00"), 0)                        # 00:00 has always passed: the loop makes no step
-        b = news_live.read_heartbeat()
+        b = news_live.read_heartbeat()               # "stops": the line goes out after the first look, whose phase its beat keeps
         self.assertEqual((b["phase"], b["step"], b["mismatch_told"]),
-                         ("boot", 0, {"day": datetime.now(NY).date().isoformat(), "symbol": "AAA"}))
+                         ("stops", 0, {"day": datetime.now(NY).date().isoformat(), "symbol": "AAA"}))
         self.assertEqual((self.start(), len([b for _, b in self.sent if b.startswith(E1_AAA)])), (0, 1))
 
     def test_a_sale_the_book_does_not_show_is_said_with_its_own_word_and_the_name_stays_under_its_stop(self):
@@ -831,3 +832,161 @@ class WhoWasTold(_Starts):
         journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
         self.assertEqual((self.start(), self.start()), (0, 0))
         self.assertEqual(self.sent, [("high", "דווח באיחור: SELL 1 GONE @ 9.0 - x. כסף נייר")])
+
+
+class _WatchedStarts(_Starts):
+    """A start of the engine on a book that holds BBB (10 shares bought at 50.00, the stop at 48.50), with every call
+    of the start that leaves the process written down in self.calls, in the order they were made: "quote:<symbol>"
+    (live_price), "git" (code_stamp), "feed" (the poll) and "send" (notify.send). _Engine's stand-ins answer underneath."""
+
+    def setUp(self):
+        super().setUp()
+        self.cfg["news"]["stop_catchup"] = "off"   # whether a bar read is due depends on the hour; one test turns it on
+        self.calls = []
+        price, send = news_live.live_price, news_live.notify.send   # _Engine's stand-ins; its tearDown puts the real ones back
+        news_live.live_price = lambda sym: self.calls.append(f"quote:{sym}") or price(sym)
+        news_live.notify.send = lambda *a, **kw: self.calls.append("send") or send(*a, **kw)
+        self.stamp = lambda: {"commit": "abc1234", "dirty": False, "started": "now"}   # what the code_stamp stand-in answers
+        hold(self.nt); self.nt.save()                # every test begins here: the start builds its trader from this book
+
+    def start(self, **kw):
+        with mock.patch.object(news_live.NewsTrader, "poll_headlines", lambda nt, *a, **k: self.calls.append("feed") or []), \
+                mock.patch.object(news_live, "code_stamp", lambda: self.calls.append("git") or self.stamp()), \
+                mock.patch.object(news_live.time, "sleep", lambda s: None), \
+                mock.patch.object(news_live, "load_config", lambda: self.cfg):
+            return news_live._run("23:59", 0.0005, False, **kw)
+
+
+class FirstLook(_WatchedStarts):
+    def test_the_first_outside_call_of_a_start_is_the_held_names_quote(self):
+        calls = self.calls
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(calls[0], "quote:BBB")
+        self.assertLess(calls.index("quote:BBB"), min(calls.index("git"), calls.index("feed")))
+
+    def test_the_lines_that_can_wait_go_out_after_the_first_look_and_before_git(self):
+        calls, TODAY = self.calls, datetime.now(NY).date().isoformat()
+        journal.append("news_trades.jsonl", {"date": TODAY, "symbol": "GONE", "side": "SELL", "qty": 1, "price": 9.0, "reason": "x"})
+        journal.append("news_trades.jsonl", {"date": TODAY, "symbol": "AAA", "side": "BUY", "qty": 5, "price": 100.0, "reason": "x"})
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})    # both rows are unsent; AAA is a mismatch
+        self.assertEqual(self.start(locked=False), 0)                                                # and no lock: E2, E1 and one late line
+        sends = [i for i, c in enumerate(calls) if c == "send"]
+        self.assertEqual((calls[0], len(sends), sends[-1] < calls.index("git")), ("quote:BBB", 3, True))
+        self.assertEqual([body.startswith(line) for (_, body), line in zip(self.sent, ("מנוע החדשות רץ בלי נעילה", E1_AAA, "דווח באיחור:"))],
+                         [True, True, True])                                                         # in that order
+
+    def test_after_a_restart_the_catch_up_reads_from_the_last_look_of_the_run_before(self):   # Review Focus 1
+        now = datetime(2026, 11, 12, 10, 30, tzinfo=NY); self.cfg["news"]["stop_catchup"] = "alert"
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "stops_checked_at": (now - timedelta(minutes=10)).astimezone(timezone.utc).isoformat()})
+        asked, look = [], news_live.NewsTrader._look_at_stops
+
+        def bars(sym, since, now):                   # the minute bars: from when they were asked for, and what the file said then
+            self.calls.append(f"bars:{sym}")
+            asked.append((since, news_live.read_heartbeat()["stops_checked_at"]))
+            return []
+        # every look of this start is made at 10:30 of that Thursday, whatever the wall clock says; BBB's quote has no
+        # time of its own (not live), so the ten minutes since the last look of the run before are read from the bars
+        with mock.patch.object(news_live.NewsTrader, "_look_at_stops", lambda nt, ev, guarded=False: look(nt, ev, guarded, now=now)), \
+                mock.patch.object(news_live, "bars_since", bars):
+            self.assertEqual(self.start(), 0)
+        self.assertEqual((asked[0][0].strftime("%H:%M"), asked[0][1] is not None), ("10:20", True))   # not 09:30, and no null stamp
+        self.assertLess(self.calls.index("bars:BBB"), self.calls.index("git"))   # and it is the first look that reads them
+
+    def test_a_name_under_its_stop_is_sold_saved_and_said_before_git(self):
+        self.prices["BBB"] = 48.0
+        at_git = []
+
+        def stamp():   # (the last trade's side, BBB still in the saved book, lines sent so far), and the start ends here
+            trades = journal.read("news_trades.jsonl")
+            at_git.append((trades[-1]["side"] if trades else None, "BBB" in journal.load_json("news_book.json")["positions"],
+                           len(self.sent)))
+            raise RuntimeError("the start has shown enough")
+        self.stamp = stamp
+        with self.assertRaises(RuntimeError):
+            self.start()
+        self.assertEqual(at_git, [("SELL", False, 1)])
+
+    def test_a_broken_chain_at_a_start_sells_nothing_and_returns_4(self):
+        self.prices["BBB"] = 48.0
+        with mock.patch.object(journal, "broken_chains", lambda names=None: ["news_trades.jsonl"]):
+            self.assertEqual(self.start(), 4)
+        self.assertEqual(journal.read("news_trades.jsonl"), [])
+        self.assertEqual([p for p, _ in self.sent], ["urgent"])
+        self.assertEqual(self.calls, ["send"])       # and nothing else left the process: no quote, no git, no feed
+
+    def test_a_first_look_that_fails_is_on_record_and_the_loop_still_starts(self):
+        steps = []
+        with mock.patch.object(news_live.NewsTrader, "check_stops", side_effect=RuntimeError("quotes down")), \
+                mock.patch.object(news_live.NewsTrader, "step", lambda nt: steps.append(1) or []):   # the loop's rounds, counted
+            self.assertEqual(self.start(), 0)
+        self.assertIn("first_look", [e.get("where") for e in journal.read("news_errors.jsonl")])
+        self.assertTrue(steps)
+
+    def test_code_stamp_runs_git_with_optional_locks_off(self):
+        envs, paths = [], []
+
+        def git(cmd, **kw):                          # in the place of subprocess.run: a commit, so that both calls are made
+            env = kw.get("env") or {}
+            envs.append(env.get("GIT_OPTIONAL_LOCKS")); paths.append(env.get("PATH"))
+            return subprocess.CompletedProcess(cmd, 0, stdout="abc1234\n", stderr="")
+        with mock.patch.object(news_live.subprocess, "run", git):
+            news_live.code_stamp()
+        self.assertEqual(set(envs), {"0"})
+        self.assertEqual(paths, [os.environ.get("PATH")] * 2)   # rev-parse and status, each with the rest of the environment
+
+
+class TheOrderOfAStart(_WatchedStarts):
+    """What the seven tests above leave open: a start before the bell, what the heartbeat says when git is asked, the
+    engine's own log, a look that raises, a sale and a late line in one start, and the words of the broken-chain alert."""
+
+    def test_before_the_bell_no_quote_is_asked_and_the_chains_are_read_before_anything_leaves_the_process(self):
+        news_live.market_open_now = lambda: False
+        read_at, chains = [], journal.broken_chains
+        with mock.patch.object(journal, "broken_chains", lambda names=None: read_at.append(len(self.calls)) or chains(names)):
+            self.assertEqual(self.start(), 0)
+        self.assertEqual((read_at[0], self.calls[0], [c for c in self.calls if c.startswith("quote")]), (0, "git", []))
+
+    def test_when_git_is_asked_the_file_says_the_first_look_is_over_and_carries_no_code_yet(self):
+        at_git = []
+        self.stamp = lambda: at_git.append(news_live.read_heartbeat()) or {"commit": "abc1234", "dirty": False, "started": "now"}
+        with mock.patch.object(news_live.NewsTrader, "_quote_is_live", lambda *a, **k: True):   # BBB's quote is live: it is stamped
+            self.assertEqual(self.start(), 0)
+        b = at_git.pop()
+        self.assertEqual((b["phase"], b["step"], b["code"], b["held"]["BBB"]["checked_at"] is not None), ("stops", 0, None, True))
+        self.assertEqual(news_live.read_heartbeat()["code"]["commit"], "abc1234")   # the beats of the steps carry it
+        self.nt.book.state["positions"] = {}; self.nt.save()   # nothing held: a look that asks no quote writes no beat of its own
+        journal._path("news_heartbeat.json").unlink()
+        self.assertEqual(self.start(), 0)
+        self.assertEqual([(b["phase"], b["step"], b["held"]) for b in at_git], [("stops", 0, {})])
+
+    def test_what_the_first_look_sold_is_in_the_engines_log_before_the_line_of_the_start(self):
+        self.prices["BBB"] = 48.0
+        self.assertEqual(self.start(), 0)
+        self.assertRegex(self.out.getvalue(), r"(?s)NY\] SELL 10 BBB @ .*\[news\] engine started on commit abc1234")
+
+    def test_a_first_look_that_raises_costs_a_row_and_nothing_else_of_the_start(self):
+        trade("GONE")                                # of the run before, and nobody was told: a late line is due
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        steps = []
+        with mock.patch.object(news_live.NewsTrader, "_look_at_stops", side_effect=OSError(28, "No space left on device")), \
+                mock.patch.object(news_live.NewsTrader, "step", lambda nt: steps.append(1) or []):
+            self.assertEqual(self.start(), 0)
+        self.assertEqual([(e["where"], e["error"]) for e in journal.read("news_errors.jsonl")], [("first_look", "OSError")])
+        self.assertEqual((self.calls, bool(steps), news_live.read_heartbeat()["phase"]), (["send", "git"], True, "stops"))
+
+    def test_a_sale_of_the_first_look_and_a_late_line_of_the_same_start_are_each_said_once_the_sale_first(self):
+        trade("GONE")                                # of the run before, and nobody was told
+        journal.save_json("news_heartbeat.json", {"at": journal.now_utc(), "told_through": None})
+        self.prices["BBB"] = 48.0                    # under its stop of 48.50: the first look of the first start sells it
+        self.assertEqual((self.start(), self.start()), (0, 0))
+        self.assertEqual([("SELL 10 BBB" in body, body.startswith("דווח באיחור: SELL 1 GONE")) for _, body in self.sent],
+                         [(True, False), (False, True)])   # two messages in all: the second start has nothing left to say
+        self.assertEqual(news_live.read_heartbeat()["told_through"], journal.read("news_trades.jsonl")[-1]["hash"])
+
+    def test_the_alert_of_a_broken_chain_at_a_start_is_word_for_word_the_one_of_a_step(self):
+        with mock.patch.object(journal, "broken_chains", lambda names=None: ["news_scores.jsonl", "news_trades.jsonl"]):
+            self.assertEqual(self.start(), 4)
+            with self.assertRaises(news_live.ChainBroken) as in_a_step:
+                step(self.nt)
+        self.assertEqual(self.sent, [("urgent", f"{in_a_step.exception} (כסף נייר)")])
+        self.assertIn(f"[news] {in_a_step.exception}\n", self.out.getvalue())
