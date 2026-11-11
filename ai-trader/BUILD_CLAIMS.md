@@ -12,6 +12,11 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
   `tests/fixtures/ntfy/`, `tests/fixtures/list_triggers_sample.json`, `tests/test_news_supervised.py`,
   `tests/test_supervise.py`, `tests/test_ownerlines.py`, `tests/test_uptime.py`, `tests/test_slots.py`,
   `tests/test_watch.py`, `tests/test_slot_files.py`, `tests/test_news_guards.py` (class `OneEngine` only).
+  Added 2026-11-11 10:35 after the baseline: `tests/test_loss_protocol_pins.py`, `tests/test_audit_fixes.py`,
+  `tests/test_news_measure.py` and the rest of `tests/test_news_guards.py` - only the expectation of a test that
+  calls `run`/`_run` or reads the heartbeat or the lock file, where the spec changes an exit code or a file's
+  shape (four pins end the loop with `ChainBroken` and expect 0; the spec makes that 4). No test about a trade,
+  a stop, a buy or a hold is changed.
   Purpose: supervisor: spec 2026-11-10-supervisor-design, plan 2026-11-10-supervisor (approved by the owner on
   2026-11-11). The time above is the last refresh; the claim was opened earlier the same day, in the commit that
   closed the wave-3 claim. Build tasks 2-8 first (engine changes); nothing reaches the live engine before its
