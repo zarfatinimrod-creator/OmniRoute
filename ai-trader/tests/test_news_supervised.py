@@ -546,6 +546,15 @@ class WhatAStartFinds(_Starts):
         self.nt.book_mismatch = None
         self.assertIsNone(self.nt._buys_blocked())
 
+    def test_the_message_that_tells_the_owner_of_a_buy_refused_on_a_mismatch_ends_with_paper_money(self):
+        self.nt.book_mismatch = {"side": "BUY", "symbol": "BBB"}
+        with mock.patch.object(self.nt, "_quote_is_live", lambda *a, **k: True):   # a real step: one headline, scored 9
+            step(self.nt, items(1), lambda batch, model: {x["key"]: {"score": 9, "why": "test"} for x in batch})
+        told = [(p, b) for p, b in self.sent if "התיק לא תואם ליומן העסקאות" in b]   # the message as the phone gets it
+        self.assertEqual(([p for p, _ in told], dict(self.nt.book.positions)), (["high"], {}))
+        last = told[0][1].splitlines()[-1]                                           # the book line, still the last line
+        self.assertTrue(last.startswith("תיק חדשות (נייר): $") and last.endswith("%). כסף נייר"), told[0][1])
+
     def test_check_prints_a_line_per_check_and_returns_the_first_code_that_fails(self):
         def check(*stand_ins):
             """news-live --check: (its code, the lines it printed), with nothing built, written or sent."""

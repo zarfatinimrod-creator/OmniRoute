@@ -1369,7 +1369,8 @@ class NewsTrader:
             if events:
                 try:
                     eq = self.book.equity(self._marks())
-                    body = "\n".join(events) + f"\nתיק חדשות (נייר): ${eq:,.0f} ({eq / self.n['starting_cash'] - 1:+.2%})"
+                    body = ("\n".join(events) + f"\nתיק חדשות (נייר): ${eq:,.0f} ({eq / self.n['starting_cash'] - 1:+.2%})"
+                            ". כסף נייר")  # the last words of every message the owner gets: a trade, a refused buy
                     notify.send("AI Trader - חדשות", body, self.cfg, "high")
                 except Exception as e:  # noqa: BLE001 - the alert must not hide the error of the step itself
                     self._note_error(e, "step_alert")
