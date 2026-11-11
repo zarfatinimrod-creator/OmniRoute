@@ -214,6 +214,13 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     the pace: 1 headline of 1,190 scored above 8 on 2026-11-09 and 2026-11-10 (`state/news_scores.jsonl`), so
     about a month. The hold is lifted only on his word. The Saturday review writes the running count in the
     weekly report.
+65. [news][source] SEC filings as a faster news source, log-only first (roadmap 2026-11-10, sub-project 4).
+    **Owner's decision (Nimrod, 2026-11-11, answer א):** the SEC contact address for the User-Agent is a new address
+    used only by the bot; he opens it himself and gives it in chat. It lives only in the environment variable
+    `AITRADER_SEC_CONTACT` (never in a file, a log, a journal, an error text or the repository; the repository is
+    public). Until it exists nothing calls the SEC. Next: the design spec (being written from the roadmap), his
+    approval, a plan, then the build in the one-at-a-time queue. The source moves no money until it has a forward
+    record and passes rule 4 (Basic law 2, item 3).
 
 ## Done
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
