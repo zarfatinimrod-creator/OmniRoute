@@ -5,6 +5,10 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
+- **2026-11-11 16:50 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py` (the
+  `due` line of `_decide` only), `tests/test_crypto_cycle.py`. Purpose: quant-critic HOLD on the crypto go-live gate
+  (B1: an order that expires unfilled drops a regime-off exit; the next decision must be a full re-decision).
+
 - **2026-11-11 10:09 - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
