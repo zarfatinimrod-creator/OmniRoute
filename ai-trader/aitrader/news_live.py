@@ -42,7 +42,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-from . import journal, notify, postmortem
+from . import journal, notify, ownerlines, postmortem
 from .broker import PaperBroker
 from .data import UA, _chart, load_config, official_opens
 from .strategy import etf_groups
@@ -70,6 +70,13 @@ TRIAL_GUARDS = ("no_chase", "second_check", "stop_cooldown")
 
 def ncfg(cfg: dict) -> dict:
     return {**DEFAULTS, **cfg.get("news", {})}
+
+
+def owner_line(cfg: dict, line_id: str, **fields) -> str:
+    """A line of the owner's table (ownerlines.py; supervisor spec, section 8), at the sizes config.json gives. Every
+    line of that table that the engine sends goes through here."""
+    sup = cfg["supervisor"]
+    return ownerlines.render(line_id, max_bytes=sup["max_line_bytes"], free_chars=sup["free_text_max_chars"], **fields)
 
 
 ERRORS_SAID: set[tuple] = set()  # (where, error type, New York day) already in news_errors.jsonl from this process
@@ -1383,33 +1390,55 @@ class NewsTrader:
                                                   "positions": len(self.book.positions), "queue": len(self.queue),
                                                   "stops_checked_at": checked.isoformat() if checked else None,
                                                   "buys_blocked": blocked[0] if blocked else None,
-                                                  "code": getattr(self, "code", None)})
+                                                  "code": getattr(self, "code", None),
+                                                  "lock": getattr(self, "locked", True)})
         if market_open_now() and time.time() - self._eq_logged >= self.n.get("equity_log_seconds", 300):
             self._eq_logged = time.time()  # equity curve for the dashboard, one point per 5 minutes in session
             journal.write_all("news_equity.jsonl", journal.read("news_equity.jsonl")[-5000:] + [
                 {"at": journal.now_utc(), "equity": round(self.book.equity(self._marks()), 2), "positions": len(self.book.positions)}])
 
 
+def _lock_holder(lock) -> tuple:
+    """(pid, started_at) as the holder wrote them into the lock file; "unknown" twice when the file does not say: the
+    holder took the lock a moment ago and has not written yet, or it is an engine from before the file named anyone."""
+    try:
+        lock.seek(0)
+        who = json.loads(lock.read())
+        return who["pid"], who["started_at"]
+    except Exception:  # noqa: BLE001 - whatever the file holds, the start is refused all the same
+        return "unknown", "unknown"
+
+
 def run(until_ny: str = "16:05", max_minutes: float | None = None, prime: bool = True) -> int:
     """One engine per book: two would trade it twice and interleave the chained journals. The lock is held for the
-    life of the loop and freed when it ends, however it ends (a killed engine leaves no lock behind). Returns 0, or
-    3 when another engine holds the book and this one did not start: the caller must not take that for a run."""
-    with open(journal._path("news_engine.lock"), "w") as lock:
+    life of the loop and freed when it ends, however it ends (a killed engine leaves no lock behind). The holder
+    writes its pid and start time into the lock file: for the start it refuses, and for whoever asks who is running.
+    Returns what the loop returns, or 3 when another engine holds the book and this one did not start: the caller
+    must not take that for a run."""
+    with open(journal._path("news_engine.lock"), "a+") as lock:  # "a+": a refused start leaves the holder's name in the file
+        locked = True
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            print("[news] another news engine holds the book: this one does not start (exit 3)", flush=True)
+            pid, started = _lock_holder(lock)
+            print(f"[news] another news engine holds the book (pid {pid}, started {started}): this one does not start"
+                  " (exit 3)", flush=True)
             return 3
         except OSError as e:  # the lock itself does not work here: an engine with no lock still checks the stops
             print(f"[news] the engine lock could not be taken ({type(e).__name__}): running without it", flush=True)
-        _run(until_ny, max_minutes, prime)
-    return 0
+            locked = False
+        if locked:  # one line, the holder's own; an engine that got no lock leaves the file to whoever holds it
+            lock.truncate(0)
+            lock.write(json.dumps({"pid": os.getpid(), "started_at": journal.now_utc()}) + "\n")
+            lock.flush()
+        return _run(until_ny, max_minutes, prime, locked=locked)
 
 
-def _run(until_ny: str, max_minutes: float | None, prime: bool) -> None:
+def _run(until_ny: str, max_minutes: float | None, prime: bool, *, locked: bool = True) -> int:
     cfg = load_config()
     nt = NewsTrader(cfg)
     nt.code = code_stamp()
+    nt.locked = locked  # in every heartbeat: False = this engine runs with no lock on the book
     print(f"[news] engine started on commit {nt.code['commit']}"
           + (" + uncommitted changes" if nt.code["dirty"] else "") + f", guards {nt.n['guards']}", flush=True)
     if prime and not nt.seen:  # first start: mark everything already out as seen, act only on what comes next
@@ -1420,6 +1449,11 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool) -> None:
         notify.send("AI Trader - תקלה", f"config.json calendar does not cover {datetime.now(NY).year}: the news engine"
                     " treats every day as closed: it will not trade and will NOT check stops on open news positions until the"
                     " NYSE holidays are added (כסף נייר)", cfg, "urgent")
+    if not locked:  # said once per start. A line that cannot be built or sent must not cost the book its only engine
+        try:
+            notify.send("AI Trader - תקלה", owner_line(cfg, "E2"), cfg, "urgent")
+        except Exception as e:  # noqa: BLE001
+            error_once("lock_line", e)
     hh, mm = (int(x) for x in until_ny.split(":"))
     t0 = time.time()
     fails = 0
@@ -1454,3 +1488,4 @@ def _run(until_ny: str, max_minutes: float | None, prime: bool) -> None:
     # lock is held until this returns, and no stop is looked at meanwhile); after the close one call's time is given
     nt.drain_trial(wait=0 if market_open_now() else nt.n["verify_timeout_seconds"])
     print("[news] stopped", flush=True)
+    return 0

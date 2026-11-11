@@ -297,6 +297,12 @@
   "drift": {
     "pause_seconds": 1.5
   },
+  "supervisor": {
+    "_note": "Supervisor spec 2026-11-10, section 10. The first three keys, for the lines the news engine sends the owner (aitrader/ownerlines.py): max_line_bytes: no line is longer (ntfy takes 4,096 bytes). held_names_in_line: the held names a line lists before it says how many more. free_text_max_chars: a note, a file name or a list that comes from outside is cut to this.",
+    "max_line_bytes": 1200,
+    "held_names_in_line": 6,
+    "free_text_max_chars": 200
+  },
   "books": {
     "_note": "Book profiles (spec 2026-11-09-crypto-book-design, sections 3.1 and 5; plan planning decisions). load_config('crypto') = this file without 'books', then books.crypto merged over it, then books.<ship_profile> over that when it is not 'crypto'. universe, prior_weights, signals and benchmark are replaced whole; every other block merges key by key. crypto_base lists only what differs from the candidate. Zero-weight signals keep the stock parameters (the values the replays used); max_positions 2 = the whole two-coin universe (the replays' 15 behaves the same). The candidate leaves risk.dd_reentry_ref to its default (dd_halve + dd_flat) / 2 = -0.375 (planning decision 1). risk.max_position_pct_by_symbol XRP-USD is read only by the crypto sweep's BTC+XRP hindsight control (XRP is in no profile's universe).",
     "crypto": {

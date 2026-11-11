@@ -767,7 +767,7 @@ class OneEngine(_Engine):
         try:
             with mock.patch.object(news_live, "NewsTrader", mock.Mock(side_effect=AssertionError("must not be built"))):
                 self.assertEqual(news_live.run(max_minutes=0.001), 3)  # not 0: the caller must not take it for a run
-                with mock.patch.object(news_live, "run", lambda until, minutes: 3):
+                with mock.patch.object(news_live, "run", lambda until, minutes, **k: 3):
                     self.assertEqual(cli.main(["news-live", "--minutes", "1"]), 3)
         finally:
             held.close()
@@ -775,7 +775,7 @@ class OneEngine(_Engine):
     def test_a_lock_that_does_not_work_at_all_does_not_leave_the_book_without_an_engine(self):
         ran = []
         with mock.patch.object(news_live.fcntl, "flock", side_effect=OSError(37, "no locks available")), \
-                mock.patch.object(news_live, "_run", lambda *a: ran.append(a)):
+                mock.patch.object(news_live, "_run", lambda *a, **k: ran.append(a) or 0):
             self.assertEqual(news_live.run(max_minutes=0.001), 0)
         self.assertEqual(len(ran), 1)  # an engine with no lock still looks at the stops; no engine looks at nothing
 

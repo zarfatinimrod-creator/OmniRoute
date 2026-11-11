@@ -1,0 +1,281 @@
+"""Real processes (supervisor spec 11.1): the news engine started as a process of its own, on a temporary state
+directory, behind the stand-ins and the tripwire of tests/helpers/engine_child.py. Nothing here reaches the network,
+the model, the live state or the owner's phone."""
+
+from helpers import no_phone  # noqa: F401  (first: a test run must never reach the owner's phone)
+
+import json
+import os
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from aitrader.broker import PaperBroker
+from helpers import engine_child
+
+TESTS = Path(__file__).resolve().parent
+ENGINE_CHILD = TESTS / "helpers" / "engine_child.py"
+
+
+def _lines(path: Path) -> list:
+    """The whole JSON lines of a file that a live process may be writing; [] when it is not there."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return []
+    return [json.loads(line) for line in text[:text.rfind("\n") + 1].splitlines() if line.strip()]
+
+
+class Procs(unittest.TestCase):
+    """A temporary directory with state/ in it, and what a test needs to start engine processes there and to watch
+    them. tearDown kills whatever is left and fails the test when one of them tripped the wire."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.state = self.tmp / "state"
+        self.state.mkdir()
+        self.sent_file = self.tmp / "sent.jsonl"
+        self._started, self._scenarios = [], 0
+
+    def tearDown(self):
+        for p in self._started:
+            if p.poll() is None:
+                p.kill()
+        try:  # the scorer stand-in's `sleep 60`, when a scenario asked for one: only that, never a pid that was reused
+            orphan = int(Path(f"{self.sent_file}.orphan").read_text())
+            if Path(f"/proc/{orphan}/cmdline").read_bytes() == b"sleep\x0060\x00":
+                os.kill(orphan, signal.SIGKILL)
+        except (OSError, ValueError):
+            pass
+        for p in self._started:
+            p.wait()
+            p.stdout.close()
+            p.stderr.close()
+        tripwire = Path(f"{self.sent_file}.tripwire")
+        tripped = tripwire.read_text().splitlines() if tripwire.exists() else []
+        shutil.rmtree(self.tmp, ignore_errors=True)
+        self.assertEqual(tripped, [], "an engine process tried to leave the machine and the tripwire stopped it")
+
+    def scenario(self, scenario: dict) -> str:
+        """The scenario as a file of its own; its path."""
+        self._scenarios += 1
+        path = self.tmp / f"scenario-{self._scenarios}.json"
+        path.write_text(json.dumps(scenario))
+        return str(path)
+
+    def start_engine(self, scenario: dict, *options: str) -> subprocess.Popen:
+        """engine_child.py on self.state with this scenario; `options` go to news-live as they are. A start does not
+        prime: without a seen file the engine would mark the scenario's first poll as old news."""
+        seen = self.state / "news_seen.json"
+        if not seen.exists():
+            seen.write_text(json.dumps({"before-the-test": datetime.now(timezone.utc).isoformat()}))
+        p = subprocess.Popen([sys.executable, str(ENGINE_CHILD), "--state-dir", str(self.state), "--scenario",
+                              self.scenario(scenario), "--sent", str(self.sent_file), *options],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=no_phone.clean_env())
+        self._started.append(p)
+        return p
+
+    def write_book(self, held: dict[str, float]) -> None:
+        """news_book.json with {symbol: entry} held: 10 shares each, the stop at 97% of the entry. Bought today (New
+        York) at no recorded time: the 5-day exit and the look back at minute bars both leave such a name alone, so
+        the book plays the same on whatever day and hour the test runs."""
+        today = datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+        book = PaperBroker(100000.0).state
+        book["positions"] = {sym: {"qty": 10, "avg_cost": entry, "last_price": entry, "entry_date": today,
+                                   "stop_price": round(entry * 0.97, 4)} for sym, entry in held.items()}
+        (self.state / "news_book.json").write_text(json.dumps(book))
+
+    def beat(self) -> dict:
+        """The engine's heartbeat; {} when there is no file."""
+        try:
+            return json.loads((self.state / "news_heartbeat.json").read_text())
+        except FileNotFoundError:
+            return {}
+
+    def wait_beat(self) -> dict:
+        return self.wait_for(self.beat)
+
+    def rows(self, name: str) -> list:
+        return _lines(self.state / name)
+
+    def sent_rows(self) -> list:
+        """What the engines handed to notify.send: {at, title, body, priority} each."""
+        return _lines(self.sent_file)
+
+    def wait_for(self, fn, timeout=5):
+        """What fn() gives as soon as it is true; the test fails when that takes longer than `timeout` seconds."""
+        end = time.monotonic() + timeout
+        while True:
+            got = fn()
+            if got:
+                return got
+            if time.monotonic() >= end:
+                ended = [f"exit {p.returncode}: {p.stderr.read()[-400:]}" for p in self._started if p.poll() is not None]
+                self.fail(f"not within {timeout} s: {getattr(fn, '__name__', fn)}; engines that ended: {ended}")
+            time.sleep(0.01)
+
+    def step_done(self) -> bool:
+        """The first step has ended: the heartbeat and the queue file are there and the engine is idle."""
+        return ((self.state / "news_heartbeat.json").exists() and (self.state / "news_queue.json").exists()
+                and self.beat().get("phase", "idle") == "idle")
+
+    def dead(self, pid: int) -> bool:
+        """No such process, or a zombie."""
+        try:
+            stat = Path(f"/proc/{pid}/stat").read_text()
+        except OSError:
+            return True
+        return stat.rpartition(")")[2].split()[0] == "Z"
+
+
+class EngineLock(Procs):
+    def test_a_second_engine_exits_3_within_2_s_names_the_holder_and_touches_no_state(self):
+        a = self.start_engine({"news": {"poll_seconds": 30}}, "--minutes", "5")
+        self.wait_for(self.step_done)                  # a sleeps 30 s now: nothing of its own changes the files
+        before = {p.name: p.read_bytes() for p in self.state.iterdir()}
+        b = self.start_engine({}, "--minutes", "5")
+        self.assertEqual(b.wait(timeout=2), 3)
+        self.assertEqual({p.name: p.read_bytes() for p in self.state.iterdir()}, before)
+        self.assertIn(f"pid {a.pid}", b.stdout.read())
+        self.assertEqual(json.loads((self.state / "news_engine.lock").read_text())["pid"], a.pid)
+        self.assertEqual(self.sent_rows(), [])         # and the refused start said nothing to the owner
+
+    def test_after_kill_9_of_the_holder_a_new_start_takes_the_lock(self):
+        a = self.start_engine({"news": {"poll_seconds": 30}}, "--minutes", "5")
+        self.wait_for(self.step_done)
+        a.kill()
+        a.wait()
+        c = self.start_engine({}, "--minutes", "0.001")
+        self.assertEqual(c.wait(timeout=10), 0)
+        self.assertEqual(json.loads((self.state / "news_engine.lock").read_text())["pid"], c.pid)   # one line: the last holder
+
+    def test_the_lock_is_free_while_an_orphan_of_the_dead_engine_still_runs(self):
+        a = self.start_engine({"polls": [[{"key": "k1", "symbol": "AAA", "title": "AAA one"}]], "score_orphan": True},
+                              "--minutes", "5")
+        self.wait_for(lambda: self.rows("news_scores.jsonl"))
+        a.kill()
+        a.wait()
+        self.assertFalse(self.dead(int(Path(str(self.sent_file) + ".orphan").read_text())))
+        self.assertEqual(self.start_engine({}, "--minutes", "0.001").wait(timeout=10), 0)
+
+    def test_an_open_session_with_a_queued_name_and_a_headline_reaches_nothing_outside(self):
+        (self.state / "news_queue.json").write_text(json.dumps([{"symbol": "BBB", "score": 9, "why": "x", "id": "q1", "queued_at": "2026-11-12T13:00:00+00:00"}]))
+        p = self.start_engine({"session": "open", "polls": [[{"key": "k1", "symbol": "AAA", "title": "AAA one"}]]}, "--minutes", "0.002")
+        self.assertEqual(p.wait(timeout=20), 0)        # 97 = the tripwire
+        self.assertFalse(Path(str(self.sent_file) + ".tripwire").exists())
+        # and it went where the outside calls are: the queued name was bought at a quote, the headline scored, the line sent
+        self.assertEqual([(t["side"], t["symbol"]) for t in self.rows("news_trades.jsonl")], [("BUY", "BBB")])
+        self.assertEqual([r["id"] for r in self.rows("news_scores.jsonl")], ["k1"])
+        self.assertEqual([r["priority"] for r in self.sent_rows()], ["high"])
+
+
+# One forbidden call each, in a process of its own behind the tripwire alone (argv: the tripwire's file, tests/). The
+# targets cannot answer, so a tripwire that failed to stop one of them would still reach nobody.
+BEHIND_THE_WIRE = ("import sys; sys.path.insert(0, sys.argv[2]); from helpers import engine_child;"
+                   " engine_child.install_tripwire(sys.argv[1])\n")
+OUTSIDE = {
+    "requests.sessions.Session.request": "import requests; requests.post('https://outside.invalid/', json={}, timeout=1)",
+    "urllib.request.urlopen": "import urllib.request as u; u.urlopen(u.Request('https://outside.invalid/x'), timeout=1)",
+    "socket.create_connection": "import socket; socket.create_connection(('192.0.2.1', 9), timeout=1)",
+    "subprocess.Popen git": "import subprocess; subprocess.run(['git', '--version'], capture_output=True)",
+    "subprocess.Popen claude": "import subprocess; subprocess.run(['/nonexistent/claude', '-p', 'x'], capture_output=True)",
+}
+# What stays on this machine goes through: a local listener by all three roads, and a program that is neither.
+INSIDE = """
+import socket, subprocess, urllib.request, requests
+port = sys.argv[3]
+socket.create_connection(("127.0.0.1", int(port)), timeout=2).close()
+for road, ask in (("urlopen", urllib.request.urlopen), ("requests", requests.get)):
+    try:
+        ask(f"http://127.0.0.1:{port}/", timeout=0.2)
+    except OSError:   # the listener never answers: the call was let through and then timed out
+        print(road)
+subprocess.run(["sleep", "0"], check=True)
+print("sleep")
+"""
+
+
+class Harness(Procs):
+    """Every process test and drill after this one trusts the harness, so what the lock tests above do not call is
+    checked here: a tripwire that has never been seen to fire is no tripwire."""
+
+    def _behind_the_wire(self, name: str, code: str, *args: str) -> subprocess.Popen:
+        p = subprocess.Popen([sys.executable, "-c", BEHIND_THE_WIRE + code, str(self.tmp / name), str(TESTS), *args],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=no_phone.clean_env())
+        self._started.append(p)   # tearDown ends it, whatever becomes of the test
+        return p
+
+    def test_the_tripwire_ends_the_process_with_97_on_each_call_that_would_leave_the_machine(self):
+        started = {name: self._behind_the_wire(name, code) for name, code in OUTSIDE.items()}
+        for name, p in started.items():
+            _, err = p.communicate(timeout=20)
+            self.assertEqual((p.returncode, (self.tmp / name).read_text()), (97, name.split()[0] + "\n"), err[-400:])
+
+    def test_the_tripwire_lets_through_what_stays_on_this_machine(self):
+        with socket.create_server(("127.0.0.1", 0)) as listener:   # it takes connections and never answers
+            p = self._behind_the_wire("inside", INSIDE, str(listener.getsockname()[1]))
+            out, err = p.communicate(timeout=20)
+        self.assertEqual((p.returncode, out.split(), (self.tmp / "inside").exists()),
+                         (0, ["urlopen", "requests", "sleep"], False), err[-400:])
+
+    def test_whatever_the_engine_child_starts_runs_behind_the_tripwire(self):
+        engine = ("import socket, sys; sys.path.insert(0, sys.argv[1]); from helpers import engine_child\n"   # an engine that
+                  "engine_child.cli.main = lambda argv: socket.create_connection(('192.0.2.1', 9), timeout=1)\n"  # tries to leave
+                  "sys.exit(engine_child.main(sys.argv[2:]))")
+        sent = self.tmp / "sent-of-its-own"   # not self.sent_file: this trip is the point, tearDown must not count it
+        p = subprocess.run([sys.executable, "-c", engine, str(TESTS), "--state-dir", str(self.state), "--scenario",
+                            self.scenario({}), "--sent", str(sent)],
+                           capture_output=True, text=True, env=no_phone.clean_env(), timeout=20)
+        self.assertEqual((p.returncode, Path(f"{sent}.tripwire").read_text()), (97, "socket.create_connection\n"), p.stderr[-400:])
+
+    def test_a_scenario_is_played_as_written(self):
+        self.write_book({"BBB": 50.0})
+        (self.state / "news_queue.json").write_text(json.dumps([{"symbol": "CCC", "score": 9, "why": "x", "id": "q1"}]))
+        polls = [[{"key": "k1", "symbol": "AAA", "title": "AAA one"}], [{"key": "k2", "symbol": "AAA", "title": "AAA two"}]]
+        self.start_engine({"session": "open", "universe": {"AAA": "Tech", "BBB": "Tech", "CCC": "Tech", "SPY": "Index"},
+                           "news": {"slippage_bps": 0}, "opens": {"CCC": 42.0}, "polls": polls, "scores": {"k2": 7},
+                           "prices": {"BBB": [51.0, 48.0], "AAA": [10.0, 20.0]}}, "--minutes", "5")
+        self.wait_for(lambda: len(self.rows("news_scores.jsonl")) == 2)      # the second poll came, a step later
+        # a list per poll, a price per call, a score per key (5 for a key the scenario does not hold)
+        self.assertEqual([(r["id"], r["price"], r["score"]) for r in self.rows("news_scores.jsonl")],
+                         [("k1", 10.0, 5), ("k2", 20.0, 7)])
+        # CCC from the queue at its official open; BBB seen at 51.00 by the first look and at 48.00, under its stop of
+        # 48.50, by the look after it. No slippage: the scenario's news keys are merged over config.json's
+        self.assertEqual([(t["side"], t["symbol"], t["price"]) for t in self.rows("news_trades.jsonl")],
+                         [("BUY", "CCC", 42.0), ("SELL", "BBB", 48.0)])
+        self.assertEqual(sum("SELL 10 BBB" in r["body"] for r in self.sent_rows()), 1)
+        beat = self.wait_beat()
+        self.assertEqual((beat["positions"], beat["code"]["commit"]), (1, "abc1234"))
+        self.assertIs(beat["lock"], True)              # the engine holds its lock, and its heartbeat says so
+
+    def test_the_phone_stand_in_writes_the_line_down_and_answers_as_the_scenario_says(self):
+        phone = ("import json, sys; sys.path.insert(0, sys.argv[1]); from helpers import engine_child\n"
+                 "for ok in (True, False):\n"
+                 "    engine_child.install({**engine_child.SCENARIO, 'send_ok': ok}, sys.argv[2])\n"
+                 "    print(json.dumps(engine_child.news_live.notify.send('a title', 'a body', {}, 'urgent')))\n")
+        p = subprocess.run([sys.executable, "-c", phone, str(TESTS), str(self.sent_file)],
+                           capture_output=True, text=True, env=no_phone.clean_env(), timeout=20)
+        self.assertEqual(p.stdout.splitlines(), ['["ntfy"]', "[]"], p.stderr[-400:])   # a channel took it; none did
+        self.assertEqual([{k: v for k, v in r.items() if k != "at"} for r in self.sent_rows()],
+                         [{"title": "a title", "body": "a body", "priority": "urgent"}] * 2)
+        self.assertEqual([r["at"][-6:] for r in self.sent_rows()], ["+00:00"] * 2)
+
+    def test_a_scenario_key_the_harness_does_not_know_is_refused_before_the_engine_starts(self):
+        p = self.start_engine({"sesion": "open"}, "--minutes", "0.001")
+        self.assertEqual(p.wait(timeout=10), 2)
+        self.assertIn("sesion", p.stderr.read())
+        self.assertFalse((self.state / "news_engine.lock").exists())
+
+    def test_a_start_has_no_end_by_the_clock_unless_its_options_name_one(self):
+        # the engine's own default is 16:05 New York: after the close a start would end before its first step
+        self.assertEqual(engine_child.engine_options(["--minutes", "5"]), ["--until", "24:00", "--minutes", "5"])
+        for own in (["--minutes", "5", "--until", "16:05"], ["--until=16:05"]):
+            self.assertEqual(engine_child.engine_options(own), own)
