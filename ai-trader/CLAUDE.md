@@ -233,7 +233,10 @@ Several sessions work this folder (the owner's main chat, the trader session, on
 wait for each other, code does:
 - **Not claimed, every session writes its own:** `state/`, `logs/`, `reports/`, lessons and postmortem records.
 - **Claimed:** anything under `aitrader/`, `tests/`, `scripts/`, `config.json`, `skills/`, `agents/`, `dashboard/`
-  and this file. Before changing one of these: `git pull`, read `BUILD_CLAIMS.md`. If another session holds an open
+  and this file. Before changing one of these: sync as hard rule 8 says - `git fetch origin <branch>`, then
+  `git merge-tree --write-tree --name-only HEAD origin/<branch>` (it touches neither the index nor the tree; exit 1
+  is a conflict: do not merge, report it), and on exit 0 `git merge --no-edit origin/<branch>`, where `<branch>` is
+  the branch this checkout tracks - then read `BUILD_CLAIMS.md`. If another session holds an open
   claim on that file younger than 24 hours, do not edit it: add a line under "Waiting" and push that. Otherwise add
   your claim (session, files, purpose, UTC time), commit and push THAT FIRST, then work, and move the claim to
   "Done" in the push that carries the work.

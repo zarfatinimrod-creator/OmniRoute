@@ -193,7 +193,7 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
 | `closed_today`, `after_hours` | אין מסחר היום; מחוץ ל-08:00 עד 16:00 ניו יורק (`launch_from_ny` עד `launch_until_ny`) | כלום |
 | `none` | מפקח חי: הנעילה שלו מוחזקת בידי pid חי, וה-`mark` האחרון ביומן הזמינות בן 180 שניות לכל היותר (`parent_stale_seconds`) | כלום |
 | `replace_parent` | הנעילה של המפקח מוחזקת בידי pid חי, אבל ה-`mark` האחרון ישן מ-180 שניות | עוצרים את משימת הרקע שלו (TaskStop; אין משימה: `kill` ל-`parent.pid`, אחרי 10 שניות `kill -9`), ואז מפעילים |
-| `halted` | בקובץ המצב יש עצירה (4, 5 או 6; `today.halt`) | לא מפעילים. קוראים את הסיבה ומטפלים בה (ל-4: `python3 -m aitrader verify` והנוהל הקיים), ואז `python3 -m aitrader.supervise --clear-halt`: הוא מריץ את `python3 -m aitrader news-live --check` (בדיקות ההפעלה, קריאה בלבד) ומנקה את העצירה רק כשהיא יוצאת עם 0. מהיום שאחרי העצירה `--status --watchdog` שם את R5e ב-`unsent`, עד שהוא נשלח |
+| `halted` | בקובץ המצב יש עצירה (4, 5 או 6; `today.halt`) | לא מפעילים כל עוד העצירה עומדת. קוראים את הסיבה ומטפלים בה (ל-4: `python3 -m aitrader verify` והנוהל הקיים), ואז `python3 -m aitrader.supervise --clear-halt`: הוא מריץ את `python3 -m aitrader news-live --check` (בדיקות ההפעלה, קריאה בלבד) ומנקה את העצירה רק כשהיא יוצאת עם 0. כשהוא יוצא עם 0: מריצים שוב `python3 -m aitrader.supervise --status --watchdog` ועושים מה ש-`action` אומר (בדרך כלל `launch`). מהיום שאחרי העצירה `--status --watchdog` שם את R5e ב-`unsent`, עד שהוא נשלח |
 | `kill_stray` | נעילת המנוע מוחזקת בידי pid שאינו הילד של מפקח חי (ה-pid כתוב ב-`why`) | אם משימת רקע של הסשן הזה מחזיקה את ה-pid: כלום. אחרת עוצרים אותו לפי הנוהל שלמטה (`kill <pid>` הוא עצירה מתוכננת: מחכים עד שהתהליך נעלם, `kill -9` רק אחרי שתי דקות), ואז מפעילים |
 | `wait_for_watchdog` | trip שני היום, הקריאה לא מבדיקת המנוע, והשורה האחרונה ביומן הזמינות היא לא עצירה מתוכננת (`handover`, `signal`, `orphaned`). `--status --watchdog` לא מחזיר אותו לעולם | כלום: בדיקת המנוע הבאה מפעילה |
 | `launch` | אף אחת מהשורות למעלה: אין מפקח חי, יום מסחר, בתוך השעות, אין עצירה | מריצים את `launch.command` כמשימת רקע עם `launch.timeout_ms` |
@@ -201,20 +201,23 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
 `unsent`: שורות של היום שלא הגיעו לנמרוד (`sent` false) ושהמפקח כבר לא ינסה לשלוח. בדיקת המנוע שולחת כל `text` כמו
 שהוא ב-PushNotification, ואז `python3 -m aitrader.supervise --relayed ID...` עם המזהים, ו-`--status` לא מציג אותן שוב.
 
-- כשמשימת הרקע מסתיימת הסשן מתעורר לבד: קוראים את השורה האחרונה שלה, מריצים `python3 -m aitrader.supervise --status`
-  ועושים מה ש-`action` אומר. השורה האחרונה של המפקח נראית כך:
-  `supervise: 76 handover. Run python3 -m aitrader.supervise --status and do what action says.` הטבלה היא לקורא היומן:
+- כשמשימת הרקע מסתיימת הסשן מתעורר לבד, ועושה לפי הסדר: (א) קורא את השורה האחרונה של המפקח ואת קוד היציאה שלו,
+  ועושה מה שכתוב בשורה שלה בטבלה שלמטה; (ב) מריץ `cd /home/user/OmniRoute/ai-trader && python3 -m aitrader.supervise --status`
+  ועושה מה ש-`action` אומר, חוץ מ-`launch` כשהטבלה אמרה לא להפעיל בתור הזה; (ג) שולח את `unsent` כמו בדיקת
+  המנוע (כל `text` ב-PushNotification, ואז `--relayed` עם המזהים).
+  השורה האחרונה של המפקח נראית כך:
+  `supervise: 76 handover. Run python3 -m aitrader.supervise --status and do what action says.` הטבלה היא הכלל:
 
-  | השורה האחרונה של המפקח | מה זה אומר | ה-`action` הצפוי |
-  |------------------------|------------|------------------|
-  | `0 end_of_day`, `0 closed_today` | היום נגמר; אין מסחר היום | `after_hours` או `closed_today` |
-  | `76 handover` | החלפה מתוכננת לפני מגבלת השעתיים | `launch`, מיד |
-  | `75 tripped` | המנוע נפל שוב ושוב (crash loop) | trip ראשון (`today.trips` הוא 1): `launch` פעם אחת, אחרי קריאת 20 השורות האחרונות של `.cache/news_live.log` (כשכתוב שם `tree_busy`: קודם משלימים את המיזוג או מריצים `git merge --abort`). אחר כך: `wait_for_watchdog` |
-  | `4 halt`, `5 halt`, `6 halt` | עצירה: יומן פגום, לוח חגים, קובץ התיק | `halted` |
-  | `3 lock_held pid <n>` | מנוע מחוץ לפיקוח מחזיק את התיק (או: מפקח אחר מחזיק את הנעילה של המפקח, והחדש לא התחיל) | `kill_stray` (כשזה מפקח אחר: `none` או `replace_parent`) |
-  | `143 signal`, `143 orphaned` | המפקח קיבל הוראה לעצור (אות עצירה, או שתהליך האב שלו נעלם) | `launch` אם השעות מאפשרות |
+  | השורה האחרונה של המפקח | מה זה אומר | מה עושים (ואז `--status`) |
+  |------------------------|------------|-------------------------------|
+  | `0 end_of_day`, `0 closed_today` | היום נגמר; אין מסחר היום | כלום; `--status` אומר `after_hours` או `closed_today` |
+  | `76 handover` | החלפה מתוכננת לפני מגבלת השעתיים | כלום; `--status` אומר `launch`, ומפעילים מיד |
+  | `75 tripped` | המנוע נפל שוב ושוב (crash loop) | קודם קוראים את 20 השורות האחרונות של `.cache/news_live.log`; אם יש מיזוג באמצע (`git rev-parse -q --verify MERGE_HEAD` מדפיס hash): `git merge --abort` (אם גם הוא נכשל: לא דוחפים, S2 עם הקובץ שה-abort ציין, ולא נוגעים בשום דבר אחר). אחר כך `--status`: trip ראשון (`today.trips` הוא 1) - `launch`; trip שני - `wait_for_watchdog` |
+  | `4 halt`, `5 halt`, `6 halt` | עצירה: יומן פגום, לוח חגים, קובץ התיק | כלום; `--status` אומר `halted` |
+  | `3 lock_held pid <n>` | מנוע מחוץ לפיקוח מחזיק את התיק (או: מפקח אחר מחזיק את הנעילה של המפקח, והחדש לא התחיל) | כלום; `--status` אומר `kill_stray` (כשזה מפקח אחר: `none` או `replace_parent`) |
+  | `143 signal`, `143 orphaned` | המפקח קיבל הוראה לעצור (אות עצירה, או שתהליך האב שלו נעלם) | כלום; `--status` אומר `launch` אם השעות מאפשרות |
   | נעצר במגבלה, בלי קוד ("was stopped after reaching its background time limit") | מגבלת השעתיים הגיעה לפני ההחלפה | `launch`. אם הוא רץ עם ה-timeout הארוך (בלי `--handover`): חוזרים ל-`--handover` עם timeout 7200000 (והדגל `supervisor.long_timeout_proven` חוזר ל-false, דרך השער), ו-R8 לנמרוד ב-PushNotification: `המפקח נעצר אחרי שעתיים למרות ההגדרה של 9 שעות. חוזרים להחלפה מתוכננת 4 פעמים ביום. כסף נייר` |
-  | 1 או כל דבר אחר | באג במפקח | קוראים את 20 השורות האחרונות של `.cache/supervise.log`; `launch` פעם אחת; R12 לנמרוד ב-PushNotification: `המפקח עצמו קרס (תקלה בקוד שלו). הפעלתי אותו מחדש פעם אחת. כסף נייר` |
+  | `1`, `2` (`a bad argument or config`, או שגיאה של argparse), או כל קוד או שורה שאינם בטבלה | באג במפקח, או הגדרה שהוא לא מקבל | קוראים את 20 השורות האחרונות של `.cache/supervise.log`. הפעלה מחדש אחרי סוף כזה: לכל היותר פעם אחת ביום ניו יורק. הסימן הוא הקובץ `.cache/parent_relaunched`, ובו התאריך של ניו יורק (`TZ=America/New_York date +%F`). אם הוא כבר מחזיק את התאריך של היום: לא מפעילים בתור הזה (גם כש-`--status` אומר `launch`), ו-R12 לנמרוד ב-PushNotification: `המפקח עצמו קרס (תקלה בקוד שלו). הפעלתי אותו מחדש פעם אחת. כסף נייר`. אחרת: כותבים לתוכו את התאריך של היום, ו-`--status` מפעיל |
 - אם עבודה אחרת רצה בסשן, ההתעוררות מחכה לה, ובזמן הזה אין מנוע ואין בדיקת סטופים. לפני עבודה ארוכה בסשן הסוחר
   בודקים מתי המנוע עלה (`code.started` ב-heartbeat) ומפעילים אותו מחדש קודם.
 - מנוע שני על אותו תיק לא עולה (`state/news_engine.lock`): הפקודה מסתיימת מיד עם קוד יציאה 3, ושום מנוע חדש לא
@@ -358,8 +361,15 @@ python3 -m aitrader summary --book crypto --ack <newest>           # רק אחר
 **push** תמיד בלולאת הניסיון החוזר:
 
 ```bash
-for i in 1 2 3 4 5; do git fetch origin ccr-120121ba-vsvwlj; git merge --no-edit origin/ccr-120121ba-vsvwlj || break; git push -u origin ccr-120121ba-vsvwlj && break; sleep $((2**i)); done
+ok=; for i in 1 2 3 4 5; do git fetch origin ccr-120121ba-vsvwlj; git merge-tree --write-tree --name-only HEAD origin/ccr-120121ba-vsvwlj || break; git merge --no-edit origin/ccr-120121ba-vsvwlj || break; git push -u origin ccr-120121ba-vsvwlj && { ok=1; break; }; sleep $((2**i)); done; test -n "$ok"
 ```
+`git merge-tree` בודק את המיזוג בלי לגעת באינדקס ובעץ: על התנגשות הוא יוצא עם 1 ומדפיס את מזהה העץ בשורה הראשונה
+ואחריו את הקבצים בהתנגשות. הלולאה יוצאת עם 0 רק כשהדחיפה עברה. יציאה שאינה 0 עם קבצים בהתנגשות שהודפסו היא
+התנגשות, ושום מיזוג לא נעשה: לא דוחפים, פועלים לפי כלל ההתנגשות של המשימה - S2 עם שם הקובץ הראשון (בלילה הוא
+נכתב ללוג הלילה, ומשימת הבוקר שולחת אותו) - וממשיכים לשלבים שאחריה. מיזוג שסורב בגלל קבצים שלא נכנסו ל-commit:
+commit של ה-state, והלולאה פעם אחת נוספת. כל יציאה אחרת שאינה 0, בלי קובץ בהתנגשות: הדחיפה נכשלה, וה-commit
+מחכה למשימה הבאה. תור לא נגמר עם מיזוג באמצע: אם יש, `git merge --abort`; אם גם הוא נכשל - לא דוחפים, S2 עם
+הקובץ שה-abort ציין, לא נוגעים בשום דבר אחר, וממשיכים.
 
 **מגבלות (כנות):** המשטר ומפסק הירידה נבדקים פעם ביום, בסגירה היומית, לא תוך-יומי. הזמנה שלא מולאה עד ההחלטה הבאה
 פגה (`expired_unfilled`), וההחלטה שמחליפה אותה היא החלטה מלאה; וטו או הקטנה על התאריך שפג לא עוברים אליה. Yahoo הוא מחיר מצרפי, לא מחיר של בורסה.
