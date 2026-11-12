@@ -151,7 +151,7 @@ class CryptoPushLoop(unittest.TestCase):
 
     def on_remote(self, sha: str) -> bool:
         return subprocess.run(["git", "--git-dir", str(self.remote), "merge-base", "--is-ancestor", sha, BRANCH],
-                              env=self.env, capture_output=True, timeout=30).returncode == 0
+                              cwd=self.tmp, env=self.env, capture_output=True, timeout=30).returncode == 0
 
     def test_a_conflict_ends_nonzero_names_the_file_and_leaves_no_merge_and_the_tree_as_it_was(self):
         self.commit(self.other, "ai-trader/state/backlog.md", "theirs\n")
