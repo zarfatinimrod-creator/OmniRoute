@@ -1,6 +1,6 @@
 {
   "decision_date": "2026-11-11",
-  "status": "pending",
+  "status": "executed",
   "rebalance": false,
   "exits_only": true,
   "targets": {
@@ -60,5 +60,27 @@
   "earnings_blackout": {},
   "preview_at_close": [],
   "new_entries": [],
-  "logged_at": "2026-11-11T21:23:31+00:00"
+  "logged_at": "2026-11-11T21:23:31+00:00",
+  "open_source": {
+    "one_minute": [
+      "AAPL",
+      "ABBV",
+      "AMGN",
+      "COP",
+      "CVX",
+      "DE",
+      "JNJ",
+      "KO",
+      "LLY",
+      "MRK",
+      "PM",
+      "TEVA",
+      "UNP",
+      "XLV",
+      "XOM"
+    ],
+    "daily_fallback": []
+  },
+  "executed_on": "2026-11-12",
+  "fills": []
 }
