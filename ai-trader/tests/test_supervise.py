@@ -756,6 +756,20 @@ open(sys.argv[1] + ".tmp", "w").write(str(g.pid))
 os.replace(sys.argv[1] + ".tmp", sys.argv[1])
 signal.pause()"""
 
+# A child whose beats carry no stop stamp at all (no checked_at, no stops_checked_at; Ruling 48): one held name, the
+# market open, a beat every 0.1 s. argv: the heartbeat file, then what main adds (--until, --supervised PID); it ends
+# when its parent is no longer that pid.
+STAMPLESS_CHILD = """import json, os, sys, time
+from datetime import datetime, timezone
+path, parent = sys.argv[1], int(sys.argv[sys.argv.index("--supervised") + 1])
+while os.getppid() == parent:
+    hb = {"at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(), "pid": os.getpid(), "phase": "idle",
+          "market_open": True, "held": {"BBB": {"stop": 48.5}}, "blind": []}
+    with open(path + ".tmp", "w") as f:
+        f.write(json.dumps(hb))
+    os.replace(path + ".tmp", path)
+    time.sleep(0.1)"""
+
 
 def saturday() -> datetime:
     """A clock that says 2026-11-14 15:00 UTC, a Saturday: no session."""
@@ -1293,6 +1307,69 @@ class Watching(Parents):
         ((a, b),) = asked
         self.assertEqual((self.urows("up")[0]["blind_s"], a), (42.0, datetime.fromisoformat(self.urows("sup_start")[0]["t"])))
 
+    # Tests added by Rulings 48 and 49 (Task 14b).
+    def alerts(self, kind: str) -> list[dict]:
+        return [r for r in self.urows("alert") if r["kind"] == kind]
+
+    def test_an_unknown_stop_stamp_counts_from_the_childs_start(self):   # Ruling 48: never an R6 of "0 seconds" at the boot beat
+        child = [sys.executable, "-c", STAMPLESS_CHILD, str(self.state / "news_heartbeat.json")]
+        p = self.spawn_parent(None, child_cmd=child, stops_stale_seconds=3)
+        self.wait_beat()
+        time.sleep(0.5)                                     # fresh beats; the child has lived well under stops_stale_seconds
+        self.assertEqual((self.urows("stale_stops"), self.alerts("R6")), ([], []))
+        r6, = self.wait_for(lambda: self.alerts("R6"), timeout=10)
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertGreaterEqual(int(re.search(r"כבר (\d+) שניות", r6["text"])[1]), 3)   # {s}: the child's age, never 0
+        self.assertEqual([(r["what"], r["names"], r["stop"]) for r in self.urows("stale_stops")], [("start", ["BBB"], None)])
+
+    def pause(self, p: subprocess.Popen, seconds: float, parent: bool = True) -> float:
+        """SIGSTOP to the parent p (unless parent is False) and to the process group of its child, then SIGCONT to both
+        after `seconds`, the parent first (it then ticks while its child's beat is still old); the pause as measured.
+        Only what this test started is signalled: p, and the dummy child p started, which leads a group of its own."""
+        child = self.wait_beat()["pid"]
+        self.assertIn(str(DUMMY_CHILD).encode(), Path(f"/proc/{child}/cmdline").read_bytes())
+        self.assertEqual(os.getpgid(child), child)                 # start_new_session: its group is its own
+        t0 = time.monotonic()
+        try:
+            if parent:
+                p.send_signal(signal.SIGSTOP)
+            os.killpg(child, signal.SIGSTOP)
+            time.sleep(seconds)
+        finally:
+            if parent:
+                p.send_signal(signal.SIGCONT)
+            os.killpg(child, signal.SIGCONT)
+        return time.monotonic() - t0
+
+    def test_a_pause_of_the_whole_machine_is_a_pause_row_and_an_r4_and_no_hang(self):   # Ruling 49; hang_seconds 2
+        p = self.spawn_parent([{"beats": -1}], hang_seconds=2, outage_report_seconds=2)   # the clock: a session (Parents)
+        self.wait_for(lambda: self.urows("up"))
+        paused = self.pause(p, 4)                                  # hang_seconds + 2 s
+        self.assertEqual(self.stop_parent(p, settle=2.5), 143)     # past hang_seconds after the resume
+        (pause,), (r4,) = self.urows("pause"), self.alerts("R4")
+        self.assertEqual((pause["child"], self.urows("hang"), self.alerts("R2")), (self.urows("start")[0]["child"], [], []))
+        self.assertTrue(paused - 0.5 < pause["s"] < paused + 1, (pause, paused))
+        start, end = datetime.fromisoformat(pause["start"]), datetime.fromisoformat(pause["t"])
+        self.assertTrue(timedelta(seconds=3) <= end - start <= timedelta(seconds=6), pause)
+        tz = supervise.load_cfg()["supervisor"]["owner_tz"]
+        self.assertIn(f"לא רצה מ-{ownerlines.hhmm(start, tz)} עד {ownerlines.hhmm(end, tz)}:", r4["text"])
+        self.assertEqual((r4["t"], r4["m"]), (pause["t"], 0))      # the minutes of a 4 s pause
+
+    def test_a_pause_shorter_than_hang_seconds_is_nothing(self):
+        p = self.spawn_parent([{"beats": -1}], hang_seconds=3, outage_report_seconds=1)
+        self.wait_for(lambda: self.urows("up"))
+        self.pause(p, 1)
+        self.assertEqual(self.stop_parent(p, settle=1), 143)
+        self.assertEqual((self.urows("pause"), self.urows("hang"), self.urows("alert")), ([], [], []))
+
+    def test_a_child_stopped_alone_is_still_a_hang(self):         # its parent goes on ticking: the old beat is the child's own
+        p = self.spawn_parent([{"beats": -1}], hang_seconds=2)
+        self.wait_for(lambda: self.urows("up"))
+        self.pause(p, 3, parent=False)                             # the hang is judged 2 s in; the switch is off (Parents)
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual(([r["killed_with"] for r in self.urows("hang")], [r["kind"] for r in self.urows("alert")], self.urows("pause")),
+                         (["none"], ["R2"], []))
+
 
 TOPIC = "t0p1c-under-test"
 POLL_FIELDS = ["event", "id", "message", "priority", "sequence_id", "time", "title", "topic"]   # ntfy's (ruling P10)
@@ -1640,14 +1717,17 @@ class Status(Parents):
     def action(self, **case) -> str:
         return self.status(**case)["action"]
 
-    def clear_halt(self, check_rc: int) -> int:
-        """A halt 4 in the state file, then --clear-halt with a stand-in check that prints a line and exits check_rc; its
-        return code. Its stdout is kept in self.out."""
+    def clear_halt(self, check_rc: int = 0, code: str | None = None, **sup) -> int:
+        """A halt 4 in the state file, then --clear-halt with a stand-in check that prints a line and exits check_rc (or
+        runs `code`), and `sup` over the config copy's supervisor block; its return code. ROOT is moved to the test's
+        directory for the call, so that the test's state directory is the default one: news-live --check has no
+        --state-dir, and --clear-halt refuses any other (Ruling 41). Its stdout is kept in self.out."""
         supervise.save_state(self.paths.state, {"day": "2026-11-12", "halt": {"code": 4, "why": "chain",
                                                                               "at": "2026-11-12T14:00:00+00:00"}})
-        check = [sys.executable, "-c", f"import sys; print('stand-in check: ' + sys.argv[1]); sys.exit({check_rc})"]
-        with contextlib.redirect_stdout(io.StringIO()) as out:
-            rc = supervise.main(["--clear-halt", "--state-dir", str(self.state), "--config", str(self.config())],
+        check = [sys.executable, "-c", code or f"import sys; print('stand-in check: ' + sys.argv[1]); sys.exit({check_rc})"]
+        cfg = self.config(**sup)
+        with mock.patch.object(supervise, "ROOT", self.tmp), contextlib.redirect_stdout(io.StringIO()) as out:
+            rc = supervise.main(["--clear-halt", "--state-dir", str(self.state), "--config", str(cfg)],
                                 child_cmd=check, env=no_phone.clean_env(), clock=lambda: self.NOW)
         self.out = out.getvalue()
         return rc
@@ -1752,6 +1832,63 @@ class Status(Parents):
                          (0, 0, 0))
         self.assertEqual(json.loads(self.paths.relayed.read_text()), {"day": "2026-11-12", "ids": ["R1-3", "R4-2", "R5e-2026-11-12"]})
         self.assertNotIn("R5e", [u["kind"] for u in self.status(halt_day="2026-11-11", watchdog=True)["unsent"]])   # relayed: once is enough
+
+    # Tests added by Rulings 39 and 41 (Task 14b).
+    def test_r5e_says_the_positions_are_unknown_when_the_book_cannot_be_read(self):   # Ruling 39: {} meant "none" and "cannot tell"
+        halt = {"code": 6, "why": "book", "at": "2026-11-11T15:00:00+00:00"}           # a halt 6 of an earlier New York day
+        for case, text in (("no book file", None), ("valid JSON but no book: a list", "[]"), ("no positions map", "{}"),
+                           ("not JSON", "{not json"), ("a position that is no mapping", '{"positions": {"BBB": 48.5}}')):
+            with self.subTest(case):
+                self.paths.book.unlink(missing_ok=True)
+                if text is not None:
+                    self.paths.book.write_text(text)
+                self.assertEqual(self.status(halt=halt, watchdog=True)["unsent"][-1],
+                                 {"id": "R5e-2026-11-12", "kind": "R5e",
+                                  "text": "מנוע החדשות עדיין עצור מאז 11.11 (קובץ התיק). סטופים לא נבדקים. פתוח: לא ידוע. כסף נייר"})
+        self.write_book({})                                                            # a book that reads and holds nothing
+        self.assertIn("פתוח: אין פוזיציות.", self.status(halt=halt, watchdog=True)["unsent"][-1]["text"])
+
+    def test_a_check_that_does_not_answer_within_its_timeout_leaves_the_halt(self):   # Ruling 41: --clear-halt cannot hang
+        t0 = time.monotonic()
+        rc = self.clear_halt(code="import time; time.sleep(5)", clear_halt_check_timeout_seconds=1)
+        self.assertEqual((rc, self.state_file()["halt"]["code"], self.out.splitlines()),
+                         (1, 4, ["supervise: the check did not answer within 1 s: the halt stays"]))
+        self.assertLess(time.monotonic() - t0, 4)                                      # the stand-in would sleep 5 s
+        with contextlib.redirect_stderr(io.StringIO()) as err:                          # a bool is no number
+            self.assertEqual((self.clear_halt(clear_halt_check_timeout_seconds=True), self.out), (2, ""))
+        self.assertIn("a bad argument or config", err.getvalue())
+
+    def test_clear_halt_refuses_a_state_directory_its_check_cannot_read(self):   # Ruling 41: news-live --check has no --state-dir
+        elsewhere, ran = self.tmp / "elsewhere", self.tmp / "the-check-ran"
+        elsewhere.mkdir()
+        supervise.save_state(elsewhere / "news_supervisor.json", {"day": "2026-11-12", "halt": {"code": 4, "why": "chain",
+                                                                                                 "at": "2026-11-12T14:00:00+00:00"}})
+        check = [sys.executable, "-c", "import sys; open(sys.argv[1], 'w').close()", str(ran)]   # it would pass, and say so
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            rc = supervise.main(["--clear-halt", "--state-dir", str(elsewhere), "--config", str(self.config())],
+                                child_cmd=check, env=no_phone.clean_env(), clock=lambda: self.NOW)
+        self.assertEqual((rc, len(out.getvalue().splitlines()), "the halt stays" in out.getvalue(), ran.exists()), (1, 1, True, False))
+        self.assertEqual(json.loads((elsewhere / "news_supervisor.json").read_text())["halt"]["code"], 4)
+
+    def test_conflicting_forms_are_refused_with_2_and_status_with_watchdog_still_works(self):   # Ruling 41
+        where = ["--state-dir", str(self.state), "--config", str(self.config())]
+        stand_in = [sys.executable, "-c", "import sys; sys.exit(1)"]                   # a check, should one ever run
+        for argv, said in ((["--status", "--clear-halt"], "argument --clear-halt: not allowed with argument --status"),
+                           (["--status", "--relayed", "R1-1"], "argument --relayed: not allowed with argument --status"),
+                           (["--clear-halt", "--relayed", "R1-1"], "argument --relayed: not allowed with argument --clear-halt"),
+                           (["--watchdog"], "argument --watchdog: only with --status"),
+                           (["--watchdog", "--relayed", "R1-1"], "argument --watchdog: only with --status"),
+                           (["--watchdog", "--clear-halt"], "argument --watchdog: only with --status")):
+            with self.subTest(argv=argv), contextlib.redirect_stderr(io.StringIO()) as err, \
+                    contextlib.redirect_stdout(io.StringIO()):
+                # main returns argparse's code (its contract since Task 11: "2 for a bad argument"); the message is
+                # argparse's refusal, so the 2 is no config error
+                self.assertEqual(supervise.main([*argv, *where], child_cmd=stand_in, env={}, clock=lambda: self.NOW), 2)
+                self.assertIn(said, err.getvalue())
+        self.assertEqual(list(self.state.iterdir()), [])                               # refused before any writer
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(supervise.main(["--status", "--watchdog", *where], env={}, clock=lambda: self.NOW), 0)
+        self.assertEqual(json.loads(out.getvalue())["action"], "launch")
 
 
 class Handover(Parents):

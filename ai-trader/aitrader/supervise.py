@@ -8,7 +8,8 @@ before the harness's 2-hour cap (spec 4.5: --handover, measured by the next pare
 
     python3 -u -m aitrader.supervise --until HH:MM [--handover] [--state-dir DIR] [--config FILE]
     python3 -m aitrader.supervise --status [--watchdog] [--state-dir DIR] [--config FILE]
-    python3 -m aitrader.supervise --clear-halt | --relayed ID... [--state-dir DIR] [--config FILE]
+    python3 -m aitrader.supervise --relayed ID... [--state-dir DIR] [--config FILE]
+    python3 -m aitrader.supervise --clear-halt [--config FILE]
     python3 -m aitrader.supervise --net-check [--config FILE]
 
 Standard library only, and never aitrader.journal, notify or news_live (they bring pandas and requests): the parent
@@ -434,9 +435,10 @@ def may_send(st: dict, line_id: str, now: datetime, cap: int) -> bool:
 
 def gap_line(prev: dict | None, up_at: datetime, cold: bool, cal: dict, sup: dict) -> tuple[str, dict] | None:
     """The line for the outage before a parent's first `up` (spec 8, R4 and R4b), or None. prev: the last readable row
-    before this sup_start. Only when [prev.t, up_at] holds outage_report_seconds or more inside sessions (today's or
-    earlier ones): R4 when prev is no sup_stop (with cold, `cold_time` is prev.t on the owner's clock: the parent never
-    runs git, and the last row it can read is what git restored); R4b when it is a sup_stop whose `why` has a word in
+    before this sup_start (or a machine pause's start as {"t", "ev": "pause"}: R4, ruling 49; up_at is then its end).
+    Only when [prev.t, up_at] holds outage_report_seconds or more inside sessions (today's or earlier ones): R4 when
+    prev is no sup_stop (with cold, `cold_time` is prev.t on the owner's clock: the parent never runs git, and the last
+    row it can read is what git restored); R4b when it is a sup_stop whose `why` has a word in
     ownerlines.WORDS["R4b.why"]. After a sup_stop for a halt, a held lock, the end of the day or a closed day it is
     None: R5a-R5e said that the stops are not checked, and the minutes reach R11. The fields carry `m`, the line's
     minutes, for its alert row (ruling P6)."""
@@ -477,9 +479,12 @@ def _read_beat(path: Path) -> tuple[dict | None, float | None]:
     return (hb if isinstance(hb, dict) else None), mtime
 
 
-def _held_now(paths: Paths, child_pid: int | None) -> dict:
+def _held_now(paths: Paths, child_pid: int | None) -> dict | None:
     """{symbol: stop} from the beat of the child child_pid; with no beat of its own (no child, none yet, another pid's),
-    from the book as plain JSON (ruling P11: the book is tracked and holds every stop, the heartbeat is neither)."""
+    from the book as plain JSON (ruling P11: the book is tracked and holds every stop, the heartbeat is neither). None
+    when neither can tell (Ruling 39): no beat of its own, and no book that reads as a book (missing, not JSON, no
+    positions map, a position that is no mapping); a beat of another pid is not used, it can be days old. {} only for
+    a book that reads and holds nothing. ownerlines.held_text gives the two their own words."""
     hb, mtime = _read_beat(paths.heartbeat)
     if child_pid is not None and isinstance(hb, dict) and hb.get("pid") == child_pid:
         return beat_view(hb, mtime, child_pid, time.time())["held"]
@@ -487,7 +492,7 @@ def _held_now(paths: Paths, child_pid: int | None) -> dict:
         book = json.loads(paths.book.read_text(encoding="utf-8"))
         return {sym: p.get("stop_price") for sym, p in book["positions"].items()}
     except (OSError, ValueError, KeyError, TypeError, AttributeError):  # no book, or none that can be read
-        return {}
+        return None
 
 
 def _signal_group(pgid: int, sig: int) -> None:
@@ -511,7 +516,7 @@ NUMBERS = ("loop_seconds", "healthy_seconds", "backoff_first_seconds", "backoff_
            "hang_term_grace_seconds", "stops_stale_seconds", "outage_report_seconds", "max_alerts_per_hour",
            "alert_retry_seconds", "alert_retry_minutes", "send_timeout_seconds", "max_line_bytes",
            "held_names_in_line", "free_text_max_chars", "min_leg_minutes",
-           "max_leg_minutes")  # what main and the core read
+           "max_leg_minutes", "clear_halt_check_timeout_seconds")  # what main and the core read
 # above 0, or the parent refuses the config: a zero loop would spin, a zero grace would kill at once
 POSITIVE = ("loop_seconds", "start_grace_seconds", "hang_term_grace_seconds", "planned_stop_grace_seconds")
 
@@ -585,7 +590,8 @@ def status(paths: Paths, cfg: dict, now: datetime, *, watchdog: bool = False, en
     - unsent: today's alert lines whose latest row says sent false, past their retries (the first row is older than
       alert_retry_minutes, or no parent lives to retry them; R10 at once: the parent never retries it) and not in
       news_relayed.json. With watchdog and a halt of an earlier New York day, R5e as well, id "R5e-<today>", until it
-      is relayed; its {held} from the book (ruling P11). On the day of the halt R5a-R5d have spoken.
+      is relayed; its {held} from the book (ruling P11), "unknown" when no book can be read (ruling 39). On the day of
+      the halt R5a-R5d have spoken.
     - launch: the command and timeout of the tracked background command: --handover and TWO_HOURS_MS until
       long_timeout_proven is true and environ's BASH_MAX_TIMEOUT_MS is at least long_timeout_ms (section 9)."""
     sup, cal = cfg["supervisor"], cfg["calendar"]
@@ -679,17 +685,21 @@ def relay(paths: Paths, ids: list[str], now: datetime) -> int:
     return 0
 
 
-def clear_halt(paths: Paths, now: datetime, check: list[str], env: Mapping | None) -> int:
+def clear_halt(paths: Paths, now: datetime, check: list[str], env: Mapping | None, timeout: float) -> int:
     """--clear-halt (spec 4.4): with a live parent, nothing (3). Else the engine's start checks run read-only (check +
     --check: `news-live --check`) and their output is printed; on 0 the halt is cleared under the parent's lock (0),
-    else it stays (1)."""
+    else it stays (1). A check that has not answered within `timeout` seconds is killed and the halt stays (1;
+    Ruling 41): a woken session must never hang on it."""
     parent = _live(paths.lock, "aitrader.supervise")
     if parent is not None:
         print(f"supervise: a live parent, pid {parent}: the halt stays", flush=True)
         return 3
     try:
         done = subprocess.run([*check, "--check"], cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, encoding="utf-8", errors="replace")
+                              stderr=subprocess.STDOUT, encoding="utf-8", errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(f"supervise: the check did not answer within {timeout} s: the halt stays", flush=True)
+        return 1
     except OSError as e:
         print(f"supervise: the check did not run ({type(e).__name__}): the halt stays", flush=True)
         return 1
@@ -733,7 +743,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     The forms of a woken session (spec 4.4) run no loop and need no --until: --status [--watchdog] prints status() as
     JSON and returns 0, and writes nothing; --relayed ID... (relay) and --clear-halt (clear_halt: it runs child_cmd,
     default `python3 -m aitrader news-live`, with --check, and clears the halt under the parent's lock) are its only
-    two writers."""
+    two writers. They are one at a time, and --watchdog goes with --status only (else 2, argparse's refusal; ruling
+    41). news-live --check reads ai-trader's state/ and takes no --state-dir, so --clear-halt with any other
+    --state-dir clears nothing and returns 1 before the check (ruling 41)."""
     ppid = os.getppid()  # before anything else: what "orphaned" is measured against
     began = time.time()  # real time: up.sold of the first child counts the sales from here
     ap = argparse.ArgumentParser(prog="python3 -m aitrader.supervise")
@@ -743,12 +755,15 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     ap.add_argument("--state-dir", type=Path, help="state in DIR and logs in DIR/.cache (drills and tests)")
     ap.add_argument("--config", type=Path, help="this config.json (drills and tests)")
     ap.add_argument("--net-check", action="store_true", help="ask ntfy's health once; exit 0 only on 200")
-    ap.add_argument("--status", action="store_true", help="read-only: what a woken session does now, as JSON")
+    form = ap.add_mutually_exclusive_group()  # a woken session's forms, one at a time (Ruling 41)
+    form.add_argument("--status", action="store_true", help="read-only: what a woken session does now, as JSON")
+    form.add_argument("--clear-halt", action="store_true", help="clear the halt once news-live --check exits 0")
+    form.add_argument("--relayed", nargs="+", metavar="ID", help="these unsent lines went out through the Claude app")
     ap.add_argument("--watchdog", action="store_true", help="with --status: the call is a watchdog slot's")
-    ap.add_argument("--clear-halt", action="store_true", help="clear the halt once news-live --check exits 0")
-    ap.add_argument("--relayed", nargs="+", metavar="ID", help="these unsent lines went out through the Claude app")
     try:
         a = ap.parse_args(argv)
+        if a.watchdog and not a.status:
+            ap.error("argument --watchdog: only with --status")
         once = a.net_check or a.status or a.clear_halt or bool(a.relayed)  # one answer, no loop and no --until
         if a.until is None and not once:
             ap.error("the following arguments are required: --until")
@@ -767,6 +782,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                          or any(sup[k] <= 0 for k in POSITIVE)
                          or not all(HHMM.fullmatch(t) for t in sup["handover_times_ny"])):  # else the loop would raise
             raise ValueError("--until, or a number or the handover times of the supervisor block")
+        if a.clear_halt and type(sup["clear_halt_check_timeout_seconds"]) not in (int, float):  # as NUMBERS: no bool
+            raise ValueError("the check's timeout of the supervisor block")
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"supervise: a bad argument or config ({type(e).__name__})", file=sys.stderr)
         return 2
@@ -784,7 +801,12 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     if a.relayed:
         return relay(paths, a.relayed, clock())
     if a.clear_halt:
-        return clear_halt(paths, clock(), child_cmd or [sys.executable, "-m", "aitrader", "news-live"], env)
+        if state_dir.resolve() != (ROOT / "state").resolve():  # news-live --check reads ROOT's state/ only (Ruling 41)
+            print(f"supervise: --clear-halt checks and clears {ROOT / 'state'} only (news-live --check has no"
+                  " --state-dir): the halt stays", flush=True)
+            return 1
+        return clear_halt(paths, clock(), child_cmd or [sys.executable, "-m", "aitrader", "news-live"], env,
+                          sup["clear_halt_check_timeout_seconds"])
     print(f"supervise: pid {pid}, until {a.until}, handover {'on' if a.handover else 'off'}", flush=True)
     state_dir.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -844,11 +866,13 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
         # open stale-stops episode; r6: (its start, R6's {s}) when R6 went out. gap: what the first `up` of this parent
         # measures its outage from, until it has (R4, R4b). n: the day's last alert number (ruling P13: the log outlives
         # a parent). left: ntfy's last remainder, for the marks. last_child, codes (the exit codes since the last
-        # healthy run), refused (when the lock refusals began), tripped: what the lines on the way out read.
+        # healthy run), refused (when the lock refusals began), tripped: what the lines on the way out read. tick: the
+        # last loop tick (time.time(), clock()); resumed: time.time() at the tick that ended a pause (ruling 49).
         seen = {"mark": None, "down_at": None, "ended": None, "stale": None, "r6": None,
                 "gap": (prev, cold),
                 "n": max((_alert_n(r) for _, r in today if r.get("ev") == "alert"), default=0),
-                "left": None, "last_child": None, "codes": [], "refused": None, "tripped": {}}
+                "left": None, "last_child": None, "codes": [], "refused": None, "tripped": {}, "tick": None,
+                "resumed": None}
         # The restart episode (spec 8, R1): its falls, the `up` and `code` rows of its children, and the hang kill
         # that waits for the next `up` to be told by R2 (ruling P5).
         ep: dict = {"falls": [], "ups": [], "codes": [], "r2": None}
@@ -964,14 +988,32 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     return "handover"
                 return look(child, ran_s)
 
+            def paused(child, last: tuple, wall: float, now: datetime) -> None:
+                """Ruling 49: more than hang_seconds between two of this parent's own ticks (wall: time.time()), so the
+                machine paused the parent and its child together; that is no hang. One row `pause`: its start (the
+                tick before, on the clock rows are written on), its seconds and the child. look judges no hang on the
+                child's beat until hang_seconds after this tick. With outage_report_seconds or more of market-open
+                seconds in it, R4 for it, from its start to now, built by gap_line."""
+                start = _utc(last[1])
+                emit("pause", now, start=start, s=round(wall - last[0], 1), child=child.pid if child else None)
+                seen["resumed"] = wall
+                line = gap_line({"t": start, "ev": "pause"}, now, False, cal, sup)
+                if line:
+                    say(line[0], now, extra={"m": line[1]["m"]}, held=_held_now(paths, child.pid if child else None),
+                        **line[1])
+
             def look(child, ran_s):
                 """One loop tick's reading of the heartbeat (spec 4.3, 4.6): the lines' outcomes, R7, the mark of a new
                 clock minute, and for the running child its `up` and `code` rows, stale stops, the end of a restart
                 episode and a hang, with the owner's line of each (spec 8). Returns "hang" when the child is to be
                 killed, else None."""
                 hb, mtime = _read_beat(paths.heartbeat)
-                view, now = beat_view(hb, mtime, child.pid if child else None, time.time()), clock()
+                wall = time.time()  # the beat's age and the gap between ticks are read on it, never on clock()
+                view, now = beat_view(hb, mtime, child.pid if child else None, wall), clock()
                 mine = view["mine"]
+                last, seen["tick"] = seen["tick"], (wall, now)
+                if last is not None and wall - last[0] > sup["hang_seconds"]:
+                    paused(child, last, wall, now)
                 drain(now)
                 hour = st["alerts"] if isinstance(st.get("alerts"), dict) else {}
                 if hour.get("capped") and hour.get("hour") != _hour(now):  # an hour that had capped lines has ended
@@ -1000,7 +1042,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                         ep["codes"].append(code_row)
                 if mine and view["age_s"] <= sup["hang_seconds"]:  # a fresh beat: what it says about the stops
                     ages = _stamp_ages(hb, view["age_s"]) if view["open"] else {}
-                    names = sorted(s for s, a in ages.items() if a is None or a > sup["stops_stale_seconds"])
+                    born = wall - kid["started"]  # ruling 48: an unknown stamp's age counts from this child's start
+                    names = sorted(s for s, a in ages.items()
+                                   if (born if a is None else a) > sup["stops_stale_seconds"])
                     stop_s = None if view["stop_age_s"] is None else round(view["stop_age_s"], 1)
                     if names and not seen["stale"]:
                         seen["stale"] = names
@@ -1017,7 +1061,10 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                             say("R6b", now, s=round(s + (now - t).total_seconds()))
                 if ep["falls"] and kid["up"] and ran_s >= sup["healthy_seconds"]:  # the episode is over: R1
                     episode_end(now)
-                # A hang: this child's beat is older than hang_seconds, or it has none after start_grace_seconds
+                # A hang: this child's beat is older than hang_seconds, or it has none after start_grace_seconds. After
+                # a pause of the whole machine its beat is not judged until hang_seconds after the resume (ruling 49).
+                if mine and seen["resumed"] is not None and wall - seen["resumed"] < sup["hang_seconds"]:
+                    return None
                 if not (view["age_s"] > sup["hang_seconds"] if mine else ran_s > sup["start_grace_seconds"]):
                     kid["hang_said"] = False
                     return None

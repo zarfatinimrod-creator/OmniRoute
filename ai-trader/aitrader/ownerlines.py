@@ -84,8 +84,10 @@ PARTS: dict[str, str] = {
 }
 
 # The owner's word for an internal code. The spec gives no words for E1's {side}; these two were decided with the table.
+# held: {held} when nothing is held, and when it cannot be told what is (Ruling 39).
 WORDS: dict[str, dict] = {
     "cause": {"crash": "קרס", "killed": "נהרג", "stopped": "נעצר"},
+    "held": {"none": "אין פוזיציות", "unknown": "לא ידוע"},
     "R4b.why": {"handover": "החלפה מתוכננת", "crash_loop": "נפילות חוזרות", "signal": "אות עצירה", "orphaned": "אות עצירה"},
     "R5e.why": {4: "יומן פגום", 5: "לוח חגים", 6: "קובץ התיק"},
     "W0.what": {"sync": "אין גישה לקוד", "crash": "הפקודה קרסה", "ntfy": "אין קריאה מ-ntfy", "fire": "אי אפשר להפעיל משימה"},
@@ -95,10 +97,13 @@ WORDS: dict[str, dict] = {
 FREE = ("note", "what", "file", "names")  # fields whose text comes from outside this table: render cuts them
 
 
-def held_text(held: dict[str, float], max_names: int) -> str:
-    """{held} from {symbol: stop}: "MU (סטופ 708.97)" for each name, at most max_names of them and then "ועוד {n}"."""
+def held_text(held: dict[str, float] | None, max_names: int) -> str:
+    """{held} from {symbol: stop}: "MU (סטופ 708.97)" for each name, at most max_names of them and then "ועוד {n}".
+    None: what is held cannot be told (Ruling 39), never the same word as an empty book."""
+    if held is None:
+        return WORDS["held"]["unknown"]
     if not held:
-        return "אין פוזיציות"
+        return WORDS["held"]["none"]
     more = len(held) - max_names
     names = ", ".join(f"{sym} (סטופ {stop:.2f})" for sym, stop in list(held.items())[:max_names])
     return names + (f" ועוד {more}" if more > 0 else "")

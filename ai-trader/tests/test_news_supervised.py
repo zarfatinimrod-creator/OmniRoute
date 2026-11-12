@@ -1505,7 +1505,7 @@ class GateFollowUps(_Engine):
 
     # 3. a line sent again backs off (critic N5)
     def test_a_line_no_channel_took_is_sent_again_at_most_once_every_unsent_resend_seconds(self):
-        self.assertEqual(self.nt.n["unsent_resend_seconds"], 120)
+        self.nt.n["unsent_resend_seconds"] = 120               # the times below are read against it, whatever config.json says
         clock, bodies = [0.0], []
 
         def send(title, body, cfg, prio="default", **kw):     # a channel is configured and takes nothing: an outage

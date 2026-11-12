@@ -301,7 +301,7 @@
     "pause_seconds": 1.5
   },
   "supervisor": {
-    "_note": "Supervisor spec 2026-11-10 (research/specs/2026-11-10-supervisor-design.md), section 10: every number of the parent process (aitrader/supervise.py), the dead-man switch and the watcher, at the spec's defaults. Seconds unless the key names another unit; *_ny times are New York, owner_tz is the owner's zone. The five switches (hang_kill_enabled, long_timeout_proven, deadman.enabled, watcher.fire_enabled, watcher.notify_enabled) stay false until the drill of their rollout step passes (spec 11.2). planned_stop_grace_seconds covers one scorer call (90 s) plus one look: raise it in the same change that sets news.guards to \"enforce\", whose second check can take 180 s (spec 5.3); planned_stop_grace_seconds must stay at or under mark_gap_max_seconds (raise both together): the parent writes no mark while it waits for a planned stop to end. until_ny: the --until of the launch command. max_line_bytes: no line to the owner is longer (ntfy takes 4,096 bytes). held_names_in_line: the held names a line lists before it says how many more. free_text_max_chars: a note, a file name or a list that comes from outside is cut to this. The lines DM1, DM2 and R8 (aitrader/ownerlines.py) say deadman.delay_seconds, deadman.handover_delay_seconds, long_timeout_ms and the number of handover_times_ny in words: a test fails when a value and its text disagree.",
+    "_note": "Supervisor spec 2026-11-10 (research/specs/2026-11-10-supervisor-design.md), section 10: every number of the parent process (aitrader/supervise.py), the dead-man switch and the watcher, at the spec's defaults. Seconds unless the key names another unit; *_ny times are New York, owner_tz is the owner's zone. The five switches (hang_kill_enabled, long_timeout_proven, deadman.enabled, watcher.fire_enabled, watcher.notify_enabled) stay false until the drill of their rollout step passes (spec 11.2). planned_stop_grace_seconds covers one scorer call (90 s) plus one look: raise it in the same change that sets news.guards to \"enforce\", whose second check can take 180 s (spec 5.3); planned_stop_grace_seconds must stay at or under mark_gap_max_seconds (raise both together): the parent writes no mark while it waits for a planned stop to end. until_ny: the --until of the launch command. max_line_bytes: no line to the owner is longer (ntfy takes 4,096 bytes). held_names_in_line: the held names a line lists before it says how many more. free_text_max_chars: a note, a file name or a list that comes from outside is cut to this. clear_halt_check_timeout_seconds: how long --clear-halt waits for news-live --check before the halt stays. The lines DM1, DM2 and R8 (aitrader/ownerlines.py) say deadman.delay_seconds, deadman.handover_delay_seconds, long_timeout_ms and the number of handover_times_ny in words: a test fails when a value and its text disagree.",
     "loop_seconds": 0.5,
     "healthy_seconds": 60,
     "backoff_first_seconds": 1,
@@ -325,6 +325,7 @@
     "alert_retry_seconds": 60,
     "alert_retry_minutes": 15,
     "send_timeout_seconds": 5,
+    "clear_halt_check_timeout_seconds": 120,
     "max_line_bytes": 1200,
     "held_names_in_line": 6,
     "free_text_max_chars": 200,

@@ -40,6 +40,10 @@ class Lines(unittest.TestCase):
         sales = [{"sym": f"S{i}", "stop": 48.5, "fill": 48.0} for i in range(8)]
         self.assertEqual((ownerlines.sold_text([], 6), ownerlines.sold_text(sales, 6).count("נמכר בהפעלה"), ownerlines.sold_text(sales, 6).endswith("ועוד 2.")), ("", 6, True))
 
+    # Test added by Ruling 39 (Task 14b): "nothing held" and "cannot tell" are two words, never one.
+    def test_held_text_says_unknown_for_none_and_no_positions_for_an_empty_book(self):
+        self.assertEqual((ownerlines.held_text(None, 3), ownerlines.held_text({}, 3)), ("לא ידוע", "אין פוזיציות"))
+
     def test_r1_and_the_two_forms_read_as_the_spec_writes_them(self):
         self.assertEqual(
             ownerlines.render("R1", **LIM, time="17:02:11", cause="קרס", down_s=1, falls="", blind_s=0,
