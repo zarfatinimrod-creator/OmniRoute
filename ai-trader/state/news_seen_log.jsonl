@@ -2696,3 +2696,10 @@
 {"key": "97a7e31c0d9e3ad3", "symbol": "WMT", "published": "2026-11-12T19:44:50+00:00", "first_seen": "2026-11-12T19:57:59.554523+00:00", "outcome": "scored"}
 {"key": "63e6cb30dcef23d3", "symbol": "BAC", "published": "2026-11-12T19:44:41+00:00", "first_seen": "2026-11-12T19:57:59.554633+00:00", "outcome": "scored"}
 {"key": "ad1a5d3bacb0922c", "symbol": "BAC", "published": "2026-11-12T19:42:58+00:00", "first_seen": "2026-11-12T19:57:59.554637+00:00", "outcome": "scored"}
+{"key": "6040706ef0330567", "symbol": "JPM", "published": "2026-11-12T19:17:39+00:00", "first_seen": "2026-11-12T19:58:39.547982+00:00", "outcome": "stale"}
+{"key": "c4788485d0193a7f", "symbol": "UNP", "published": "2026-11-12T19:44:20+00:00", "first_seen": "2026-11-12T20:01:39.649056+00:00", "outcome": "scored"}
+{"key": "3ab0adb38206a0b7", "symbol": "NVDA", "published": "2026-11-12T19:57:46+00:00", "first_seen": "2026-11-12T20:02:59.723755+00:00", "outcome": "scored"}
+{"key": "2c5b07811e78b43a", "symbol": "NVDA", "published": "2026-11-12T20:00:26+00:00", "first_seen": "2026-11-12T20:07:19.865691+00:00", "outcome": "scored"}
+{"key": "62ffd40afee82ef6", "symbol": "GS", "published": "2026-11-12T19:59:45+00:00", "first_seen": "2026-11-12T20:07:59.871689+00:00", "outcome": "scored"}
+{"key": "1707df8dd3439544", "symbol": "NVDA", "published": "2026-11-12T19:57:02+00:00", "first_seen": "2026-11-12T20:08:19.922967+00:00", "outcome": "scored"}
+{"key": "a5f60391cb6cf263", "symbol": "JPM", "published": "2026-11-12T19:00:00+00:00", "first_seen": "2026-11-12T20:08:39.921835+00:00", "outcome": "stale"}
