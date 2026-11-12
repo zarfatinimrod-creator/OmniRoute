@@ -34,6 +34,10 @@
                                           --what TEXT --lesson TEXT --fix TEXT [--fix-ref REF] it writes the review
   news-hold --reason TEXT                 the news engine opens no new position until the hold is lifted (stops and sales
                                           go on); `news-hold --release --reason TEXT` lifts it, on the owner's word
+  uptime-report [--day [YYYY-MM-DD] [--notify]] [--days N]   the supervisor's uptime log, read-only: each New York day's
+                                          percent of market time with its stops checked, and its causes (default the
+                                          last supervisor.report_days days; --day: one day, today when bare); --notify
+                                          (the close slot only) adds the day's R4c, R9 and R11 as one line {"notify": [...]}
 
   --book stocks|crypto (before or after the command; default stocks) picks the paper book. crypto runs in
   state/crypto/ and is accepted by cycle, status, scorecard, backtest, verify, predict, context, veto, shrink, summary;
@@ -143,6 +147,13 @@ def main(argv=None) -> int:
     pm.add_argument("--lesson", default="")
     pm.add_argument("--fix", default="")
     pm.add_argument("--fix-ref", default="", help="commit, backlog item or lesson that carries the fix")
+    ur = sub.add_parser("uptime-report")
+    one = ur.add_mutually_exclusive_group()
+    one.add_argument("--day", nargs="?", const="", default=None, metavar="YYYY-MM-DD",
+                     help="one New York day (today when bare)")
+    one.add_argument("--days", type=int, default=None, help="the last N days (default supervisor.report_days)")
+    ur.add_argument("--notify", action="store_true",
+                    help="with --day: add the close slot's lines as one JSON line; only the close slot pushes them")
     for sp in sub.choices.values():  # --book also after the command; SUPPRESS keeps the top-level value when absent
         sp.add_argument("--book", choices=["stocks", "crypto"], default=argparse.SUPPRESS)
     a = ap.parse_args(argv)
@@ -489,6 +500,30 @@ def _run(a: argparse.Namespace) -> int:
             print(f"postmortem: the list could not be built ({type(e).__name__}: {str(e)[:200]}); check state/{postmortem.LEDGER}"
                   " and the trade journals. Until it can be read the news engine opens no position.", file=sys.stderr)
             return 1
+    elif a.cmd == "uptime-report":  # read-only: the supervisor's uptime log (spec 4.6, 11.2)
+        from datetime import date, datetime, timedelta  # local, as news-score's: that import makes the names local here
+
+        from . import supervise, uptime
+
+        if a.notify and a.day is None:
+            print("uptime-report: --notify belongs to --day (the close slot's one reading of its day)", file=sys.stderr)
+            return 2
+        today = datetime.now(supervise.NY).date()
+        try:
+            one = date.fromisoformat(a.day) if a.day else today
+        except ValueError:
+            print(f"uptime-report: --day takes YYYY-MM-DD, not {a.day[:20]!r}", file=sys.stderr)
+            return 2
+        cfg = supervise.load_cfg()
+        n = a.days or cfg["supervisor"]["report_days"]
+        days = [one] if a.day is not None else [today - timedelta(days=k) for k in range(n - 1, -1, -1)]
+        rows = supervise.read_rows(journal.STATE / "uptime.jsonl")
+        health_file = journal.STATE / "news_health.jsonl"  # read, never created: journal.path would make the folder
+        health = supervise.read_rows(health_file) if health_file.exists() else None
+        reports = [uptime.day_report(rows, d, cfg, health) for d in days]
+        print(uptime.render(reports, cfg))
+        if a.notify:
+            print(json.dumps({"notify": uptime.close_lines(reports[0], rows, cfg)}, ensure_ascii=False))
     elif a.cmd == "news":
         from .data import news_headlines
 
