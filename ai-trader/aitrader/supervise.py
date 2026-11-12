@@ -1,9 +1,11 @@
 """The supervisor's parent process (supervisor spec 2026-11-10, section 4): it starts the news engine, restarts it,
-and keeps the uptime log. So far (Tasks 10-12): its foundations (the config, its own trading calendar, the uptime log,
-the state file and its lock), the restart core, the loop that runs it, and what the loop reads in the heartbeat (a mark
-a minute, `up` and `code` at a child's first looks, a hang, stale stops):
+and keeps the uptime log. So far (Tasks 10-13): its foundations (the config, its own trading calendar, the uptime log,
+the state file and its lock), the restart core, the loop that runs it, what the loop reads in the heartbeat (a mark
+a minute, `up` and `code` at a child's first looks, a hang, stale stops), and its lines to the owner (spec 8: every
+restart, hang, trip, halt and gap, one line per event, through deadman.Sender):
 
     python3 -u -m aitrader.supervise --until HH:MM [--handover] [--state-dir DIR] [--config FILE]
+    python3 -m aitrader.supervise --net-check [--config FILE]
 
 Standard library only, and never aitrader.journal, notify or news_live (they bring pandas and requests): the parent
 must start in a moment and keep running when what broke is the engine's own imports. It reads config.json itself.
@@ -25,6 +27,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import IO
 from zoneinfo import ZoneInfo
+
+from . import deadman, ownerlines
 
 ROOT = Path(__file__).resolve().parent.parent  # ai-trader/: config.json, state/, .cache/
 KEPT_ACROSS_DAYS = ("halt", "reported_through", "last_commit")  # what a state file of another New York day keeps
@@ -50,9 +54,9 @@ def session_hours(day: date, cal: dict) -> tuple[tuple[int, int], tuple[int, int
 
 class Paths:
     """Where the parent's files are. state_dir: its lock and state file, the dead-man's and the relay's files, the
-    uptime log, and the engine's files it reads (the heartbeat, the engine's lock, the trade journal). cache_dir: the
-    parent's log and the engine's. --state-dir DIR (main) is Paths(DIR, DIR / ".cache"); the default is ai-trader's
-    state/ and .cache/."""
+    uptime log, and the engine's files it reads (the heartbeat, the engine's lock, the trade journal, the book).
+    cache_dir: the parent's log and the engine's. --state-dir DIR (main) is Paths(DIR, DIR / ".cache"); the default is
+    ai-trader's state/ and .cache/."""
 
     def __init__(self, state_dir: Path, cache_dir: Path):
         state_dir, cache_dir = Path(state_dir), Path(cache_dir)
@@ -64,6 +68,7 @@ class Paths:
         self.heartbeat = state_dir / "news_heartbeat.json"
         self.engine_lock = state_dir / "news_engine.lock"
         self.trades = state_dir / "news_trades.jsonl"
+        self.book = state_dir / "news_book.json"
         self.sup_log = cache_dir / "supervise.log"
         self.engine_log = cache_dir / "news_live.log"
 
@@ -367,6 +372,63 @@ def mark_due(last_mark: datetime | None, now: datetime) -> bool:
     return last_mark is None or now.replace(second=0, microsecond=0) != last_mark.replace(second=0, microsecond=0)
 
 
+TITLE = "AI Trader - מפקח"  # every line of the parent's own (the spec fixes only the dead-man's title)
+COUNTED = ("R1", "R2", "R6")  # the lines max_alerts_per_hour counts (spec 8)
+HELD_BACK = ("R1", "R2")  # of those, the ones held back over the count
+
+
+def _hour(now: datetime) -> str:
+    """The clock hour of `now`, as the state file's alerts.hour keeps it."""
+    return now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H")
+
+
+def may_send(st: dict, line_id: str, now: datetime, cap: int) -> bool:
+    """Whether a line goes out now (spec 8). R1, R2 and R6 count against `cap` lines in the clock hour of `now`, kept in
+    the state file's `alerts` {"hour", "sent", "capped"} so that a new parent goes on counting. R1 and R2 over the
+    count are held back ("capped"). R6 is counted and never held back, and no other line is: the spec lists R6 under
+    the cap and also says that urgent lines are never capped, and "stops not checked" must not wait for an hour to
+    turn. A new hour starts the counts again. `alerts` is replaced whole: load_state's same-day merge is shallow."""
+    old = st.get("alerts")
+    a = {"hour": None, "sent": 0, "capped": 0, **(old if isinstance(old, dict) else {})}
+    if a["hour"] != _hour(now):
+        a = {"hour": _hour(now), "sent": 0, "capped": 0}
+    go = line_id not in HELD_BACK or a["sent"] < cap
+    if line_id in COUNTED:
+        a = {**a, "sent": a["sent"] + 1} if go else {**a, "capped": a["capped"] + 1}
+    st["alerts"] = a
+    return go
+
+
+def gap_line(prev: dict | None, up_at: datetime, cold: bool, cal: dict, sup: dict) -> tuple[str, dict] | None:
+    """The line for the outage before a parent's first `up` (spec 8, R4 and R4b), or None. prev: the last readable row
+    before this sup_start. Only when [prev.t, up_at] holds outage_report_seconds or more inside sessions (today's or
+    earlier ones): R4 when prev is no sup_stop (with cold, `cold_time` is prev.t on the owner's clock: the parent never
+    runs git, and the last row it can read is what git restored); R4b when it is a sup_stop whose `why` has a word in
+    ownerlines.WORDS["R4b.why"]. After a sup_stop for a halt, a held lock, the end of the day or a closed day it is
+    None: R5a-R5e said that the stops are not checked, and the minutes reach R11. The fields carry `m`, the line's
+    minutes, for its alert row (ruling P6)."""
+    t = _when(prev.get("t")) if isinstance(prev, dict) else None
+    if t is None:
+        return None
+    s = open_seconds(t, up_at, cal)
+    if s < sup["outage_report_seconds"]:
+        return None
+    tz = sup["owner_tz"]
+    fields = {"time": ownerlines.hhmm(t, tz), "time2": ownerlines.hhmm(up_at, tz), "m": round(s / 60)}
+    if prev.get("ev") != "sup_stop":
+        return "R4", {**fields, **({"cold_time": fields["time"]} if cold else {})}
+    why = ownerlines.WORDS["R4b.why"].get(str(prev.get("why")))
+    return ("R4b", {**fields, "why": why}) if why else None
+
+
+def _alert_n(row: dict) -> int:
+    """The n of an alert row's id, "<kind>-<n>"; 0 when it has none."""
+    try:
+        return int(str(row.get("id")).rsplit("-", 1)[1])
+    except (IndexError, ValueError):
+        return 0
+
+
 def _read_beat(path: Path) -> tuple[dict | None, float | None]:
     """The heartbeat and its file's mtime, both from one open file (a beat is replaced whole, never rewritten in place,
     so the two belong together); (None, None) when there is no file, the beat None when it is no JSON object."""
@@ -390,7 +452,9 @@ UNTIL = re.compile(r"([01]\d|2[0-3]):[0-5]\d|24:00")
 NUMBERS = ("loop_seconds", "healthy_seconds", "backoff_first_seconds", "backoff_max_seconds", "max_restarts",
            "restart_window_seconds", "max_restarts_day", "lock_wait_seconds", "planned_stop_grace_seconds",
            "end_of_day_slack_seconds", "uptime_keep_days", "long_timeout_ms", "hang_seconds", "start_grace_seconds",
-           "hang_term_grace_seconds", "stops_stale_seconds")  # what main and the core read
+           "hang_term_grace_seconds", "stops_stale_seconds", "outage_report_seconds", "max_alerts_per_hour",
+           "alert_retry_seconds", "alert_retry_minutes", "send_timeout_seconds", "max_line_bytes",
+           "held_names_in_line", "free_text_max_chars")  # what main and the core read
 
 
 def _holder(lock: Path):
@@ -410,21 +474,33 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     clock() -> an aware UTC time (default now) answers the calendar questions only: the day, the session, --until and
     the `t` of a row. Ages never read it, so a test or a drill can run the parent on a session morning on any day.
     SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the child. Two lines go
-    to stdout, the first and the last; the rest goes to .cache/supervise.log."""
+    to stdout, the first and the last; the rest goes to .cache/supervise.log. The owner's lines (spec 8) go to
+    alerts.ntfy_base_url with the topic of env (default os.environ), through a worker thread that the loop never waits
+    for. --net-check asks ntfy's health once, prints what came back and returns 0 only on 200 (spec 6, "Not verified":
+    that urllib reaches ntfy through the session's proxy and CA bundle)."""
     ppid = os.getppid()  # before anything else: what "orphaned" is measured against
     began = time.time()  # real time: up.sold of the first child counts the sales from here
     ap = argparse.ArgumentParser(prog="python3 -m aitrader.supervise")
-    ap.add_argument("--until", required=True, help="HH:MM New York, handed to the engine (24:00 never comes)")
+    ap.add_argument("--until", help="HH:MM New York, handed to the engine (24:00 never comes); required but with"
+                    " --net-check")
     ap.add_argument("--handover", action="store_true", help="hand over before the harness's 2-hour cap")
     ap.add_argument("--state-dir", type=Path, help="state in DIR and logs in DIR/.cache (drills and tests)")
     ap.add_argument("--config", type=Path, help="this config.json (drills and tests)")
+    ap.add_argument("--net-check", action="store_true", help="ask ntfy's health once; exit 0 only on 200")
     try:
         a = ap.parse_args(argv)
+        if a.until is None and not a.net_check:
+            ap.error("the following arguments are required: --until")
     except SystemExit as e:  # argparse has printed why
         return e.code if isinstance(e.code, int) else 2
+    environ = os.environ if env is None else env
     try:
         cfg = load_cfg(a.config)
-        sup, cal = cfg["supervisor"], cfg["calendar"]
+        sup, cal, base = cfg["supervisor"], cfg["calendar"], cfg["alerts"]["ntfy_base_url"]
+        if a.net_check:  # nothing is published, and no topic is needed: the status, or the class of what went wrong
+            got = deadman.Sender(base, None, sup["send_timeout_seconds"], env=environ, sync=True).health()
+            print(f"supervise: net-check {got}", flush=True)
+            return 0 if got == 200 else 1
         if not UNTIL.fullmatch(a.until) or not all(isinstance(sup[k], (int, float)) for k in NUMBERS):
             raise ValueError("--until or a number of the supervisor block")
     except (OSError, ValueError, KeyError, TypeError) as e:
@@ -441,6 +517,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
         print(f"supervise: 3 lock_held pid {_holder(paths.lock)}. {AFTER}", flush=True)
         return 3
     log_file = open(paths.sup_log, "a", encoding="utf-8")
+    sender = deadman.Sender(base, environ.get(cfg["alerts"].get("ntfy_topic_env", "AITRADER_NTFY_TOPIC")),
+                            sup["send_timeout_seconds"], env=environ)
     heard, earlier = [], {}
     if threading.current_thread() is threading.main_thread():  # Python lets no other thread set a handler
         earlier = {s: signal.signal(s, lambda signum, frame: heard.append(signum))
@@ -476,10 +554,114 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             gap = round((now - datetime.fromisoformat(prev["t"])).total_seconds())
         except (KeyError, TypeError, ValueError):  # no row before this one, or no time that can be read
             gap = None
+        cold = not paths.heartbeat.exists()
         emit("sup_start", until=a.until, handover=a.handover,
              timeout_ms=TWO_HOURS_MS if a.handover else sup["long_timeout_ms"], prev_t=prev.get("t"),
-             prev_ev=prev.get("ev"), gap_s=gap, cold=not paths.heartbeat.exists())
+             prev_ev=prev.get("ev"), gap_s=gap, cold=cold)
         log(f"start: pid {pid}, until {a.until}, handover {'on' if a.handover else 'off'}")
+        today = [(t, r) for r in rows if (t := _when(r.get("t"))) is not None and t.astimezone(NY).date() == day]
+        day_began = min((t for t, _ in today), default=now)  # R3 after the day's limit counts the minutes from here
+
+        # What the loop has seen. mark: the clock time of the last mark. down_at / ended: when the last child ended, on
+        # the injected clock (the exit row's t) and on the real one (time.time(), for up.sold). stale: the names of an
+        # open stale-stops episode; r6: (its start, R6's {s}) when R6 went out. gap: what the first `up` of this parent
+        # measures its outage from, until it has (R4, R4b). n: the day's last alert number (ruling P13: the log outlives
+        # a parent). left: ntfy's last remainder, for the marks. last_child, codes (the exit codes since the last
+        # healthy run), refused (when the lock refusals began), tripped: what the lines on the way out read.
+        seen = {"mark": None, "down_at": None, "ended": None, "stale": None, "r6": None,
+                "gap": (rows[-1] if rows else None, cold),
+                "n": max((_alert_n(r) for _, r in today if r.get("ev") == "alert"), default=0),
+                "left": None, "last_child": None, "codes": [], "refused": None, "tripped": {}}
+        # The restart episode (spec 8, R1): its falls, the `up` and `code` rows of its children, and the hang kill
+        # that waits for the next `up` to be told by R2 (ruling P5).
+        ep: dict = {"falls": [], "ups": [], "codes": [], "r2": None}
+        pending: dict = {}  # alert id -> a line on its way: {row, payload, first, next (None: in flight), failed}
+        counts = {"restarts_today": st["restarts_today"], "stamps": []}
+        tz = sup["owner_tz"]
+
+        def save() -> None:
+            try:  # the counts so far: a parent that is killed keeps what it has saved
+                save_state(paths.state, {**st, "restarts_today": counts["restarts_today"]})
+            except OSError as e:
+                log(f"the state file was not written ({type(e).__name__})")
+
+        def held_now(child_pid: int | None) -> dict:
+            """{symbol: stop} from this child's beat; with no beat of its own, from the book (ruling P11)."""
+            hb, mtime = _read_beat(paths.heartbeat)
+            if child_pid is not None and isinstance(hb, dict) and hb.get("pid") == child_pid:
+                return beat_view(hb, mtime, child_pid, time.time())["held"]
+            try:
+                book = json.loads(paths.book.read_text(encoding="utf-8"))
+                return {sym: p.get("stop_price") for sym, p in book["positions"].items()}
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):  # no book, or none that can be read
+                return {}
+
+        def row(line: dict, sent) -> dict:
+            return {"id": line["id"], "kind": line["kind"], "sent": sent, "text": line["text"], **line["extra"]}
+
+        def say(kind: str, now: datetime, extra: dict | None = None, **fields) -> None:
+            """One line to the owner (spec 8), from ownerlines' table: {held} from {symbol: stop}, {sold} from trade
+            rows. Its id is <kind>-<n>, n counting the day's alerts. Held back by may_send: an alert row "capped".
+            Else it goes to the worker, and drain writes its row when the outcome comes. extra: more fields of the
+            row (R4 and R4b: `m`, ruling P6)."""
+            try:
+                if "held" in fields:
+                    fields["held"] = ownerlines.held_text(fields["held"], sup["held_names_in_line"])
+                if "sold" in fields:
+                    fields["sold"] = ownerlines.sold_text([{"sym": r["symbol"], "stop": r["stop"], "fill": r["price"]}
+                                                           for r in fields["sold"]], sup["held_names_in_line"])
+                text = ownerlines.render(kind, max_bytes=sup["max_line_bytes"], free_chars=sup["free_text_max_chars"],
+                                         **fields)
+            except (KeyError, ValueError, TypeError, AttributeError) as e:  # a beat or a book it cannot be built from
+                log(f"line {kind} not built ({type(e).__name__})")
+                return
+            seen["n"] += 1
+            line = {"id": f"{kind}-{seen['n']}", "kind": kind, "text": text, "extra": extra or {}}
+            go = may_send(st, kind, now, sup["max_alerts_per_hour"])
+            save()  # the hour's counts survive this parent (spec 8)
+            if not go:
+                emit("alert", now, **row(line, "capped"))
+                log(f"line {line['id']}: capped")
+                return
+            pending[line["id"]] = {"row": line, "first": time.monotonic(), "next": None, "failed": False,
+                                   "payload": {"title": TITLE, "message": text,
+                                               "priority": deadman.PRIORITY[ownerlines.priority(kind)]}}
+            sender.publish(pending[line["id"]]["payload"], line["id"])
+
+        def drain(now: datetime, retry: bool = True) -> None:
+            """The outcomes the worker brought back: an alert row `sent` true, or `sent` false at a line's first
+            failure; then a try again every alert_retry_seconds for alert_retry_minutes, and a late success adds a row
+            with the same id. The log gets a status code or an exception's class, never a URL or a message."""
+            mono = time.monotonic()
+            for r in sender.results():
+                p = pending.get(r["tag"])
+                if p is None:
+                    continue
+                seen["left"] = seen["left"] if r["left"] is None else r["left"]
+                log(f"line {r['tag']}: {r['status'] or r['error'] or 'no topic'}")
+                if r["ok"] or not p["failed"]:
+                    emit("alert", now, **row(p["row"], r["ok"]))
+                if r["ok"] or mono - p["first"] >= sup["alert_retry_minutes"] * 60:
+                    del pending[r["tag"]]
+                else:
+                    p["failed"], p["next"] = True, mono + sup["alert_retry_seconds"]
+            for tag, p in pending.items():
+                if retry and p["next"] is not None and p["next"] <= mono:
+                    p["next"] = None
+                    sender.publish(p["payload"], tag)
+
+        def finish() -> None:
+            """On the way out: send_timeout_seconds for the lines in flight (ruling P18(b)), then a row `sent` false
+            for each that had no outcome, so that the next watchdog turn relays it."""
+            end = time.monotonic() + sup["send_timeout_seconds"]
+            drain(clock(), retry=False)
+            while any(p["next"] is None for p in pending.values()) and time.monotonic() < end:
+                (sleep or time.sleep)(min(sup["loop_seconds"], max(0.0, end - time.monotonic())))
+                drain(clock(), retry=False)
+            for p in pending.values():
+                if not p["failed"]:
+                    emit("alert", clock(), **row(p["row"], False))
+
         # A weekday of a year the calendar does not list is no closed day, though session_hours fails it closed: the
         # engine's start check refuses it with its urgent line and 5, and the parent halts on that 5 (spec 4.3).
         if session_hours(day, cal) is None and (day.weekday() >= 5 or day.year in cal.get("years", [])):
@@ -487,12 +669,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
         else:
             cmd = list(child_cmd or [sys.executable, "-u", "-m", "aitrader", "news-live"])
             cmd += ["--until", a.until, "--supervised", str(pid)]
-
-            # What the loop has seen. mark: the clock time of the last mark. down_at / ended: when the last child
-            # ended, on the injected clock (the exit row's t) and on the real one (time.time(), for up.sold).
-            # stale: the names of an open stale-stops episode. kid: the child that runs now (spawn sets it).
-            seen = {"mark": None, "down_at": None, "ended": None, "stale": None}
-            kid: dict = {}
+            kid: dict = {}  # the child that runs now (spawn sets it)
 
             def spawn() -> subprocess.Popen:
                 before = _read_beat(paths.heartbeat)[0] or {}  # the engine before this one: its last look ends there
@@ -512,18 +689,23 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 return look(child, ran_s)
 
             def look(child, ran_s):
-                """One loop tick's reading of the heartbeat (spec 4.3, 4.6): the mark of a new clock minute, and for the
-                running child its `up` and `code` rows, stale stops and a hang. Returns "hang" when the child is to be
+                """One loop tick's reading of the heartbeat (spec 4.3, 4.6): the lines' outcomes, R7, the mark of a new
+                clock minute, and for the running child its `up` and `code` rows, stale stops, the end of a restart
+                episode and a hang, with the owner's line of each (spec 8). Returns "hang" when the child is to be
                 killed, else None."""
                 hb, mtime = _read_beat(paths.heartbeat)
                 view, now = beat_view(hb, mtime, child.pid if child else None, time.time()), clock()
                 mine = view["mine"]
+                drain(now)
+                hour = st["alerts"] if isinstance(st.get("alerts"), dict) else {}
+                if hour.get("capped") and hour.get("hour") != _hour(now):  # an hour that had capped lines has ended
+                    say("R7", now, n=hour["capped"], cap=sup["max_alerts_per_hour"], r=counts["restarts_today"])
                 if mark_due(seen["mark"], now):
                     seen["mark"] = now
                     emit("mark", now, hb=round(view["age_s"], 1) if mine else None,
                          stop=None if view["stop_age_s"] is None else round(view["stop_age_s"], 1),
                          n=len(view["held"]) if mine else None, open=view["open"], blind=view["blind"], dm=None,
-                         left=None)
+                         left=seen["left"])
                 if child is None:
                     return None
                 if mine and not kid["up"] and (not view["open"] or first_look_done(hb, child.pid, kid["started"])):
@@ -534,12 +716,12 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     kid["code"] = True
                     changed = st["last_commit"] is not None and code["commit"] != st["last_commit"]
                     st["last_commit"] = code["commit"]
-                    emit("code", now, child=child.pid, commit=code["commit"], dirty=code.get("dirty"),
-                         code_changed=changed)
-                    try:  # the commit outlives this parent (R1 and the next parent compare with it)
-                        save_state(paths.state, {**st, "restarts_today": counts["restarts_today"]})
-                    except OSError as e:
-                        log(f"the state file was not written ({type(e).__name__})")
+                    code_row = {"child": child.pid, "commit": code["commit"], "dirty": code.get("dirty"),
+                                "code_changed": changed}
+                    emit("code", now, **code_row)
+                    if ep["falls"]:
+                        ep["codes"].append(code_row)
+                    save()  # the commit outlives this parent (R1 and the next parent compare with it)
                 if mine and view["age_s"] <= sup["hang_seconds"]:  # a fresh beat: what it says about the stops
                     ages = _stamp_ages(hb, view["age_s"]) if view["open"] else {}
                     names = sorted(s for s, a in ages.items() if a is None or a > sup["stops_stale_seconds"])
@@ -547,9 +729,18 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     if names and not seen["stale"]:
                         seen["stale"] = names
                         emit("stale_stops", now, what="start", names=names, stop=stop_s)
+                        if not set(names) <= set(view["blind"]):  # else the engine's blind-quote alert owns it
+                            s = round(stop_s if stop_s is not None else time.time() - kid["started"])
+                            seen["r6"] = (now, s)
+                            say("R6", now, s=s, names=", ".join(names), held=view["held"])
                     elif not names and seen["stale"]:
                         emit("stale_stops", now, what="end", names=seen["stale"], stop=stop_s)
                         seen["stale"] = None
+                        if seen["r6"]:
+                            (t, s), seen["r6"] = seen["r6"], None
+                            say("R6b", now, s=round(s + (now - t).total_seconds()))
+                if ep["falls"] and kid["up"] and ran_s >= sup["healthy_seconds"]:  # the episode is over: R1
+                    episode_end(now)
                 # A hang: this child's beat is older than hang_seconds, or it has none after start_grace_seconds
                 if not (view["age_s"] > sup["hang_seconds"] if mine else ran_s > sup["start_grace_seconds"]):
                     kid["hang_said"] = False
@@ -562,7 +753,25 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     emit("hang", now, child=child.pid, **kid["hang"], killed_with="none")
                     log(f"child {child.pid} hangs ({kid['hang']['hb']} s without a beat): not killed, the switch is"
                         " off")
+                    say("R2", now, off=True, s=kid["hang"]["hb"], held=held_now(child.pid))
                 return None
+
+            def episode_end(now: datetime) -> None:
+                """R1, once for the episode however many falls (spec 8): the time and cause of its first fall, down_s
+                to its last `up`, the blind seconds of all its `up` rows, what they sold, new code, the day's restarts.
+                No R1 when a hang kill was its only fall: R2 told it at the restart (ruling P5)."""
+                falls, ups = ep["falls"], ep["ups"]
+                if not (len(falls) == 1 and falls[0]["hang"]):
+                    last, changed = ups[-1], [c for c in ep["codes"] if c["code_changed"]]
+                    say("R1", now, time=ownerlines.hhmm(falls[0]["t"], tz, seconds=True),
+                        cause=ownerlines.WORDS["cause"][falls[0]["cause"]],
+                        down_s=round((last["t"] - falls[0]["t"]).total_seconds(), 1),
+                        falls=ownerlines.PARTS["R1.falls"].format(k=len(falls)) if len(falls) > 1 else "",
+                        blind_s=round(sum(u["blind_s"] for u in ups), 1), held=last["held"],
+                        sold=[r for u in ups for r in u["sold"] or []],
+                        code=ownerlines.PARTS["R1.code"].format(commit=changed[-1]["commit"]) if changed else "",
+                        n=counts["restarts_today"])
+                ep.update(falls=[], ups=[], codes=[], r2=None)
 
             def up(child, hb: dict, view: dict, now: datetime) -> None:
                 """The row `up` (spec 4.6): what the restart cost, at this child's first beat that has looked at its
@@ -586,10 +795,22 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     log(f"news_trades.jsonl could not be read ({type(e).__name__})")
                     sold = None
                 down = seen["down_at"]
-                emit("up", now, child=child.pid, down_from=None if down is None else _utc(down),
-                     down_s=None if down is None else round((now - down).total_seconds(), 2), blind_s=blind_s,
-                     handover_s=None, held=view["held"], blind=blind, commit=None, dirty=None, code_changed=None,
-                     sold=sold)
+                up_row = {"child": child.pid, "down_from": None if down is None else _utc(down),
+                          "down_s": None if down is None else round((now - down).total_seconds(), 2),
+                          "blind_s": blind_s, "handover_s": None, "held": view["held"], "blind": blind, "commit": None,
+                          "dirty": None, "code_changed": None, "sold": sold}
+                emit("up", now, **up_row)
+                if ep["falls"]:
+                    ep["ups"].append({**up_row, "t": now})
+                if ep["r2"] is not None:  # ruling P5: a hang kill is told at the restart, with its time and blind_s
+                    say("R2", now, s=ep["r2"], time=ownerlines.hhmm(now, tz, seconds=True), blind_s=blind_s,
+                        held=view["held"])
+                    ep["r2"] = None
+                if seen["gap"] is not None:  # this parent's first `up`: the outage before it, if any (R4, R4b)
+                    (prev_row, was_cold), seen["gap"] = seen["gap"], None
+                    line = gap_line(prev_row, now, was_cold, cal, sup)
+                    if line:
+                        say(line[0], now, extra={"m": line[1]["m"]}, held=view["held"], **line[1])
 
             def stop(child, how: str) -> None:
                 """A hang stop (spec 4.3): SIGTERM to the child's process group, hang_term_grace_seconds, SIGKILL to
@@ -631,18 +852,45 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 if ev == "tripped":
                     st["trips_today"] += 1
                     fields["trips_today"] = st["trips_today"]
+                    seen["tripped"] = fields
                 if ev == "exit":
-                    seen.update(down_at=now, ended=time.time())
+                    seen.update(down_at=now, ended=time.time(), last_child=fields["child"])
+                    refused = fields["why"] == "exit" and fields["rc"] == 3  # another engine holds the book: no fall
+                    seen["refused"] = (seen["refused"] or time.monotonic()) if refused else None
+                    healthy = fields["ran_s"] >= sup["healthy_seconds"]
+                    seen["codes"] = [] if healthy else [*seen["codes"], fields["rc"]]
+                    if not refused and fields["why"] != "planned":
+                        fall(now, fields)
                 emit(ev, now, **fields)
+
+            def fall(now: datetime, fields: dict) -> None:
+                """A fall of the child, for R1: its time and its cause (a code: "crash"; a signal or a hang kill:
+                "killed"; 0 or 143: "stopped"). A hang kill waits for the next `up` to be told by R2 (ruling P5)."""
+                hang = fields["why"] == "hang"
+                cause = "killed" if hang or fields["rc"] is None else "stopped" if fields["rc"] in (0, 143) else "crash"
+                ep["falls"].append({"t": now, "cause": cause, "hang": hang})
+                if hang:
+                    ep["r2"] = kid["hang"]["hb"]
 
             def at_until() -> bool:
                 return near_until(clock().astimezone(NY), a.until, sup["end_of_day_slack_seconds"])
 
-            counts = {"restarts_today": st["restarts_today"], "stamps": []}
             rc, word = restart_core(spawn, watch, stop, at_until, core_emit, sup, counts, sleep=sleep or time.sleep)
             st["restarts_today"] = counts["restarts_today"]
             if word == "halt":
                 st["halt"] = {"code": rc, "why": HALT_WHY[rc], "at": _utc(clock())}
+        if word == "crash_loop":  # R3, R3b at the second trip of the day, then nothing (spec 4.3; ruling P9)
+            trip = seen["tripped"]
+            kind = {1: "R3c" if seen["codes"] and set(seen["codes"]) == {7} else "R3", 2: "R3b"}.get(st["trips_today"])
+            if kind:
+                minutes = trip["window_s"] / 60 if trip.get("window_s") else (clock() - day_began).total_seconds() / 60
+                say(kind, clock(), k=trip.get("restarts", 0) + 1, m=max(1, round(minutes)),
+                    held=held_now(seen["last_child"]))
+        elif word == "halt":
+            say({4: "R5a", 5: "R5b", 6: "R5d"}[rc], clock(), held=held_now(seen["last_child"]))
+        elif word == "lock_held":
+            say("R5c", clock(), s=round(time.monotonic() - (seen["refused"] or time.monotonic())))
+        finish()  # the lines' rows come before sup_stop: the row before the next sup_start is the sup_stop
         emit("sup_stop", why=word, rc=rc)
         try:
             save_state(paths.state, st)
@@ -655,6 +903,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     finally:
         for s, handler in earlier.items():  # None: a handler that was not set from Python cannot be named here
             signal.signal(s, signal.SIG_DFL if handler is None else handler)
+        sender.close()
         log_file.close()
         lock.close()
 
