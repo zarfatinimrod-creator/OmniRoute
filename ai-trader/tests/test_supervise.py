@@ -1541,6 +1541,23 @@ class ParentLines(Parents):
                 got.append(deadman.Sender(self.stub.url, None, 2, env={"http_proxy": "http://127.0.0.1:9"}, sync=True).health())
         self.assertEqual(got, [200, "ConnectionRefusedError"])
 
+    # Test added by ruling 37: a planned end cuts a restart episode short of its healthy run.
+    def test_a_planned_end_says_the_r1_of_an_episode_whose_restart_is_up_and_nothing_before_that(self):
+        # one fall, then a child that beats; healthy_seconds 30, so the episode is still open when 09:18 comes, 3 s
+        # after the start (min_leg_minutes 0). stop_after: a parent that never hands over still ends, with 143
+        moved = datetime(2026, 11, 12, 9, 17, 57, tzinfo=NY) - datetime.now(timezone.utc)
+        rc = self.run_parent([{"beats": 0, "then": "exit", "code": 1}, {"beats": -1}], "--handover", min_leg_minutes=0,
+                             clock=lambda: datetime.now(timezone.utc) + moved, healthy_seconds=30, stop_after=10)
+        self.assertEqual((rc, self.ids(), [r["ev"] for r in self.urows()][-2:]), (76, ["R1"], ["alert", "sup_stop"]))
+        self.fresh({})                  # the same fall, and the restarted child never beats; SIGTERM 2 s after the start
+        rc = self.run_parent([{"beats": 0, "then": "exit", "code": 1}, {"beats": 0, "then": "hang"}], healthy_seconds=30,
+                             stop_after=2)
+        self.assertEqual((rc, len(self.urows("start")), self.urows("alert")), (143, 2, []))   # no `up`: nothing at the stop
+        self.fresh({})                  # a fall, a child that comes up and falls too, then one that never beats: R1 would say
+        rc = self.run_parent([{"beats": 0, "then": "exit", "code": 1}, {"beats": 3, "then": "crash"}, {"beats": 0, "then": "hang"}],
+                             healthy_seconds=30, stop_after=2)              # "came back" of an engine that is down again
+        self.assertEqual((rc, len(self.urows("start")), len(self.urows("up")), self.urows("alert")), (143, 3, 1, []))
+
 
 # A process that sleeps out the test and whose command line names `word` as a parent's or an engine's does. Given a lock
 # file (argv[1], else ""), it first holds an flock on it, as a parent or an engine holds its own lock, then says "held":
@@ -1734,3 +1751,67 @@ class Status(Parents):
                          (0, 0, 0))
         self.assertEqual(json.loads(self.paths.relayed.read_text()), {"day": "2026-11-12", "ids": ["R1-3", "R4-2", "R5e-2026-11-12"]})
         self.assertNotIn("R5e", [u["kind"] for u in self.status(halt_day="2026-11-11", watchdog=True)["unsent"]])   # relayed: once is enough
+
+
+class Handover(Parents):
+    """The parent hands over by the clock before the harness's 2-hour cap, and the next parent measures how long the
+    stops went unchecked across the handover (supervisor spec 4.5; section 2, target 11; section 3, row 5)."""
+
+    @staticmethod
+    def clock_from(h: int, m: int, s: int):
+        """A clock that says h:m:s New York on Thursday 2026-11-12 now and runs on from there."""
+        moved = datetime(2026, 11, 12, h, m, s, tzinfo=NY) - datetime.now(timezone.utc)
+        return lambda: datetime.now(timezone.utc) + moved
+
+    def test_handover_due(self):
+        t, T = lambda hm: datetime(2026, 11, 12, *map(int, hm.split(":")), tzinfo=NY), ["09:18", "10:48", "12:28", "14:17"]
+        self.assertEqual([supervise.handover_due(t(a), t(b), T, 20, 110) for a, b in
+                          (("08:07", "09:17"), ("08:07", "09:18"), ("09:05", "09:18"), ("09:05", "10:48"), ("14:20", "16:09"), ("14:20", "16:10"))],
+                         [False, True, False, True, False, True])      # 09:05 is under 20 minutes before 09:18; 14:20 + 110 min = 16:10
+
+    def test_a_handover_ends_with_76_and_the_next_parent_measures_it(self):   # the clock is shifted so that a listed time comes 2 s
+        clock = self.clock_from(9, 17, 58)                                    # after the start; min_leg_minutes 0
+        # stop_after: a parent that never hands over is stopped at 10 s and ends with 143
+        rc = self.run_parent([{"beats": -1}], "--handover", clock=clock, min_leg_minutes=0, stop_after=10)
+        self.assertEqual(rc, 76)
+        self.assertEqual(([(r["rc"], r["why"]) for r in self.urows("exit")], self.urows("sup_stop")[-1]["why"]), ([(143, "planned")], "handover"))
+        self.assertIsNotNone(datetime.fromisoformat(self.state_file()["handover"]["last_look"]).tzinfo)   # ruling P17
+        # the second parent: the same clock, now past 09:18; its child beats 3 times, then ends with 0 at its --until
+        rc2 = self.run_parent([{"beats": 3, "then": "exit", "code": 0}], "--until", "09:18", clock=clock)
+        self.assertEqual(rc2, 0)
+        self.assertTrue(0 <= self.urows("up")[-1]["handover_s"] < 60)
+        self.assertIsNone(self.state_file()["handover"])
+
+    def test_without_the_flag_no_handover_happens(self):   # max_leg_minutes 0: with the flag, due at every tick
+        script = [{"beats": 3, "then": "exit", "code": 0}]                     # 0 at --until: the end of the day
+        self.assertEqual(self.run_parent(script, "--until", "10:00", max_leg_minutes=0), 0)
+        self.assertEqual([r["why"] for r in self.urows("sup_stop")], ["end_of_day"])
+        self.fresh({})                                                         # the same parent with the flag
+        self.run_parent(script, "--until", "10:00", "--handover", max_leg_minutes=0)
+        self.assertEqual([(r["why"], r["rc"]) for r in self.urows("sup_stop")], [("handover", 76)])
+
+    # Tests added in self-review: the edge of min_leg_minutes, the last look a handover records, and a config that
+    # handover_due could not read.
+    def test_a_listed_time_exactly_min_leg_minutes_after_the_start_is_not_skipped(self):   # spec 4.5: only a closer one is
+        t = lambda hm: datetime(2026, 11, 12, *map(int, hm.split(":")), tzinfo=NY)
+        self.assertEqual([supervise.handover_due(t(a), t("09:18"), ["09:18"], 20, 110) for a in ("08:58", "08:59")], [True, False])
+
+    def test_last_look_is_the_oldest_stop_look_of_the_last_beat(self):   # a beat by hand: AAA 30 s ago, BBB 100 s ago
+        at = datetime.now(timezone.utc).replace(microsecond=0)
+        (self.state / "news_heartbeat.json").write_text(json.dumps(
+            {"at": at.isoformat(), "pid": 1, "phase": "idle", "market_open": True, "blind": [],
+             "stops_checked_at": at.isoformat(),
+             "held": {"AAA": {"stop": 97.0, "checked_at": (at - timedelta(seconds=30)).isoformat()},
+                      "BBB": {"stop": 48.5, "checked_at": (at - timedelta(seconds=100)).isoformat()}}}))
+        # the child never beats, so that beat is the last one when 09:18 comes, 2 s after the start
+        rc = self.run_parent([{"beats": 0, "then": "hang"}], "--handover", clock=self.clock_from(9, 17, 58),
+                             min_leg_minutes=0, stop_after=10)
+        self.assertEqual((rc, self.state_file()["handover"]["last_look"]), (76, (at - timedelta(seconds=100)).isoformat()))
+
+    def test_a_handover_time_that_is_no_clock_time_is_a_bad_config(self):   # else handover_due would raise inside the loop
+        bad = [{"handover_times_ny": ["9:18"]}, {"handover_times_ny": ["24:00"]}, {"handover_times_ny": [918]},
+               {"handover_times_ny": "09:18"}, {"min_leg_minutes": "20"}, {"max_leg_minutes": True}]
+        with contextlib.redirect_stderr(io.StringIO()) as err, contextlib.redirect_stdout(io.StringIO()):
+            got = [supervise.main(self.parent_argv(("--handover",), sup), child_cmd=self.dummy_cmd([{"beats": -1}]),
+                                  env=no_phone.clean_env(), clock=saturday) for sup in bad]
+        self.assertEqual((got, err.getvalue().count("a bad argument or config"), self.urows()), ([2] * 6, 6, []))

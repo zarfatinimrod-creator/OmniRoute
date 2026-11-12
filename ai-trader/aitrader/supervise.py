@@ -1,9 +1,10 @@
 """The supervisor's parent process (supervisor spec 2026-11-10, section 4): it starts the news engine, restarts it,
-and keeps the uptime log. So far (Tasks 10-14): its foundations (the config, its own trading calendar, the uptime log,
+and keeps the uptime log. So far (Tasks 10-15): its foundations (the config, its own trading calendar, the uptime log,
 the state file and its lock), the restart core, the loop that runs it, what the loop reads in the heartbeat (a mark
 a minute, `up` and `code` at a child's first looks, a hang, stale stops), its lines to the owner (spec 8: every
-restart, hang, trip, halt and gap, one line per event, through deadman.Sender), and what a woken session reads
-(spec 4.4: --status decides, --clear-halt and --relayed are its only two writers):
+restart, hang, trip, halt and gap, one line per event, through deadman.Sender), what a woken session reads
+(spec 4.4: --status decides, --clear-halt and --relayed are its only two writers), and the handover by the clock
+before the harness's 2-hour cap (spec 4.5: --handover, measured by the next parent's first `up`):
 
     python3 -u -m aitrader.supervise --until HH:MM [--handover] [--state-dir DIR] [--config FILE]
     python3 -m aitrader.supervise --status [--watchdog] [--state-dir DIR] [--config FILE]
@@ -311,6 +312,18 @@ def near_until(now_ny: datetime, until: str, slack_s: float) -> bool:
     return now_ny >= midnight + timedelta(hours=h, minutes=m, seconds=-slack_s)
 
 
+def handover_due(started_ny: datetime, now_ny: datetime, times: list[str], min_leg_minutes: int,
+                 max_leg_minutes: int) -> bool:
+    """Whether a parent started at started_ny hands over now (spec 4.5; both New York): from the first tick at or after
+    a listed time ("HH:MM", today) that lies min_leg_minutes or more after the start (a closer one is skipped), and
+    once the parent has run max_leg_minutes, whatever the clock says (the backstop before the 2-hour cap)."""
+    def at(hm: str) -> datetime:
+        h, m = (int(x) for x in hm.split(":"))
+        return now_ny.replace(hour=h, minute=m, second=0, microsecond=0)
+    return (now_ny - started_ny >= timedelta(minutes=max_leg_minutes)
+            or any(started_ny + timedelta(minutes=min_leg_minutes) <= at(hm) <= now_ny for hm in times))
+
+
 def open_seconds(a: datetime, b: datetime, cal: dict) -> float:
     """The seconds of [a, b] that fall inside regular sessions (session_hours on each New York date from a's to b's):
     a weekend or a holiday adds nothing and an early close ends at 13:00. 0 when b is not after a."""
@@ -490,13 +503,15 @@ TWO_HOURS_MS = 7_200_000  # the harness's cap on a background command (spec 4.5)
 HALT_WHY = {4: "chain", 5: "calendar", 6: "book"}  # the state file's halt.why for the engine's code
 SAID = {"crash_loop": "tripped"}  # the word of the last stdout line, where it is not the sup_stop row's why
 AFTER = "Run python3 -m aitrader.supervise --status and do what action says."
-UNTIL = re.compile(r"([01]\d|2[0-3]):[0-5]\d|24:00")
+HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")  # a clock time of the day: the handover times
+UNTIL = re.compile(rf"{HHMM.pattern}|24:00")
 NUMBERS = ("loop_seconds", "healthy_seconds", "backoff_first_seconds", "backoff_max_seconds", "max_restarts",
            "restart_window_seconds", "max_restarts_day", "lock_wait_seconds", "planned_stop_grace_seconds",
            "end_of_day_slack_seconds", "uptime_keep_days", "long_timeout_ms", "hang_seconds", "start_grace_seconds",
            "hang_term_grace_seconds", "stops_stale_seconds", "outage_report_seconds", "max_alerts_per_hour",
            "alert_retry_seconds", "alert_retry_minutes", "send_timeout_seconds", "max_line_bytes",
-           "held_names_in_line", "free_text_max_chars")  # what main and the core read
+           "held_names_in_line", "free_text_max_chars", "min_leg_minutes",
+           "max_leg_minutes")  # what main and the core read
 # above 0, or the parent refuses the config: a zero loop would spin, a zero grace would kill at once
 POSITIVE = ("loop_seconds", "start_grace_seconds", "hang_term_grace_seconds", "planned_stop_grace_seconds")
 
@@ -706,9 +721,11 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     `python3 -u -m aitrader news-live`, plus --until and --supervised <this pid>) and runs restart_core until it gives
     an answer. Returns 0 (end_of_day, closed_today), 3 (lock_held, or another parent holds the lock: it writes nothing),
     4, 5, 6 (halt), 75 (tripped), 76 (handover), 143 (signal, orphaned), 2 for a bad argument or config.
-    clock() -> an aware UTC time (default now) answers the calendar questions only: the day, the session, --until and
-    the `t` of a row. Ages never read it, so a test or a drill can run the parent on a session morning on any day.
-    SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the child. Two lines go
+    clock() -> an aware UTC time (default now) answers the calendar questions only: the day, the session, --until, the
+    handover times and the `t` of a row. Ages never read it, so a test or a drill can run the parent on a session
+    morning on any day. SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the
+    child; with --handover, so does handover_due, and the state file keeps {"at", "last_look"} for the next parent's
+    first `up` (its handover_s). An episode a planned end cuts short gets its R1 then (ruling 37). Two lines go
     to stdout, the first and the last; the rest goes to .cache/supervise.log. The owner's lines (spec 8) go to
     alerts.ntfy_base_url with the topic of env (default os.environ), through a worker thread that the loop never waits
     for. --net-check asks ntfy's health once, prints what came back and returns 0 only on 200 (spec 6, "Not verified":
@@ -747,8 +764,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             return 0 if got == 200 else 1
         if not once and (not UNTIL.fullmatch(a.until)  # a bool is no number; a zero loop or grace would spin or kill
                          or any(isinstance(sup[k], bool) or not isinstance(sup[k], (int, float)) for k in NUMBERS)
-                         or any(sup[k] <= 0 for k in POSITIVE)):
-            raise ValueError("--until or a number of the supervisor block")
+                         or any(sup[k] <= 0 for k in POSITIVE)
+                         or not all(HHMM.fullmatch(t) for t in sup["handover_times_ny"])):  # else the loop would raise
+            raise ValueError("--until, or a number or the handover times of the supervisor block")
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"supervise: a bad argument or config ({type(e).__name__})", file=sys.stderr)
         return 2
@@ -921,6 +939,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             cmd = list(child_cmd or [sys.executable, "-u", "-m", "aitrader", "news-live"])
             cmd += ["--until", a.until, "--supervised", str(pid)]
             kid: dict = {}  # the child that runs now (spawn sets it)
+            started_ny = now.astimezone(NY)  # what handover_due measures this parent's legs from
 
             def spawn() -> subprocess.Popen:
                 before = _read_beat(paths.heartbeat)[0] or {}  # the engine before this one: its last look ends there
@@ -940,6 +959,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     return "signal"
                 if os.getppid() != ppid:
                     return "orphaned"
+                if a.handover and handover_due(started_ny, clock().astimezone(NY), sup["handover_times_ny"],
+                                               sup["min_leg_minutes"], sup["max_leg_minutes"]):
+                    return "handover"
                 return look(child, ran_s)
 
             def look(child, ran_s):
@@ -1029,7 +1051,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
 
             def up(child, hb: dict, view: dict, now: datetime) -> None:
                 """The row `up` (spec 4.6): what the restart cost, at this child's first beat that has looked at its
-                stops (with the market closed: its first beat)."""
+                stops (with the market closed: its first beat); after a handover, at this parent's first, also what the
+                handover cost (handover_s)."""
                 at, blind = _when(hb.get("at")), view["blind"]
                 # the first look after, per held name: this child's own stamp; for a blind or unlooked name, the beat.
                 # A name the child before held that this beat no longer holds was sold by the first look: the beat too.
@@ -1042,6 +1065,15 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 # before the parent is the gap R4 measures), so a name held is never shown as protected
                 last = kid["last_look"] or _when(hb.get("stops_checked_at")) or sup_t
                 blind_s = round(open_seconds(last, max(after), cal), 1) if after and None not in after else 0
+                # The parent before handed over (spec 4.5): from its last look to this first look, beat to beat when
+                # nothing is held. Only this parent's first `up` gets it: it is cleared and saved at once.
+                ho = st.get("handover")
+                ho_look = _when(ho.get("last_look")) if isinstance(ho, dict) else None
+                first = None if None in after else max(after, default=at)
+                handover_s = None if None in (ho_look, first) else round((first - ho_look).total_seconds(), 1)
+                if ho is not None:
+                    st["handover"] = None
+                    save()
                 ref = int(seen["ended"] if seen["ended"] is not None else began)  # ruling P14: the whole second
                 try:
                     sold = [r for r in read_rows(paths.trades) if r.get("side") == "SELL"
@@ -1052,8 +1084,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 down = seen["down_at"]
                 up_row = {"child": child.pid, "down_from": None if down is None else _utc(down),
                           "down_s": None if down is None else round((now - down).total_seconds(), 2),
-                          "blind_s": blind_s, "handover_s": None, "held": view["held"], "blind": blind, "commit": None,
-                          "dirty": None, "code_changed": None, "sold": sold}
+                          "blind_s": blind_s, "handover_s": handover_s, "held": view["held"], "blind": blind,
+                          "commit": None, "dirty": None, "code_changed": None, "sold": sold}
                 emit("up", now, **up_row)
                 if ep["falls"]:
                     ep["ups"].append({**up_row, "t": now})
@@ -1126,8 +1158,16 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
 
             rc, word = restart_core(spawn, watch, stop, at_until, core_emit, sup, counts, sleep=sleep or time.sleep)
             st["restarts_today"] = counts["restarts_today"]
+            # Ruling 37: a planned end cuts an open episode short of its healthy run. Its R1 goes out now when a child
+            # came up after the episode's last fall; else nothing more is said here (the handover gap measures it).
+            if word in PLANNED and ep["ups"] and ep["ups"][-1]["t"] > ep["falls"][-1]["t"]:
+                episode_end(clock())
             if word == "halt":
                 st["halt"] = {"code": rc, "why": HALT_WHY[rc], "at": _utc(clock())}
+            elif word == "handover":  # the next parent's first `up` measures handover_s from last_look (spec 4.5)
+                hb = _read_beat(paths.heartbeat)[0] or {}  # the last beat: its oldest stop look; its `at` if none held
+                looks = list(_looks(hb).values()) or [_when(hb.get("at"))]
+                st["handover"] = {"at": _utc(clock()), "last_look": None if None in looks else _utc(min(looks))}
         if word == "crash_loop":  # R3, R3b at the second trip of the day, then nothing (spec 4.3; ruling P9)
             trip = seen["tripped"]
             kind = {1: "R3c" if seen["codes"] and set(seen["codes"]) == {7} else "R3", 2: "R3b"}.get(st["trips_today"])
