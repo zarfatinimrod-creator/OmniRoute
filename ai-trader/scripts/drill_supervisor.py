@@ -68,9 +68,9 @@ NY = ZoneInfo("America/New_York")
 MORNING = datetime(2026, 11, 12, 10, 0, tzinfo=NY)  # a session morning, Thursday: the parents' clock starts here
 UNTIL = "24:00"  # the end every child gets: it never comes, so the real New York clock never ends a drill
 # --fast: config.json's numbers scaled, their order kept. The back-off is scaled too: at 1, 2, 4, 8 s the five quick
-# crashes of drill c would never fall inside a 10 s window, and the loop would never trip. So is the parent's tick: at
-# 0.5 s a dead engine is seen up to 0.5 s late and a new one takes about 0.45 s to beat, which leaves the 1 s mark of
-# drill a to chance (0.57 to 0.91 s measured); the real numbers keep 0.5 s.
+# crashes of drill c would never fall inside a 10 s window, and the loop would never trip. The parent's tick is scaled
+# as well: at 0.5 s a dead engine is seen up to 0.5 s late and a new one takes about 0.45 s to beat, which leaves the
+# 1 s mark of drill a to chance (0.57 to 0.91 s measured); the real numbers keep 0.5 s.
 FAST = {"healthy_seconds": 2, "restart_window_seconds": 10, "hang_seconds": 4, "stops_stale_seconds": 3,
         "backoff_first_seconds": 0.1, "backoff_max_seconds": 2, "loop_seconds": 0.05}
 # The pass marks of rollout step 2 (spec 11.2) and the sizes of the drills (spec 11.1; rulings P2, P3).
@@ -89,14 +89,14 @@ E_SPAN_S = 4  # e: a kill comes at a moment drawn from the first this many secon
 E_NAMES = ("AAA", "BBB", "CCC", "DDD")  # e: the names it trades
 G_STARTS, G_ROUNDS = 50, 20  # g
 WAIT_S = 30  # how long a drill waits for a parent or an engine to come up before it fails
+# The parent in a process of its own (argv: a JSON object with main's argv, the child's command and the clock's offset
+# in seconds). Its environment holds TOPIC, so its lines go to the NtfyStub of its config copy.
 PARENT = """import json, sys
 from datetime import datetime, timedelta, timezone
 from aitrader import supervise
 a = json.loads(sys.argv[1])
 offset = timedelta(seconds=a["offset_s"])
 sys.exit(supervise.main(a["argv"], child_cmd=a["child_cmd"], clock=lambda: datetime.now(timezone.utc) + offset))"""
-# The parent in a process of its own (argv: a JSON object with main's argv, the child's command and the clock's offset
-# in seconds). Its environment holds TOPIC, so its lines go to the NtfyStub of its config copy.
 
 
 def guard(argv: list[str], environ, base_url: str) -> str | None:
@@ -180,8 +180,9 @@ def argv_of(pid: int) -> list[str]:
 
 def signal_child(pid: int, sig: int) -> None:
     """sig to a stub child of a drill, and never to a pid that was reused for something else."""
-    if {str(DUMMY), str(ENGINE)} & set(argv_of(pid)):
-        os.kill(pid, sig)
+    if not {str(DUMMY), str(ENGINE)} & set(argv_of(pid)):
+        raise Failed(f"pid {pid} of the heartbeat is no stub child of this drill: not signalled")
+    os.kill(pid, sig)
 
 
 def flockable(path: Path) -> bool:
@@ -198,7 +199,8 @@ def config_copy(path: Path, fast: bool, port: int, **sup) -> Path:
     """config.json with the --fast numbers when fast, the five switches pinned false (ruling P29) unless sup says
     otherwise, sup over the supervisor block, and the parents' lines sent to 127.0.0.1:port; its path."""
     cfg = supervise.load_cfg()
-    cfg["supervisor"].update({**(FAST if fast else {}), "hang_kill_enabled": False, "long_timeout_proven": False, **sup})
+    cfg["supervisor"].update({**(FAST if fast else {}), "hang_kill_enabled": False, "long_timeout_proven": False,
+                              **sup})
     cfg["supervisor"]["deadman"]["enabled"] = False
     cfg["supervisor"]["watcher"].update(fire_enabled=False, notify_enabled=False)
     cfg["alerts"]["ntfy_base_url"] = f"{LOCAL}:{port}"
@@ -272,7 +274,8 @@ class Drill:
         config = config_copy(self.path("config", ".json"), self.fast, urlsplit(self.stub.url).port, **sup)
         spec = {"argv": ["--state-dir", str(state), "--config", str(config), "--until", UNTIL], "child_cmd": child_cmd,
                 "offset_s": (MORNING - datetime.now(timezone.utc)).total_seconds()}
-        return self.popen([sys.executable, "-c", PARENT, json.dumps(spec)], no_phone.clean_env(**{PHONE_VARS[0]: TOPIC}))
+        return self.popen([sys.executable, "-c", PARENT, json.dumps(spec)],
+                          no_phone.clean_env(**{PHONE_VARS[0]: TOPIC}))
 
     def bare(self, state: Path, scenario: dict, *options: str) -> subprocess.Popen:
         """The engine child with no parent (e, g), behind its tripwire."""
@@ -335,8 +338,8 @@ def drill_a(d: Drill) -> str:
     wait(lambda: said(st2, "R1") >= 1, sup["healthy_seconds"] + WAIT_S, "R1 of the engine's kill")
     d.stop(p2)
     trips, r1_engine = trips + len(rows(st2, "tripped")), said(st2, "R1")
-    numbers = (f"kills={KILLS}+1 next_beat_max_s={max(beats):.2f} engine_beat_s={beats[-1]:.2f} engine_look_s={look:.2f}"
-               f" r1={r1}+{r1_engine} tripped={trips}")
+    numbers = (f"kills={KILLS}+1 next_beat_max_s={max(beats):.2f} engine_beat_s={beats[-1]:.2f}"
+               f" engine_look_s={look:.2f} r1={r1}+{r1_engine} tripped={trips}")
     if max(beats) >= BEAT_S:
         raise Failed(f"a replacement beat {max(beats):.2f} s after its kill (limit {BEAT_S} s): "
                      + ",".join(f"{s:.2f}" for s in beats))
@@ -374,7 +377,8 @@ def drill_c(d: Drill) -> str:
     sup = d.sup
     st = d.state()
     p = d.parent(st, d.dummy(st, [{"beats": 0, "then": "exit", "code": 1}]))
-    backoffs = sum(min(sup["backoff_first_seconds"] * 2 ** i, sup["backoff_max_seconds"]) for i in range(sup["max_restarts"]))
+    backoffs = sum(min(sup["backoff_first_seconds"] * 2 ** i, sup["backoff_max_seconds"])
+                   for i in range(sup["max_restarts"]))
     try:
         rc = p.wait(timeout=backoffs + WAIT_S)
     except subprocess.TimeoutExpired:
@@ -418,7 +422,8 @@ def drill_d(d: Drill) -> str:
 def e_scenario(r: int | None) -> dict:
     """Round r's engine: the session open, good news for every name at even polls (score 10: a buy) and bad news at odd
     ones (score 1: a sale), keys of its own so that no earlier round's seen file hides them, quotes at 100, no slippage
-    and no loss review (a kill, not the loss rule, is what is drilled). r None: no headlines (the start that is judged)."""
+    and no loss review (a kill, not the loss rule, is what is drilled). r None: no headlines (the start that is
+    judged)."""
     polls = [] if r is None else [[{"key": f"r{r}-{k}-{s}", "symbol": s, "title": f"{s} news {r}-{k}"} for s in E_NAMES]
                                   for k in range(2 * E_SPAN_S)]
     return {"session": "open", "universe": {**{s: "Tech" for s in E_NAMES}, "SPY": "Index"},
@@ -454,7 +459,8 @@ def drill_e(d: Drill) -> str:
         journal.STATE = state
         bad = [name for name in sorted(journal.NEWS_CHAINED) if not journal.verify_chain(name)[0]]
         if bad:
-            raise Failed(f"step 2 does not land: the torn-append repair goes through rule 4 first (round {r}: {', '.join(bad)})")
+            raise Failed("step 2 does not land: the torn-append repair goes through rule 4 first"
+                         f" (round {r}: {', '.join(bad)})")
 
     def mismatch_rows() -> int:
         return sum(r.get("where") == "book_mismatch" for r in supervise.read_rows(state / "news_errors.jsonl"))
@@ -474,8 +480,13 @@ def drill_e(d: Drill) -> str:
         mismatches += 1
         before, sent_before = mismatch_rows(), len(supervise.read_rows(d.sent(state)))
         q = d.bare(state, e_scenario(None))
-        hb = wait(lambda: (b := beat(state)[0]).get("pid") == q.pid and b.get("phase") == "idle" and b, WAIT_S,
-                  f"round {r}: the start after the kill at its first idle beat")
+
+        def idle():
+            if q.poll() is not None:
+                raise Failed(f"round {r}: the start after the kill ended with {q.returncode}")
+            b = beat(state)[0]
+            return b.get("pid") == q.pid and b.get("phase") == "idle" and b
+        hb = wait(idle, WAIT_S, f"round {r}: the start after the kill at its first idle beat")
         if mismatch_rows() <= before and hb.get("buys_blocked") != "book_mismatch":
             raise Failed(f"round {r}: the book does not show the last {found['side']} of {found['symbol']} and the next"
                          " start did not say so")
@@ -522,7 +533,8 @@ def drill_g(d: Drill) -> str:
     write_book(state, {"BBB": 50.0})
     journal.STATE = state
     for qty in (6, 4):  # the last row is a buy the book holds: no mismatch
-        journal.append("news_trades.jsonl", {"date": "2026-11-10", "symbol": "BBB", "side": "BUY", "qty": qty, "price": 50.0})
+        journal.append("news_trades.jsonl",
+                       {"date": "2026-11-10", "symbol": "BBB", "side": "BUY", "qty": qty, "price": 50.0})
     commit(clone, "notes.txt", "one\n")
     git(clone, "push", "origin", "HEAD:main")
     git(d.tmp, "clone", str(origin), str(second))
@@ -649,22 +661,21 @@ def cloud_check(given: str, alive: bool) -> int:
     state = Path(given).resolve()
     paths = supervise.Paths(state, state / ".cache")
     log = supervise.read_rows(paths.uptime)
+    # the last parent's own rows: from its sup_start on (a parent before it in the same directory has its own)
+    last = log[next((i for i in range(len(log) - 1, -1, -1) if log[i].get("ev") == "sup_start"), 0):]
+    stops = [str(r.get("why")) for r in last if r.get("ev") == "sup_stop"]
     if alive:
-        holder, marks = lock_holder(paths.lock), sum(r.get("ev") == "mark" for r in log)
-        stops = [str(r.get("why")) for r in log if r.get("ev") == "sup_stop"]
-        why = ((["no live process holds the parent lock"] if holder is None else []) + ([] if marks else ["no mark row"])
-               + ([f"a sup_stop row ({', '.join(stops)})"] if stops else []))
-        print(f"FAIL cloud-check --alive {'; '.join(why)}" if why else f"PASS cloud-check --alive parent={holder} marks={marks}",
-              flush=True)
+        holder, marks = lock_holder(paths.lock), sum(r.get("ev") == "mark" for r in last)
+        why = ((["no live process holds the parent lock"] if holder is None else [])
+               + ([] if marks else ["no mark row"]) + ([f"a sup_stop row ({', '.join(stops)})"] if stops else []))
+        print(f"FAIL cloud-check --alive {'; '.join(why)}" if why
+              else f"PASS cloud-check --alive parent={holder} marks={marks}", flush=True)
         return 1 if why else 0
     left = processes_of(state, given)
     busy = [lock.name for lock in (paths.lock, paths.engine_lock) if not flockable(lock)]
     if left or busy:
         print(f"FAIL cloud-check processes of the directory left: {left}; locks held: {busy}", flush=True)
         return 1
-    # what the stop from outside left in the log (ruling P39), read before the relaunch below adds rows of its own
-    last = next((i for i in range(len(log) - 1, -1, -1) if log[i].get("ev") == "sup_start"), -1)
-    stopped = next((str(r.get("why")) for r in log[last + 1:] if r.get("ev") == "sup_stop"), "none") if last >= 0 else "none"
     old, t0 = beat(state)[0].get("pid"), time.time()
     p = subprocess.Popen([sys.executable, "-u", str(Path(__file__).resolve()), "cloud", str(state)], cwd=AT,
                          env=no_phone.clean_env(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -684,7 +695,8 @@ def cloud_check(given: str, alive: bool) -> int:
         except subprocess.TimeoutExpired:
             p.kill()
             p.wait()
-    print(f"PASS cloud-check sup_stop={stopped} new_beat_s={took:.2f}", flush=True)
+    # what the stop from outside left in the log (ruling P39), read before the relaunch added rows of its own
+    print(f"PASS cloud-check sup_stop={stops[0] if stops else 'none'} new_beat_s={took:.2f}", flush=True)
     return 0
 
 

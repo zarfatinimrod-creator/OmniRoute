@@ -1870,7 +1870,7 @@ class Drills(unittest.TestCase):
         env = {"AITRADER_NTFY_TOPIC": "t0p1c-under-test"}
         self.assertEqual((drill.guard(["phone", "--with-owner", "--phase", "peek"], env, "https://ntfy.sh"), env), ("t0p1c-under-test", {}))
         for argv in (["c"], ["cloud-check", "x"], ["phone"]):
-            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):   # its refusal line: not into the test output
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):   # not into the test output
                 drill.guard(argv, {}, "https://ntfy.sh")
 
     def test_cloud_check_alive_fails_for_a_parent_that_left_at_once(self):      # Review Focus 2: DIR holds a log of sup_start, sup_stop "orphaned"
@@ -1880,7 +1880,7 @@ class Drills(unittest.TestCase):
         supervise.append_row(d / "uptime.jsonl", 4242, "sup_start", now, until="24:00", handover=False)
         supervise.append_row(d / "uptime.jsonl", 4242, "sup_stop", now, why="orphaned", rc=143)
         # the lock file's text names a live pid (this one) that holds no lock: the text alone must not pass the check
-        (d / "news_supervisor.lock").write_text(json.dumps({"pid": os.getpid(), "started_at": supervise._utc(now)}) + "\n")
+        (d / "news_supervisor.lock").write_text(json.dumps({"pid": os.getpid(), "started_at": now.isoformat()}) + "\n")
         cp = self.drill("cloud-check", "--alive", str(d), timeout=60)
         rc, out = cp.returncode, cp.stdout
         self.assertEqual((rc, out.split()[:1]), (1, ["FAIL"]), cp.stdout + cp.stderr[-2000:])
@@ -1895,13 +1895,19 @@ class Drills(unittest.TestCase):
         supervise.append_row(log, os.getpid(), "mark", now, hb=0.1)
         lock = open(d / "news_supervisor.lock", "a+")                   # this process plays the parent that holds it
         self.addCleanup(lock.close)
-        self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split()[:1], ["FAIL"])   # no holder
+        # a mark and no sup_stop, but nobody holds the lock
+        self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split()[:1], ["FAIL"])
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         cp = self.drill("cloud-check", "--alive", str(d), timeout=60)
-        self.assertEqual((cp.returncode, cp.stdout.split()[:3]), (0, ["PASS", "cloud-check", "--alive"]), cp.stdout + cp.stderr)
+        self.assertEqual((cp.returncode, cp.stdout.split()[:3]), (0, ["PASS", "cloud-check", "--alive"]),
+                         cp.stdout + cp.stderr)
         self.assertIn(f"parent={os.getpid()}", cp.stdout)
         supervise.append_row(log, os.getpid(), "sup_stop", now, why="orphaned", rc=143)
         cp = self.drill("cloud-check", "--alive", str(d), timeout=60)
         self.assertEqual((cp.returncode, cp.stdout.split()[:1], "orphaned" in cp.stdout), (1, ["FAIL"], True))
+        supervise.append_row(log, os.getpid(), "sup_start", now, until="24:00", handover=False)   # a later parent, the
+        supervise.append_row(log, os.getpid(), "mark", now, hb=0.1)                               # same directory
+        self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split()[:1], ["PASS"])
         log.write_text("")                                              # no mark, no sup_stop
-        self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split(), ["FAIL", "cloud-check", "--alive", "no", "mark", "row"])
+        self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split(),
+                         ["FAIL", "cloud-check", "--alive", "no", "mark", "row"])
