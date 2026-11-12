@@ -32,7 +32,7 @@ Claude מוסיף שיקול דעת - חדשות, אירועים, סיכונים
 
 ```bash
 cd ai-trader && pip install -q -r requirements.txt
-git pull --rebase   # state/ הוא הזיכרון - תמיד מהגרסה האחרונה
+git fetch origin ccr-120121ba-vsvwlj && git merge --no-edit origin/ccr-120121ba-vsvwlj   # state/ הוא הזיכרון - תמיד מהגרסה האחרונה; אף פעם לא rebase
 python3 -m aitrader verify   # שרשרת ההאש של היומן תקינה? אם לא - עצור ודווח
 ```
 אם `verify` מדפיס `LOSSES AWAITING REVIEW` - יש הפסד ממומש בלי תחקיר. קודם עושים את העבודה הקבועה של הסשן
@@ -157,7 +157,8 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
      שוב תוך שניות.
    - אחר כך, באותה הרצה של הסשן (מתוך `ai-trader/`):
      `git add state/postmortems.jsonl state/lessons.md state/backlog.md && git commit -m "trader: loss review <keys>"`,
-     ואז `git pull --rebase` ו-`git push`. תחקיר שלא נדחף הולך לאיבוד עם המכונה, וההפסד חוזר לרשימה.
+     ואז `git fetch origin ccr-120121ba-vsvwlj`, `git merge --no-edit origin/ccr-120121ba-vsvwlj` ו-`git push` (אף פעם לא
+     rebase). תחקיר שלא נדחף הולך לאיבוד עם המכונה, וההפסד חוזר לרשימה.
    - הודעה לנמרוד (כמה הפסדנו, למה, ומה שינינו; כסף נייר) יוצאת כשהתחקיר מצא פגם, חוק שהופר, חוק שנראה שגוי או
      טעות שחוזרת (כל מסקנה חוץ מ-`planned_loss`). הפסד מתוכנן נכנס לסיכום היומי בלי התראה נפרדת. אם התיקון
      דורש החלטה של נמרוד: שאלה אחת בהודעה, עם א/ב/ג והמלצה (סעיף 5).
@@ -179,13 +180,41 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
 
 ## 3ב. מנוע החדשות - הפעלה, עצירת קניות, כללים בניסיון (2026-11-10)
 
-**הפעלה.** המנוע רץ רק כמשימת רקע של הסשן (הכלי Bash עם `run_in_background`, timeout 7200000), אף פעם לא
-`nohup`, `setsid` או `&`: המכונה בענן נסגרת כמה דקות אחרי שהסשן נח, ותהליך מנותק מת איתה (3 פעמים
-ב-2026-11-10). משימת רקע משאירה את המכונה פעילה, אבל נעצרת אחרי שעתיים, ולכן מפעילים עם `--minutes 110`:
-```bash
-cd ai-trader && mkdir -p .cache && python3 -u -m aitrader news-live --until 16:05 --minutes 110 >> .cache/news_live.log 2>&1
-```
-- כשהמשימה מסתיימת הסשן מתעורר לבד. אם השעה בניו יורק לפני 16:00 - מפעילים שוב מיד.
+**הפעלה (המפקח).** את המנוע מפעיל המפקח, תהליך האב `aitrader.supervise`: הוא מפעיל את המנוע מחדש כשהוא נופל, מחליף
+את עצמו לפני מגבלת השעתיים של משימת רקע (`--handover`), ושולח לנמרוד את השורות שלו. הסשן לא מפעיל את המנוע בעצמו.
+`python3 -m aitrader.supervise --status` (קריאה בלבד) מחליט, והסשן רק מבצע; בדיקת המנוע המתוזמנת מריצה
+`--status --watchdog`. את המפקח מפעילים רק כש-`--status` אומר: את `launch.command`, מתיקיית השורש של הריפו, כמשימת
+רקע של הסשן (הכלי Bash עם `run_in_background`, ה-timeout מ-`launch.timeout_ms`), אף פעם לא `nohup`, `setsid` או `&`:
+המכונה בענן נסגרת כמה דקות אחרי שהסשן נח, ותהליך מנותק מת איתה (3 פעמים ב-2026-11-10). משימת רקע משאירה את המכונה
+פעילה.
+
+| `action` | מתי (השורה הראשונה שמתאימה, מלמעלה למטה) | מה הסשן עושה |
+|----------|------------------------------------------|--------------|
+| `closed_today`, `after_hours` | אין מסחר היום; מחוץ ל-08:00 עד 16:00 ניו יורק (`launch_from_ny` עד `launch_until_ny`) | כלום |
+| `none` | מפקח חי: הנעילה שלו מוחזקת בידי pid חי, וה-`mark` האחרון ביומן הזמינות בן 180 שניות לכל היותר (`parent_stale_seconds`) | כלום |
+| `replace_parent` | הנעילה של המפקח מוחזקת בידי pid חי, אבל ה-`mark` האחרון ישן מ-180 שניות | עוצרים את משימת הרקע שלו (TaskStop; אין משימה: `kill` ל-`parent.pid`, אחרי 10 שניות `kill -9`), ואז מפעילים |
+| `halted` | בקובץ המצב יש עצירה (4, 5 או 6; `today.halt`) | לא מפעילים. קוראים את הסיבה ומטפלים בה (ל-4: `python3 -m aitrader verify` והנוהל הקיים), ואז `python3 -m aitrader.supervise --clear-halt`: הוא מריץ את `python3 -m aitrader news-live --check` (בדיקות ההפעלה, קריאה בלבד) ומנקה את העצירה רק כשהיא יוצאת עם 0. מהיום שאחרי העצירה `--status --watchdog` שם את R5e ב-`unsent`, עד שהוא נשלח |
+| `kill_stray` | נעילת המנוע מוחזקת בידי pid שאינו הילד של מפקח חי (ה-pid כתוב ב-`why`) | אם משימת רקע של הסשן הזה מחזיקה את ה-pid: כלום. אחרת עוצרים אותו לפי הנוהל שלמטה (`kill <pid>` הוא עצירה מתוכננת: מחכים עד שהתהליך נעלם, `kill -9` רק אחרי שתי דקות), ואז מפעילים |
+| `wait_for_watchdog` | trip שני היום, הקריאה לא מבדיקת המנוע, והשורה האחרונה ביומן הזמינות היא לא עצירה מתוכננת (`handover`, `signal`, `orphaned`). `--status --watchdog` לא מחזיר אותו לעולם | כלום: בדיקת המנוע הבאה מפעילה |
+| `launch` | אף אחת מהשורות למעלה: אין מפקח חי, יום מסחר, בתוך השעות, אין עצירה | מריצים את `launch.command` כמשימת רקע עם `launch.timeout_ms` |
+
+`unsent`: שורות של היום שלא הגיעו לנמרוד (`sent` false) ושהמפקח כבר לא ינסה לשלוח. בדיקת המנוע שולחת כל `text` כמו
+שהוא ב-PushNotification, ואז `python3 -m aitrader.supervise --relayed ID...` עם המזהים, ו-`--status` לא מציג אותן שוב.
+
+- כשמשימת הרקע מסתיימת הסשן מתעורר לבד: קוראים את השורה האחרונה שלה, מריצים `python3 -m aitrader.supervise --status`
+  ועושים מה ש-`action` אומר. השורה האחרונה של המפקח נראית כך:
+  `supervise: 76 handover. Run python3 -m aitrader.supervise --status and do what action says.` הטבלה היא לקורא היומן:
+
+  | השורה האחרונה של המפקח | מה זה אומר | ה-`action` הצפוי |
+  |------------------------|------------|------------------|
+  | `0 end_of_day`, `0 closed_today` | היום נגמר; אין מסחר היום | `after_hours` או `closed_today` |
+  | `76 handover` | החלפה מתוכננת לפני מגבלת השעתיים | `launch`, מיד |
+  | `75 tripped` | המנוע נפל שוב ושוב (crash loop) | trip ראשון (`today.trips` הוא 1): `launch` פעם אחת, אחרי קריאת 20 השורות האחרונות של `.cache/news_live.log` (כשכתוב שם `tree_busy`: קודם משלימים את המיזוג או מריצים `git merge --abort`). אחר כך: `wait_for_watchdog` |
+  | `4 halt`, `5 halt`, `6 halt` | עצירה: יומן פגום, לוח חגים, קובץ התיק | `halted` |
+  | `3 lock_held pid <n>` | מנוע מחוץ לפיקוח מחזיק את התיק (או: מפקח אחר מחזיק את הנעילה של המפקח, והחדש לא התחיל) | `kill_stray` (כשזה מפקח אחר: `none` או `replace_parent`) |
+  | `143 signal`, `143 orphaned` | המפקח קיבל הוראה לעצור (אות עצירה, או שתהליך האב שלו נעלם) | `launch` אם השעות מאפשרות |
+  | נעצר במגבלה, בלי קוד ("was stopped after reaching its background time limit") | מגבלת השעתיים הגיעה לפני ההחלפה | `launch`. אם הוא רץ עם ה-timeout הארוך (בלי `--handover`): חוזרים ל-`--handover` עם timeout 7200000 (והדגל `supervisor.long_timeout_proven` חוזר ל-false, דרך השער), ו-R8 לנמרוד ב-PushNotification: `המפקח נעצר אחרי שעתיים למרות ההגדרה של 9 שעות. חוזרים להחלפה מתוכננת 4 פעמים ביום. כסף נייר` |
+  | 1 או כל דבר אחר | באג במפקח | קוראים את 20 השורות האחרונות של `.cache/supervise.log`; `launch` פעם אחת; R12 לנמרוד ב-PushNotification: `המפקח עצמו קרס (תקלה בקוד שלו). הפעלתי אותו מחדש פעם אחת. כסף נייר` |
 - אם עבודה אחרת רצה בסשן, ההתעוררות מחכה לה, ובזמן הזה אין מנוע ואין בדיקת סטופים. לפני עבודה ארוכה בסשן הסוחר
   בודקים מתי המנוע עלה (`code.started` ב-heartbeat) ומפעילים אותו מחדש קודם.
 - מנוע שני על אותו תיק לא עולה (`state/news_engine.lock`): הפקודה מסתיימת מיד עם קוד יציאה 3, ושום מנוע חדש לא
@@ -329,7 +358,7 @@ python3 -m aitrader summary --book crypto --ack <newest>           # רק אחר
 **push** תמיד בלולאת הניסיון החוזר:
 
 ```bash
-for i in 1 2 3 4 5; do git push -u origin ccr-120121ba-vsvwlj && break; git pull --rebase origin ccr-120121ba-vsvwlj; sleep $((2**i)); done
+for i in 1 2 3 4 5; do git fetch origin ccr-120121ba-vsvwlj && git merge --no-edit origin/ccr-120121ba-vsvwlj || break; git push -u origin ccr-120121ba-vsvwlj && break; sleep $((2**i)); done
 ```
 
 **מגבלות (כנות):** המשטר ומפסק הירידה נבדקים פעם ביום, בסגירה היומית, לא תוך-יומי. הזמנה שלא מולאה עד ההחלטה הבאה

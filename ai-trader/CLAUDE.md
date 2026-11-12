@@ -185,7 +185,9 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
    "predicts" the market; it estimates small edges with known error rates.
 7. **No look-ahead.** Values on date t use data up to the close of t. Claude's own judgement is graded only
    forward (live), never in historical replay (the model may remember the past).
-8. `git stash` is banned (it is shared across worktrees). Commit state with clear messages and push.
+8. `git stash` is banned (it is shared across worktrees). Commit state with clear messages and push. In the trader
+   session's checkout nothing is ever rebased: `git fetch`, then `git merge --no-edit`. A turn never ends with a merge
+   in progress. A conflict is reported, never resolved by discarding.
 
 ## Memory (four layers)
 - working: `state/portfolio.json`, `state/weights.json`, `state/latest.json`
