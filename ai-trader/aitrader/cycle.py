@@ -534,6 +534,10 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
                 journal.append("skips.jsonl", {"logged_at": journal.now_utc(), "reason": msg})
             return {"skipped": msg, "executed": [], "decided_now": False, "events": [msg]}
         frozen = set()
+        want = UtcDailyCalendar.last_final_bar(now) if utc else None
+        if want and dec_bar.date() != want:  # backlog 68: a daily row missing from the reply; never decide on an older close
+            no_decision = (f"אין שורה יומית של {want} בנתונים (הנר האחרון הסופי הוא {dec_bar.date()}) - אין החלטה בריצה הזו,"
+                           " הזמנה ממתינה עדיין מתמלאת, ריצה מאוחרת תנסה שוב")
     else:  # stocks: a stale benchmark makes the newest bar not final; a stale or absent symbol is frozen
         final = clock_final(last) and bench not in stale_symbols(panel, last, _bar_end_utc(last, cfg), [bench])
         dec_bar = last if final else prev

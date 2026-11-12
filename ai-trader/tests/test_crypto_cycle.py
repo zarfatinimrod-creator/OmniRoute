@@ -666,6 +666,39 @@ class FinalReview(CryptoBook):
         self.assertEqual([(f["side"], f["symbol"]) for f in out["executed"]], [("SELL", "BTC-USD")])
         self.assertNotIn("BTC-USD", load(self.state, "portfolio.json")["positions"])
 
+    def gap_panel(self, upto: int, missing: int) -> dict:
+        """Rows 0..upto with the daily row `missing` absent, as Yahoo returned BTC-USD at 2026-11-12 00:14 UTC."""
+        return {k: v.drop(index=self.idx[missing]) for k, v in self.panel(upto).items()}
+
+    def test_missing_daily_row_is_no_decision_on_both_profiles(self):
+        """Backlog 68: at D+1 00:12 the reply lacks row D (row D+1 is the bar in progress). The bar before the open
+        one is then D-1, two days old: no decision on it, the desk's view says so too, and a later run decides D."""
+        for profile in ("crypto", "crypto_base"):
+            with self.subTest(profile=profile):
+                self.cfg, self.state = data.load_config("crypto", profile), self.mkdtemp()
+                gap = self.gap_panel(I + 1, I)
+                prop = self.at(I + 1, self.ts(I + 1, 0, 12), propose=True, panel=gap)
+                self.assertIn(self.day(I), prop["skipped"])
+                out = self.at(I + 1, self.ts(I + 1, 0, 12), panel=gap)
+                self.assertFalse(out["decided_now"])
+                self.assertIsNone(self.pending())
+                self.assertEqual(read_jsonl(self.state, "decisions.jsonl"), [])
+                self.assertTrue(any(self.day(I) in e for e in out["events"]))
+                out = self.decide(I)  # the row came back: bar D is decided as usual
+                self.assertTrue(out["decided_now"])
+                self.assertEqual(self.pending()["decision_date"], self.day(I))
+
+    def test_missing_daily_row_still_fills_the_pending_order(self):
+        """Backlog 68, the fill side: a missing daily row stops only the decision. An order decided earlier still fills
+        at its exec_ts hour from the hourly bars (a stop is never waited out)."""
+        self.decide(I - 1)  # exec_ts I 01:00, not filled at I 00:12
+        self.set_bars(I, 1)
+        out = self.at(I + 1, self.ts(I + 1, 0, 12), panel=self.gap_panel(I + 1, I))
+        self.assertFalse(out["decided_now"])
+        self.assertTrue(out["executed"])
+        self.assertEqual({t["fill_ts"] for t in self.trades()}, {self.ts(I, 1)})
+        self.assertEqual((self.pending()["decision_date"], self.pending()["status"]), (self.day(I - 1), "executed"))
+
     def test_fill_walk_capped_at_fill_max_wait_hours(self):
         self.cfg["market"]["close_source"] = "next_open"  # this test is about the next_open rule; the book ships "yahoo" (Task 11)
         self.assertEqual(self.cfg["market"]["fill_max_wait_hours"], 24)

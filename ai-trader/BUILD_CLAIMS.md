@@ -6,7 +6,8 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 ## Open
 
 - **2026-11-12 07:06 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py`,
-  `tests/test_crypto_cycle.py`. Purpose: backlog 68 (owner's answer "א", 2026-11-12): on the UTC daily calendar a
+  `tests/test_crypto_cycle.py`; added 07:25: `tests/test_regime.py` and `tests/test_books.py` (only the frozen test
+  clock of two crypto runs, aligned with their panels). Purpose: backlog 68 (owner's answer "א", 2026-11-12): on the UTC daily calendar a
   decision bar that is not yesterday's (a day missing from Yahoo's reply) skips the run instead of deciding on an old
   close. Rule 4: failing test first, quant-critic, suite. Must land before the 00:12 UTC run.
 

@@ -199,6 +199,8 @@ class SameRegimeEverywhere(unittest.TestCase):
                 sl = {k: v.iloc[:i + 1] for k, v in p.items()}
                 cycle.load_market = lambda c, rng="10y", age=0.1, sl=sl: sl
                 ds = str(p["close"].index[i].date())
+                # the UTC clock at D+1 00:12, so bar D is the calendar's decision bar (backlog 68)
+                journal.now_utc = lambda d=p["close"].index[i]: f"{(d + pd.Timedelta(days=1)).date()}T00:12:00+00:00"
                 proposal = cycle.run_cycle(propose=True)
                 saved = journal.load_json("proposal.json")["diag"]["regime"]  # read now: a crypto decision deletes it (Task 6)
                 cycle.run_cycle()
