@@ -1,0 +1,13 @@
+{
+  "cash": 100000.0,
+  "positions": {},
+  "peak_equity": 100000.0,
+  "blocked": {},
+  "created": "2026-11-10",
+  "last_mark": "2026-11-10",
+  "start_prices": {
+    "BTC-USD": 73720.1171875
+  },
+  "regime": "risk_on",
+  "dd_state": "normal"
+}
