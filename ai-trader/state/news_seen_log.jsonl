@@ -2047,3 +2047,4 @@
 {"key": "b131ed5cc0acfebd", "symbol": "AAPL", "published": "2026-11-12T15:13:00+00:00", "first_seen": "2026-11-12T15:37:39.421246+00:00", "outcome": "scored"}
 {"key": "a6fb5fec90f3833a", "symbol": "QCOM", "published": "2026-11-12T15:13:00+00:00", "first_seen": "2026-11-12T15:37:39.421748+00:00", "outcome": "scored"}
 {"key": "64e9db7e7faf0b5a", "symbol": "CRM", "published": "2026-11-12T14:33:00+00:00", "first_seen": "2026-11-12T15:37:59.518117+00:00", "outcome": "stale"}
+{"key": "f9d6e049c76fcb36", "symbol": "AMD", "published": "2026-11-12T15:36:56+00:00", "first_seen": "2026-11-12T15:37:59.518499+00:00", "outcome": "scored"}
