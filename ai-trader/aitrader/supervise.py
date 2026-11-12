@@ -569,7 +569,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
         # a parent). left: ntfy's last remainder, for the marks. last_child, codes (the exit codes since the last
         # healthy run), refused (when the lock refusals began), tripped: what the lines on the way out read.
         seen = {"mark": None, "down_at": None, "ended": None, "stale": None, "r6": None,
-                "gap": (rows[-1] if rows else None, cold),
+                "gap": (prev, cold),
                 "n": max((_alert_n(r) for _, r in today if r.get("ev") == "alert"), default=0),
                 "left": None, "last_child": None, "codes": [], "refused": None, "tripped": {}}
         # The restart episode (spec 8, R1): its falls, the `up` and `code` rows of its children, and the hang kill
@@ -716,12 +716,12 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     kid["code"] = True
                     changed = st["last_commit"] is not None and code["commit"] != st["last_commit"]
                     st["last_commit"] = code["commit"]
+                    save()  # the commit outlives this parent; saved before the row, so a reader of the row finds it saved
                     code_row = {"child": child.pid, "commit": code["commit"], "dirty": code.get("dirty"),
                                 "code_changed": changed}
                     emit("code", now, **code_row)
                     if ep["falls"]:
                         ep["codes"].append(code_row)
-                    save()  # the commit outlives this parent (R1 and the next parent compare with it)
                 if mine and view["age_s"] <= sup["hang_seconds"]:  # a fresh beat: what it says about the stops
                     ages = _stamp_ages(hb, view["age_s"]) if view["open"] else {}
                     names = sorted(s for s, a in ages.items() if a is None or a > sup["stops_stale_seconds"])

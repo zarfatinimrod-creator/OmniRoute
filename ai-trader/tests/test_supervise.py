@@ -1439,5 +1439,5 @@ class ParentLines(Parents):
     def test_the_sender_goes_through_the_proxy_of_its_env_unless_no_proxy_names_the_host(self):   # the proxy port is dead
         proxy = {"http_proxy": "http://127.0.0.1:9"}
         with mock.patch.dict(os.environ, {"NO_PROXY": "", "no_proxy": ""}):   # only the env given to the Sender decides
-            got = [deadman.Sender(self.stub.url, None, 2, env=env).health() for env in ({**proxy, "NO_PROXY": "127.0.0.1"}, proxy)]
+            got = [deadman.Sender(self.stub.url, None, 2, env=env, sync=True).health() for env in ({**proxy, "NO_PROXY": "127.0.0.1"}, proxy)]
         self.assertEqual(got, [200, "ConnectionRefusedError"])
