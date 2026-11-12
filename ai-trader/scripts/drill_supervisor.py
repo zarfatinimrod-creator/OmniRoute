@@ -580,17 +580,25 @@ def drill_f(d: Drill) -> str:
     sup, quote = d.sup, QUOTE_S[d.fast]
     st = d.state()
     write_book(st, HELD)
+    # The engine before this one looked at the stops just now: its stamp is adopted, so the start row comes when the
+    # slow looks let it age past stops_stale_seconds. On a directory with no stamp at all the parent would count the
+    # unknown stamp as stale at the boot beat, and the quote stubs would decide nothing.
+    now = datetime.now(timezone.utc).isoformat()
+    (st / "news_heartbeat.json").write_text(json.dumps({"at": now, "stops_checked_at": now}))
     p = d.parent(st, d.engine(st, {"session": "open", "quote_delay_s": quote}))
-    wait(lambda: rows(st, "stale_stops") and said(st, "R6"), WAIT_S, "stale_stops and R6")
+    wait(lambda: rows(st, "stale_stops") and said(st, "R6"), sup["stops_stale_seconds"] + WAIT_S, "stale_stops and R6")
     # One look costs len(HELD) quotes, and its stamp is when it began: the names stay stale and never turn fresh. Long
     # enough for the first look to end and for any stretch without a beat to pass hang_seconds.
     watched = len(HELD) * quote + sup["hang_seconds"]
     time.sleep(watched)
-    starts = sum(r.get("what") == "start" for r in rows(st, "stale_stops"))
+    stale = rows(st, "stale_stops")
+    starts, aged = sum(r.get("what") == "start" for r in stale), stale[0].get("stop")
     r6, hangs, spawned = said(st, "R6"), len(rows(st, "hang")), len(rows(st, "start"))
     p.kill()  # not a planned stop: that would wait for the engine to finish its slow look; the engine dies with it
     p.wait()
-    numbers = f"stale_start={starts} r6={r6} hang={hangs} starts={spawned} watched_s={watched:g}"
+    numbers = f"stale_start={starts} stop_s={aged} r6={r6} hang={hangs} starts={spawned} watched_s={watched:g}"
+    if not isinstance(aged, (int, float)):
+        raise Failed(f"the stale stops were an unknown stamp, not one the slow looks let age: {numbers}")
     if (starts, r6, hangs, spawned) != (1, 1, 0, 1):
         raise Failed(f"want one stale_stops start row, one R6 and no kill: {numbers}")
     return numbers
