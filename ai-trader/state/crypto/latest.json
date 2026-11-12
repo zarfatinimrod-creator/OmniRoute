@@ -1,27 +1,27 @@
 {
   "date": "2026-11-12",
-  "as_of_utc": "2026-11-12T00:14:27+00:00",
+  "as_of_utc": "2026-11-12T01:15:38+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-12T00:00:00+00:00",
     "regular_end_utc": "2026-11-12T23:59:00+00:00",
-    "last_trade_utc": "2026-11-12T00:14:22+00:00",
-    "price": 73812.5
+    "last_trade_utc": "2026-11-12T01:15:35+00:00",
+    "price": 73715.69
   },
-  "equity": 100000.0,
-  "cash": 100000.0,
-  "gross": 0.0,
-  "return_since_start": 0.0,
-  "shadow_return_since_start": 0.0,
+  "equity": 99272.2,
+  "cash": 20317.46,
+  "gross": 0.7953,
+  "return_since_start": -0.0073,
+  "shadow_return_since_start": -0.0073,
   "baselines": {
-    "bench_since_start": 0.0013,
-    "equal_weight_since_start": 0.0013
+    "bench_since_start": -0.0001,
+    "equal_weight_since_start": -0.0001
   },
   "started": "2026-11-10",
   "regime": "risk_on",
   "dd_state": "normal",
-  "drawdown": 0.0,
-  "decided_now": true,
+  "drawdown": -0.0073,
+  "decided_now": false,
   "weights": {
     "tsmom": 0.0,
     "xsmom": 0.0,
@@ -34,7 +34,7 @@
   },
   "pending": {
     "decision_date": "2026-11-10",
-    "status": "pending",
+    "status": "executed",
     "rebalance": true,
     "targets": {
       "BTC-USD": 0.7968257771145335
@@ -55,13 +55,21 @@
       }
     ]
   },
-  "executed": [],
-  "top_scores": {
-    "BTC-USD": 0.448
-  },
-  "bottom_scores": {
-    "BTC-USD": 0.448
-  },
+  "executed": [
+    {
+      "date": "2026-11-12",
+      "symbol": "BTC-USD",
+      "side": "BUY",
+      "qty": 1.071071,
+      "price": 74025.0722,
+      "value": 79286.11,
+      "realized_pnl": -396.43,
+      "fee": 396.4305,
+      "reason": "entry"
+    }
+  ],
+  "top_scores": null,
+  "bottom_scores": null,
   "stopped": [],
   "scorecard": {
     "open": 3,
@@ -72,12 +80,22 @@
     "congress_buy": null,
     "logged": null
   },
-  "positions": {},
-  "day_moves": {},
+  "positions": {
+    "BTC-USD": {
+      "qty": 1.071071,
+      "avg_cost": 74025.07,
+      "last": 73715.69,
+      "pnl_pct": -0.0042,
+      "since": "2026-11-12"
+    }
+  },
+  "day_moves": {
+    "BTC-USD": -0.0001
+  },
   "alert_channels": [
     "queued"
   ],
   "events": [
-    "מתוכנן ל-2026-11-12T01:00:00+00:00: BUY 1.074964 BTC-USD"
+    "בוצע ב-2026-11-12T01:00:00+00:00 (1h): BUY 1.071071 BTC-USD @ 74025.0722"
   ]
 }

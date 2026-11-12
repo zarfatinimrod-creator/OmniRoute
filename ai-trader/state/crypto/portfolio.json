@@ -1,6 +1,14 @@
 {
-  "cash": 100000.0,
-  "positions": {},
+  "cash": 20317.461391826233,
+  "positions": {
+    "BTC-USD": {
+      "qty": 1.071071,
+      "avg_cost": 74025.0721640625,
+      "entry_date": "2026-11-12",
+      "peak_close": 73988.078125,
+      "last_price": 73988.078125
+    }
+  },
   "peak_equity": 100000.0,
   "blocked": {},
   "created": "2026-11-10",
@@ -9,5 +17,7 @@
     "BTC-USD": 73720.1171875
   },
   "regime": "risk_on",
-  "dd_state": "normal"
+  "dd_state": "normal",
+  "fees_paid": 396.430540339173,
+  "last_rebalance": "2026-11-10"
 }

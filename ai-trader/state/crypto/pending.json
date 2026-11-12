@@ -1,6 +1,6 @@
 {
   "decision_date": "2026-11-10",
-  "status": "pending",
+  "status": "executed",
   "rebalance": true,
   "exits_only": false,
   "targets": {
@@ -34,5 +34,21 @@
   "exec_ts": "2026-11-12T01:00:00+00:00",
   "decision_close": {
     "BTC-USD": 73720.1171875
-  }
+  },
+  "executed_on": "2026-11-12",
+  "fills": [
+    {
+      "date": "2026-11-12",
+      "symbol": "BTC-USD",
+      "side": "BUY",
+      "qty": 1.071071,
+      "price": 74025.0722,
+      "value": 79286.11,
+      "realized_pnl": -396.43,
+      "fee": 396.4305,
+      "reason": "entry"
+    }
+  ],
+  "fill_source": "1h",
+  "fill_ts": "2026-11-12T01:00:00+00:00"
 }
