@@ -1441,3 +1441,22 @@ class ParentLines(Parents):
         with mock.patch.dict(os.environ, {"NO_PROXY": "", "no_proxy": ""}):   # only the env given to the Sender decides
             got = [deadman.Sender(self.stub.url, None, 2, env=env, sync=True).health() for env in ({**proxy, "NO_PROXY": "127.0.0.1"}, proxy)]
         self.assertEqual(got, [200, "ConnectionRefusedError"])
+
+    def test_a_request_that_cannot_even_be_built_is_named_by_its_class_and_the_worker_lives_on(self):   # Review Focus 5
+        # a schemeless base: urllib's ValueError quotes the URL, topic and all; the sender runs its worker thread
+        sender, got, err = deadman.Sender("127.0.0.1", TOPIC, 2, env=no_phone.clean_env()), [], io.StringIO()
+        with contextlib.redirect_stderr(err):   # where threading.excepthook would print a dead worker's exception
+            sender.request("GET", "/json?poll=1", "poll")
+            sender.publish({"message": "after"}, "line")    # the same worker must still give it a result
+            end = time.monotonic() + 5
+            while len(got) < 2 and time.monotonic() < end:
+                got += sender.results()
+                time.sleep(0.01)
+            sender.close()
+        self.assertEqual(([(r["tag"], r["ok"], r["status"], r["error"]) for r in got], err.getvalue()),
+                         ([("poll", False, None, "ValueError"), ("line", False, None, "ValueError")], ""))
+        sync = deadman.Sender(self.stub.url, TOPIC, 2, env=no_phone.clean_env(), sync=True)
+        with mock.patch.object(deadman, "_number", side_effect=RuntimeError(TOPIC)):   # a surprise past the try
+            sync.publish({"message": "odd"}, "odd")
+        self.assertEqual([(r["tag"], r["ok"], r["error"]) for r in sync.results()],
+                         [("odd", False, "RuntimeError")])

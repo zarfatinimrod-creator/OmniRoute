@@ -114,17 +114,20 @@ class Sender:
         r = {"tag": tag, "ok": False, "status": None, "error": None, "left": None, "reset_s": None,
              "retry_after": None, "lines": None}
         if self.topic:
-            r.update(self._ask(method, suffix, payload))
+            try:
+                r.update(self._ask(method, suffix, payload))
+            except Exception as e:  # noqa: BLE001 - the worker must outlive any job; its trace is the class name only
+                r["error"] = _name(e)
         with self._lock:
             self._done.append(r)
 
     def _ask(self, method: str, suffix: str | None, payload: dict | None) -> dict:
-        if suffix is None:  # a publish: the topic goes into the body here and nowhere else
-            req = urllib.request.Request(self.base + "/", method=method, headers={"Content-Type": "application/json"},
-                                         data=json.dumps({**payload, "topic": self.topic}).encode())
-        else:
-            req = urllib.request.Request(f"{self.base}/{self.topic}{suffix}", method=method)
-        try:
+        try:  # building the request too: urllib's refusal of a URL quotes the URL, and a cancel's or poll's has the topic
+            if suffix is None:  # a publish: the topic goes into the body here and nowhere else
+                req = urllib.request.Request(self.base + "/", method=method, headers={"Content-Type": "application/json"},
+                                             data=json.dumps({**payload, "topic": self.topic}).encode())
+            else:
+                req = urllib.request.Request(f"{self.base}/{self.topic}{suffix}", method=method)
             with self._open(req) as resp:
                 status, headers, data = resp.status, resp.headers, resp.read()
         except urllib.error.HTTPError as e:
