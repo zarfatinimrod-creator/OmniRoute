@@ -181,8 +181,8 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
 ## 3ב. מנוע החדשות - הפעלה, עצירת קניות, כללים בניסיון (2026-11-10)
 
 **הפעלה (המפקח).** את המנוע מפעיל המפקח, תהליך האב `aitrader.supervise`: הוא מפעיל את המנוע מחדש כשהוא נופל, מחליף
-את עצמו לפני מגבלת השעתיים של משימת רקע (`--handover`), ושולח לנמרוד את השורות שלו. הסשן לא מפעיל את המנוע בעצמו.
-`python3 -m aitrader.supervise --status` (קריאה בלבד) מחליט, והסשן רק מבצע; בדיקת המנוע המתוזמנת מריצה
+את עצמו לפני מגבלת השעתיים של משימת רקע (`--handover`), ושולח לנמרוד את השורות שלו. הסשן לא מריץ את `news-live` בעצמו:
+כשכתוב למטה "מפעילים", הכוונה למפקח, לפי `--status`. `python3 -m aitrader.supervise --status` (קריאה בלבד) מחליט, והסשן רק מבצע; בדיקת המנוע המתוזמנת מריצה
 `--status --watchdog`. את המפקח מפעילים רק כש-`--status` אומר: את `launch.command`, מתיקיית השורש של הריפו, כמשימת
 רקע של הסשן (הכלי Bash עם `run_in_background`, ה-timeout מ-`launch.timeout_ms`), אף פעם לא `nohup`, `setsid` או `&`:
 המכונה בענן נסגרת כמה דקות אחרי שהסשן נח, ותהליך מנותק מת איתה (3 פעמים ב-2026-11-10). משימת רקע משאירה את המכונה
@@ -358,7 +358,7 @@ python3 -m aitrader summary --book crypto --ack <newest>           # רק אחר
 **push** תמיד בלולאת הניסיון החוזר:
 
 ```bash
-for i in 1 2 3 4 5; do git fetch origin ccr-120121ba-vsvwlj && git merge --no-edit origin/ccr-120121ba-vsvwlj || break; git push -u origin ccr-120121ba-vsvwlj && break; sleep $((2**i)); done
+for i in 1 2 3 4 5; do git fetch origin ccr-120121ba-vsvwlj; git merge --no-edit origin/ccr-120121ba-vsvwlj || break; git push -u origin ccr-120121ba-vsvwlj && break; sleep $((2**i)); done
 ```
 
 **מגבלות (כנות):** המשטר ומפסק הירידה נבדקים פעם ביום, בסגירה היומית, לא תוך-יומי. הזמנה שלא מולאה עד ההחלטה הבאה
