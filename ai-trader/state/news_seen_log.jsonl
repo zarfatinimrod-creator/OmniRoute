@@ -2126,3 +2126,7 @@
 {"key": "63154e87cc57ad1d", "symbol": "AMZN", "published": "2026-11-12T15:45:57+00:00", "first_seen": "2026-11-12T16:10:00.252265+00:00", "outcome": "scored"}
 {"key": "bd01a4355b3b30e9", "symbol": "AMZN", "published": "2026-11-12T15:46:27+00:00", "first_seen": "2026-11-12T16:10:00.252273+00:00", "outcome": "scored"}
 {"key": "d0fd786572fe50da", "symbol": "V", "published": "2026-11-12T16:01:03+00:00", "first_seen": "2026-11-12T16:10:00.252456+00:00", "outcome": "scored"}
+{"key": "efdf44ac2f86f879", "symbol": "MSFT", "published": "2026-11-12T15:45:57+00:00", "first_seen": "2026-11-12T16:10:20.337760+00:00", "outcome": "scored"}
+{"key": "99307d78813d599f", "symbol": "IBM", "published": "2026-11-12T15:54:28+00:00", "first_seen": "2026-11-12T16:10:20.337914+00:00", "outcome": "scored"}
+{"key": "03b02f8aae61d3b6", "symbol": "HD", "published": "2026-11-12T15:45:57+00:00", "first_seen": "2026-11-12T16:10:20.338057+00:00", "outcome": "scored"}
+{"key": "f5a15a205b1742c4", "symbol": "LMT", "published": "2026-11-12T15:54:28+00:00", "first_seen": "2026-11-12T16:10:20.338444+00:00", "outcome": "scored"}
