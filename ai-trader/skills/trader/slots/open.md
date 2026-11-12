@@ -1,5 +1,5 @@
 Scheduled slot: MARKET OPEN (09:52 New York). Paper money only. Never git stash.
-1. cd to the repo, git fetch origin ccr-120121ba-vsvwlj && git merge --no-edit origin/ccr-120121ba-vsvwlj; if this container is new, bash ai-trader/bin/install-skills.sh. If the merge is refused because of uncommitted files, commit the state first (step 4) and merge again; never stash, never discard files. On a conflict: step 4's rule.
+1. cd to the repo, git fetch origin ccr-120121ba-vsvwlj && git merge --no-edit origin/ccr-120121ba-vsvwlj; if this container is new, bash ai-trader/bin/install-skills.sh. If the merge is refused because of uncommitted files, commit the state first (step 4) and merge again; never stash, never discard files. On a conflict: `git merge --abort`, which discards nothing, then go on with this slot's work on the local state; step 4's merge meets the conflict again and reports it.
 2. cd ai-trader && python3 -m aitrader verify (stop and report if a chain is broken) && python3 -m aitrader cycle
    - This fills yesterday's pending decision at TODAY'S OFFICIAL OPEN price (never later prices). Intraday runs never decide or trade.
    - If the market is closed today (holiday), the cycle does nothing - just note it.

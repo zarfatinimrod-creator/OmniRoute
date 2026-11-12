@@ -51,6 +51,19 @@ class SlotFiles(unittest.TestCase):
         self.assertEqual([w in copy[0] for w in ("uptime-report --day", "`uptime`", "`commits`", "logs/YYYY-MM-DD-close.md")],
                          [True, True, True, True])
 
+    def test_a_conflict_at_the_start_sync_is_aborted_and_the_slot_still_does_its_work(self):   # Task 19 review, F1
+        # S2 and "stop" belong to the closing block, after the slot's work (brief; spec 4.7): a conflict at the start
+        # must not skip the work - the close-time stock stop check is in it
+        checked = []
+        for f in sorted(SLOTS.glob("*.md")):
+            first = next(line for line in f.read_text(encoding="utf-8").splitlines() if line.startswith("1."))
+            if "&& git merge --no-edit origin/" not in first:   # no start sync: news-watch syncs at its end, the dashboard runs no git
+                continue
+            checked.append(f.name)
+            self.assertEqual([w in first for w in ("git merge --abort", "then go on with this slot's work on the local state", "'s rule")],
+                             [True, True, False], f.name)
+        self.assertEqual(checked, ["close.md", "crypto-decide.md", "crypto-fill.md", "crypto-summary.md", "midday.md", "open.md", "weekly.md"])
+
 
 if __name__ == "__main__":
     unittest.main()
