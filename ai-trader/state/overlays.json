@@ -1,6 +1,127 @@
 {
-  "date": "2026-11-11",
+  "date": "2026-11-12",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-09",
+      "ticker": "NOMD",
+      "company": "Nomad Foods Ltd",
+      "industry": "Food & Kindred Products",
+      "insiders": 2,
+      "price": 12.17,
+      "value": 1054392.0,
+      "delta_own": "+9%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-10",
+      "ticker": "LUCK",
+      "company": "Lucky Strike Entertainment Corp",
+      "industry": "Amusement & Recreation Services",
+      "insiders": 3,
+      "price": 13.74,
+      "value": 965695.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-11",
+      "ticker": "RWAY",
+      "company": "Runway Growth Finance Corp.",
+      "industry": "Closed-End Funds",
+      "insiders": 3,
+      "price": 6.74,
+      "value": 218908.0,
+      "delta_own": "+671%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-09",
+      "ticker": "ADTN",
+      "company": "Adtran Holdings, Inc.",
+      "industry": "Telephone & Telegraph Apparatus",
+      "insiders": 2,
+      "price": 4.08,
+      "value": 847008.0,
+      "delta_own": "+16%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-10",
+      "ticker": "EGBN",
+      "company": "Eagle Bancorp Inc",
+      "industry": "State Commercial Banks",
+      "insiders": 2,
+      "price": 34.02,
+      "value": 199430.0,
+      "delta_own": "+10%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-09-25",
+      "ticker": "PAM",
+      "company": "Pampa Energy Inc.",
+      "industry": "Electric Services",
+      "insiders": 3,
+      "price": 12.34,
+      "value": 56713058.0,
+      "delta_own": "+13%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-11",
+      "ticker": "DKNG",
+      "company": "Draftkings Inc.",
+      "industry": "Miscellaneous Amusement & Recreation",
+      "insiders": 2,
+      "price": 18.77,
+      "value": 448787.0,
+      "delta_own": "+11%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-10",
+      "ticker": "MP",
+      "company": "Mp Materials Corp. / De",
+      "industry": "Metal Mining",
+      "insiders": 3,
+      "price": 36.26,
+      "value": 3353606.0,
+      "delta_own": "+5%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-11",
+      "ticker": "TH",
+      "company": "Target Hospitality Corp.",
+      "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
+      "insiders": 2,
+      "price": 14.7,
+      "value": 687833.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-10",
+      "ticker": "NTHI",
+      "company": "Neonc Technologies Holdings, Inc.",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 2,
+      "price": 3.71,
+      "value": 839805.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-09",
+      "ticker": "COHR",
+      "company": "Coherent Corp.",
+      "industry": "Optical Instruments & Lenses",
+      "insiders": 2,
+      "price": 203.38,
+      "value": 1220285.0,
+      "delta_own": "+3%"
+    },
     {
       "filing_date": "2026-11-10",
       "trade_date": "2026-11-06",
@@ -52,9 +173,9 @@
       "company": "Galaxy Digital Inc.",
       "industry": "Security Brokers, Dealers & Flotation Companies",
       "insiders": 2,
-      "price": 13.12,
-      "value": 10192678.0,
-      "delta_own": "+146%"
+      "price": 12.99,
+      "value": 9934246.0,
+      "delta_own": "+141%"
     },
     {
       "filing_date": "2026-11-10",
@@ -113,28 +234,6 @@
     },
     {
       "filing_date": "2026-11-09",
-      "trade_date": "2026-11-06",
-      "ticker": "ADTN",
-      "company": "Adtran Holdings, Inc.",
-      "industry": "Telephone & Telegraph Apparatus",
-      "insiders": 2,
-      "price": 4.02,
-      "value": 675088.0,
-      "delta_own": "+13%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-06",
-      "ticker": "LUCK",
-      "company": "Lucky Strike Entertainment Corp",
-      "industry": "Amusement & Recreation Services",
-      "insiders": 3,
-      "price": 15.83,
-      "value": 926691.0,
-      "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-09",
       "trade_date": "2026-11-05",
       "ticker": "MTDR",
       "company": "Matador Resources Co",
@@ -176,105 +275,6 @@
       "price": 3.96,
       "value": 494605.0,
       "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "AN",
-      "company": "Autonation, Inc.",
-      "industry": "Auto Dealers & Gasoline Stations",
-      "insiders": 4,
-      "price": 183.85,
-      "value": 1729868.0,
-      "delta_own": "+4%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-06",
-      "ticker": "SOPH",
-      "company": "Sophia Genetics Sa",
-      "industry": "Computer Processing & Data Preparation",
-      "insiders": 2,
-      "price": 6.96,
-      "value": 278388.0,
-      "delta_own": "+4%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "CMCO",
-      "company": "Columbus McKinnon Corp",
-      "industry": "Construction Machinery & Equip",
-      "insiders": 2,
-      "price": 16.92,
-      "value": 598484.0,
-      "delta_own": "+12%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-09-25",
-      "ticker": "PAM",
-      "company": "Pampa Energy Inc.",
-      "industry": "Electric Services",
-      "insiders": 3,
-      "price": 12.11,
-      "value": 55413046.0,
-      "delta_own": "+13%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "KMT",
-      "company": "Kennametal Inc",
-      "industry": "Machine Tools, Metal Cutting Types",
-      "insiders": 3,
-      "price": 27.01,
-      "value": 567118.0,
-      "delta_own": "+6%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "TTMI",
-      "company": "Ttm Technologies Inc",
-      "industry": "Printed Circuit Boards",
-      "insiders": 4,
-      "price": 87.25,
-      "value": 3926152.0,
-      "delta_own": "+14%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "TSM",
-      "company": "Taiwan Semiconductor Manufacturing Co Ltd",
-      "industry": "Semiconductors & Related Devices",
-      "insiders": 2,
-      "price": 130.17,
-      "value": 545393.0,
-      "delta_own": "+24%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "NTHI",
-      "company": "Neonc Technologies Holdings, Inc.",
-      "industry": "Pharmaceutical Preparations",
-      "insiders": 2,
-      "price": 3.49,
-      "value": 545305.0,
-      "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-06",
-      "trade_date": "2026-11-05",
-      "ticker": "KYN",
-      "company": "Kayne Anderson Energy Infrastructure Fund, Inc.",
-      "industry": "Closed-End Funds",
-      "insiders": 3,
-      "price": 13.39,
-      "value": 432609.0,
-      "delta_own": "+3%"
     }
   ],
   "congress_buy": null,
