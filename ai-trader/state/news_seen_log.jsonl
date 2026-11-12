@@ -1879,3 +1879,8 @@
 {"key": "701d319dfcb22ab6", "symbol": "AAPL", "published": "2026-11-12T14:01:15+00:00", "first_seen": "2026-11-12T14:52:25.668596+00:00", "outcome": "stale"}
 {"key": "01b69f5defd1250d", "symbol": "AMD", "published": "2026-11-12T14:44:01+00:00", "first_seen": "2026-11-12T14:52:45.676299+00:00", "outcome": "scored"}
 {"key": "6891909a6ed324d6", "symbol": "AMZN", "published": "2026-11-12T14:47:00+00:00", "first_seen": "2026-11-12T14:52:45.676581+00:00", "outcome": "scored"}
+{"key": "fa5600a86261a9e0", "symbol": "NVDA", "published": "2026-11-12T14:47:00+00:00", "first_seen": "2026-11-12T14:53:05.744746+00:00", "outcome": "scored"}
+{"key": "41be4b45722d5b7f", "symbol": "NVDA", "published": "2026-11-12T14:44:36+00:00", "first_seen": "2026-11-12T14:53:05.744768+00:00", "outcome": "scored"}
+{"key": "6503594196301277", "symbol": "NVDA", "published": "2026-11-12T14:44:01+00:00", "first_seen": "2026-11-12T14:53:05.744773+00:00", "outcome": "scored"}
+{"key": "1a3207a15b73dbad", "symbol": "NVDA", "published": "2026-11-12T14:35:50+00:00", "first_seen": "2026-11-12T14:53:05.744779+00:00", "outcome": "scored"}
+{"key": "fd4e50d41df20b6a", "symbol": "COP", "published": "2026-11-12T14:44:01+00:00", "first_seen": "2026-11-12T14:53:25.686433+00:00", "outcome": "scored"}
