@@ -1884,3 +1884,17 @@
 {"key": "6503594196301277", "symbol": "NVDA", "published": "2026-11-12T14:44:01+00:00", "first_seen": "2026-11-12T14:53:05.744773+00:00", "outcome": "scored"}
 {"key": "1a3207a15b73dbad", "symbol": "NVDA", "published": "2026-11-12T14:35:50+00:00", "first_seen": "2026-11-12T14:53:05.744779+00:00", "outcome": "scored"}
 {"key": "fd4e50d41df20b6a", "symbol": "COP", "published": "2026-11-12T14:44:01+00:00", "first_seen": "2026-11-12T14:53:25.686433+00:00", "outcome": "scored"}
+{"key": "8b5561477507ce36", "symbol": "AVGO", "published": "2026-11-12T13:39:10+00:00", "first_seen": "2026-11-12T14:53:45.654792+00:00", "outcome": "stale"}
+{"key": "4009b98b59745f50", "symbol": "AMD", "published": "2026-11-12T13:39:10+00:00", "first_seen": "2026-11-12T14:53:45.655225+00:00", "outcome": "stale"}
+{"key": "ec1a761287bd7bbe", "symbol": "TSLA", "published": "2026-11-12T14:48:18+00:00", "first_seen": "2026-11-12T14:54:25.641717+00:00", "outcome": "scored"}
+{"key": "ddc0d4abeef26bda", "symbol": "WMT", "published": "2026-11-12T13:46:00+00:00", "first_seen": "2026-11-12T14:55:25.798289+00:00", "outcome": "stale"}
+{"key": "b2fda4e3df1217fa", "symbol": "ABBV", "published": "2026-11-12T13:46:00+00:00", "first_seen": "2026-11-12T14:55:25.798764+00:00", "outcome": "stale"}
+{"key": "7f4ff14152680728", "symbol": "NVDA", "published": "2026-11-12T14:45:00+00:00", "first_seen": "2026-11-12T14:55:25.797938+00:00", "outcome": "scored"}
+{"key": "47244717148ee96a", "symbol": "MU", "published": "2026-11-12T13:40:00+00:00", "first_seen": "2026-11-12T14:55:45.739587+00:00", "outcome": "stale"}
+{"key": "8067157b7af8eeda", "symbol": "DIS", "published": "2026-11-12T13:45:01+00:00", "first_seen": "2026-11-12T14:56:05.689927+00:00", "outcome": "stale"}
+{"key": "66dd68995fcf26e6", "symbol": "XOM", "published": "2026-11-12T13:41:00+00:00", "first_seen": "2026-11-12T14:56:05.690576+00:00", "outcome": "stale"}
+{"key": "c63dd55458b403cb", "symbol": "META", "published": "2026-11-12T14:00:00+00:00", "first_seen": "2026-11-12T14:56:25.709187+00:00", "outcome": "stale"}
+{"key": "002aecd4a05ee794", "symbol": "NOW", "published": "2026-11-12T14:00:00+00:00", "first_seen": "2026-11-12T14:56:45.752287+00:00", "outcome": "stale"}
+{"key": "42dd6472dbd0df57", "symbol": "AAPL", "published": "2026-11-12T14:00:00+00:00", "first_seen": "2026-11-12T14:57:05.793988+00:00", "outcome": "stale"}
+{"key": "a34a67b3ff176ad8", "symbol": "CVX", "published": "2026-11-12T13:41:00+00:00", "first_seen": "2026-11-12T14:57:05.794882+00:00", "outcome": "stale"}
+{"key": "331962049f9412e7", "symbol": "MSFT", "published": "2026-11-12T14:46:37+00:00", "first_seen": "2026-11-12T14:57:05.794298+00:00", "outcome": "scored"}
