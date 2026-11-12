@@ -1,6 +1,7 @@
 """The supervisor's parent process (supervisor spec 2026-11-10, section 4): it starts the news engine, restarts it,
-and keeps the uptime log. So far (Tasks 10-11): its foundations (the config, its own trading calendar, the uptime log,
-the state file and its lock), the restart core and the loop that runs it:
+and keeps the uptime log. So far (Tasks 10-12): its foundations (the config, its own trading calendar, the uptime log,
+the state file and its lock), the restart core, the loop that runs it, and what the loop reads in the heartbeat (a mark
+a minute, `up` and `code` at a child's first looks, a hang, stale stops):
 
     python3 -u -m aitrader.supervise --until HH:MM [--handover] [--state-dir DIR] [--config FILE]
 
@@ -285,6 +286,102 @@ def near_until(now_ny: datetime, until: str, slack_s: float) -> bool:
     return now_ny >= midnight + timedelta(hours=h, minutes=m, seconds=-slack_s)
 
 
+def open_seconds(a: datetime, b: datetime, cal: dict) -> float:
+    """The seconds of [a, b] that fall inside regular sessions (session_hours on each New York date from a's to b's):
+    a weekend or a holiday adds nothing and an early close ends at 13:00. 0 when b is not after a."""
+    total, day = 0.0, a.astimezone(NY).date()
+    while day <= b.astimezone(NY).date():
+        hours = session_hours(day, cal)
+        if hours:
+            (oh, om), (ch, cm) = hours
+            lo = max(a, datetime(day.year, day.month, day.day, oh, om, tzinfo=NY))
+            hi = min(b, datetime(day.year, day.month, day.day, ch, cm, tzinfo=NY))
+            total += max(0.0, (hi - lo).total_seconds())
+        day += timedelta(days=1)
+    return total
+
+
+def _when(text) -> datetime | None:
+    """An ISO-8601 time with its zone; None for anything else."""
+    try:
+        t = datetime.fromisoformat(text)
+    except (TypeError, ValueError):
+        return None
+    return t if t.utcoffset() is not None else None
+
+
+def _held(hb: dict) -> dict:
+    held = hb.get("held")
+    return held if isinstance(held, dict) else {}
+
+
+def _looks(hb: dict) -> dict:
+    """Each held name's last stop look in a beat: its own checked_at, else the beat's stops_checked_at (until a process
+    has looked itself, the look the run before it left; spec 5.5); None when neither can be read."""
+    kept = _when(hb.get("stops_checked_at"))
+    return {sym: _when(v.get("checked_at") if isinstance(v, dict) else None) or kept for sym, v in _held(hb).items()}
+
+
+def _stamp_ages(hb: dict, age_s: float | None) -> dict:
+    """Each held name's stop-look age now (ruling P16): the beat's `at` less its stamp, plus the beat's own age, so that
+    it keeps growing through a long call that writes no beat. None when a time or the age is not known."""
+    at = _when(hb.get("at"))
+    return {sym: None if None in (at, t, age_s) else (at - t).total_seconds() + age_s for sym, t in _looks(hb).items()}
+
+
+def beat_view(hb: dict | None, mtime: float | None, child_pid: int | None, now: float) -> dict:
+    """What the parent reads in the heartbeat (spec 4.3, 4.6). now = time.time(): age_s is now less the file's mtime,
+    never the injected clock. mine: the beat is this child's; a beat of another pid, or none, is no beat (Review
+    Focus 1), and then the rest is empty. stop_age_s: the age of the oldest per-name stamp now (ruling P16); None when
+    nothing is held or a held name's stamp cannot be read. held: {symbol: stop}."""
+    mine = child_pid is not None and isinstance(hb, dict) and hb.get("pid") == child_pid
+    view = {"mine": mine, "age_s": None if mtime is None else now - mtime, "stop_age_s": None, "held": {},
+            "open": None, "blind": [], "phase": None}
+    if not mine:
+        return view
+    ages = list(_stamp_ages(hb, view["age_s"]).values())
+    blind = hb.get("blind")
+    view.update(stop_age_s=max(ages) if ages and None not in ages else None,
+                held={sym: v.get("stop") if isinstance(v, dict) else None for sym, v in _held(hb).items()},
+                open=bool(hb.get("market_open")), blind=list(blind) if isinstance(blind, list) else [],
+                phase=hb.get("phase"))
+    return view
+
+
+def first_look_done(hb: dict | None, child_pid: int, started: float) -> bool:
+    """This child has looked at its stops (spec 4.6, `up`): the beat is its own, past "boot", and every held name has a
+    checked_at at or after `started` (time.time() at the start) or is in the beat's blind list. A held name with no
+    live quote keeps an old checked_at for hours: without the blind half no `up` would come at all."""
+    if not isinstance(hb, dict) or hb.get("pid") != child_pid or hb.get("phase") == "boot":
+        return False
+    blind = hb.get("blind") if isinstance(hb.get("blind"), list) else []
+    for sym, v in _held(hb).items():
+        t = _when(v.get("checked_at") if isinstance(v, dict) else None)
+        if sym not in blind and (t is None or t.timestamp() < started):
+            return False
+    return True
+
+
+def mark_due(last_mark: datetime | None, now: datetime) -> bool:
+    """A mark is due at the first loop tick inside a clock minute that has none (spec 4.6)."""
+    return last_mark is None or now.replace(second=0, microsecond=0) != last_mark.replace(second=0, microsecond=0)
+
+
+def _read_beat(path: Path) -> tuple[dict | None, float | None]:
+    """The heartbeat and its file's mtime, both from one open file (a beat is replaced whole, never rewritten in place,
+    so the two belong together); (None, None) when there is no file, the beat None when it is no JSON object."""
+    try:
+        with open(path, "rb") as f:
+            data, mtime = f.read(), os.fstat(f.fileno()).st_mtime
+    except OSError:
+        return None, None
+    try:
+        hb = json.loads(data)
+    except ValueError:
+        return None, mtime
+    return (hb if isinstance(hb, dict) else None), mtime
+
+
 TWO_HOURS_MS = 7_200_000  # the harness's cap on a background command (spec 4.5): a fact of the platform, not a tuning
 HALT_WHY = {4: "chain", 5: "calendar", 6: "book"}  # the state file's halt.why for the engine's code
 SAID = {"crash_loop": "tripped"}  # the word of the last stdout line, where it is not the sup_stop row's why
@@ -292,7 +389,8 @@ AFTER = "Run python3 -m aitrader.supervise --status and do what action says."
 UNTIL = re.compile(r"([01]\d|2[0-3]):[0-5]\d|24:00")
 NUMBERS = ("loop_seconds", "healthy_seconds", "backoff_first_seconds", "backoff_max_seconds", "max_restarts",
            "restart_window_seconds", "max_restarts_day", "lock_wait_seconds", "planned_stop_grace_seconds",
-           "end_of_day_slack_seconds", "uptime_keep_days", "long_timeout_ms")  # what main and the core read
+           "end_of_day_slack_seconds", "uptime_keep_days", "long_timeout_ms", "hang_seconds", "start_grace_seconds",
+           "hang_term_grace_seconds", "stops_stale_seconds")  # what main and the core read
 
 
 def _holder(lock: Path):
@@ -314,6 +412,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the child. Two lines go
     to stdout, the first and the last; the rest goes to .cache/supervise.log."""
     ppid = os.getppid()  # before anything else: what "orphaned" is measured against
+    began = time.time()  # real time: up.sold of the first child counts the sales from here
     ap = argparse.ArgumentParser(prog="python3 -m aitrader.supervise")
     ap.add_argument("--until", required=True, help="HH:MM New York, handed to the engine (24:00 never comes)")
     ap.add_argument("--handover", action="store_true", help="hand over before the harness's 2-hour cap")
@@ -354,9 +453,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
         except OSError:  # a full disk: the parent goes on
             pass
 
-    def emit(ev: str, **fields) -> None:
+    def emit(ev: str, now: datetime | None = None, **fields) -> None:
         try:
-            append_row(paths.uptime, pid, ev, clock(), **fields)
+            append_row(paths.uptime, pid, ev, now or clock(), **fields)
         except OSError as e:  # spec 4.6: a log failure never stops the parent
             log(f"uptime.jsonl: a {ev} row was not written ({type(e).__name__})")
 
@@ -389,7 +488,17 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             cmd = list(child_cmd or [sys.executable, "-u", "-m", "aitrader", "news-live"])
             cmd += ["--until", a.until, "--supervised", str(pid)]
 
+            # What the loop has seen. mark: the clock time of the last mark. down_at / ended: when the last child
+            # ended, on the injected clock (the exit row's t) and on the real one (time.time(), for up.sold).
+            # stale: the names of an open stale-stops episode. kid: the child that runs now (spawn sets it).
+            seen = {"mark": None, "down_at": None, "ended": None, "stale": None}
+            kid: dict = {}
+
             def spawn() -> subprocess.Popen:
+                before = _read_beat(paths.heartbeat)[0] or {}  # the engine before this one: its last look ends there
+                looks = list(_looks(before).values()) or [_when(before.get("stops_checked_at"))]
+                kid.update(started=time.time(), last_look=None if None in looks else min(looks), up=False, code=False,
+                           hang=None, hang_said=False)
                 # From the main thread: the kernel ties the child's PR_SET_PDEATHSIG to the thread that started it.
                 with open(paths.engine_log, "ab") as out:  # the child keeps a descriptor of its own
                     return subprocess.Popen(cmd, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=out,
@@ -398,12 +507,109 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             def watch(child, ran_s):
                 if heard:
                     return "signal"
-                return "orphaned" if os.getppid() != ppid else None
+                if os.getppid() != ppid:
+                    return "orphaned"
+                return look(child, ran_s)
+
+            def look(child, ran_s):
+                """One loop tick's reading of the heartbeat (spec 4.3, 4.6): the mark of a new clock minute, and for the
+                running child its `up` and `code` rows, stale stops and a hang. Returns "hang" when the child is to be
+                killed, else None."""
+                hb, mtime = _read_beat(paths.heartbeat)
+                view, now = beat_view(hb, mtime, child.pid if child else None, time.time()), clock()
+                mine = view["mine"]
+                if mark_due(seen["mark"], now):
+                    seen["mark"] = now
+                    emit("mark", now, hb=round(view["age_s"], 1) if mine else None,
+                         stop=None if view["stop_age_s"] is None else round(view["stop_age_s"], 1),
+                         n=len(view["held"]) if mine else None, open=view["open"], blind=view["blind"], dm=None,
+                         left=None)
+                if child is None:
+                    return None
+                if mine and not kid["up"] and (not view["open"] or first_look_done(hb, child.pid, kid["started"])):
+                    kid["up"] = True
+                    up(child, hb, view, now)
+                code = hb.get("code") if mine else None
+                if not kid["code"] and isinstance(code, dict) and code.get("commit"):
+                    kid["code"] = True
+                    changed = st["last_commit"] is not None and code["commit"] != st["last_commit"]
+                    st["last_commit"] = code["commit"]
+                    emit("code", now, child=child.pid, commit=code["commit"], dirty=code.get("dirty"),
+                         code_changed=changed)
+                    try:  # the commit outlives this parent (R1 and the next parent compare with it)
+                        save_state(paths.state, {**st, "restarts_today": counts["restarts_today"]})
+                    except OSError as e:
+                        log(f"the state file was not written ({type(e).__name__})")
+                if mine and view["age_s"] <= sup["hang_seconds"]:  # a fresh beat: what it says about the stops
+                    ages = _stamp_ages(hb, view["age_s"]) if view["open"] else {}
+                    names = sorted(s for s, a in ages.items() if a is None or a > sup["stops_stale_seconds"])
+                    stop_s = None if view["stop_age_s"] is None else round(view["stop_age_s"], 1)
+                    if names and not seen["stale"]:
+                        seen["stale"] = names
+                        emit("stale_stops", now, what="start", names=names, stop=stop_s)
+                    elif not names and seen["stale"]:
+                        emit("stale_stops", now, what="end", names=seen["stale"], stop=stop_s)
+                        seen["stale"] = None
+                # A hang: this child's beat is older than hang_seconds, or it has none after start_grace_seconds
+                if not (view["age_s"] > sup["hang_seconds"] if mine else ran_s > sup["start_grace_seconds"]):
+                    kid["hang_said"] = False
+                    return None
+                kid["hang"] = {"hb": round(view["age_s"] if mine else ran_s, 1), "phase": view["phase"]}
+                if sup.get("hang_kill_enabled") is True:
+                    return "hang"
+                if not kid["hang_said"]:  # the switch off: one row per hang, and nothing is signalled
+                    kid["hang_said"] = True
+                    emit("hang", now, child=child.pid, **kid["hang"], killed_with="none")
+                    log(f"child {child.pid} hangs ({kid['hang']['hb']} s without a beat): not killed, the switch is"
+                        " off")
+                return None
+
+            def up(child, hb: dict, view: dict, now: datetime) -> None:
+                """The row `up` (spec 4.6): what the restart cost, at this child's first beat that has looked at its
+                stops (with the market closed: its first beat)."""
+                at, blind = _when(hb.get("at")), view["blind"]
+                # the first look after, per held name: this child's own stamp; for a blind or unlooked name, the beat
+                after = [at if s in blind or t is None or t.timestamp() < kid["started"] else t
+                         for s, t in _looks(hb).items()]
+                last = kid["last_look"] or _when(hb.get("stops_checked_at"))  # cold: the stamp the engine adopted
+                blind_s = (round(open_seconds(last, max(after), cal), 1)
+                           if after and None not in after and last is not None else 0)
+                ref = int(seen["ended"] if seen["ended"] is not None else began)  # ruling P14: the whole second
+                try:
+                    sold = [r for r in read_rows(paths.trades) if r.get("side") == "SELL"
+                            and (t := _when(r.get("logged_at"))) is not None and t.timestamp() >= ref]
+                except OSError as e:
+                    log(f"news_trades.jsonl could not be read ({type(e).__name__})")
+                    sold = None
+                down = seen["down_at"]
+                emit("up", now, child=child.pid, down_from=None if down is None else _utc(down),
+                     down_s=None if down is None else round((now - down).total_seconds(), 2), blind_s=blind_s,
+                     handover_s=None, held=view["held"], blind=blind, commit=None, dirty=None, code_changed=None,
+                     sold=sold)
 
             def stop(child, how: str) -> None:
-                """A planned stop (spec 5.3): SIGTERM to the child's pid alone, so that a scorer call in flight can
-                finish, planned_stop_grace_seconds, then SIGKILL to its process group. A hang stop (spec 4.3, the
-                group and hang_term_grace_seconds) comes with the hang itself; until then watch never answers "hang"."""
+                """A hang stop (spec 4.3): SIGTERM to the child's process group, hang_term_grace_seconds, SIGKILL to
+                the group, then the row `hang`. A planned stop (spec 5.3): SIGTERM to the child's pid alone, so that a
+                scorer call in flight can finish, planned_stop_grace_seconds, then SIGKILL to its process group.
+                The group is signalled only while the child is not reaped: its id is still the child's."""
+                if how == "hang":
+                    killed = "TERM"
+                    try:
+                        os.killpg(child.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        child.wait(timeout=sup["hang_term_grace_seconds"])
+                    except subprocess.TimeoutExpired:
+                        killed = "KILL"
+                        try:
+                            os.killpg(child.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        child.wait()
+                    emit("hang", child=child.pid, **kid["hang"], killed_with=killed)
+                    log(f"child {child.pid} hangs ({kid['hang']['hb']} s without a beat): its group got SIG{killed}")
+                    return
                 child.send_signal(signal.SIGTERM)  # nothing, when the child has already ended
                 try:
                     child.wait(timeout=sup["planned_stop_grace_seconds"])
@@ -417,10 +623,13 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     child.wait()
 
             def core_emit(ev: str, **fields) -> None:
+                now = clock()
                 if ev == "tripped":
                     st["trips_today"] += 1
                     fields["trips_today"] = st["trips_today"]
-                emit(ev, **fields)
+                if ev == "exit":
+                    seen.update(down_at=now, ended=time.time())
+                emit(ev, now, **fields)
 
             def at_until() -> bool:
                 return near_until(clock().astimezone(NY), a.until, sup["end_of_day_slack_seconds"])

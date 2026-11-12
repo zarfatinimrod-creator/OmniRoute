@@ -839,6 +839,14 @@ class Parents(Procs):
         except OSError:
             pass
 
+    def kill_sleep(self, pid: int) -> None:
+        """SIGKILL to the `sleep 60` that GROUP_CHILD started, and only to that: never to a pid that was reused."""
+        try:
+            if Path(f"/proc/{pid}/cmdline").read_bytes() == b"sleep\x0060\x00":
+                os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
 
 class ParentLoop(Parents):
     """The parent's loop on real processes (supervisor spec 4.2, 4.3, 4.5; section 3, rows 1, 4, 6 and 11)."""
@@ -873,6 +881,7 @@ class ParentLoop(Parents):
 
     def test_a_second_parent_returns_3_names_the_holder_and_writes_nothing(self):   # uptime.jsonl bytes unchanged
         first = self.spawn_parent([{"beats": -1}]); self.wait_beat()
+        self.wait_for(lambda: self.urows("code"))      # the first parent's rows of its child's first beats: `up`, then `code`
         before = self.files()
         second = self.spawn_parent([{"beats": -1}])
         self.assertEqual((second.wait(timeout=5), f"pid {first.pid}" in second.stdout.read()), (3, True))
@@ -942,14 +951,6 @@ class ParentLoop(Parents):
         self.assertEqual((p.wait(timeout=5), [(r["rc"], r["why"]) for r in self.urows("exit")]), (143, [(143, "planned")]))
         self.assertFalse(self.dead(grandchild))                                 # in the child's group, and not signalled
 
-    def kill_sleep(self, pid: int) -> None:
-        """SIGKILL to the `sleep 60` that GROUP_CHILD started, and only to that: never to a pid that was reused."""
-        try:
-            if Path(f"/proc/{pid}/cmdline").read_bytes() == b"sleep\x0060\x00":
-                os.kill(pid, signal.SIGKILL)
-        except OSError:
-            pass
-
     # Tests added by ruling.
     def test_a_state_file_that_does_not_parse_is_named_in_the_log_and_saved_whole(self):     # ruling P18(c)
         (self.state / "news_supervisor.json").write_text('{"day": "2026-11-14", "restarts_today": 3')   # torn
@@ -983,3 +984,183 @@ class ParentLoop(Parents):
         self.assertEqual((len(self.urows("start")), [(r["why"], r["rc"]) for r in self.urows("sup_stop")]),
                          (1, [("closed_today", 0), ("halt", 5)]))
         self.assertEqual((self.state_file()["halt"]["code"], self.state_file()["halt"]["why"]), (5, "calendar"))
+
+
+class Watching(Parents):
+    """What the parent reads in the heartbeat and writes from it (supervisor spec 4.3, 4.6; section 3, rows 2, 3 and
+    17): a mark a minute, `up` and `code` at a child's first looks, a hang, stale stops."""
+
+    def stop_parent(self, p: subprocess.Popen, settle: float = 0.5) -> int:
+        """A few more loop ticks (a row that should come once has its chance to come twice), then SIGTERM; its code."""
+        time.sleep(settle)
+        p.send_signal(signal.SIGTERM)
+        return p.wait(timeout=10)
+
+    def test_open_seconds_is_cut_to_the_session(self):          # Review Focus 3: 2026-11-27 closes at 13:00 New York, 18:00 UTC
+        cal, utc = supervise.load_cfg()["calendar"], lambda h, m: datetime(2026, 11, 27, h, m, tzinfo=timezone.utc)
+        self.assertEqual(supervise.open_seconds(utc(17, 50), utc(18, 30), cal), 600)
+        self.assertEqual(supervise.open_seconds(utc(14, 0), utc(14, 40), cal), 600)      # the open is 14:30 UTC
+
+    def test_a_frozen_child_is_killed_and_replaced(self):        # hang_seconds 2, the switch on; the run: 5 beats, then "hang"
+        p = self.spawn_parent([{"beats": 5, "then": "hang"}], hang_seconds=2, hang_kill_enabled=True)
+        # SIGTERM once the second child beats: it hangs too, but only 5 beats and 2 s later
+        self.wait_for(lambda: len(self.urows("start")) >= 2 and self.beat().get("pid") == self.urows("start")[1]["child"],
+                      timeout=10)
+        self.assertEqual(self.stop_parent(p, settle=0), 143)
+        self.assertEqual(([r["killed_with"] for r in self.urows("hang")], len(self.urows("start"))), (["TERM"], 2))
+
+    def test_with_the_switch_off_a_hang_is_logged_once_and_nothing_is_signalled(self):
+        p = self.spawn_parent([{"beats": 5, "then": "hang"}], hang_seconds=2)      # the switch is pinned off (Parents)
+        self.wait_for(lambda: self.urows("hang"), timeout=10)
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual(([r["killed_with"] for r in self.urows("hang")], len(self.urows("start"))), (["none"], 1))
+
+    def test_a_new_child_has_the_start_grace_for_its_first_beat(self):    # hang_seconds 1, start_grace_seconds 5, "first_after_s" 3
+        p = self.spawn_parent([{"first_after_s": 3, "beats": 20, "then": "exit", "code": 0}], "--until", "10:00",
+                              hang_seconds=1, start_grace_seconds=5)   # beats for 2 s, then the end of the day
+        self.assertEqual(p.wait(timeout=20), 0)
+        self.assertEqual(self.urows("hang"), [])
+
+    def test_a_beat_left_by_another_pid_is_no_beat(self):        # Review Focus 1: a fresh heartbeat file with pid 1, a child that never beats
+        now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        (self.state / "news_heartbeat.json").write_text(json.dumps(
+            {"at": now, "pid": 1, "phase": "idle", "market_open": True, "held": {}, "blind": [], "stops_checked_at": now}))
+        # hang_seconds 60: taken for the child's own, that beat would stay fresh for the whole test and no hang would come
+        p = self.spawn_parent([{"beats": 0, "then": "hang"}], hang_seconds=60, start_grace_seconds=1)
+        self.wait_for(lambda: self.urows("hang"), timeout=10)
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual(len(self.urows("hang")), 1)
+
+    def test_stale_stops_start_once_and_end_once(self):          # BBB held; "stop_age_s" [[300, 20], [0, 1]]; stops_stale_seconds 1
+        p = self.spawn_parent([{"held": {"BBB": 48.5}, "stop_age_s": [[300, 20], [0, 1]]}], stops_stale_seconds=1)
+        self.wait_for(lambda: len(self.urows("stale_stops")) >= 2, timeout=10)
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual([r["what"] for r in self.urows("stale_stops")], ["start", "end"])
+
+    def test_up_says_what_the_restart_cost(self):                # BBB held at a stop of 48.5; the child is killed once
+        p = self.spawn_parent([{"held": {"BBB": 48.5}}])
+        first = self.wait_for(lambda: self.urows("up"))[0]
+        os.kill(first["child"], signal.SIGKILL)
+        self.wait_for(lambda: len(self.urows("up")) >= 2)
+        self.assertEqual(self.stop_parent(p, settle=0), 143)
+        up = self.urows("up")[-1]
+        self.assertEqual((up["held"], up["blind"], up["commit"], up["handover_s"], up["sold"]), ({"BBB": 48.5}, [], None, None, []))
+        self.assertGreater(up["down_s"], 0)
+
+    def test_up_is_written_while_a_held_name_is_blind(self):     # Review Focus 1: the run has BBB held, "blind": ["BBB"], "stop_age_s" 3000
+        p = self.spawn_parent([{"held": {"BBB": 48.5}, "blind": ["BBB"], "stop_age_s": 3000}])
+        self.wait_for(lambda: self.urows("up"))
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual([(r["held"], r["blind"]) for r in self.urows("up")], [({"BBB": 48.5}, ["BBB"])])
+
+    def test_the_real_engine_gets_a_code_row_after_its_up_row(self):   # engine_child.py as child_cmd, session "open", BBB held
+        self.write_book({"BBB": 50.0})
+        p = self.spawn_parent(None, child_cmd=self.engine_cmd({"session": "open", "prices": {"BBB": 50.0}}))   # --until 24:00 (P1)
+        self.wait_for(lambda: self.urows("code"), timeout=20)
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual([(r["ev"], r.get("commit")) for r in self.urows() if r["ev"] in ("up", "code")], [("up", None), ("code", "abc1234")])
+
+    def test_code_changed_compares_with_the_child_before(self):        # dummy runs with "commit" aaa1111, aaa1111, bbb2222; killed twice
+        p = self.spawn_parent([{"commit": "aaa1111"}, {"commit": "aaa1111"}, {"commit": "bbb2222"}])
+        for n in (1, 2):
+            os.kill(self.wait_for(lambda: len(self.urows("code")) >= n and self.urows("code")[n - 1])["child"], signal.SIGKILL)
+        self.wait_for(lambda: len(self.urows("code")) >= 3)
+        self.assertEqual(self.stop_parent(p, settle=0), 143)
+        self.assertEqual([r["code_changed"] for r in self.urows("code")], [False, False, True])
+
+    def test_a_mark_is_due_once_per_clock_minute(self):
+        t = lambda s: datetime(2026, 11, 12, 15, 0, s, tzinfo=timezone.utc)
+        self.assertEqual([supervise.mark_due(None, t(5)), supervise.mark_due(t(5), t(59)), supervise.mark_due(t(5), t(59) + timedelta(seconds=1))], [True, False, True])
+
+    # Tests added by ruling.
+    def test_the_stop_age_grows_with_the_beats_own_age(self):          # ruling P16: (at - the oldest stamp) + the beat's age
+        at = datetime(2026, 11, 12, 15, 0, tzinfo=timezone.utc)
+        hb = {"at": at.isoformat(), "pid": 7, "phase": "score", "market_open": True, "blind": [],
+              "held": {"AAA": {"stop": 97.0, "checked_at": (at - timedelta(seconds=30)).isoformat()},
+                       "BBB": {"stop": 48.5, "checked_at": (at - timedelta(seconds=100)).isoformat()}}}
+        view = supervise.beat_view(hb, 1000.0, 7, 1050.0)               # the file was written 50 s ago: one long call
+        self.assertEqual(view, {"mine": True, "age_s": 50.0, "stop_age_s": 150.0, "held": {"AAA": 97.0, "BBB": 48.5},
+                                "open": True, "blind": [], "phase": "score"})
+        other, empty = supervise.beat_view(hb, 1000.0, 8, 1050.0), supervise.beat_view({**hb, "held": {}}, 1000.0, 7, 1050.0)
+        self.assertEqual((other["mine"], other["held"], empty["stop_age_s"]), (False, {}, None))   # another pid's beat; nothing held
+
+    def test_a_sale_in_the_second_the_parent_started_is_in_up_sold(self):   # ruling P14: logged_at against the whole second
+        time.sleep(1.01 - time.time() % 1)          # just after a second turns: the parent below starts inside this second
+        second = datetime.fromtimestamp(int(time.time()), timezone.utc)
+        rows = [{"side": "SELL", "symbol": "AAA", "logged_at": (second - timedelta(seconds=1)).isoformat()},   # before the start
+                {"side": "BUY", "symbol": "BBB", "logged_at": second.isoformat()},
+                {"side": "SELL", "symbol": "BBB", "logged_at": second.isoformat()}]
+        (self.state / "news_trades.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+        self.assertEqual(self.run_parent([{"beats": 3, "then": "exit", "code": 0}], "--until", "10:00"), 0)
+        self.assertEqual([r["symbol"] for r in self.urows("up")[0]["sold"]], ["BBB"])
+        self.assertEqual(self.urows("up")[0]["sold"][0]["side"], "SELL")
+
+    # Tests added in self-review: the mark's fields, and where blind_s is measured from and to.
+    def test_a_mark_carries_the_fields_of_spec_4_6(self):           # the clock turns a minute while the child beats
+        start = datetime.now(timezone.utc)
+        moved = datetime(2026, 11, 12, 10, 0, 59, tzinfo=NY) - start
+        script = [{"beats": 30, "held": {"BBB": 48.5}, "then": "exit", "code": 0}]      # 3 s of beats
+        self.assertEqual(self.run_parent(script, "--until", "10:00", clock=lambda: datetime.now(timezone.utc) + moved), 0)
+        first, second = self.urows("mark")                                # 10:00:59 with no child yet, 10:01:00 beside it
+        self.assertEqual({k: first[k] for k in ("hb", "stop", "n", "open", "blind", "dm", "left")},
+                         {"hb": None, "stop": None, "n": None, "open": None, "blind": [], "dm": None, "left": None})
+        self.assertEqual((second["n"], second["open"], second["blind"], second["dm"], second["left"]), (1, True, [], None, None))
+        self.assertLess(max(second["hb"], second["stop"]), 1.0)
+
+    def test_blind_s_runs_from_the_last_look_before_the_start_to_the_first_look_after(self):   # spec 4.6; section 3, row 17
+        last = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(seconds=40)
+        (self.state / "news_heartbeat.json").write_text(json.dumps(    # what the engine before this one left
+            {"at": last.isoformat(), "pid": 1, "phase": "idle", "market_open": True, "stops_checked_at": last.isoformat(),
+             "held": {"BBB": {"stop": 48.5, "checked_at": last.isoformat()}}, "blind": []}))
+        asked, began = [], int(time.time())
+        script = [{"beats": 10, "held": {"BBB": 48.5}, "blind": ["BBB"], "stop_age_s": 3000, "then": "exit", "code": 0}]
+        with mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0):
+            self.assertEqual(self.run_parent(script, "--until", "10:00"), 0)   # open_seconds reads the real calendar: not the hour here
+        (a, b), = asked
+        # to: BBB is blind, so the `at` of the beat that wrote `up` (a whole second of this run), not its stamp of 3000 s ago
+        self.assertEqual((self.urows("up")[0]["blind_s"], a, began <= b.timestamp() <= time.time()), (42.0, last, True))
+
+    # Tests added from the mutation pass: behaviour the brief specifies that no test above would miss.
+    def test_first_look_done_wants_this_childs_own_look_at_every_held_name(self):   # spec 4.6, `up`
+        at = datetime.now(timezone.utc)
+        started = at.timestamp() - 1
+        beat = {"pid": 7, "phase": "stops", "blind": [], "held": {"BBB": {"stop": 48.5, "checked_at": at.isoformat()}}}
+        old = {**beat, "held": {"BBB": {"stop": 48.5, "checked_at": (at - timedelta(seconds=5)).isoformat()}}}   # the run before's look
+        self.assertEqual([supervise.first_look_done(beat, 7, started), supervise.first_look_done(beat, 8, started),
+                          supervise.first_look_done({**beat, "phase": "boot", "held": {}}, 7, started),
+                          supervise.first_look_done(old, 7, started), supervise.first_look_done({**old, "blind": ["BBB"]}, 7, started),
+                          supervise.first_look_done(None, 7, started)],
+                         [True, False, False, False, True, False])
+
+    def test_with_the_market_closed_up_comes_at_the_first_beat(self):        # no look is due: the old stamp does not hold it back
+        p = self.spawn_parent([{"open": False, "held": {"BBB": 48.5}, "stop_age_s": 3000}])
+        self.wait_for(lambda: self.urows("up"))
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual([r["held"] for r in self.urows("up")], [{"BBB": 48.5}])
+
+    def test_a_hang_kill_reaches_the_childs_whole_group(self):    # spec 4.3: what the hung engine waits on goes with it
+        pid_file = self.tmp / "grandchild.pid"
+        # GROUP_CHILD never beats: a hang once the grace is over. max_restarts 0: the kill trips the parent, no second child
+        p = self.spawn_parent(None, child_cmd=[sys.executable, "-c", GROUP_CHILD, str(pid_file)], hang_kill_enabled=True,
+                              start_grace_seconds=1, max_restarts=0)
+        grandchild = int(self.wait_for(lambda: pid_file.exists() and pid_file.read_text()))
+        self.addCleanup(self.kill_sleep, grandchild)
+        self.assertEqual(p.wait(timeout=15), 75)
+        self.assertEqual([r["killed_with"] for r in self.urows("hang")], ["TERM"])
+        self.wait_for(lambda: self.dead(grandchild), timeout=2)       # the `sleep 60` in the child's group got the SIGTERM
+
+    def test_a_hung_child_that_ignores_sigterm_gets_sigkill_and_hb_is_its_beats_age(self):
+        script = [{"first_after_s": 1, "beats": 2, "then": "hang", "ignore_term": True}]   # the hang comes 2 s after the start
+        p = self.spawn_parent(script, hang_kill_enabled=True, hang_seconds=1, start_grace_seconds=5, hang_term_grace_seconds=1,
+                              max_restarts=0)
+        self.assertEqual(p.wait(timeout=15), 75)
+        (hang,), (end,) = self.urows("hang"), self.urows("exit")
+        self.assertEqual((hang["killed_with"], hang["phase"], end["rc"], end["signal"], end["why"]), ("KILL", "idle", None, 9, "hang"))
+        self.assertTrue(1.0 <= hang["hb"] < 1.5 < end["ran_s"] - 1, (hang, end))   # the beat's age, not the time since the start
+
+    def test_a_hung_child_is_a_hang_and_not_stale_stops(self):    # stale stops need a fresh beat (spec 4.3): during a hang
+        p = self.spawn_parent([{"beats": 3, "then": "hang", "held": {"BBB": 48.5}}], hang_seconds=1, stops_stale_seconds=2)
+        self.wait_for(lambda: self.urows("hang"), timeout=10)        # the switch is off: the child stays, its beat ages on
+        self.wait_for(lambda: time.time() - (self.state / "news_heartbeat.json").stat().st_mtime > 2.5, timeout=10)
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual(([r["killed_with"] for r in self.urows("hang")], self.urows("stale_stops")), (["none"], []))
