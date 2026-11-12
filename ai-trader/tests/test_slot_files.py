@@ -109,8 +109,8 @@ class SlotFiles(unittest.TestCase):
 class CryptoPushLoop(unittest.TestCase):
     """(f) The crypto push loop exactly as crypto-fill.md writes it, run with bash in one of two clones of a local bare
     remote under a temporary directory. Never origin, the network or this checkout's own .git: every git call and the
-    loop run with cwd in the temporary directory, the environment has no GIT_* variable of this process and no user or
-    system git config, and the remote is a local path."""
+    loop run with cwd in the temporary directory, the environment is no_phone.clean_env() (no GIT_*, AITRADER_*, proxy
+    or BASH_ENV variable of this process) with no user or system git config, and the remote is a local path."""
 
     def setUp(self):
         line = LOOP.search((SLOTS / "crypto-fill.md").read_text(encoding="utf-8"))[0]
@@ -119,10 +119,9 @@ class CryptoPushLoop(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(prefix="crypto-loop-"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.assertNotIn(ROOT, self.tmp.parents)
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-        self.env.update(HOME=str(self.tmp), GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0",
-                        GIT_AUTHOR_NAME="test", GIT_AUTHOR_EMAIL="nobody", GIT_COMMITTER_NAME="test",
-                        GIT_COMMITTER_EMAIL="nobody", LC_ALL="C")
+        self.env = no_phone.clean_env(HOME=str(self.tmp), GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
+                                      GIT_TERMINAL_PROMPT="0", GIT_AUTHOR_NAME="test", GIT_AUTHOR_EMAIL="nobody",
+                                      GIT_COMMITTER_NAME="test", GIT_COMMITTER_EMAIL="nobody", LC_ALL="C")
         self.remote = self.tmp / "remote.git"
         self.git(self.tmp, "init", "-q", "--bare", "-b", BRANCH, str(self.remote))
         seed = self.tmp / "seed"
