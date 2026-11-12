@@ -251,24 +251,13 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
 67. [news][owner] The R5d line says "ויש עסקאות ביומן" also for a book file that parses but is no book while the
     journal is empty (critic N8, review Ruling 18). Reword the line through the owner, or narrow the case.
 
-68. [crypto][defect] A day missing from Yahoo's daily reply goes unnoticed by the crypto decision. At 00:14 UTC on
-    2026-11-12 the BTC-USD daily series ran 2026-11-10 -> 2026-11-12, with no 2026-11-11 row (the only calendar gap in
-    3,652 rows). The 11-12 row is the bar in progress, so `cycle` took the bar before it, 11-10, and decided on a close
-    two days old (pending.json decision_date 2026-11-10, decision_close 73,720.12, exec_ts 01:00 UTC). `stale_symbols`
-    checks that the chosen bar is present and was fetched after its end, not that it is yesterday's bar. Same class as
-    the input defect behind the MU loss (a day missing from the reply). Harmless this time: with Coinbase's 11-11 close
-    (73,927.63, `data.coinbase_close`) BTC is +1.11% over its 200-day average against +0.80% as decided, 20-day vol
-    38.5% against 38.4%: the same regime and practically the same size. Fix: on a UTC daily calendar the decision bar
-    must be yesterday's; when it is not in the panel, skip the run (`stale_skips_run` already says so) or take its close
-    from Coinbase. Rule 4 (critic + suite); `aitrader/cycle.py` and `aitrader/data.py` are under no open claim today.
-70. [crypto][defect] The morning summary was not delivered by ntfy on its first night: 2026-11-12 06:04 UTC,
-    `summary --book crypto --send` exit 3, ntfy ConnectionError (`logs/2026-11-12-crypto-night.md`). The fallback
-    worked (the session sent the text by PushNotification, then `--ack`), but every morning now depends on the
-    session being alive. Find out whether ntfy.sh is reachable from the trader session's container at all (network
-    policy) and from where the earlier ntfy deliveries were made; then either allow the host or make PushNotification
-    the documented primary path for the summary.
 
 ## Done
+- 2026-11-12: backlog 68 fixed (df8042e2, quant-critic PASS, 679 tests): on the UTC daily calendar a decision bar
+  that is not yesterday's (a daily row missing from Yahoo's reply) is no decision; the pending fill still runs.
+  Built on Opus with the owner's approval (Fable limit reached). Critic's non-blocking follow-ups: write the reason
+  to skips.jsonl so the morning summary says why and counts repeats; one alert per run while the row is missing
+  (queued at night); an urgent alert when no decision holds while a pending order is past its fill cap.
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
   two documented changes in behaviour on bad input, both toward safety. With a quote whose time cannot be read, the
   stop and the time exit now act on the price (before, that name had no stop check in that step) while buys and

@@ -5,12 +5,6 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-12 07:06 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py`,
-  `tests/test_crypto_cycle.py`; added 07:25: `tests/test_regime.py` and `tests/test_books.py` (only the frozen test
-  clock of two crypto runs, aligned with their panels). Purpose: backlog 68 (owner's answer "א", 2026-11-12): on the UTC daily calendar a
-  decision bar that is not yesterday's (a day missing from Yahoo's reply) skips the run instead of deciding on an old
-  close. Rule 4: failing test first, quant-critic, suite. Must land before the 00:12 UTC run.
-
 - **2026-11-11 10:09 (refreshed 21:10; rollout step 1 landed at 21:08 UTC, ab7b27f9) - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
@@ -52,6 +46,14 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
+
+- **2026-11-12 07:06 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W)** - files: `aitrader/cycle.py`,
+  `tests/test_crypto_cycle.py`; added 07:25: `tests/test_regime.py` and `tests/test_books.py` (only the frozen test
+  clock of two crypto runs, aligned with their panels). Purpose: backlog 68 (owner's answer "א", 2026-11-12): on the UTC daily calendar a
+  decision bar that is not yesterday's (a day missing from Yahoo's reply) skips the run instead of deciding on an old
+  close. Rule 4: failing test first, quant-critic, suite. Must land before the 00:12 UTC run.
+  **Done 2026-11-12**: quant-critic PASS (Opus; the owner allowed Opus for this build after the Fable limit),
+  679 tests, pushed (df8042e2).
 
 - **2026-11-11 16:15 - crypto go-live session (session_012EDbLibRq5pyVrGFkk1G2W), for the main session** (your claim
   of 10:09 holds `config.json` and `skills/trader/SKILL.md`). Plan 2026-11-09-crypto-book-v1 Task 11, ordered by the
