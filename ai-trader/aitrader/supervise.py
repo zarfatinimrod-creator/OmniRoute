@@ -647,7 +647,7 @@ def status(paths: Paths, cfg: dict, now: datetime, *, watchdog: bool = False, en
                                      why=ownerlines.WORDS["R5e.why"][code],
                                      held=ownerlines.held_text(_held_now(paths, None), sup["held_names_in_line"]))
             unsent.append({"id": r5e, "kind": "R5e", "text": text})
-        except (KeyError, ValueError, TypeError):  # a halt code no engine gives, or a book stop that is no number
+        except (KeyError, ValueError, TypeError):  # a halt code no engine gives (or no key at all), a line too long
             pass
 
     hb, mtime = _read_beat(paths.heartbeat)
@@ -994,10 +994,16 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 machine paused the parent and its child together; that is no hang. One row `pause`: its start (the
                 tick before, on the clock rows are written on), its seconds and the child. look judges no hang on the
                 child's beat until hang_seconds after this tick. With outage_report_seconds or more of market-open
-                seconds in it, R4 for it, from its start to now, built by gap_line."""
+                seconds in it, R4 for it, from its start to now, built by gap_line. Ruling 53: not while this parent's
+                first `up` is still to come with a line of its own (gap_line from the row before this parent's start,
+                so that line spans the pause): one outage, one line (spec 8), counted once by R11. A first `up` that
+                tells no outage (the row before is a sup_stop for a halt, a held lock, the end of a day or a closed
+                day, or there is no row with a time) leaves the pause its own R4."""
                 start = _utc(last[1])
                 emit("pause", now, start=start, s=round(wall - last[0], 1), child=child.pid if child else None)
                 seen["resumed"] = wall
+                if seen["gap"] is not None and gap_line(seen["gap"][0], now, seen["gap"][1], cal, sup):
+                    return
                 line = gap_line({"t": start, "ev": "pause"}, now, False, cal, sup)
                 if line:
                     say(line[0], now, extra={"m": line[1]["m"], "s": line[1]["s"]},
@@ -1013,6 +1019,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 view, now = beat_view(hb, mtime, child.pid if child else None, wall), clock()
                 mine = view["mine"]
                 last, seen["tick"] = seen["tick"], (wall, now)
+                # ponytail: any wait inside this loop longer than hang_seconds reads as a pause of the machine. Today
+                # only stop() waits, at most hang_term_grace_seconds; the upgrade is to measure the pause from the
+                # process's own CPU-stopped time.
                 if last is not None and wall - last[0] > sup["hang_seconds"]:
                     paused(child, last, wall, now)
                 drain(now)
@@ -1044,8 +1053,13 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 if mine and view["age_s"] <= sup["hang_seconds"]:  # a fresh beat: what it says about the stops
                     ages = _stamp_ages(hb, view["age_s"]) if view["open"] else {}
                     born = wall - kid["started"]  # ruling 48: an unknown stamp's age counts from this child's start
+                    # Ruling 53: after a machine pause no age counts from before its resume tick, so the stamps a beat
+                    # still carries from before the pause raise no R6 until stops_stale_seconds after it ({s} stays the
+                    # true age). An episode already open is judged on the true ages: capped, they would end it with an
+                    # R6b while the stamps are still old.
+                    cap = wall - seen["resumed"] if seen["resumed"] is not None and not seen["stale"] else float("inf")
                     names = sorted(s for s, a in ages.items()
-                                   if (born if a is None else a) > sup["stops_stale_seconds"])
+                                   if min(born if a is None else a, cap) > sup["stops_stale_seconds"])
                     stop_s = None if view["stop_age_s"] is None else round(view["stop_age_s"], 1)
                     if names and not seen["stale"]:
                         seen["stale"] = names

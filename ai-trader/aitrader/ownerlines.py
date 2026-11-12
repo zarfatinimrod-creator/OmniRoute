@@ -97,15 +97,21 @@ WORDS: dict[str, dict] = {
 FREE = ("note", "what", "file", "names")  # fields whose text comes from outside this table: render cuts them
 
 
-def held_text(held: dict[str, float] | None, max_names: int) -> str:
+def held_text(held: dict | None, max_names: int) -> str:
     """{held} from {symbol: stop}: "MU (סטופ 708.97)" for each name, at most max_names of them and then "ועוד {n}".
-    None: what is held cannot be told (Ruling 39), never the same word as an empty book."""
+    None: what is held cannot be told (Ruling 39), never the same word as an empty book. A stop that is no int or
+    float (None from a book position without stop_price or a beat entry that is no mapping, a string, a bool) cannot
+    be told either: "MU (סטופ לא ידוע)", and the line still goes out (Ruling 53)."""
     if held is None:
         return WORDS["held"]["unknown"]
     if not held:
         return WORDS["held"]["none"]
+
+    def stop_text(stop) -> str:
+        number = isinstance(stop, (int, float)) and not isinstance(stop, bool)
+        return f"{stop:.2f}" if number else WORDS["held"]["unknown"]
     more = len(held) - max_names
-    names = ", ".join(f"{sym} (סטופ {stop:.2f})" for sym, stop in list(held.items())[:max_names])
+    names = ", ".join(f"{sym} (סטופ {stop_text(stop)})" for sym, stop in list(held.items())[:max_names])
     return names + (f" ועוד {more}" if more > 0 else "")
 
 

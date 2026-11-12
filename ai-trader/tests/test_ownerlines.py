@@ -44,6 +44,14 @@ class Lines(unittest.TestCase):
     def test_held_text_says_unknown_for_none_and_no_positions_for_an_empty_book(self):
         self.assertEqual((ownerlines.held_text(None, 3), ownerlines.held_text({}, 3)), ("לא ידוע", "אין פוזיציות"))
 
+    # Tests added by Ruling 53 (Task 14d): a stop that is no number is "not known", and the line still goes out.
+    def test_a_stop_of_none_is_unknown_and_a_numeric_stop_beside_it_prints_as_before(self):
+        self.assertEqual(ownerlines.held_text({"MU": None, "NVDA": 120.5}, 3), "MU (סטופ לא ידוע), NVDA (סטופ 120.50)")
+
+    def test_a_string_or_a_bool_stop_is_unknown_too(self):
+        for stop in ("708.97", True):                               # a bool is an int to Python, never a stop
+            self.assertEqual(ownerlines.held_text({"MU": stop}, 3), "MU (סטופ לא ידוע)", stop)
+
     def test_r1_and_the_two_forms_read_as_the_spec_writes_them(self):
         self.assertEqual(
             ownerlines.render("R1", **LIM, time="17:02:11", cause="קרס", down_s=1, falls="", blind_s=0,

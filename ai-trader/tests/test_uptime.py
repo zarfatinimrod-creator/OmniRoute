@@ -168,6 +168,22 @@ class Report(unittest.TestCase):
         self.assertIn("מ-22:30 עד סוף המסחר: 30 דקות בלי בדיקת סטופים. פתוח: MU (סטופ 708.97).",
                       r4c["text"])  # 20:30 UTC on the owner's clock; AAA, sold, is not in it
 
+    # Test added by Ruling 53 (Task 14d), Task 16's settled item: with no `held` map in the day's last `up`, R4c's
+    # {held} is "cannot tell" (Ruling 39), never "nothing held". The day's last outage, from 20:30 UTC, is open at the
+    # close and no R4 or R4b told it, so R4c is sent (Ruling 50).
+    def test_r4c_says_unknown_when_the_days_last_up_has_no_held_map(self):
+        rows = [row("2026-11-12T13:08:00+00:00", "up", down_s=None, blind_s=0, handover_s=None, held={"MU": 708.97})]
+        rows += marks("2026-11-12", "14:30:00", "20:30:00", n=1, stop=30)
+        rows += [row("2026-11-12T17:59:15+00:00", "exit", child=7, rc=1, signal=None, ran_s=900.0, why="exit"),
+                 row("2026-11-12T18:00:00+00:00", "up", child=8, down_s=45, blind_s=45, handover_s=None, held=None),
+                 row("2026-11-12T20:30:00+00:00", "exit", child=8, rc=1, signal=None, ran_s=9000.0, why="exit")]
+        rows.sort(key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        r4c = uptime.close_lines(r, rows, CFG)[0]
+        self.assertEqual((r["open_at_close"], r4c["id"]), (None, "R4c"))
+        self.assertIn("30 דקות בלי בדיקת סטופים. פתוח: לא ידוע. שעון ישראל.", r4c["text"])
+        self.assertNotIn("אין פוזיציות", r4c["text"])
+
     def test_r4c_needs_an_engine_outage_as_long_as_r4_reports_and_r11_takes_what_it_leaves(self):
         """Stale stops at the close are a live engine's (R6), not "the engine did not run"; an outage shorter than
         outage_report_seconds (180) gets no line of its own, as for R4 and R4b. Both minutes go to R11."""

@@ -770,6 +770,24 @@ while os.getppid() == parent:
     os.replace(path + ".tmp", path)
     time.sleep(0.1)"""
 
+# STAMPLESS_CHILD with a stop stamp on its held name: fresh at every beat until the child gets a SIGCONT, and from then
+# on the stamp of its last beat before it, which never moves again (Ruling 53: the engine's first beats after a machine
+# pause still carry the stamps from before it). argv as STAMPLESS_CHILD's.
+PAUSED_STAMP_CHILD = """import json, os, signal, sys, time
+from datetime import datetime, timezone
+path, parent = sys.argv[1], int(sys.argv[sys.argv.index("--supervised") + 1])
+resumed, stamp = [], None
+signal.signal(signal.SIGCONT, lambda *_: resumed.append(True))
+while os.getppid() == parent:
+    now = datetime.now(timezone.utc).isoformat()
+    stamp = stamp if resumed and stamp else now
+    hb = {"at": now, "pid": os.getpid(), "phase": "idle", "market_open": True,
+          "held": {"BBB": {"stop": 48.5, "checked_at": stamp}}, "blind": []}
+    with open(path + ".tmp", "w") as f:
+        f.write(json.dumps(hb))
+    os.replace(path + ".tmp", path)
+    time.sleep(0.1)"""
+
 
 def saturday() -> datetime:
     """A clock that says 2026-11-14 15:00 UTC, a Saturday: no session."""
@@ -902,7 +920,8 @@ class Parents(Procs):
         """SIGKILL to a parent or a child this test started that outlived it, and never to a pid that was reused."""
         try:
             argv = set(Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0"))
-            if argv & {PARENT_WRAPPER.encode(), GROUP_CHILD.encode(), str(DUMMY_CHILD).encode(), str(ENGINE_CHILD).encode()}:
+            if argv & {PARENT_WRAPPER.encode(), GROUP_CHILD.encode(), STAMPLESS_CHILD.encode(),
+                       PAUSED_STAMP_CHILD.encode(), str(DUMMY_CHILD).encode(), str(ENGINE_CHILD).encode()}:
                 os.kill(pid, signal.SIGKILL)
         except OSError:
             pass
@@ -1322,12 +1341,14 @@ class Watching(Parents):
         self.assertGreaterEqual(int(re.search(r"כבר (\d+) שניות", r6["text"])[1]), 3)   # {s}: the child's age, never 0
         self.assertEqual([(r["what"], r["names"], r["stop"]) for r in self.urows("stale_stops")], [("start", ["BBB"], None)])
 
-    def pause(self, p: subprocess.Popen, seconds: float, parent: bool = True) -> float:
+    def pause(self, p: subprocess.Popen, seconds: float, parent: bool = True, child: int | None = None,
+              argv: str = str(DUMMY_CHILD)) -> float:
         """SIGSTOP to the parent p (unless parent is False) and to the process group of its child, then SIGCONT to both
         after `seconds`, the parent first (it then ticks while its child's beat is still old); the pause as measured.
-        Only what this test started is signalled: p, and the dummy child p started, which leads a group of its own."""
-        child = self.wait_beat()["pid"]
-        self.assertIn(str(DUMMY_CHILD).encode(), Path(f"/proc/{child}/cmdline").read_bytes())
+        Only what this test started is signalled: p, and the child p started (child: its pid, else the beat's), which
+        leads a group of its own and whose command line holds `argv` (default: the dummy child)."""
+        child = child or self.wait_beat()["pid"]
+        self.assertIn(argv.encode(), Path(f"/proc/{child}/cmdline").read_bytes())
         self.assertEqual(os.getpgid(child), child)                 # start_new_session: its group is its own
         t0 = time.monotonic()
         try:
@@ -1369,6 +1390,67 @@ class Watching(Parents):
         self.assertEqual(self.stop_parent(p), 143)
         self.assertEqual(([r["killed_with"] for r in self.urows("hang")], [r["kind"] for r in self.urows("alert")], self.urows("pause")),
                          (["none"], ["R2"], []))
+
+    # Tests added by Ruling 53 (Task 14d).
+    def pause_before_the_first_up(self, ev: str, **fields) -> dict:
+        """A row `ev` of an earlier parent 1 s before this one starts; then this parent, the market open, and a machine
+        pause (hang_seconds 2, the pause 4 s) before its child's first `up`. The dummy child holds that window open: it
+        waits 3 s before its first beat, and so its first look (first_after_s; start_grace_seconds 30 keeps the wait
+        from being a hang), and the pause begins as soon as the child has started, mostly before that wait has even
+        begun. Returns the earlier row, once the child is up and the parent has ended with 143."""
+        prev = supervise.append_row(self.paths.uptime, 4242, ev, self.clock() - timedelta(seconds=1), **fields)
+        p = self.spawn_parent([{"first_after_s": 3}], hang_seconds=2, start_grace_seconds=30, outage_report_seconds=2)
+        start, = self.wait_for(lambda: self.urows("start"), timeout=10)
+        self.pause(p, 4, child=start["child"])
+        self.wait_for(lambda: self.urows("up"), timeout=10)
+        self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual([r["ev"] for r in self.urows() if r["ev"] in ("pause", "up")], ["pause", "up"])   # it held
+        return prev
+
+    def told(self) -> list[dict]:
+        """The alert rows of R4 and R4b: the lines that tell an outage."""
+        return [r for r in self.urows("alert") if r["kind"] in ("R4", "R4b")]
+
+    def test_a_pause_before_the_first_up_gives_one_line_the_first_ups_which_spans_it(self):   # spec 8: one outage
+        prev = self.pause_before_the_first_up("mark")         # the earlier parent ended with no sup_stop: R4 at the up
+        (pause,), (up,) = self.urows("pause"), self.urows("up")
+        self.assertEqual([(r["kind"], r["t"]) for r in self.told()], [("R4", up["t"])])   # the first up's, as before
+        (line,), tz = self.told(), supervise.load_cfg()["supervisor"]["owner_tz"]
+        start, end = (ownerlines.hhmm(datetime.fromisoformat(t), tz) for t in (prev["t"], up["t"]))
+        self.assertIn(f"לא רצה מ-{start} עד {end}:", line["text"])
+        self.assertGreater(line["s"], pause["s"])                                            # the pause is inside it
+
+    def test_a_pause_before_a_first_up_that_tells_no_outage_has_its_own_r4(self):   # else the pause would go untold
+        self.pause_before_the_first_up("sup_stop", why="end_of_day", rc=0)   # after a day's end the up tells nothing
+        (pause,) = self.urows("pause")
+        self.assertEqual([(r["kind"], r["t"]) for r in self.told()], [("R4", pause["t"])])
+        (line,), tz = self.told(), supervise.load_cfg()["supervisor"]["owner_tz"]
+        start, end = (ownerlines.hhmm(datetime.fromisoformat(t), tz) for t in (pause["start"], pause["t"]))
+        self.assertIn(f"לא רצה מ-{start} עד {end}:", line["text"])
+
+    def test_stop_stamps_from_before_a_pause_raise_no_r6_until_stops_stale_seconds_after_it(self):
+        child = [sys.executable, "-c", PAUSED_STAMP_CHILD, str(self.state / "news_heartbeat.json")]
+        p = self.spawn_parent(None, child_cmd=child, hang_seconds=2, stops_stale_seconds=2, outage_report_seconds=2)
+        self.wait_for(lambda: self.urows("up"))
+        self.addCleanup(self.kill_ours, self.urows("start")[0]["child"])
+        self.pause(p, 4, argv=PAUSED_STAMP_CHILD)                  # longer than stops_stale_seconds
+        r6, = self.wait_for(lambda: self.alerts("R6"), timeout=10)  # the stamp is still old after that: R6 then
+        self.assertEqual(self.stop_parent(p), 143)
+        (pause,), (stale,) = self.urows("pause"), self.urows("stale_stops")
+        self.assertEqual((stale["what"], stale["t"]), ("start", r6["t"]))                  # the only stale_stops row
+        waited = datetime.fromisoformat(r6["t"]) - datetime.fromisoformat(pause["t"])
+        self.assertGreaterEqual(waited, timedelta(seconds=2))                              # stops_stale_seconds
+        self.assertGreaterEqual(int(re.search(r"כבר (\d+) שניות", r6["text"])[1]), 4 + 2)   # {s}: true, pause + 2
+        self.assertEqual([r["kind"] for r in self.urows("alert")], ["R4", "R6"])           # no R6b: the stamp stays old
+
+    def test_a_stale_stops_episode_open_before_a_pause_is_still_open_after_it(self):   # no R6b while the stamps are old
+        p = self.spawn_parent([{"held": {"BBB": 48.5}, "stop_age_s": 300}], hang_seconds=2, stops_stale_seconds=2)
+        self.wait_for(lambda: self.alerts("R6"))                   # Yahoo slow before the pause
+        self.pause(p, 4)
+        time.sleep(2 + 1)                                          # past stops_stale_seconds after the resume
+        self.assertEqual(self.stop_parent(p), 143)
+        r6 = [r["kind"] for r in self.urows("alert") if r["kind"] in ("R6", "R6b")]
+        self.assertEqual(([r["what"] for r in self.urows("stale_stops")], r6), (["start"], ["R6"]))
 
 
 TOPIC = "t0p1c-under-test"
@@ -1859,6 +1941,18 @@ class Status(Parents):
                                   "text": "מנוע החדשות עדיין עצור מאז 11.11 (קובץ התיק). סטופים לא נבדקים. פתוח: לא ידוע. כסף נייר"})
         self.write_book({})                                                            # a book that reads and holds nothing
         self.assertIn("פתוח: אין פוזיציות.", self.status(halt=halt, watchdog=True)["unsent"][-1]["text"])
+
+    # Test added by Ruling 53 (Task 14d): a stop that is no number never drops the line.
+    def test_status_on_a_book_position_with_no_stop_price_returns_0_and_says_its_stop_is_unknown(self):
+        supervise.save_state(self.paths.state, {"day": "2026-11-12",     # a halt 6 of an earlier New York day: R5e
+                                                "halt": {"code": 6, "why": "book", "at": "2026-11-11T15:00:00+00:00"}})
+        self.paths.book.write_text(json.dumps({"cash": 1000.0, "positions": {"MU": {"qty": 10, "avg_cost": 100.0}}}))
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            rc = supervise.main(["--status", "--watchdog", "--state-dir", str(self.state), "--config",
+                                 str(self.config())], env={}, clock=lambda: self.NOW)
+        r5e = [u["text"] for u in json.loads(out.getvalue())["unsent"] if u["kind"] == "R5e"]
+        self.assertEqual((rc, r5e), (0, ["מנוע החדשות עדיין עצור מאז 11.11 (קובץ התיק). סטופים לא נבדקים."
+                                         " פתוח: MU (סטופ לא ידוע). כסף נייר"]))
 
     def test_a_check_that_does_not_answer_within_its_timeout_leaves_the_halt(self):   # Ruling 41: --clear-halt cannot hang
         t0 = time.monotonic()
