@@ -278,9 +278,10 @@ class Drill:
         return self.tmp / f"{state.name}.sent.jsonl"
 
     def popen(self, cmd: list[str], env: dict) -> subprocess.Popen:
-        # ponytail: a SIGTERM or SIGHUP whose handler runs inside Popen, after the fork and before the child is in
-        # self.procs (a moment of each start), leaves that one child unkilled. Closing it would need the stop held back
-        # across the start, and a blocked signal mask is inherited by the child: a flag the handler reads instead.
+        # ponytail: still open. A SIGTERM or SIGHUP whose handler runs between the fork inside Popen and the append
+        # below (a moment of each start) raises Interrupted there and leaves that one child unkilled: popen does not
+        # raise `hold`. Closing it: hold = [] before the Popen and, after the append, raise a stop noted meanwhile, as
+        # run's cleanup does.
         with open(self.path("out", ".log"), "wb") as out:  # the process keeps a descriptor of its own
             p = subprocess.Popen(cmd, cwd=AT, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT)
         self.procs.append(p)

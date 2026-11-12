@@ -52,6 +52,11 @@ class Lines(unittest.TestCase):
         for stop in ("708.97", True):                               # a bool is an int to Python, never a stop
             self.assertEqual(ownerlines.held_text({"MU": stop}, 3), "MU (סטופ לא ידוע)", stop)
 
+    # Test added by Ruling 55 (Task 14e): a float that is no finite number never prints "nan" or "inf" to the owner.
+    def test_a_nan_or_infinite_stop_is_unknown_and_a_finite_one_beside_it_prints_as_before(self):
+        self.assertEqual(ownerlines.held_text({"MU": float("nan"), "NVDA": float("inf"), "AMD": 12.0}, 3),
+                         "MU (סטופ לא ידוע), NVDA (סטופ לא ידוע), AMD (סטופ 12.00)")
+
     def test_r1_and_the_two_forms_read_as_the_spec_writes_them(self):
         self.assertEqual(
             ownerlines.render("R1", **LIM, time="17:02:11", cause="קרס", down_s=1, falls="", blind_s=0,

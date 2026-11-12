@@ -7,6 +7,7 @@ The numbers (the byte limit, the names in {held}, the length of a free text) com
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -101,14 +102,15 @@ def held_text(held: dict | None, max_names: int) -> str:
     """{held} from {symbol: stop}: "MU (סטופ 708.97)" for each name, at most max_names of them and then "ועוד {n}".
     None: what is held cannot be told (Ruling 39), never the same word as an empty book. A stop that is no int or
     float (None from a book position without stop_price or a beat entry that is no mapping, a string, a bool) cannot
-    be told either: "MU (סטופ לא ידוע)", and the line still goes out (Ruling 53)."""
+    be told either: "MU (סטופ לא ידוע)", and the line still goes out (Ruling 53); nor can a float that is no finite
+    number, NaN or an infinity (Ruling 55)."""
     if held is None:
         return WORDS["held"]["unknown"]
     if not held:
         return WORDS["held"]["none"]
 
     def stop_text(stop) -> str:
-        number = isinstance(stop, (int, float)) and not isinstance(stop, bool)
+        number = isinstance(stop, (int, float)) and not isinstance(stop, bool) and math.isfinite(stop)
         return f"{stop:.2f}" if number else WORDS["held"]["unknown"]
     more = len(held) - max_names
     names = ", ".join(f"{sym} (סטופ {stop_text(stop)})" for sym, stop in list(held.items())[:max_names])

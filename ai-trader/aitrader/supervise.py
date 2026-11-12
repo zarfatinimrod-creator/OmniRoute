@@ -1020,8 +1020,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 mine = view["mine"]
                 last, seen["tick"] = seen["tick"], (wall, now)
                 # ponytail: any wait inside this loop longer than hang_seconds reads as a pause of the machine. Today
-                # only stop() waits, at most hang_term_grace_seconds; the upgrade is to measure the pause from the
-                # process's own CPU-stopped time.
+                # only a hang stop() waits and ticks again (a planned stop ends the loop): at most
+                # hang_term_grace_seconds for the SIGTERM, then the child.wait() after the SIGKILL, which has no bound
+                # (normally instant). The upgrade is to measure the pause from the process's own CPU-stopped time.
                 if last is not None and wall - last[0] > sup["hang_seconds"]:
                     paused(child, last, wall, now)
                 drain(now)

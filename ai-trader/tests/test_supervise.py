@@ -770,9 +770,9 @@ while os.getppid() == parent:
     os.replace(path + ".tmp", path)
     time.sleep(0.1)"""
 
-# STAMPLESS_CHILD with a stop stamp on its held name: fresh at every beat until the child gets a SIGCONT, and from then
-# on the stamp of its last beat before it, which never moves again (Ruling 53: the engine's first beats after a machine
-# pause still carry the stamps from before it). argv as STAMPLESS_CHILD's.
+# STAMPLESS_CHILD with a stop stamp on its held name and the same one in stops_checked_at: fresh at every beat until the
+# child gets a SIGCONT, and from then on the stamp of its last beat before it, which never moves again (Ruling 53: the
+# engine's first beats after a machine pause still carry the stamps from before it). argv as STAMPLESS_CHILD's.
 PAUSED_STAMP_CHILD = """import json, os, signal, sys, time
 from datetime import datetime, timezone
 path, parent = sys.argv[1], int(sys.argv[sys.argv.index("--supervised") + 1])
@@ -781,7 +781,7 @@ signal.signal(signal.SIGCONT, lambda *_: resumed.append(True))
 while os.getppid() == parent:
     now = datetime.now(timezone.utc).isoformat()
     stamp = stamp if resumed and stamp else now
-    hb = {"at": now, "pid": os.getpid(), "phase": "idle", "market_open": True,
+    hb = {"at": now, "pid": os.getpid(), "phase": "idle", "market_open": True, "stops_checked_at": stamp,
           "held": {"BBB": {"stop": 48.5, "checked_at": stamp}}, "blind": []}
     with open(path + ".tmp", "w") as f:
         f.write(json.dumps(hb))
@@ -1433,14 +1433,19 @@ class Watching(Parents):
         p = self.spawn_parent(None, child_cmd=child, hang_seconds=2, stops_stale_seconds=2, outage_report_seconds=2)
         self.wait_for(lambda: self.urows("up"))
         self.addCleanup(self.kill_ours, self.urows("start")[0]["child"])
+        time.sleep(3)                                              # Ruling 55: the child is 3 s older than its stamp
         self.pause(p, 4, argv=PAUSED_STAMP_CHILD)                  # longer than stops_stale_seconds
         r6, = self.wait_for(lambda: self.alerts("R6"), timeout=10)  # the stamp is still old after that: R6 then
+        seen, beat = time.time(), json.loads((self.state / "news_heartbeat.json").read_text())
+        frozen = datetime.fromisoformat(beat["stops_checked_at"])  # its stamps from before the pause, frozen since
         self.assertEqual(self.stop_parent(p), 143)
         (pause,), (stale,) = self.urows("pause"), self.urows("stale_stops")
         self.assertEqual((stale["what"], stale["t"]), ("start", r6["t"]))                  # the only stale_stops row
         waited = datetime.fromisoformat(r6["t"]) - datetime.fromisoformat(pause["t"])
         self.assertGreaterEqual(waited, timedelta(seconds=2))                              # stops_stale_seconds
-        self.assertGreaterEqual(int(re.search(r"כבר (\d+) שניות", r6["text"])[1]), 4 + 2)   # {s}: true, pause + 2
+        s = int(re.search(r"כבר (\d+) שניות", r6["text"])[1])
+        self.assertGreaterEqual(s, 4 + 2)                                                  # {s}: pause + 2 at least
+        self.assertLessEqual(abs(s - (seen - frozen.timestamp())), 1)   # {s}: the frozen stamp's age, never the child's
         self.assertEqual([r["kind"] for r in self.urows("alert")], ["R4", "R6"])           # no R6b: the stamp stays old
 
     def test_a_stale_stops_episode_open_before_a_pause_is_still_open_after_it(self):   # no R6b while the stamps are old
@@ -1449,6 +1454,7 @@ class Watching(Parents):
         self.pause(p, 4)
         time.sleep(2 + 1)                                          # past stops_stale_seconds after the resume
         self.assertEqual(self.stop_parent(p), 143)
+        self.assertEqual(len(self.urows("pause")), 1)              # Ruling 55: else this test guards nothing
         r6 = [r["kind"] for r in self.urows("alert") if r["kind"] in ("R6", "R6b")]
         self.assertEqual(([r["what"] for r in self.urows("stale_stops")], r6), (["start"], ["R6"]))
 
