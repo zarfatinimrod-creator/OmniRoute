@@ -630,6 +630,12 @@ class Foundations(unittest.TestCase):
         self.assertEqual((hb["held"]["BBB"]["stop"], at - datetime.fromisoformat(hb["held"]["BBB"]["checked_at"])),
                          (48.5, timedelta(seconds=7)))
 
+    # Test added by ruling 36 (h).
+    def test_the_planned_stop_grace_stays_within_the_mark_gap_and_the_note_says_so(self):   # no marks while stop() waits
+        sup = supervise.load_cfg()["supervisor"]
+        self.assertLessEqual(sup["planned_stop_grace_seconds"], sup["mark_gap_max_seconds"])
+        self.assertIn("planned_stop_grace_seconds must stay at or under mark_gap_max_seconds", sup["_note"])
+
 
 class RestartCore(unittest.TestCase):
     """restart_core alone (supervisor spec 4.3): fake children on a fake clock; no process, no file, no wall clock."""
@@ -708,6 +714,11 @@ class RestartCore(unittest.TestCase):
         self.assertEqual(self.core([(0.1, 1)], backoff_first_seconds=30, orders={0.5: "signal"}), (143, "signal"))
         self.assertEqual(len(self.emitted("start")), 1)
 
+    # Test added by ruling 36 (d).
+    def test_after_lock_refusals_a_crash_backs_off_from_the_first_value(self):   # not 2^N s after N refusals
+        self.assertEqual(self.core([(0.1, 3)] * 5 + [(0.1, 1), (1, 0)], near_until=True), (0, "end_of_day"))
+        self.assertEqual(self.backoffs, [1, 2, 4, 8, 16, 1])
+
 
 # The parent in a process of its own (argv: a JSON object with main's argv, the child's command and the clock's offset
 # in seconds): what spawn_parent starts. Its clock is the real one moved by the offset, as run_parent's is.
@@ -731,6 +742,15 @@ sys.stdin.read()"""
 GROUP_CHILD = """import os, signal, subprocess, sys
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
 g = subprocess.Popen(["sleep", "60"])
+open(sys.argv[1] + ".tmp", "w").write(str(g.pid))
+os.replace(sys.argv[1] + ".tmp", sys.argv[1])
+signal.pause()"""
+
+# GROUP_CHILD whose `sleep 60` ignores SIGTERM (SIG_IGN outlives the exec): only a SIGKILL to the group ends it.
+DEAF_GROUP_CHILD = """import os, signal, subprocess, sys
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+g = subprocess.Popen(["sleep", "60"])
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
 open(sys.argv[1] + ".tmp", "w").write(str(g.pid))
 os.replace(sys.argv[1] + ".tmp", sys.argv[1])
 signal.pause()"""
@@ -1018,6 +1038,34 @@ class ParentLoop(Parents):
                          (1, [("closed_today", 0), ("halt", 5)]))
         self.assertEqual((self.state_file()["halt"]["code"], self.state_file()["halt"]["why"]), (5, "calendar"))
 
+    # Tests added by ruling 36.
+    def test_with_no_topic_a_line_is_one_row_sent_false_and_one_log_line(self):   # (a): nothing can be requested: no retries
+        self.run_parent([{"beats": 5, "then": "hang"}], hang_seconds=1, alert_retry_seconds=0.1, stop_after=3)   # R2, the switch off
+        self.assertEqual(([(r["kind"], r["sent"]) for r in self.urows("alert")], self.sup_log().count("no topic")), ([("R2", False)], 1))
+
+    def test_a_counted_restart_is_on_disk_while_its_back_off_runs(self):   # (b): a parent killed in the back-off keeps it
+        p = self.spawn_parent([{"beats": 0, "then": "exit", "code": 1}], backoff_first_seconds=30)
+        self.wait_for(lambda: self.paths.state.exists() and self.state_file()["restarts_today"] == 1)
+        p.kill(); p.wait()
+        self.assertEqual((self.state_file()["restarts_today"], len(self.urows("start"))), (1, 1))
+
+    def test_a_spawn_that_raises_is_a_counted_crash_and_main_returns(self):   # (c): an engine that cannot even be started
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            rc = supervise.main(self.parent_argv((), {}), child_cmd=[str(self.tmp / "no-such-engine")], env=no_phone.clean_env(),
+                                clock=self.clock)
+        self.assertEqual((rc, out.getvalue().splitlines()[-1].split(".")[0]), (75, "supervise: 75 tripped"))
+        self.assertEqual(([(r["child"], r["rc"], r["why"]) for r in self.urows("exit")], self.urows("start")),
+                         ([(None, None, "spawn FileNotFoundError")] * 6, []))
+        self.assertEqual(self.state_file()["restarts_today"], 5)
+
+    def test_a_bool_or_a_grace_that_is_not_positive_is_a_bad_config(self):   # (e)
+        bad = [{"loop_seconds": 0}, {"start_grace_seconds": 0}, {"planned_stop_grace_seconds": -1}, {"hang_term_grace_seconds": True},
+               {"max_restarts": False}]
+        with contextlib.redirect_stderr(io.StringIO()) as err, contextlib.redirect_stdout(io.StringIO()):
+            got = [supervise.main(self.parent_argv((), sup), child_cmd=self.dummy_cmd([{"beats": -1}]), env=no_phone.clean_env(),
+                                  clock=saturday) for sup in bad]
+        self.assertEqual((got, err.getvalue().count("a bad argument or config"), self.urows()), ([2] * 5, 5, []))
+
 
 class Watching(Parents):
     """What the parent reads in the heartbeat and writes from it (supervisor spec 4.3, 4.6; section 3, rows 2, 3 and
@@ -1219,6 +1267,30 @@ class Watching(Parents):
         self.wait_for(lambda: time.time() - (self.state / "news_heartbeat.json").stat().st_mtime > 2.5, timeout=10)
         self.assertEqual(self.stop_parent(p), 143)
         self.assertEqual(([r["killed_with"] for r in self.urows("hang")], self.urows("stale_stops")), (["none"], []))
+
+    # Tests added by ruling 36.
+    def test_a_hang_kill_ends_a_grandchild_that_ignores_sigterm_after_its_leader_ended(self):   # (f): the group gets SIGKILL always
+        pid_file = self.tmp / "grandchild.pid"
+        p = self.spawn_parent(None, child_cmd=[sys.executable, "-c", DEAF_GROUP_CHILD, str(pid_file)], hang_kill_enabled=True,
+                              start_grace_seconds=1, max_restarts=0)
+        grandchild = int(self.wait_for(lambda: pid_file.exists() and pid_file.read_text()))
+        self.addCleanup(self.kill_sleep, grandchild)
+        self.assertEqual(p.wait(timeout=15), 75)
+        self.assertEqual([r["killed_with"] for r in self.urows("hang")], ["TERM"])     # the leader itself ended on SIGTERM
+        self.wait_for(lambda: self.dead(grandchild), timeout=2)
+
+    def test_on_a_cold_start_with_no_stamp_blind_s_counts_from_sup_start(self):   # (g): never 0 while a name is held
+        asked, real = [], supervise.first_look_done
+
+        def first_look_done(hb, child_pid, started):   # no beat before this engine, and its own beats carry no stops_checked_at
+            hb.pop("stops_checked_at", None)
+            return real(hb, child_pid, started)
+        script = [{"beats": 10, "held": {"BBB": 48.5}, "blind": ["BBB"], "stop_age_s": 3000, "then": "exit", "code": 0}]
+        with mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0), \
+                mock.patch.object(supervise, "first_look_done", first_look_done):
+            self.assertEqual(self.run_parent(script, "--until", "10:00"), 0)
+        ((a, b),) = asked
+        self.assertEqual((self.urows("up")[0]["blind_s"], a), (42.0, datetime.fromisoformat(self.urows("sup_start")[0]["t"])))
 
 
 TOPIC = "t0p1c-under-test"
@@ -1460,3 +1532,174 @@ class ParentLines(Parents):
             sync.publish({"message": "odd"}, "odd")
         self.assertEqual([(r["tag"], r["ok"], r["error"]) for r in sync.results()],
                          [("odd", False, "RuntimeError")])
+
+    # Test added by ruling 36 (j): what deadman._opener's docstring now says.
+    def test_urllib_also_reads_the_process_no_proxy(self):              # the Sender's env names no NO_PROXY; the process's does
+        got = []
+        for process in ({"NO_PROXY": "127.0.0.1", "no_proxy": "127.0.0.1"}, {"NO_PROXY": "", "no_proxy": ""}):
+            with mock.patch.dict(os.environ, process):
+                got.append(deadman.Sender(self.stub.url, None, 2, env={"http_proxy": "http://127.0.0.1:9"}, sync=True).health())
+        self.assertEqual(got, [200, "ConnectionRefusedError"])
+
+
+# A process that sleeps out the test and whose command line names `word` as a parent's or an engine's does: what
+# --status takes for a live parent ("aitrader.supervise") or a live engine ("news-live").
+STAND_IN = "import time; time.sleep(60)"
+
+
+class Status(Parents):
+    """supervise --status, --clear-halt and --relayed (supervisor spec 4.4): what a woken session reads, and its only two
+    writers. status() runs on the test's own state directory: a case's files are written before it and put back after
+    it, so each call sees its own case only and a call with no case touches nothing. The default now is 10:07 New York on
+    Thursday 2026-11-12; status() gets environ={} unless the test gives one (ruling P29)."""
+
+    NOW = datetime(2026, 11, 12, 10, 7, tzinfo=NY)
+
+    def live(self, word: str) -> subprocess.Popen:
+        """A stand-in process whose command line names `word`, started by this test (so its parent is no parent)."""
+        p = subprocess.Popen([sys.executable, "-c", STAND_IN, word], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, env=no_phone.clean_env())
+        self._started.append(p)
+        return p
+
+    def holds(self, lock: Path, pid: int) -> None:
+        """The lock file's text names pid, as its holder writes it. Nothing takes the lock: --status never probes it."""
+        lock.write_text(json.dumps({"pid": pid, "started_at": "2026-11-12T15:00:00+00:00"}) + "\n")
+
+    def status(self, now=None, ny=None, parent=None, mark_age_s=None, engine=None, halt=None, halt_day=None, trips=0,
+               last_stop=None, watchdog=False, proven=False, environ=None) -> dict:
+        """supervise.status on self.state for one case: now (default NOW; ny "HH:MM" moves NOW to that New York time),
+        parent "alive" (a stand-in named in the parent's lock file) with its last mark mark_age_s old, engine
+        "alive_without_a_parent" (a stand-in named in the engine's lock file), a halt in the state file (halt as given,
+        or halt_day: a halt 4 at 10:00 New York that day), trips today, last_stop (the log's last row is a sup_stop with
+        that why), proven (long_timeout_proven in the config copy)."""
+        now = now or (self.NOW.replace(hour=int(ny[:2]), minute=int(ny[3:])) if ny else self.NOW)
+        paths, procs, kept = self.paths, [], {}
+
+        def touch(path: Path) -> Path:      # what a case writes is put back after the call, and only that
+            kept.setdefault(path, path.read_bytes() if path.exists() else None)
+            return path
+        try:
+            if parent == "alive":
+                procs.append(self.live("aitrader.supervise"))
+                self.holds(touch(paths.lock), procs[-1].pid)
+            if mark_age_s is not None:
+                supervise.append_row(touch(paths.uptime), procs[0].pid if procs else 4242, "mark",
+                                     now - timedelta(seconds=mark_age_s), hb=1.0, stop=None, n=0, open=True, blind=[], dm=None,
+                                     left=None)
+            if engine == "alive_without_a_parent":
+                procs.append(self.live("news-live"))
+                self.holds(touch(paths.engine_lock), procs[-1].pid)
+            if halt_day:
+                halt = {"code": 4, "why": "chain", "at": f"{halt_day}T15:00:00+00:00"}
+            if halt or trips:
+                supervise.save_state(touch(paths.state), {"day": now.astimezone(NY).date().isoformat(), "trips_today": trips,
+                                                          "halt": halt})
+            if last_stop:
+                supervise.append_row(touch(paths.uptime), 4242, "sup_stop", now - timedelta(seconds=60), why=last_stop,
+                                     rc=supervise.PLANNED.get(last_stop, 75))
+            cfg = json.loads(self.config(long_timeout_proven=proven).read_text())
+            return supervise.status(paths, cfg, now, watchdog=watchdog, environ={} if environ is None else environ)
+        finally:
+            for p in procs:
+                p.kill()
+                p.wait()
+            for path, data in kept.items():
+                if data is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(data)
+
+    def action(self, **case) -> str:
+        return self.status(**case)["action"]
+
+    def clear_halt(self, check_rc: int) -> int:
+        """A halt 4 in the state file, then --clear-halt with a stand-in check that prints a line and exits check_rc; its
+        return code. Its stdout is kept in self.out."""
+        supervise.save_state(self.paths.state, {"day": "2026-11-12", "halt": {"code": 4, "why": "chain",
+                                                                              "at": "2026-11-12T14:00:00+00:00"}})
+        check = [sys.executable, "-c", f"import sys; print('stand-in check: ' + sys.argv[1]); sys.exit({check_rc})"]
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            rc = supervise.main(["--clear-halt", "--state-dir", str(self.state), "--config", str(self.config())],
+                                child_cmd=check, env=no_phone.clean_env(), clock=lambda: self.NOW)
+        self.out = out.getvalue()
+        return rc
+
+    def relayed(self, *ids: str, now: datetime | None = None) -> int:
+        with contextlib.redirect_stdout(io.StringIO()):
+            return supervise.main(["--relayed", *ids, "--state-dir", str(self.state), "--config", str(self.config())],
+                                  clock=lambda: now or self.NOW)
+
+    def test_the_first_row_that_applies_wins(self):
+        self.assertEqual(self.action(now=datetime(2026, 11, 14, 15, 7, tzinfo=timezone.utc)), "closed_today")
+        self.assertEqual((self.action(ny="07:59"), self.action(ny="16:00")), ("after_hours", "after_hours"))
+        self.assertEqual((self.action(parent="alive", mark_age_s=180), self.action(parent="alive", mark_age_s=181)), ("none", "replace_parent"))
+        self.assertEqual(self.action(halt={"code": 4, "why": "chain", "at": "2026-11-12T14:00:00+00:00"}), "halted")
+        self.assertEqual(self.action(engine="alive_without_a_parent"), "kill_stray")
+        self.assertEqual((self.action(trips=2), self.action(trips=2, watchdog=True), self.action()), ("wait_for_watchdog", "launch", "launch"))
+        self.assertEqual([self.action(trips=2, last_stop=w) for w in ("handover", "signal", "orphaned", "crash_loop")], ["launch"] * 3 + ["wait_for_watchdog"])
+
+    def test_a_lock_file_that_names_a_live_pid_that_is_no_parent_is_no_parent(self):   # Review Focus 1: the lock text holds os.getpid()
+        self.holds(self.paths.lock, os.getpid())
+        self.assertEqual((self.status()["parent"]["alive"], self.status()["action"]), (False, "launch"))
+
+    def test_the_launch_pair(self):
+        two_hours = {"command": "cd ai-trader && exec python3 -u -m aitrader.supervise --until 16:05 --handover", "timeout_ms": 7200000}
+        self.assertEqual(self.status()["launch"], two_hours)
+        self.assertEqual(self.status(proven=True, environ={})["launch"], two_hours)
+        self.assertEqual(self.status(proven=True, environ={"BASH_MAX_TIMEOUT_MS": "32400000"})["launch"],
+                         {"command": "cd ai-trader && exec python3 -u -m aitrader.supervise --until 16:05", "timeout_ms": 32400000})
+
+    def test_unsent_leaves_out_what_was_relayed_what_is_still_retried_and_adds_r5e_from_the_second_day(self):
+        # a live parent; R4-1 relayed; R1-3 and R10-4 failed a minute ago; R4-1 and R4-2 failed 20 minutes ago (past
+        # alert_retry_minutes); the book holds BBB (R5e's {held}, ruling P11)
+        parent = self.live("aitrader.supervise")
+        self.holds(self.paths.lock, parent.pid)
+        for n, kind, ago in ((1, "R4", 20), (2, "R4", 20), (3, "R1", 1), (4, "R10", 1)):
+            supervise.append_row(self.paths.uptime, 4242, "alert", self.NOW - timedelta(minutes=ago), id=f"{kind}-{n}", kind=kind,
+                                 sent=False, text=f"line {kind}-{n}")
+        self.assertEqual(self.relayed("R4-1"), 0)
+        self.write_book({"BBB": 50.0})
+        self.assertEqual([u["id"] for u in self.status()["unsent"]], ["R4-2", "R10-4"])    # a live parent; R4-1 relayed; R1-3 and R10-4 failed a minute ago
+        self.assertEqual([u["kind"] for u in self.status(halt_day="2026-11-11", watchdog=True)["unsent"]][-1], "R5e")
+        self.assertNotIn("R5e", [u["kind"] for u in self.status(halt_day="2026-11-12", watchdog=True)["unsent"]])
+        r5e = self.status(halt_day="2026-11-11", watchdog=True)["unsent"][-1]
+        self.assertEqual((r5e["id"], r5e["text"]), ("R5e-2026-11-12", "מנוע החדשות עדיין עצור מאז 11.11 (יומן פגום). סטופים לא נבדקים."
+                                                                      " פתוח: BBB (סטופ 48.50). כסף נייר"))
+        parent.kill(); parent.wait()                                           # no parent is left to retry R1-3: at once
+        self.assertEqual([u["id"] for u in self.status()["unsent"]], ["R4-2", "R1-3", "R10-4"])
+
+    def test_clear_halt_clears_only_when_the_check_passes_and_status_writes_nothing(self):
+        self.assertEqual((self.clear_halt(check_rc=4), self.state_file()["halt"]["code"]), (1, 4))
+        self.assertIn("stand-in check: --check", self.out)                    # the check's own output is printed
+        self.assertEqual((self.clear_halt(check_rc=0), self.state_file()["halt"]), (0, None))
+        before = {p.name: p.read_bytes() for p in self.state.iterdir()}; self.status()
+        self.assertEqual({p.name: p.read_bytes() for p in self.state.iterdir()}, before)
+
+    # Test added by ruling.
+    def test_the_two_hour_timeout_is_two_hours_ms(self):                     # ruling 36 (i): the platform's cap, never a second literal
+        with mock.patch.object(supervise, "TWO_HOURS_MS", 1234):
+            self.assertEqual(self.status()["launch"]["timeout_ms"], 1234)
+
+    # Tests added in self-review: what the brief specifies that no test above would miss.
+    def test_the_status_form_prints_the_json_of_spec_4_4(self):           # what the woken session runs: --status --watchdog
+        supervise.save_state(self.paths.state, {"day": "2026-11-12", "halt": {"code": 5, "why": "calendar", "at": "2026-11-11T15:00:00+00:00"}})
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            rc = supervise.main(["--status", "--watchdog", "--state-dir", str(self.state), "--config", str(self.config())], env={},
+                                clock=lambda: self.NOW)
+        got = json.loads(out.getvalue())
+        self.assertEqual((rc, got["action"], [u["kind"] for u in got["unsent"]], got["today"]["halt"]["code"]), (0, "halted", ["R5e"], 5))
+        self.assertEqual(sorted(got), sorted(["action", "why", "ny_time", "session_day", "parent", "engine", "today", "deadman_ok",
+                                              "ntfy_left", "unsent", "launch"]))
+        self.assertEqual((got["ny_time"], sorted(got["parent"]), sorted(got["engine"])),
+                         ("10:07:00", ["alive", "mark_age_s", "pid"], ["commit", "dirty", "hb_age_s", "held", "stop_age_s"]))
+
+    def test_clear_halt_with_a_live_parent_exits_3_and_runs_no_check(self):
+        self.holds(self.paths.lock, self.live("aitrader.supervise").pid)
+        self.assertEqual((self.clear_halt(check_rc=0), self.state_file()["halt"]["code"], "stand-in check" in self.out), (3, 4, False))
+
+    def test_relayed_keeps_the_days_ids_and_a_new_day_starts_an_empty_list(self):   # the one writer of news_relayed.json
+        self.assertEqual((self.relayed("R4-1", now=self.NOW - timedelta(days=1)), self.relayed("R1-3", "R4-2"), self.relayed("R4-2", "R5e-2026-11-12")),
+                         (0, 0, 0))
+        self.assertEqual(json.loads(self.paths.relayed.read_text()), {"day": "2026-11-12", "ids": ["R1-3", "R4-2", "R5e-2026-11-12"]})
+        self.assertNotIn("R5e", [u["kind"] for u in self.status(halt_day="2026-11-11", watchdog=True)["unsent"]])   # relayed: once is enough

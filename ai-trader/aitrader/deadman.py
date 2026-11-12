@@ -25,7 +25,9 @@ PRIORITY = {"min": 1, "low": 2, "default": 3, "high": 4, "urgent": 5}  # ownerli
 
 def _opener(base: str, env: Mapping) -> urllib.request.OpenerDirector:
     """An opener that goes the way requests would with this environment: the proxy of its proxy variables, unless
-    NO_PROXY names the host, and the CA bundle of SSL_CERT_FILE or REQUESTS_CA_BUNDLE (else the system's)."""
+    NO_PROXY names the host, and the CA bundle of SSL_CERT_FILE or REQUESTS_CA_BUNDLE (else the system's). urllib's
+    ProxyHandler also reads the process's own no_proxy (os.environ) when it opens a request, so a host that the process
+    environment names goes direct even when env names none: "env decides" holds whole only when env is os.environ."""
     proxies = {s: env.get(f"{s}_proxy") or env.get(f"{s.upper()}_PROXY") for s in ("http", "https", "no")}
     proxies = {s: v for s, v in proxies.items() if v}
     if urllib.request.proxy_bypass_environment(urlsplit(base).hostname or "", proxies):

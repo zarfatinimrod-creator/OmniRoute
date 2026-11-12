@@ -1,10 +1,13 @@
 """The supervisor's parent process (supervisor spec 2026-11-10, section 4): it starts the news engine, restarts it,
-and keeps the uptime log. So far (Tasks 10-13): its foundations (the config, its own trading calendar, the uptime log,
+and keeps the uptime log. So far (Tasks 10-14): its foundations (the config, its own trading calendar, the uptime log,
 the state file and its lock), the restart core, the loop that runs it, what the loop reads in the heartbeat (a mark
-a minute, `up` and `code` at a child's first looks, a hang, stale stops), and its lines to the owner (spec 8: every
-restart, hang, trip, halt and gap, one line per event, through deadman.Sender):
+a minute, `up` and `code` at a child's first looks, a hang, stale stops), its lines to the owner (spec 8: every
+restart, hang, trip, halt and gap, one line per event, through deadman.Sender), and what a woken session reads
+(spec 4.4: --status decides, --clear-halt and --relayed are its only two writers):
 
     python3 -u -m aitrader.supervise --until HH:MM [--handover] [--state-dir DIR] [--config FILE]
+    python3 -m aitrader.supervise --status [--watchdog] [--state-dir DIR] [--config FILE]
+    python3 -m aitrader.supervise --clear-halt | --relayed ID... [--state-dir DIR] [--config FILE]
     python3 -m aitrader.supervise --net-check [--config FILE]
 
 Standard library only, and never aitrader.journal, notify or news_live (they bring pandas and requests): the parent
@@ -23,6 +26,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Mapping
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import IO
@@ -50,6 +54,13 @@ def session_hours(day: date, cal: dict) -> tuple[tuple[int, int], tuple[int, int
     if day.weekday() >= 5 or day.year not in set(cal.get("years", [])) or d in set(cal.get("holidays", [])):
         return None
     return (9, 30), ((13, 0) if d in set(cal.get("early_close", [])) else (16, 0))
+
+
+def closed_day(day: date, cal: dict) -> bool:
+    """No session today and no engine to start (the parent's closed_today, --status' closed_today): a weekend or a
+    holiday. A weekday of a year the calendar does not list is no closed day, though session_hours fails it closed: the
+    engine's start check refuses it with its urgent line and 5, and the parent halts on that 5 (spec 4.3)."""
+    return session_hours(day, cal) is None and (day.weekday() >= 5 or day.year in cal.get("years", []))
 
 
 class Paths:
@@ -216,11 +227,13 @@ def restart_core(spawn, watch, stop, near_until, emit, pol, counts, *, mono=time
     - 0 near --until: (0, "end_of_day"). 4, 5, 6: (code, "halt"), no restart.
     - 3, another engine holds the book: started again after the back-off, not counted, for lock_wait_seconds from the
       first refusal; then (3, "lock_held").
-    - Any other end is a crash, among them a 7 (the exit row says "tree_busy"), a signal, a 0 far from --until and a
-      143 nobody asked for (not in the spec's table: counted, so the trip bounds it). Started again at once after a run
-      of healthy_seconds or more, else after the back-off: backoff_first_seconds, doubling up to backoff_max_seconds,
-      and from the first again after a healthy run. When one more restart would pass max_restarts in
-      restart_window_seconds, or max_restarts_day: a tripped row and (75, "crash_loop").
+    - Any other end is a crash, among them a 7 (the exit row says "tree_busy"), a signal, a 0 far from --until, a
+      143 nobody asked for (not in the spec's table: counted, so the trip bounds it) and a spawn that raises (no child:
+      the exit row has child and rc null and why "spawn <class>"; ruling 36 c). Started again at once after a run of
+      healthy_seconds or more, else after the back-off: backoff_first_seconds, doubling up to backoff_max_seconds, and
+      from the first again after a healthy run, or after lock refusals (their waits double the same delay; ruling 36
+      d). When one more restart would pass max_restarts in restart_window_seconds, or max_restarts_day: a tripped row
+      and (75, "crash_loop").
     - watch says "hang": stop(child, "hang"), then a crash. "handover", "signal" or "orphaned": stop(child, "planned")
       and (76, "handover") or (143, the word); while the core waits to start a child, the same answer, and no start."""
     delay = pol["backoff_first_seconds"]  # the wait after the next quick crash
@@ -235,22 +248,27 @@ def restart_core(spawn, watch, stop, near_until, emit, pol, counts, *, mono=time
             if left <= 0:
                 break
             sleep(min(pol["loop_seconds"], left))
-        child = spawn()
-        emit("start", child=child.pid, n=counts["restarts_today"] + 1, backoff_s=wait)
-        t0, why = mono(), "exit"
-        while (rc := child.poll()) is None:
-            order = watch(child, mono() - t0)
-            if order == "hang" or order in PLANNED:
-                why = "hang" if order == "hang" else "planned"
-                stop(child, why)
-                rc = child.poll()
-                break
-            sleep(pol["loop_seconds"])
-        ran = mono() - t0
-        why = "tree_busy" if why == "exit" and rc == 7 else why
-        signalled = rc is not None and rc < 0
-        emit("exit", child=child.pid, rc=None if signalled else rc, signal=-rc if signalled else None,
-             ran_s=round(ran, 1), why=why)
+        try:
+            child = spawn()
+        except (OSError, ValueError, subprocess.SubprocessError) as e:  # no memory, no such program: no child, a crash
+            ran, rc, why = 0.0, None, f"spawn {type(e).__name__}"
+            emit("exit", child=None, rc=None, signal=None, ran_s=ran, why=why)
+        else:
+            emit("start", child=child.pid, n=counts["restarts_today"] + 1, backoff_s=wait)
+            t0, why = mono(), "exit"
+            while (rc := child.poll()) is None:
+                order = watch(child, mono() - t0)
+                if order == "hang" or order in PLANNED:
+                    why = "hang" if order == "hang" else "planned"
+                    stop(child, why)
+                    rc = child.poll()
+                    break
+                sleep(pol["loop_seconds"])
+            ran = mono() - t0
+            why = "tree_busy" if why == "exit" and rc == 7 else why
+            signalled = rc is not None and rc < 0
+            emit("exit", child=child.pid, rc=None if signalled else rc, signal=-rc if signalled else None,
+                 ran_s=round(ran, 1), why=why)
         if why == "planned":
             return PLANNED[order], order
         if why == "exit" and rc == 0 and near_until():
@@ -265,6 +283,8 @@ def restart_core(spawn, watch, stop, near_until, emit, pol, counts, *, mono=time
             wait = min(delay, refused_at + pol["lock_wait_seconds"] - now)  # the last try falls inside the wait
             delay = min(delay * 2, pol["backoff_max_seconds"])
             continue
+        if refused_at is not None:  # the lock refusals are over: this crash backs off from the first value, not 2^N s
+            delay = pol["backoff_first_seconds"]
         refused_at, now = None, mono()
         counts["stamps"][:] = [s for s in counts["stamps"] if now - s < pol["restart_window_seconds"]]
         if len(counts["stamps"]) >= pol["max_restarts"]:
@@ -444,6 +464,28 @@ def _read_beat(path: Path) -> tuple[dict | None, float | None]:
     return (hb if isinstance(hb, dict) else None), mtime
 
 
+def _held_now(paths: Paths, child_pid: int | None) -> dict:
+    """{symbol: stop} from the beat of the child child_pid; with no beat of its own (no child, none yet, another pid's),
+    from the book as plain JSON (ruling P11: the book is tracked and holds every stop, the heartbeat is neither)."""
+    hb, mtime = _read_beat(paths.heartbeat)
+    if child_pid is not None and isinstance(hb, dict) and hb.get("pid") == child_pid:
+        return beat_view(hb, mtime, child_pid, time.time())["held"]
+    try:
+        book = json.loads(paths.book.read_text(encoding="utf-8"))
+        return {sym: p.get("stop_price") for sym, p in book["positions"].items()}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):  # no book, or none that can be read
+        return {}
+
+
+def _signal_group(pgid: int, sig: int) -> None:
+    """sig to a child's process group; a group with no member left is no error. Linux keeps the group's number while the
+    group has a member, also once the child that led it is reaped: only what the child started is signalled."""
+    try:
+        os.killpg(pgid, sig)
+    except ProcessLookupError:
+        pass
+
+
 TWO_HOURS_MS = 7_200_000  # the harness's cap on a background command (spec 4.5): a fact of the platform, not a tuning
 HALT_WHY = {4: "chain", 5: "calendar", 6: "book"}  # the state file's halt.why for the engine's code
 SAID = {"crash_loop": "tripped"}  # the word of the last stdout line, where it is not the sup_stop row's why
@@ -455,6 +497,7 @@ NUMBERS = ("loop_seconds", "healthy_seconds", "backoff_first_seconds", "backoff_
            "hang_term_grace_seconds", "stops_stale_seconds", "outage_report_seconds", "max_alerts_per_hour",
            "alert_retry_seconds", "alert_retry_minutes", "send_timeout_seconds", "max_line_bytes",
            "held_names_in_line", "free_text_max_chars")  # what main and the core read
+POSITIVE = ("loop_seconds", "start_grace_seconds", "hang_term_grace_seconds", "planned_stop_grace_seconds")  # 0 spins
 
 
 def _holder(lock: Path):
@@ -463,6 +506,182 @@ def _holder(lock: Path):
         return json.loads(lock.read_text(encoding="utf-8"))["pid"]
     except Exception:  # noqa: BLE001 - the text is a hint only
         return "unknown"
+
+
+def _argv(pid: int) -> list[str]:
+    """The command line of a live process; [] when there is none (a zombie has an empty one)."""
+    try:
+        return Path(f"/proc/{pid}/cmdline").read_bytes().decode(errors="replace").split("\0")
+    except OSError:
+        return []
+
+
+def _ppid(pid: int) -> int | None:
+    """A live process's parent pid (/proc/<pid>/stat: its name in brackets may hold spaces); None when it has none."""
+    try:
+        return int(Path(f"/proc/{pid}/stat").read_text().rpartition(")")[2].split()[1])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _live(lock: Path, name: str) -> int | None:
+    """The pid in a lock file's text when that process lives and its command line names `name` (aitrader.supervise for
+    the parent, news-live for the engine); else None. The text alone is a hint: it stays after its writer has ended,
+    and its pid can be some other process now (Review Focus 1). No lock is probed: taking one, even for a moment, could
+    refuse a parent that starts in that moment."""
+    pid = _holder(lock)
+    return pid if isinstance(pid, int) and not isinstance(pid, bool) and name in _argv(pid) else None
+
+
+def _relayed(path: Path, day: str) -> list[str]:
+    """The ids --relayed has written for the New York day `day`; [] for another day's file, or none that can be read."""
+    try:
+        got = json.loads(path.read_text(encoding="utf-8"))
+        return [i for i in got["ids"] if isinstance(i, str)] if got.get("day") == day else []
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return []
+
+
+def status(paths: Paths, cfg: dict, now: datetime, *, watchdog: bool = False, environ: Mapping | None = None) -> dict:
+    """What a woken session does now (spec 4.4), as the JSON of --status. It reads files and /proc only: it writes
+    nothing and probes no lock. A parent is alive when its lock file names a live pid whose command line names
+    aitrader.supervise; an engine, the same with the engine's lock and news-live.
+    - action: the first row of the spec's table that applies: closed_today; after_hours (outside launch_from_ny to
+      launch_until_ny, New York); none (a live parent whose last mark is at most parent_stale_seconds old);
+      replace_parent (a live parent, no such mark); halted; kill_stray (a live engine whose parent pid is no live
+      parent; why carries its pid); wait_for_watchdog (a second trip today, the call not from a watchdog slot, and the
+      log's last row no sup_stop of a handover, a signal or an orphaned parent: after a planned stop the session
+      launches at once); launch.
+    - unsent: today's alert lines whose latest row says sent false, past their retries (the first row is older than
+      alert_retry_minutes, or no parent lives to retry them; R10 at once: the parent never retries it) and not in
+      news_relayed.json. With watchdog and a halt of an earlier New York day, R5e as well, id "R5e-<today>", until it
+      is relayed; its {held} from the book (ruling P11). On the day of the halt R5a-R5d have spoken.
+    - launch: the command and timeout of the tracked background command: --handover and TWO_HOURS_MS until
+      long_timeout_proven is true and environ's BASH_MAX_TIMEOUT_MS is at least long_timeout_ms (section 9)."""
+    sup, cal = cfg["supervisor"], cfg["calendar"]
+    environ = os.environ if environ is None else environ
+    ny = now.astimezone(NY)
+    day, today = ny.date(), ny.date().isoformat()
+    st = load_state(paths.state, today)
+    try:
+        rows = read_rows(paths.uptime)
+    except OSError:  # a log that cannot be read: no rows, as for none
+        rows = []
+    parent, engine = _live(paths.lock, "aitrader.supervise"), _live(paths.engine_lock, "news-live")
+    mark = next((r for r in reversed(rows) if r.get("ev") == "mark"), {})
+    mark_t = _when(mark.get("t"))
+    mark_age = None if mark_t is None else (now - mark_t).total_seconds()
+    halt = st.get("halt")
+    code, cause, at = (halt.get(k) for k in ("code", "why", "at")) if isinstance(halt, dict) else (halt, None, None)
+    last = rows[-1] if rows else {}
+    hm = ny.strftime("%H:%M")
+    if closed_day(day, cal):
+        action, why = "closed_today", "not a session day"
+    elif not sup["launch_from_ny"] <= hm < sup["launch_until_ny"]:
+        action, why = "after_hours", f"outside {sup['launch_from_ny']} to {sup['launch_until_ny']} New York"
+    elif parent is not None and mark_age is not None and mark_age <= sup["parent_stale_seconds"]:
+        action, why = "none", f"a live parent, pid {parent}"
+    elif parent is not None:
+        action, why = "replace_parent", f"the parent, pid {parent}, has no mark in {sup['parent_stale_seconds']} s"
+    elif halt:
+        action, why = "halted", f"halt {code} ({cause}) since {at}"
+    elif engine is not None and _ppid(engine) != parent:
+        action, why = "kill_stray", f"engine pid {engine} runs without a live parent"
+    elif st["trips_today"] >= 2 and not watchdog and not (last.get("ev") == "sup_stop" and last.get("why") in PLANNED):
+        action, why = "wait_for_watchdog", "a second trip today: the next watchdog slot launches"
+    else:
+        action, why = "launch", "no live parent"
+
+    relayed, first, latest = _relayed(paths.relayed, today), {}, {}
+    for r in rows:
+        t = _when(r.get("t"))
+        if r.get("ev") == "alert" and isinstance(r.get("id"), str) and t is not None and t.astimezone(NY).date() == day:
+            first.setdefault(r["id"], t)
+            latest[r["id"]] = r
+    unsent = [{"id": i, "kind": r.get("kind"), "text": r.get("text")} for i, r in latest.items()
+              if r.get("sent") is False and i not in relayed
+              and (r.get("kind") == "R10" or parent is None
+                   or (now - first[i]).total_seconds() > sup["alert_retry_minutes"] * 60)]
+    halted_at, r5e = _when(at), f"R5e-{today}"
+    if watchdog and halted_at is not None and halted_at.astimezone(NY).date() < day and r5e not in relayed:
+        try:
+            text = ownerlines.render("R5e", max_bytes=sup["max_line_bytes"], free_chars=sup["free_text_max_chars"],
+                                     date=halted_at.astimezone(ZoneInfo(sup["owner_tz"])).strftime("%d.%m"),
+                                     why=ownerlines.WORDS["R5e.why"][code],
+                                     held=ownerlines.held_text(_held_now(paths, None), sup["held_names_in_line"]))
+            unsent.append({"id": r5e, "kind": "R5e", "text": text})
+        except (KeyError, ValueError, TypeError):  # a halt code no engine gives, or a book stop that is no number
+            pass
+
+    hb, mtime = _read_beat(paths.heartbeat)
+    view = beat_view(hb, mtime, hb.get("pid") if hb else None, time.time())
+    built = hb.get("code") if hb and isinstance(hb.get("code"), dict) else {}
+    try:
+        allowed = int(environ.get("BASH_MAX_TIMEOUT_MS", ""))
+    except (TypeError, ValueError):  # missing, or no number
+        allowed = 0
+    long = sup["long_timeout_proven"] is True and allowed >= sup["long_timeout_ms"]
+
+    def rounded(s: float | None) -> int | None:
+        return None if s is None else round(s)
+    return {"action": action, "why": why, "ny_time": ny.strftime("%H:%M:%S"), "session_day": not closed_day(day, cal),
+            "parent": {"alive": parent is not None, "pid": parent, "mark_age_s": rounded(mark_age)},
+            "engine": {"hb_age_s": rounded(view["age_s"]), "stop_age_s": rounded(view["stop_age_s"]),
+                       "held": len(view["held"]) if view["mine"] else None, "commit": built.get("commit"),
+                       "dirty": built.get("dirty")},
+            "today": {"restarts": st["restarts_today"], "trips": st["trips_today"], "halt": halt},
+            "deadman_ok": mark.get("dm"), "ntfy_left": mark.get("left"), "unsent": unsent,
+            "launch": {"command": f"cd ai-trader && exec python3 -u -m aitrader.supervise --until {sup['until_ny']}"
+                                  + ("" if long else " --handover"),
+                       "timeout_ms": sup["long_timeout_ms"] if long else TWO_HOURS_MS}}
+
+
+def relay(paths: Paths, ids: list[str], now: datetime) -> int:
+    """--relayed ID...: these lines went out through the Claude app, so --status lists them no more. The one writer of
+    state/news_relayed.json, {"day", "ids"}; a new New York day starts an empty list."""
+    day = now.astimezone(NY).date().isoformat()
+    try:
+        save_state(paths.relayed, {"day": day, "ids": list(dict.fromkeys(_relayed(paths.relayed, day) + ids))})
+    except OSError as e:
+        print(f"supervise: news_relayed.json was not written ({type(e).__name__})", file=sys.stderr)
+        return 1
+    print(f"supervise: relayed {' '.join(ids)}", flush=True)
+    return 0
+
+
+def clear_halt(paths: Paths, now: datetime, check: list[str], env: Mapping | None) -> int:
+    """--clear-halt (spec 4.4): with a live parent, nothing (3). Else the engine's start checks run read-only (check +
+    --check: `news-live --check`) and their output is printed; on 0 the halt is cleared under the parent's lock (0),
+    else it stays (1)."""
+    if _live(paths.lock, "aitrader.supervise") is not None:
+        print(f"supervise: a live parent, pid {_holder(paths.lock)}: the halt stays", flush=True)
+        return 3
+    try:
+        done = subprocess.run([*check, "--check"], cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, encoding="utf-8", errors="replace")
+    except OSError as e:
+        print(f"supervise: the check did not run ({type(e).__name__}): the halt stays", flush=True)
+        return 1
+    print(done.stdout, end="", flush=True)
+    if done.returncode != 0:
+        print(f"supervise: the check answered {done.returncode}: the halt stays", flush=True)
+        return 1
+    try:
+        lock = take_lock(paths.lock, now)
+        if lock is None:
+            print(f"supervise: a parent, pid {_holder(paths.lock)}, took the lock: the halt stays", flush=True)
+            return 3
+        try:
+            st = load_state(paths.state, now.astimezone(NY).date().isoformat())
+            st.pop("load_error", None)  # ruling P18(c): never saved
+            save_state(paths.state, {**st, "halt": None})
+        finally:
+            lock.close()
+    except OSError as e:
+        print(f"supervise: the halt was not cleared ({type(e).__name__})", flush=True)
+        return 1
+    print("supervise: the halt is cleared", flush=True)
+    return 0
 
 
 def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, env: dict | None = None,
@@ -477,19 +696,27 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     to stdout, the first and the last; the rest goes to .cache/supervise.log. The owner's lines (spec 8) go to
     alerts.ntfy_base_url with the topic of env (default os.environ), through a worker thread that the loop never waits
     for. --net-check asks ntfy's health once, prints what came back and returns 0 only on 200 (spec 6, "Not verified":
-    that urllib reaches ntfy through the session's proxy and CA bundle)."""
+    that urllib reaches ntfy through the session's proxy and CA bundle).
+    The forms of a woken session (spec 4.4) take no lock of a parent's and start no child: --status [--watchdog]
+    prints status() as JSON and returns 0; --relayed ID... (relay) and --clear-halt (clear_halt, which runs child_cmd,
+    default `python3 -m aitrader news-live`, with --check) are its only two writers."""
     ppid = os.getppid()  # before anything else: what "orphaned" is measured against
     began = time.time()  # real time: up.sold of the first child counts the sales from here
     ap = argparse.ArgumentParser(prog="python3 -m aitrader.supervise")
     ap.add_argument("--until", help="HH:MM New York, handed to the engine (24:00 never comes); required but with"
-                    " --net-check")
+                    " --net-check, --status, --clear-halt and --relayed")
     ap.add_argument("--handover", action="store_true", help="hand over before the harness's 2-hour cap")
     ap.add_argument("--state-dir", type=Path, help="state in DIR and logs in DIR/.cache (drills and tests)")
     ap.add_argument("--config", type=Path, help="this config.json (drills and tests)")
     ap.add_argument("--net-check", action="store_true", help="ask ntfy's health once; exit 0 only on 200")
+    ap.add_argument("--status", action="store_true", help="read-only: what a woken session does now, as JSON")
+    ap.add_argument("--watchdog", action="store_true", help="with --status: the call is a watchdog slot's")
+    ap.add_argument("--clear-halt", action="store_true", help="clear the halt once news-live --check exits 0")
+    ap.add_argument("--relayed", nargs="+", metavar="ID", help="these unsent lines went out through the Claude app")
     try:
         a = ap.parse_args(argv)
-        if a.until is None and not a.net_check:
+        once = a.net_check or a.status or a.clear_halt or bool(a.relayed)  # one answer, no loop and no --until
+        if a.until is None and not once:
             ap.error("the following arguments are required: --until")
     except SystemExit as e:  # argparse has printed why
         return e.code if isinstance(e.code, int) else 2
@@ -501,7 +728,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             got = deadman.Sender(base, None, sup["send_timeout_seconds"], env=environ, sync=True).health()
             print(f"supervise: net-check {got}", flush=True)
             return 0 if got == 200 else 1
-        if not UNTIL.fullmatch(a.until) or not all(isinstance(sup[k], (int, float)) for k in NUMBERS):
+        if not once and (not UNTIL.fullmatch(a.until)  # a bool is no number; a zero loop or grace would spin or kill
+                         or any(isinstance(sup[k], bool) or not isinstance(sup[k], (int, float)) for k in NUMBERS)
+                         or any(sup[k] <= 0 for k in POSITIVE)):
             raise ValueError("--until or a number of the supervisor block")
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"supervise: a bad argument or config ({type(e).__name__})", file=sys.stderr)
@@ -509,6 +738,18 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     state_dir = a.state_dir or ROOT / "state"
     cache_dir = state_dir / ".cache" if a.state_dir else ROOT / ".cache"
     paths, pid, clock = Paths(state_dir, cache_dir), os.getpid(), clock or (lambda: datetime.now(timezone.utc))
+    if a.status:
+        try:
+            print(json.dumps(status(paths, cfg, clock(), watchdog=a.watchdog, environ=environ), ensure_ascii=False),
+                  flush=True)
+        except (KeyError, TypeError, ValueError) as e:  # a supervisor block without what --status reads
+            print(f"supervise: a bad argument or config ({type(e).__name__})", file=sys.stderr)
+            return 2
+        return 0
+    if a.relayed:
+        return relay(paths, a.relayed, clock())
+    if a.clear_halt:
+        return clear_halt(paths, clock(), child_cmd or [sys.executable, "-m", "aitrader", "news-live"], env)
     print(f"supervise: pid {pid}, until {a.until}, handover {'on' if a.handover else 'off'}", flush=True)
     state_dir.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -517,8 +758,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
         print(f"supervise: 3 lock_held pid {_holder(paths.lock)}. {AFTER}", flush=True)
         return 3
     log_file = open(paths.sup_log, "a", encoding="utf-8")
-    sender = deadman.Sender(base, environ.get(cfg["alerts"].get("ntfy_topic_env", "AITRADER_NTFY_TOPIC")),
-                            sup["send_timeout_seconds"], env=environ)
+    topic = environ.get(cfg["alerts"].get("ntfy_topic_env", "AITRADER_NTFY_TOPIC"))
+    sender = deadman.Sender(base, topic, sup["send_timeout_seconds"], env=environ)
     heard, earlier = [], {}
     if threading.current_thread() is threading.main_thread():  # Python lets no other thread set a handler
         earlier = {s: signal.signal(s, lambda signum, frame: heard.append(signum))
@@ -555,9 +796,10 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
         except (KeyError, TypeError, ValueError):  # no row before this one, or no time that can be read
             gap = None
         cold = not paths.heartbeat.exists()
-        emit("sup_start", until=a.until, handover=a.handover,
+        emit("sup_start", now, until=a.until, handover=a.handover,
              timeout_ms=TWO_HOURS_MS if a.handover else sup["long_timeout_ms"], prev_t=prev.get("t"),
              prev_ev=prev.get("ev"), gap_s=gap, cold=cold)
+        sup_t = datetime.fromisoformat(_utc(now))  # the sup_start row's t (ruling 36 g: a cold start with no stamp)
         log(f"start: pid {pid}, until {a.until}, handover {'on' if a.handover else 'off'}")
         today = [(t, r) for r in rows if (t := _when(r.get("t"))) is not None and t.astimezone(NY).date() == day]
         day_began = min((t for t, _ in today), default=now)  # R3 after the day's limit counts the minutes from here
@@ -585,25 +827,15 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             except OSError as e:
                 log(f"the state file was not written ({type(e).__name__})")
 
-        def held_now(child_pid: int | None) -> dict:
-            """{symbol: stop} from this child's beat; with no beat of its own, from the book (ruling P11)."""
-            hb, mtime = _read_beat(paths.heartbeat)
-            if child_pid is not None and isinstance(hb, dict) and hb.get("pid") == child_pid:
-                return beat_view(hb, mtime, child_pid, time.time())["held"]
-            try:
-                book = json.loads(paths.book.read_text(encoding="utf-8"))
-                return {sym: p.get("stop_price") for sym, p in book["positions"].items()}
-            except (OSError, ValueError, KeyError, TypeError, AttributeError):  # no book, or none that can be read
-                return {}
-
         def row(line: dict, sent) -> dict:
             return {"id": line["id"], "kind": line["kind"], "sent": sent, "text": line["text"], **line["extra"]}
 
         def say(kind: str, now: datetime, extra: dict | None = None, **fields) -> None:
             """One line to the owner (spec 8), from ownerlines' table: {held} from {symbol: stop}, {sold} from trade
             rows. Its id is <kind>-<n>, n counting the day's alerts. Held back by may_send: an alert row "capped".
-            Else it goes to the worker, and drain writes its row when the outcome comes. extra: more fields of the
-            row (R4 and R4b: `m`, ruling P6)."""
+            With no topic nothing can ever be requested: an alert row `sent` false at once for the watchdog turn to
+            relay, one log line, no retries (ruling 36 a). Else it goes to the worker, and drain writes its row when
+            the outcome comes. extra: more fields of the row (R4 and R4b: `m`, ruling P6)."""
             try:
                 if "held" in fields:
                     fields["held"] = ownerlines.held_text(fields["held"], sup["held_names_in_line"])
@@ -622,6 +854,10 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             if not go:
                 emit("alert", now, **row(line, "capped"))
                 log(f"line {line['id']}: capped")
+                return
+            if not topic:
+                emit("alert", now, **row(line, False))
+                log(f"line {line['id']}: no topic")
                 return
             pending[line["id"]] = {"row": line, "first": time.monotonic(), "next": None, "failed": False,
                                    "payload": {"title": TITLE, "message": text,
@@ -662,9 +898,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 if not p["failed"]:
                     emit("alert", clock(), **row(p["row"], False))
 
-        # A weekday of a year the calendar does not list is no closed day, though session_hours fails it closed: the
-        # engine's start check refuses it with its urgent line and 5, and the parent halts on that 5 (spec 4.3).
-        if session_hours(day, cal) is None and (day.weekday() >= 5 or day.year in cal.get("years", [])):
+        if closed_day(day, cal):
             rc, word = 0, "closed_today"
         else:
             cmd = list(child_cmd or [sys.executable, "-u", "-m", "aitrader", "news-live"])
@@ -682,6 +916,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                                             stderr=subprocess.STDOUT, start_new_session=True)
 
             def watch(child, ran_s):
+                if counts["restarts_today"] != st["restarts_today"]:  # the core has just counted a restart: on disk at
+                    st["restarts_today"] = counts["restarts_today"]  # once, so a parent killed in the back-off keeps it
+                    save()                                           # (ruling 36 b)
                 if heard:
                     return "signal"
                 if os.getppid() != ppid:
@@ -753,7 +990,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     emit("hang", now, child=child.pid, **kid["hang"], killed_with="none")
                     log(f"child {child.pid} hangs ({kid['hang']['hb']} s without a beat): not killed, the switch is"
                         " off")
-                    say("R2", now, off=True, s=kid["hang"]["hb"], held=held_now(child.pid))
+                    say("R2", now, off=True, s=kid["hang"]["hb"], held=_held_now(paths, child.pid))
                 return None
 
             def episode_end(now: datetime) -> None:
@@ -784,9 +1021,10 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                          for s, t in looks.items()]
                 if kid["held_before"].difference(looks):
                     after.append(at)
-                last = kid["last_look"] or _when(hb.get("stops_checked_at"))  # cold: the stamp the engine adopted
-                blind_s = (round(open_seconds(last, max(after), cal), 1)
-                           if after and None not in after and last is not None else 0)
+                # cold: the stamp the engine adopted; with none at all, this parent's start (ruling 36 g: the time
+                # before the parent is the gap R4 measures), so a name held is never shown as protected
+                last = kid["last_look"] or _when(hb.get("stops_checked_at")) or sup_t
+                blind_s = round(open_seconds(last, max(after), cal), 1) if after and None not in after else 0
                 ref = int(seen["ended"] if seen["ended"] is not None else began)  # ruling P14: the whole second
                 try:
                     sold = [r for r in read_rows(paths.trades) if r.get("side") == "SELL"
@@ -813,25 +1051,20 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                         say(line[0], now, extra={"m": line[1]["m"]}, held=view["held"], **line[1])
 
             def stop(child, how: str) -> None:
-                """A hang stop (spec 4.3): SIGTERM to the child's process group, hang_term_grace_seconds, SIGKILL to
-                the group, then the row `hang`. A planned stop (spec 5.3): SIGTERM to the child's pid alone, so that a
-                scorer call in flight can finish, planned_stop_grace_seconds, then SIGKILL to its process group.
-                The group is signalled only while the child is not reaped: its id is still the child's."""
+                """A hang stop (spec 4.3): SIGTERM to the child's process group, up to hang_term_grace_seconds for the
+                child to end, then SIGKILL to the group whether or not it has (what it started may ignore SIGTERM;
+                ruling 36 f), then the row `hang`: killed_with "TERM" when the child ended within the grace, else
+                "KILL". A planned stop (spec 5.3): SIGTERM to the child's pid alone, so that a scorer call in flight can
+                finish, planned_stop_grace_seconds, then SIGKILL to its process group."""
                 if how == "hang":
-                    killed = "TERM"
-                    try:
-                        os.killpg(child.pid, signal.SIGTERM)
-                    except ProcessLookupError:
-                        pass
+                    _signal_group(child.pid, signal.SIGTERM)
                     try:
                         child.wait(timeout=sup["hang_term_grace_seconds"])
+                        killed = "TERM"
                     except subprocess.TimeoutExpired:
                         killed = "KILL"
-                        try:
-                            os.killpg(child.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-                        child.wait()
+                    _signal_group(child.pid, signal.SIGKILL)
+                    child.wait()
                     emit("hang", child=child.pid, **kid["hang"], killed_with=killed)
                     log(f"child {child.pid} hangs ({kid['hang']['hb']} s without a beat): its group got SIG{killed}")
                     return
@@ -841,10 +1074,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 except subprocess.TimeoutExpired:
                     log(f"child {child.pid} did not end within {sup['planned_stop_grace_seconds']} s of SIGTERM:"
                         " SIGKILL to its process group")
-                    try:
-                        os.killpg(child.pid, signal.SIGKILL)  # not reaped yet, so the group is still the child's
-                    except ProcessLookupError:
-                        pass
+                    _signal_group(child.pid, signal.SIGKILL)
                     child.wait()
 
             def core_emit(ev: str, **fields) -> None:
@@ -864,10 +1094,12 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 emit(ev, now, **fields)
 
             def fall(now: datetime, fields: dict) -> None:
-                """A fall of the child, for R1: its time and its cause (a code: "crash"; a signal or a hang kill:
-                "killed"; 0 or 143: "stopped"). A hang kill waits for the next `up` to be told by R2 (ruling P5)."""
+                """A fall of the child, for R1: its time and its cause (a code, or no child at all: "crash"; a signal or
+                a hang kill: "killed"; 0 or 143: "stopped"). A hang kill waits for the next `up` to be told by R2
+                (ruling P5)."""
                 hang = fields["why"] == "hang"
-                cause = "killed" if hang or fields["rc"] is None else "stopped" if fields["rc"] in (0, 143) else "crash"
+                cause = ("killed" if hang or fields["signal"] is not None else "stopped" if fields["rc"] in (0, 143)
+                         else "crash")
                 ep["falls"].append({"t": now, "cause": cause, "hang": hang})
                 if hang:
                     ep["r2"] = kid["hang"]["hb"]
@@ -885,9 +1117,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             if kind:
                 minutes = trip["window_s"] / 60 if trip.get("window_s") else (clock() - day_began).total_seconds() / 60
                 say(kind, clock(), k=trip.get("restarts", 0) + 1, m=max(1, round(minutes)),
-                    held=held_now(seen["last_child"]))
+                    held=_held_now(paths, seen["last_child"]))
         elif word == "halt":
-            say({4: "R5a", 5: "R5b", 6: "R5d"}[rc], clock(), held=held_now(seen["last_child"]))
+            say({4: "R5a", 5: "R5b", 6: "R5d"}[rc], clock(), held=_held_now(paths, seen["last_child"]))
         elif word == "lock_held":
             say("R5c", clock(), s=round(time.monotonic() - (seen["refused"] or time.monotonic())))
         finish()  # the lines' rows come before sup_stop: the row before the next sup_start is the sup_stop
