@@ -1,6 +1,61 @@
 {
-  "date": "2026-11-10",
+  "date": "2026-11-11",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-11-06",
+      "ticker": "ENOV",
+      "company": "Enovis Corp",
+      "industry": "Orthopedic, Prosthetic & Surgical Appliances & Supplies",
+      "insiders": 3,
+      "price": 19.88,
+      "value": 499516.0,
+      "delta_own": "+8%"
+    },
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-10-30",
+      "ticker": "ATEC",
+      "company": "Alphatec Holdings, Inc.",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 3,
+      "price": 7.93,
+      "value": 1664300.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-11-10",
+      "ticker": "WW",
+      "company": "Ww International, Inc.",
+      "industry": "Personal Services",
+      "insiders": 3,
+      "price": 11.84,
+      "value": 292882.0,
+      "delta_own": "+200%"
+    },
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-11-06",
+      "ticker": "FUN",
+      "company": "Six Flags Entertainment Corporation/New",
+      "industry": "Amusement & Recreation Services",
+      "insiders": 3,
+      "price": 10.29,
+      "value": 15066320.0,
+      "delta_own": "+28%"
+    },
+    {
+      "filing_date": "2026-11-10",
+      "trade_date": "2026-11-05",
+      "ticker": "GLXY",
+      "company": "Galaxy Digital Inc.",
+      "industry": "Security Brokers, Dealers & Flotation Companies",
+      "insiders": 2,
+      "price": 13.12,
+      "value": 10192678.0,
+      "delta_own": "+146%"
+    },
     {
       "filing_date": "2026-11-10",
       "trade_date": "2026-11-09",
@@ -220,61 +275,6 @@
       "price": 13.39,
       "value": 432609.0,
       "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-06",
-      "trade_date": "2026-11-04",
-      "ticker": "PMN",
-      "company": "Promis Neurosciences Inc.",
-      "industry": "Pharmaceutical Preparations",
-      "insiders": 2,
-      "price": 3.55,
-      "value": 129495.0,
-      "delta_own": "+158%"
-    },
-    {
-      "filing_date": "2026-11-06",
-      "trade_date": "2026-10-05",
-      "ticker": "AGMB",
-      "company": "Agomab Therapeutics Nv",
-      "industry": "Biological Products, (No Diagnostic Substances)",
-      "insiders": 3,
-      "price": 8.25,
-      "value": 503470.0,
-      "delta_own": "+135%"
-    },
-    {
-      "filing_date": "2026-11-05",
-      "trade_date": "2026-11-04",
-      "ticker": "BXMT",
-      "company": "Blackstone Mortgage Trust, Inc.",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 2,
-      "price": 11.5,
-      "value": 1149642.0,
-      "delta_own": "+13%"
-    },
-    {
-      "filing_date": "2026-11-05",
-      "trade_date": "2026-11-03",
-      "ticker": "LBRT",
-      "company": "Liberty Energy Inc.",
-      "industry": "Oil & Gas Field Services",
-      "insiders": 3,
-      "price": 15.19,
-      "value": 645635.0,
-      "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-05",
-      "trade_date": "2026-11-05",
-      "ticker": "GLXY",
-      "company": "Galaxy Digital Inc.",
-      "industry": "Security Brokers, Dealers & Flotation Companies",
-      "insiders": 2,
-      "price": 13.11,
-      "value": 10122778.0,
-      "delta_own": "+145%"
     }
   ],
   "congress_buy": null,

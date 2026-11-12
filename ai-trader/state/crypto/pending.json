@@ -1,0 +1,54 @@
+{
+  "decision_date": "2026-11-10",
+  "status": "executed",
+  "rebalance": true,
+  "exits_only": false,
+  "targets": {
+    "BTC-USD": 0.7968257771145335
+  },
+  "targets_raw": {
+    "BTC-USD": 0.7968257771145335
+  },
+  "stopped_shadow": [],
+  "shadow_hold": {},
+  "stopped": [],
+  "overrides": [],
+  "earnings_blackout": {},
+  "preview_at_close": [
+    {
+      "date": "2026-11-10",
+      "symbol": "BTC-USD",
+      "side": "BUY",
+      "qty": 1.074964,
+      "price": 73756.9772,
+      "value": 79286.1,
+      "realized_pnl": -396.43,
+      "fee": 396.4305,
+      "reason": "entry"
+    }
+  ],
+  "new_entries": [
+    "BTC-USD"
+  ],
+  "logged_at": "2026-11-12T00:14:26+00:00",
+  "exec_ts": "2026-11-12T01:00:00+00:00",
+  "decision_close": {
+    "BTC-USD": 73720.1171875
+  },
+  "executed_on": "2026-11-12",
+  "fills": [
+    {
+      "date": "2026-11-12",
+      "symbol": "BTC-USD",
+      "side": "BUY",
+      "qty": 1.071071,
+      "price": 74025.0722,
+      "value": 79286.11,
+      "realized_pnl": -396.43,
+      "fee": 396.4305,
+      "reason": "entry"
+    }
+  ],
+  "fill_source": "1h",
+  "fill_ts": "2026-11-12T01:00:00+00:00"
+}

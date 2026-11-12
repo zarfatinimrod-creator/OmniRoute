@@ -231,8 +231,9 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     record and passes rule 4 (Basic law 2, item 3).
     **Spec approved by the owner on 2026-11-11 (answer א):** `research/specs/2026-11-11-sec-filings-feed-design.md`.
     Next: its implementation plan; the build joins the one-at-a-time queue after the supervisor and the trading room.
-66. [crypto][gate] Deferred by the quant-critic at the go-live gate of 2026-11-11 (PASS, round 2;
-    `logs/2026-11-11-crypto-go-live.md`). None is blocking for paper.
+69. [crypto][gate] Deferred by the quant-critic at the go-live gate of 2026-11-11 (PASS, round 2;
+    `logs/2026-11-11-crypto-go-live.md`). None is blocking for paper. (Renumbered from 66, which another
+    session also used.)
     - N1: after an expired order the next decision is a full rebalance even when the expired one was exits-only
       (`aitrader/cycle.py` `redo`). Inside caps and vol target, but the backtest always fills, so it is a live/replay
       difference. Narrower option: `expiring and old.rebalance`. Needs its own gate.
@@ -250,7 +251,13 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
 67. [news][owner] The R5d line says "ויש עסקאות ביומן" also for a book file that parses but is no book while the
     journal is empty (critic N8, review Ruling 18). Reword the line through the owner, or narrow the case.
 
+
 ## Done
+- 2026-11-12: backlog 68 fixed (df8042e2, quant-critic PASS, 679 tests): on the UTC daily calendar a decision bar
+  that is not yesterday's (a daily row missing from Yahoo's reply) is no decision; the pending fill still runs.
+  Built on Opus with the owner's approval (Fable limit reached). Critic's non-blocking follow-ups: write the reason
+  to skips.jsonl so the morning summary says why and counts repeats; one alert per run while the row is missing
+  (queued at night); an urgent alert when no decision holds while a pending order is past its fill cap.
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
   two documented changes in behaviour on bad input, both toward safety. With a quote whose time cannot be read, the
   stop and the time exit now act on the price (before, that name had no stop check in that step) while buys and

@@ -259,6 +259,11 @@ class Cli(TempState):
         def market(panel, n):
             cycle.load_market = lambda c, rng="10y", age=0.1: {k: v.iloc[:n] for k, v in panel.items()}
 
+        def cmarket(n):  # crypto: rows 0..n-1 at D+1 00:12 UTC, so the newest row is the calendar's decision bar (backlog 68)
+            market(coins, n)
+            d = coins["close"].index[n - 1]
+            journal.now_utc = lambda: f"{(d + pd.Timedelta(days=1)).date()}T00:12:00+00:00"
+
         with frozen_env(self.tmp, None):
             cycle.load_config = lambda: stock_cfg
             for i in range(2):  # a stock book with a decision and a fill
@@ -285,9 +290,9 @@ class Cli(TempState):
             with prices, status, loader, sweep, fetch, csweep:
                 self.assertEqual(crypto_sweep.seed_script().seed(), 145)  # the sweep refuses to run without it
                 for i in range(2):
-                    market(coins, FIRST_BAR + i)
+                    cmarket(FIRST_BAR + i)
                     self.assertEqual(self.cli("--book", "crypto", "cycle")[0], 0)
-                market(coins, FIRST_BAR + 2)
+                cmarket(FIRST_BAR + 2)
                 runs = [["cycle", "--propose"], ["cycle", "--dry-run"], ["status"], ["scorecard"], ["verify"],
                         ["context", "BTC-USD"], ["predict", "BTC-USD", "up", "--horizon", "30"],
                         ["veto", "ETH-USD", "--reason", "crypto veto"], ["shrink", "BTC-USD", "0.5", "--reason", "crypto shrink"],
