@@ -1808,6 +1808,28 @@ class Handover(Parents):
                              min_leg_minutes=0, stop_after=10)
         self.assertEqual((rc, self.state_file()["handover"]["last_look"]), (76, (at - timedelta(seconds=100)).isoformat()))
 
+    # Test added in fix round 1 (review F2): with the market closed no stop is looked at on either side of a handover.
+    def test_with_the_market_closed_a_handover_is_measured_beat_to_beat(self):
+        # The last beat as the engine writes it with the market closed: AAA has no stamp (before the open no quote is
+        # live) and the beat repeats the stops_checked_at the run before left, yesterday's close (the 09:18 handover);
+        # BBB keeps a stamp from the session's end (the 14:17 handover of an early-close day).
+        clock, at = self.clock_from(9, 17, 58), datetime.now(timezone.utc).replace(microsecond=0)
+        (self.state / "news_heartbeat.json").write_text(json.dumps(
+            {"at": at.isoformat(), "pid": 1, "phase": "idle", "market_open": False, "blind": ["AAA", "BBB"],
+             "stops_checked_at": (at - timedelta(hours=17)).isoformat(),
+             "held": {"AAA": {"stop": 97.0, "checked_at": None},
+                      "BBB": {"stop": 48.5, "checked_at": (at - timedelta(minutes=80)).isoformat()}}}))
+        # the child never beats, so that beat is the last one when 09:18 comes, 2 s after the start
+        rc = self.run_parent([{"beats": 0, "then": "hang"}], "--handover", clock=clock, min_leg_minutes=0, stop_after=10)
+        last_look = self.state_file()["handover"]["last_look"]
+        # the next parent's child: the market still closed, both names held with the old stamp adopted
+        rc2 = self.run_parent([{"beats": 3, "then": "exit", "code": 0, "held": {"AAA": 97.0, "BBB": 48.5}, "open": False,
+                                "blind": ["AAA", "BBB"], "stop_age_s": 17 * 3600}], "--until", "09:18", clock=clock)
+        self.assertEqual((rc, rc2), (76, 0))
+        handover_s = self.urows("up")[-1]["handover_s"]
+        self.assertTrue(0 <= handover_s < 60, handover_s)
+        self.assertEqual(last_look, at.isoformat())
+
     def test_a_handover_time_that_is_no_clock_time_is_a_bad_config(self):   # else handover_due would raise inside the loop
         bad = [{"handover_times_ny": ["9:18"]}, {"handover_times_ny": ["24:00"]}, {"handover_times_ny": [918]},
                {"handover_times_ny": "09:18"}, {"min_leg_minutes": "20"}, {"max_leg_minutes": True}]

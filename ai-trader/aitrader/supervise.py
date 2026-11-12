@@ -1066,7 +1066,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 last = kid["last_look"] or _when(hb.get("stops_checked_at")) or sup_t
                 blind_s = round(open_seconds(last, max(after), cal), 1) if after and None not in after else 0
                 # The parent before handed over (spec 4.5): from its last look to this first look, beat to beat when
-                # nothing is held. Only this parent's first `up` gets it: it is cleared and saved at once.
+                # nothing is held or the market was closed. Only this parent's first `up` gets it: it is cleared and
+                # saved at once.
                 ho = st.get("handover")
                 ho_look = _when(ho.get("last_look")) if isinstance(ho, dict) else None
                 first = None if None in after else max(after, default=at)
@@ -1165,8 +1166,11 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             if word == "halt":
                 st["halt"] = {"code": rc, "why": HALT_WHY[rc], "at": _utc(clock())}
             elif word == "handover":  # the next parent's first `up` measures handover_s from last_look (spec 4.5)
-                hb = _read_beat(paths.heartbeat)[0] or {}  # the last beat: its oldest stop look; its `at` if none held
-                looks = list(_looks(hb).values()) or [_when(hb.get("at"))]
+                # the last beat: its oldest stop look; its `at` if none held, or with the market closed, when no stop is
+                # looked at and the next `up` takes its own first beat (review F2: else yesterday's adopted stamp)
+                hb = _read_beat(paths.heartbeat)[0] or {}
+                looks = [] if hb.get("market_open") is False else list(_looks(hb).values())
+                looks = looks or [_when(hb.get("at"))]
                 st["handover"] = {"at": _utc(clock()), "last_look": None if None in looks else _utc(min(looks))}
         if word == "crash_loop":  # R3, R3b at the second trip of the day, then nothing (spec 4.3; ruling P9)
             trip = seen["tripped"]
