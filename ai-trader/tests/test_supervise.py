@@ -2151,6 +2151,59 @@ class Drills(unittest.TestCase):
                 self.assertEqual((p.returncode, left, naming), (1, [], []), out + err[-2000:])
                 self.assertIn(f"FAIL e stopped by {sig.name}", out)
 
+    # Test added in fix round 1 of Task 14c (review finding F1): a mask in the main thread held nothing back, because
+    # `kill PID` reaches whichever thread of the script does not block it (the ntfy stub's lives until the cleanup ends)
+    # and CPython then runs the handler in the main thread.
+    STOP_IN_CLEANUP = """if True:
+        import importlib.util, os, signal, sys, time
+        spec = importlib.util.spec_from_file_location("drill_supervisor", "scripts/drill_supervisor.py")
+        drill = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(drill)
+
+        class Stopper:  # first in the drill's list of processes: looking at it sends the stop, mid-cleanup
+            def poll(self):
+                os.kill(os.getpid(), signal.SIGTERM)  # process-directed, as from outside
+                time.sleep(0.5)                       # the main thread runs the handler when this returns
+                return 0
+
+            def wait(self):
+                return 0
+
+        def failing(d):
+            d.procs.append(Stopper())
+            for _ in range(2):
+                p = d.popen([sys.executable, "-c", "import time; time.sleep(120)", sys.argv[1]],
+                            drill.no_phone.clean_env())
+                print("child", p.pid, flush=True)
+            raise drill.Failed("two children started")
+
+        def second(d):
+            print("second drill started", flush=True)
+            return "-"
+        drill.DRILLS.update(c=failing, d=second)
+        sys.exit(drill.main(["c", "d"]))
+    """
+
+    def test_a_stop_while_a_failed_drill_cleans_up_cuts_nothing_short(self):
+        """A drill that started two children fails; while run's cleanup kills its processes a SIGTERM comes. The
+        cleanup still kills both children, the stop then ends the run (the next drill never starts) and the script
+        returns 1. The children are the pids the script printed; a pid counts as that child only while its argv still
+        names this test's directory (a pid reused by another process is not it), and the test's own cleanup kills only
+        such a pid."""
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        cp = subprocess.run([sys.executable, "-c", self.STOP_IN_CLEANUP, str(tmp)], capture_output=True, text=True,
+                            env=no_phone.clean_env(TMPDIR=str(tmp)), cwd=TESTS.parent, timeout=60)
+        pids = [int(l.split()[1]) for l in cp.stdout.splitlines() if l.startswith("child ")]
+
+        def running() -> list[int]:
+            return [q for q in pids if (st := self.proc_stat(q)) and st[1] != "Z" and str(tmp) in self.argv_of(q)]
+        self.addCleanup(lambda: [os.kill(q, signal.SIGKILL) for q in running()])
+        fail = [l for l in cp.stdout.splitlines() if l.startswith("FAIL ")]
+        self.assertEqual((cp.returncode, len(pids), running(), "second drill started" in cp.stdout,
+                          [l.split(" (files kept")[0] for l in fail]),
+                         (1, 2, [], False, ["FAIL c two children started"]), cp.stdout + cp.stderr[-2000:])
+
     def test_a_fail_line_names_the_exceptions_class_and_never_its_text(self):   # constraints.md item 11
         """A drill that raises, and a Drill that cannot be built (its ntfy stub): each prints one FAIL line with the
         exception's class and the directory it keeps, never the exception's text, and returns so that the next drill

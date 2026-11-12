@@ -133,10 +133,18 @@ class Interrupted(BaseException):
     BaseException, so that the drills' own `except Exception` lets it through."""
 
 
+hold: list[str] | None = None  # a list while run cleans up: the handler notes a stop in it instead of raising it
+
+
 def interrupted(signum, frame) -> None:
-    """The handler of STOPS: the first one ends the run; the ones after it would only cut the cleanup short."""
+    """The handler of STOPS: the first one ends the run; the ones after it would only cut the cleanup short. While run
+    cleans up (`hold` is a list) the stop is noted there and run raises it once the cleanup is done: a signal mask would
+    not do, as `kill PID` reaches whichever thread does not block it and CPython runs the handler in the main thread."""
     for sig in STOPS:
         signal.signal(sig, signal.SIG_IGN)
+    if hold is not None:
+        hold.append(signal.Signals(signum).name)
+        return
     raise Interrupted(signal.Signals(signum).name)
 
 
@@ -642,8 +650,10 @@ DRILLS = {"a": drill_a, "b": drill_b, "c": drill_c, "d": drill_d, "e": drill_e, 
 def run(name: str, fast: bool, rounds: int, seed: int | None = None) -> bool:
     """One drill: its PASS or FAIL line. A passed drill's files are removed; a failed one's are kept and named. A FAIL
     line carries a pass mark in the drill's own words, or an exception's class and never its text (constraints, item
-    11); drill e's carries its seed. Every process the drill started is killed when it ends, by whatever path: with
-    STOPS held back meanwhile, so that a signal cannot cut that short. Interrupted goes on to main once that is done."""
+    11); drill e's carries its seed. Every process the drill started is killed when it ends, by whatever path, and a
+    signal cannot cut that short: a stop that comes meanwhile is only noted (`hold`) and raised as Interrupted once that
+    is done. Interrupted goes on to main."""
+    global hold  # noqa: PLW0603 - the handler reads it
     tmp = d = None
     passed, seeded = False, f" seed={seed}" if name == "e" else ""  # e is the drill that draws at random
 
@@ -666,7 +676,7 @@ def run(name: str, fast: bool, rounds: int, seed: int | None = None) -> bool:
         print(f"FAIL {name} stopped by {e}{kept()}", flush=True)
         raise
     finally:
-        mask = signal.pthread_sigmask(signal.SIG_BLOCK, STOPS)
+        hold = []  # the first statement: no signal check comes before it
         try:
             if d is not None:
                 d.end()
@@ -674,7 +684,9 @@ def run(name: str, fast: bool, rounds: int, seed: int | None = None) -> bool:
             if passed:
                 shutil.rmtree(tmp, ignore_errors=True)
         finally:
-            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+            noted, hold = hold, None
+        if noted:
+            raise Interrupted(noted[0])
     return passed
 
 
