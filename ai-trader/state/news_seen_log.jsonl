@@ -2424,3 +2424,15 @@
 {"key": "ceee4f78b5db7614", "symbol": "MU", "published": "2026-11-12T17:32:19+00:00", "first_seen": "2026-11-12T17:51:39.413616+00:00", "outcome": "scored"}
 {"key": "1c25e733fc21dfe9", "symbol": "GS", "published": "2026-11-12T17:47:00+00:00", "first_seen": "2026-11-12T17:51:59.423617+00:00", "outcome": "scored"}
 {"key": "9dd66f5e60e352bf", "symbol": "NVDA", "published": "2026-11-12T17:45:00+00:00", "first_seen": "2026-11-12T17:52:19.455613+00:00", "outcome": "scored"}
+{"key": "5b001fae0c9240e4", "symbol": "MRK", "published": "2026-11-12T16:53:00+00:00", "first_seen": "2026-11-12T17:55:59.518596+00:00", "outcome": "stale"}
+{"key": "a906cca2d3cd6c43", "symbol": "TSLA", "published": "2026-11-12T17:45:07+00:00", "first_seen": "2026-11-12T17:55:59.518105+00:00", "outcome": "scored"}
+{"key": "3e796ee90488973d", "symbol": "MSFT", "published": "2026-11-12T17:45:33+00:00", "first_seen": "2026-11-12T17:56:19.531937+00:00", "outcome": "scored"}
+{"key": "28dbbcd253f36451", "symbol": "MSFT", "published": "2026-11-12T17:45:28+00:00", "first_seen": "2026-11-12T17:56:19.531958+00:00", "outcome": "scored"}
+{"key": "499ad440e4131af7", "symbol": "ORCL", "published": "2026-11-12T17:45:28+00:00", "first_seen": "2026-11-12T17:56:19.532011+00:00", "outcome": "scored"}
+{"key": "275b47295aba7ad7", "symbol": "INTC", "published": "2026-11-12T17:53:02+00:00", "first_seen": "2026-11-12T17:56:19.532141+00:00", "outcome": "scored"}
+{"key": "67c38790afb87a2d", "symbol": "AAPL", "published": "2026-11-12T17:45:33+00:00", "first_seen": "2026-11-12T17:56:39.524632+00:00", "outcome": "scored"}
+{"key": "00e64986f3bfb655", "symbol": "NVDA", "published": "2026-11-12T17:45:07+00:00", "first_seen": "2026-11-12T17:56:39.524681+00:00", "outcome": "scored"}
+{"key": "501bd7aac4d4acba", "symbol": "NVDA", "published": "2026-11-12T17:53:02+00:00", "first_seen": "2026-11-12T17:56:39.524687+00:00", "outcome": "scored"}
+{"key": "7a61419a926859e9", "symbol": "GOOGL", "published": "2026-11-12T17:45:33+00:00", "first_seen": "2026-11-12T17:56:39.524884+00:00", "outcome": "scored"}
+{"key": "bdff916acde67d10", "symbol": "AMZN", "published": "2026-11-12T17:45:28+00:00", "first_seen": "2026-11-12T17:56:39.524947+00:00", "outcome": "scored"}
+{"key": "eaff4cb1c5afd0f8", "symbol": "AAPL", "published": "2026-11-12T16:30:11+00:00", "first_seen": "2026-11-12T17:57:39.544039+00:00", "outcome": "stale"}
