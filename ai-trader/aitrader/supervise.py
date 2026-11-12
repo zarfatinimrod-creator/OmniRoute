@@ -497,8 +497,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             def spawn() -> subprocess.Popen:
                 before = _read_beat(paths.heartbeat)[0] or {}  # the engine before this one: its last look ends there
                 looks = list(_looks(before).values()) or [_when(before.get("stops_checked_at"))]
-                kid.update(started=time.time(), last_look=None if None in looks else min(looks), up=False, code=False,
-                           hang=None, hang_said=False)
+                kid.update(started=time.time(), last_look=None if None in looks else min(looks),
+                           held_before=set(_held(before)), up=False, code=False, hang=None, hang_said=False)
                 # From the main thread: the kernel ties the child's PR_SET_PDEATHSIG to the thread that started it.
                 with open(paths.engine_log, "ab") as out:  # the child keeps a descriptor of its own
                     return subprocess.Popen(cmd, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=out,
@@ -568,9 +568,13 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 """The row `up` (spec 4.6): what the restart cost, at this child's first beat that has looked at its
                 stops (with the market closed: its first beat)."""
                 at, blind = _when(hb.get("at")), view["blind"]
-                # the first look after, per held name: this child's own stamp; for a blind or unlooked name, the beat
+                # the first look after, per held name: this child's own stamp; for a blind or unlooked name, the beat.
+                # A name the child before held that this beat no longer holds was sold by the first look: the beat too.
+                looks = _looks(hb)
                 after = [at if s in blind or t is None or t.timestamp() < kid["started"] else t
-                         for s, t in _looks(hb).items()]
+                         for s, t in looks.items()]
+                if kid["held_before"].difference(looks):
+                    after.append(at)
                 last = kid["last_look"] or _when(hb.get("stops_checked_at"))  # cold: the stamp the engine adopted
                 blind_s = (round(open_seconds(last, max(after), cal), 1)
                            if after and None not in after and last is not None else 0)

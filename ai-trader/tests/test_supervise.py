@@ -1120,6 +1120,28 @@ class Watching(Parents):
         # to: BBB is blind, so the `at` of the beat that wrote `up` (a whole second of this run), not its stamp of 3000 s ago
         self.assertEqual((self.urows("up")[0]["blind_s"], a, began <= b.timestamp() <= time.time()), (42.0, last, True))
 
+    # Test added by the review (Task 12, F1).
+    def test_blind_s_counts_a_name_held_before_the_start_that_the_first_look_sold(self):   # spec 4.6: 0 only when nothing was held
+        last = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(seconds=40)
+        (self.state / "news_heartbeat.json").write_text(json.dumps(    # the engine before this one held BBB
+            {"at": last.isoformat(), "pid": 1, "phase": "idle", "market_open": True, "stops_checked_at": last.isoformat(),
+             "held": {"BBB": {"stop": 48.5, "checked_at": last.isoformat()}}, "blind": []}))
+        asked, beats, real = [], [], supervise.first_look_done
+
+        def first_look_done(hb, child_pid, started):   # the first beat it says yes to is the beat that writes `up`
+            done = real(hb, child_pid, started)
+            if done:
+                beats.append(hb)
+            return done
+
+        script = [{"beats": 10, "then": "exit", "code": 0}]              # this run holds nothing: its first look sold BBB
+        with mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0), \
+                mock.patch.object(supervise, "first_look_done", first_look_done):
+            self.assertEqual(self.run_parent(script, "--until", "10:00"), 0)
+        ((a, b),), (beat,) = asked, beats
+        self.assertEqual((self.urows("up")[0]["held"], self.urows("up")[0]["blind_s"], a, b),
+                         ({}, 42.0, last, datetime.fromisoformat(beat["at"])))
+
     # Tests added from the mutation pass: behaviour the brief specifies that no test above would miss.
     def test_first_look_done_wants_this_childs_own_look_at_every_held_name(self):   # spec 4.6, `up`
         at = datetime.now(timezone.utc)
