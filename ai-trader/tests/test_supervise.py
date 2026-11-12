@@ -1542,9 +1542,15 @@ class ParentLines(Parents):
         self.assertEqual(got, [200, "ConnectionRefusedError"])
 
 
-# A process that sleeps out the test and whose command line names `word` as a parent's or an engine's does: what
-# --status takes for a live parent ("aitrader.supervise") or a live engine ("news-live").
-STAND_IN = "import time; time.sleep(60)"
+# A process that sleeps out the test and whose command line names `word` as a parent's or an engine's does. Given a lock
+# file (argv[1], else ""), it first holds an flock on it, as a parent or an engine holds its own lock, then says "held":
+# what --status takes for a live parent ("aitrader.supervise") or a live engine ("news-live").
+STAND_IN = """import fcntl, sys, time
+if sys.argv[1]:
+    lock = open(sys.argv[1], "a+")
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+print("held", flush=True)
+time.sleep(60)"""
 
 
 class Status(Parents):
@@ -1555,15 +1561,18 @@ class Status(Parents):
 
     NOW = datetime(2026, 11, 12, 10, 7, tzinfo=NY)
 
-    def live(self, word: str) -> subprocess.Popen:
-        """A stand-in process whose command line names `word`, started by this test (so its parent is no parent)."""
-        p = subprocess.Popen([sys.executable, "-c", STAND_IN, word], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, env=no_phone.clean_env())
+    def live(self, word: str, lock: Path | None = None) -> subprocess.Popen:
+        """A stand-in process whose command line names `word`, started by this test (so its parent is no parent); with
+        lock, it holds an flock on that file from the moment this returns, until it is killed."""
+        p = subprocess.Popen([sys.executable, "-c", STAND_IN, str(lock or ""), word], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=no_phone.clean_env())
         self._started.append(p)
+        self.assertEqual(p.stdout.readline(), b"held\n")
         return p
 
     def holds(self, lock: Path, pid: int) -> None:
-        """The lock file's text names pid, as its holder writes it. Nothing takes the lock: --status never probes it."""
+        """The lock file's text names pid, as its holder writes it. The text only: the lock is held by live(word, lock),
+        and --status reads the lock itself (/proc/locks), never the text alone (controller note, 12:19 UTC 2026-11-11)."""
         lock.write_text(json.dumps({"pid": pid, "started_at": "2026-11-12T15:00:00+00:00"}) + "\n")
 
     def status(self, now=None, ny=None, parent=None, mark_age_s=None, engine=None, halt=None, halt_day=None, trips=0,
@@ -1581,15 +1590,15 @@ class Status(Parents):
             return path
         try:
             if parent == "alive":
-                procs.append(self.live("aitrader.supervise"))
-                self.holds(touch(paths.lock), procs[-1].pid)
+                procs.append(self.live("aitrader.supervise", touch(paths.lock)))
+                self.holds(paths.lock, procs[-1].pid)
             if mark_age_s is not None:
                 supervise.append_row(touch(paths.uptime), procs[0].pid if procs else 4242, "mark",
                                      now - timedelta(seconds=mark_age_s), hb=1.0, stop=None, n=0, open=True, blind=[], dm=None,
                                      left=None)
             if engine == "alive_without_a_parent":
-                procs.append(self.live("news-live"))
-                self.holds(touch(paths.engine_lock), procs[-1].pid)
+                procs.append(self.live("news-live", touch(paths.engine_lock)))
+                self.holds(paths.engine_lock, procs[-1].pid)
             if halt_day:
                 halt = {"code": 4, "why": "chain", "at": f"{halt_day}T15:00:00+00:00"}
             if halt or trips:
@@ -1653,7 +1662,7 @@ class Status(Parents):
     def test_unsent_leaves_out_what_was_relayed_what_is_still_retried_and_adds_r5e_from_the_second_day(self):
         # a live parent; R4-1 relayed; R1-3 and R10-4 failed a minute ago; R4-1 and R4-2 failed 20 minutes ago (past
         # alert_retry_minutes); the book holds BBB (R5e's {held}, ruling P11)
-        parent = self.live("aitrader.supervise")
+        parent = self.live("aitrader.supervise", self.paths.lock)
         self.holds(self.paths.lock, parent.pid)
         for n, kind, ago in ((1, "R4", 20), (2, "R4", 20), (3, "R1", 1), (4, "R10", 1)):
             supervise.append_row(self.paths.uptime, 4242, "alert", self.NOW - timedelta(minutes=ago), id=f"{kind}-{n}", kind=kind,
@@ -1695,8 +1704,30 @@ class Status(Parents):
                          ("10:07:00", ["alive", "mark_age_s", "pid"], ["commit", "dirty", "hb_age_s", "held", "stop_age_s"]))
 
     def test_clear_halt_with_a_live_parent_exits_3_and_runs_no_check(self):
-        self.holds(self.paths.lock, self.live("aitrader.supervise").pid)
+        parent = self.live("aitrader.supervise", self.paths.lock)
+        self.holds(self.paths.lock, 99999999)                                 # the text names no process: the lock decides
         self.assertEqual((self.clear_halt(check_rc=0), self.state_file()["halt"]["code"], "stand-in check" in self.out), (3, 4, False))
+        self.assertIn(f"a live parent, pid {parent.pid}:", self.out)          # the holder's pid, read from the lock
+
+    # Tests added in fix round 1 (finding F2; controller note, 12:19 UTC 2026-11-11: --status tests the lock itself,
+    # never the text alone). 99999999 is above the kernel's largest pid (2**22), so no process has it.
+    def test_a_lock_file_whose_text_names_a_live_parent_that_holds_no_lock_is_no_parent(self):   # a recycled pid
+        self.holds(self.paths.lock, self.live("aitrader.supervise").pid)    # e.g. another --status run
+        got = self.status()
+        self.assertEqual((got["parent"]["alive"], got["action"]), (False, "launch"))
+        self.live("aitrader.supervise", self.tmp / "other.lock")           # a parent of another clone holds its own lock
+        self.live("news-live", self.paths.lock)                             # this lock, held by a process that is no parent
+        self.assertFalse(self.status()["parent"]["alive"])
+
+    def test_a_held_lock_whose_text_names_an_older_pid_is_a_live_parent_with_the_holders_pid(self):
+        parent = self.live("aitrader.supervise", self.paths.lock)          # take_lock keeps the flock when the text
+        self.holds(self.paths.lock, 99999999)                               # cannot be written: the old text stays
+        got = self.status()
+        self.assertEqual((got["parent"]["alive"], got["parent"]["pid"], got["action"]), (True, parent.pid, "replace_parent"))
+        engine = self.live("news-live", self.paths.engine_lock)
+        parent.kill(); parent.wait()                                        # no parent: a stray engine, its pid from its lock
+        self.holds(self.paths.engine_lock, 99999999)
+        self.assertEqual(self.status()["why"], f"engine pid {engine.pid} runs without a live parent")
 
     def test_relayed_keeps_the_days_ids_and_a_new_day_starts_an_empty_list(self):   # the one writer of news_relayed.json
         self.assertEqual((self.relayed("R4-1", now=self.NOW - timedelta(days=1)), self.relayed("R1-3", "R4-2"), self.relayed("R4-2", "R5e-2026-11-12")),

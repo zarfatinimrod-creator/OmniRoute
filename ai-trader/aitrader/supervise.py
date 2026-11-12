@@ -190,9 +190,9 @@ def take_lock(path: Path, now: datetime) -> IO | None:
     """The parent's lock (spec 4.2), taken as the engine takes its own (news_live.run): an flock held for the life of
     the parent and freed by the kernel however the parent ends. Returns the open file, which the caller keeps open,
     or None when another process holds the lock. The holder writes {"pid", "started_at"} into the file, as the engine
-    does, for the start it refuses and for --status; "a+" leaves that text alone while a refused start reads it. The
-    text is a hint only: it stays after the holder has ended. Any other failure of the lock call is raised. The file
-    is not inherited by the child (Python opens it non-inheritable)."""
+    does, for the start it refuses; "a+" leaves that text alone while a refused start reads it. The text is a hint
+    only: it stays after the holder has ended (--status reads the lock itself). Any other failure of the lock call is
+    raised. The file is not inherited by the child (Python opens it non-inheritable)."""
     f = open(path, "a+", encoding="utf-8")
     try:
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -525,13 +525,26 @@ def _ppid(pid: int) -> int | None:
         return None
 
 
+# A row of /proc/locks that holds an flock (a waiting row starts with "->"): "1: FLOCK  ADVISORY  WRITE <pid>
+# <major>:<minor>:<inode> 0 EOF". Only the inode is compared: on an overlay filesystem /proc/locks gives another device
+# than stat does. ponytail: an flock on a file of another filesystem with the same inode number, held by a process
+# whose command line names the same word, would pass too; compare the device as well if that ever happens.
+FLOCK_ROW = re.compile(r"^\d+:\s+FLOCK\s+\S+\s+(?:READ|WRITE)\s+(-?\d+)\s+[0-9a-f]+:[0-9a-f]+:(\d+)\s")
+
+
 def _live(lock: Path, name: str) -> int | None:
-    """The pid in a lock file's text when that process lives and its command line names `name` (aitrader.supervise for
-    the parent, news-live for the engine); else None. The text alone is a hint: it stays after its writer has ended,
-    and its pid can be some other process now (Review Focus 1). No lock is probed: taking one, even for a moment, could
-    refuse a parent that starts in that moment."""
-    pid = _holder(lock)
-    return pid if isinstance(pid, int) and not isinstance(pid, bool) and name in _argv(pid) else None
+    """The pid that holds the flock on the lock file when its command line names `name` (aitrader.supervise for the
+    parent, news-live for the engine); else None. The lock itself decides (controller note, 12:19 UTC 2026-11-11), read
+    in /proc/locks, never the text in the file: the text stays after its writer has ended, its pid can be some other
+    process now (Review Focus 1), and it can name an older pid while a live holder holds the lock (take_lock keeps the
+    flock when the text cannot be written). Read-only: no flock call, which even for a moment could refuse a parent
+    that starts in that moment. A file or a /proc/locks that cannot be read: None."""
+    try:
+        ino, rows = lock.stat().st_ino, Path("/proc/locks").read_text().splitlines()
+    except OSError:
+        return None
+    holders = [int(m[1]) for m in map(FLOCK_ROW.match, rows) if m and int(m[2]) == ino]
+    return next((pid for pid in holders if name in _argv(pid)), None)
 
 
 def _relayed(path: Path, day: str) -> list[str]:
@@ -545,8 +558,8 @@ def _relayed(path: Path, day: str) -> list[str]:
 
 def status(paths: Paths, cfg: dict, now: datetime, *, watchdog: bool = False, environ: Mapping | None = None) -> dict:
     """What a woken session does now (spec 4.4), as the JSON of --status. It reads files and /proc only: it writes
-    nothing and probes no lock. A parent is alive when its lock file names a live pid whose command line names
-    aitrader.supervise; an engine, the same with the engine's lock and news-live.
+    nothing and takes no lock. A parent is alive when its lock is held (/proc/locks) by a pid whose command line names
+    aitrader.supervise, and that pid is parent.pid; an engine, the same with the engine's lock and news-live.
     - action: the first row of the spec's table that applies: closed_today; after_hours (outside launch_from_ny to
       launch_until_ny, New York); none (a live parent, and the uptime log's last mark is at most parent_stale_seconds
       old: one parent runs at a time, so it is that parent's unless it has not ticked yet); replace_parent (a live
@@ -655,8 +668,9 @@ def clear_halt(paths: Paths, now: datetime, check: list[str], env: Mapping | Non
     """--clear-halt (spec 4.4): with a live parent, nothing (3). Else the engine's start checks run read-only (check +
     --check: `news-live --check`) and their output is printed; on 0 the halt is cleared under the parent's lock (0),
     else it stays (1)."""
-    if _live(paths.lock, "aitrader.supervise") is not None:
-        print(f"supervise: a live parent, pid {_holder(paths.lock)}: the halt stays", flush=True)
+    parent = _live(paths.lock, "aitrader.supervise")
+    if parent is not None:
+        print(f"supervise: a live parent, pid {parent}: the halt stays", flush=True)
         return 3
     try:
         done = subprocess.run([*check, "--check"], cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
