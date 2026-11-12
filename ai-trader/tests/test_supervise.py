@@ -966,3 +966,20 @@ class ParentLoop(Parents):
         shutil.rmtree(self.state)
         self.assertEqual(self.run_parent([{"beats": -1}], clock=saturday), 0)
         self.assertEqual(([r["ev"] for r in self.urows()], self.sup_log() != ""), (["sup_start", "sup_stop"], True))
+
+    # Test added by the review (Task 11, F1).
+    def test_a_weekday_of_a_year_the_calendar_does_not_list_starts_the_engine_and_halts_on_its_5(self):   # spec 4.3, code 5
+        cal = supervise.load_cfg()["calendar"]                                 # the config copy's calendar is this one
+        days = [date(max(cal["years"]) + 1, 1, k) for k in range(2, 9)]
+        at = lambda d: (lambda: datetime(d.year, d.month, d.day, 15, 0, tzinfo=timezone.utc))   # 10:00 New York (EST)
+        # The dummy child stands in for the engine's start check 1 (news_live.start_checks): the calendar does not cover
+        # today, its urgent line, exit 5. Not "closed_today" on a weekday: that would skip the check, its line and every
+        # stop look. On a weekend there is no stop to look at: still closed_today, and no child.
+        refuses = [{"beats": 0, "then": "exit", "code": 5}]
+        weekend = next(d for d in days if d.weekday() >= 5)
+        self.assertEqual(self.run_parent(refuses, clock=at(weekend)), 0)
+        weekday = next(d for d in days if d.weekday() < 5)
+        self.assertEqual(self.run_parent(refuses, clock=at(weekday)), 5)
+        self.assertEqual((len(self.urows("start")), [(r["why"], r["rc"]) for r in self.urows("sup_stop")]),
+                         (1, [("closed_today", 0), ("halt", 5)]))
+        self.assertEqual((self.state_file()["halt"]["code"], self.state_file()["halt"]["why"]), (5, "calendar"))

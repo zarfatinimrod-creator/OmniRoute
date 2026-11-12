@@ -381,7 +381,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
              timeout_ms=TWO_HOURS_MS if a.handover else sup["long_timeout_ms"], prev_t=prev.get("t"),
              prev_ev=prev.get("ev"), gap_s=gap, cold=not paths.heartbeat.exists())
         log(f"start: pid {pid}, until {a.until}, handover {'on' if a.handover else 'off'}")
-        if session_hours(day, cal) is None:
+        # A weekday of a year the calendar does not list is no closed day, though session_hours fails it closed: the
+        # engine's start check refuses it with its urgent line and 5, and the parent halts on that 5 (spec 4.3).
+        if session_hours(day, cal) is None and (day.weekday() >= 5 or day.year in cal.get("years", [])):
             rc, word = 0, "closed_today"
         else:
             cmd = list(child_cmd or [sys.executable, "-u", "-m", "aitrader", "news-live"])
