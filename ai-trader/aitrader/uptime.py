@@ -31,10 +31,12 @@ def _stretches(timed: list[tuple[datetime, dict]], sup: dict) -> dict[str, list]
     - an `exit` to the next `up`: "hang" after a hang kill; "handover" when the parent then handed over; "gap" when it
       then ended for the day or was stopped (signal, orphaned) and no parent ran until the next; else "restart" (a
       crash, a trip, a halt, a held lock);
-    - two marks more than mark_gap_max_seconds apart: "gap";
-    - two marks when the later one shows `hb` above up_hb_max_seconds: "hang". A null `hb` (no beat of this child:
-      spec 4.6) goes on with what the mark before it showed: "hang" after a stale beat (the hang row is written after
-      the kill, so a hang's start comes from the marks), else "gap";
+    - two marks more than mark_gap_max_seconds apart: "gap" only, whatever the later mark shows (a VM pause, a dead
+      machine, a stalled parent: spec 4.6; a pause freezes the parent and the engine together, so the beat at its end
+      is as old as the pause);
+    - two marks closer than that when the later one shows `hb` above up_hb_max_seconds: "hang". A null `hb` (no beat
+      of this child: spec 4.6) goes on with what the mark before it showed: "hang" after a stale beat (the hang row is
+      written after the kill, so a hang's start comes from the marks), else "gap";
     - two marks when the later one shows `n` above 0 and `stop` above stops_stale_seconds, or no stop it can read:
       "stale_stops"."""
     out: dict[str, list] = {c: [] for c in CAUSES}
@@ -58,12 +60,48 @@ def _stretches(timed: list[tuple[datetime, dict]], sup: dict) -> dict[str, list]
     for (ta, a), (tb, b) in zip(marks, marks[1:]):
         if (tb - ta).total_seconds() > sup["mark_gap_max_seconds"]:
             out["gap"].append((ta, tb))
-        if beat_stale(b) or (not _num(b.get("hb")) and beat_stale(a)):
+        elif beat_stale(b) or (not _num(b.get("hb")) and beat_stale(a)):
             out["hang"].append((ta, tb))
         elif not _num(b.get("hb")):
             out["gap"].append((ta, tb))
         if _num(b.get("n")) and b["n"] > 0 and not (_num(b.get("stop")) and b["stop"] <= sup["stops_stale_seconds"]):
             out["stale_stops"].append((ta, tb))
+    return out
+
+
+def _session(day: date, cal: dict) -> tuple[datetime, datetime] | None:
+    """(open, close) of `day`'s session, New York time; None on a day with no session."""
+    hours = supervise.session_hours(day, cal)
+    if hours is None:
+        return None
+    (oh, om), (ch, cm) = hours
+    return (datetime(day.year, day.month, day.day, oh, om, tzinfo=NY),
+            datetime(day.year, day.month, day.day, ch, cm, tzinfo=NY))
+
+
+def _true_alarms(timed: list[tuple[datetime, dict]], day: date, cfg: dict) -> list[bool]:
+    """For each of the day's `new_seq` rows (an alarm that went out), whether it was true (spec 11.2: dead-man alarms,
+    true and false). The row comes at the first ping after the old message was due (spec 6), so the last
+    delay_seconds - seq_margin_seconds before it lie inside the silence the alarm came from. True: an outage stretch
+    (restart, hang, handover, gap: the engine did not run or beat, or no parent ran) touches that time. False: the
+    parent ran with a fresh child through it, so its pings did not get through (a network cut to ntfy, a 429, the
+    daily limit: spec 6, 13). False too when the last `cancel_failed` or `new_seq` before the row is a cancel that
+    failed after its day's close: what went out was DM3, or the DM1 that R9 calls false."""
+    dm, stretches = cfg["supervisor"]["deadman"], _stretches(timed, cfg["supervisor"])
+    # ponytail: only the silence's last delay - margin seconds are known from the log, so a network cut whose last
+    # minutes also hold a restart reads as true; exact would need the old seq's due_at on the `new_seq` row (Task 21)
+    silence = timedelta(seconds=dm["delay_seconds"] - dm["seq_margin_seconds"])
+    out, last = [], None  # last: the latest cancel_failed or new_seq row so far, as (t, what)
+    for t, r in timed:
+        what = r.get("what") if r.get("ev") == "deadman" else None
+        if what == "new_seq" and t.astimezone(NY).date() == day:
+            bounds = last and last[1] == "cancel_failed" and _session(last[0].astimezone(NY).date(), cfg["calendar"])
+            if bounds and last[0] >= bounds[1]:  # that cancel failed after its day's close
+                out.append(False)
+            else:
+                out.append(any(a < t and (b is None or b > t - silence) for c in OUTAGE for a, b in stretches[c]))
+        if what in ("cancel_failed", "new_seq"):
+            last = (t, what)
     return out
 
 
@@ -73,12 +111,10 @@ def _by_second(timed: list[tuple[datetime, dict]], day: date, cfg: dict):
     "gap". Held: a mark's `n` above 0, or an `up` row's `held`; a second between two such readings is held when either
     says so, before the first and after the last when that one does, and with no reading at all (nothing shows that
     nothing was held)."""
-    hours = supervise.session_hours(day, cfg["calendar"])
-    if hours is None:
+    bounds = _session(day, cfg["calendar"])
+    if bounds is None:
         return None
-    (oh, om), (ch, cm) = hours
-    open_ = datetime(day.year, day.month, day.day, oh, om, tzinfo=NY)
-    close = datetime(day.year, day.month, day.day, ch, cm, tzinfo=NY)
+    open_, close = bounds
     size = int((close - open_).total_seconds())
 
     # ponytail: one slot a second (23,400 a day) is the simplest exact union; a far longer span would want merged
@@ -116,8 +152,9 @@ def day_report(rows: list[dict], day: date, cfg: dict, health: list[dict] | None
     before the day counts from the open); health: the rows of news_health.jsonl, None when there is no such file.
     uptime = 1 - unprotected_s / session_s, null with no session. A second that fits two causes is counted once, under
     the first of CAUSES. restarts: the parent's own count (a start's `n` is its restarts_today + 1: it rises at a
-    counted restart and repeats at a handover or a lock refusal). ntfy_failed: the day's alert rows `sent` false (a line
-    whose call failed, or that had no topic). open_at_close: the `held` of the day's last `up` row (ruling P11)."""
+    counted restart and repeats at a handover or a lock refusal). deadman: alarms (the day's `new_seq` rows), split
+    into alarms_true and alarms_false (_true_alarms). ntfy_failed: the day's alert rows `sent` false (a line whose call
+    failed, or that had no topic). open_at_close: the `held` of the day's last `up` row (ruling P11)."""
     timed = _timed(rows)
     today = [r for t, r in timed if t.astimezone(NY).date() == day]
 
@@ -136,6 +173,7 @@ def day_report(rows: list[dict], day: date, cfg: dict, health: list[dict] | None
     blinds = [r["blind_s"] for r in ups if _num(r.get("blind_s"))]
     lefts = [r["left"] for r in of("mark") if _num(r.get("left"))]
     last_held = ups[-1].get("held") if ups else None
+    true_alarms = _true_alarms(timed, day, cfg)
     return {
         "day": day.isoformat(),
         "session_s": len(cause),
@@ -148,7 +186,8 @@ def day_report(rows: list[dict], day: date, cfg: dict, health: list[dict] | None
         "trips": len(of("tripped")),
         "handovers": [r["handover_s"] for r in ups if r.get("handover_s") is not None],
         "longest_blind_s": max(blinds, default=None),
-        "deadman": {"alarms": deadman.count("new_seq"), "ping_failed": deadman.count("ping_failed"),
+        "deadman": {"alarms": deadman.count("new_seq"), "alarms_true": sum(true_alarms),
+                    "alarms_false": true_alarms.count(False), "ping_failed": deadman.count("ping_failed"),
                     "cancel_failed": deadman.count("cancel_failed")},
         "ntfy_failed": sum(1 for r in of("alert") if r.get("sent") is False),
         "left_min": min(lefts, default=None),
@@ -171,7 +210,9 @@ def close_lines(report: dict, rows: list[dict], cfg: dict) -> list[dict]:
     - R9: a `deadman` row cancel_failed carries dm3 false (Task 21);
     - R11: the day had a trip, or more unprotected minutes than its lines reported: the `m` of each R4 and R4b alert
       row whose line reached a channel (a row of its id with `sent` true, counted once), plus this call's R4c
-      (ruling P6). A line that never got `sent` true reported nothing."""
+      (ruling P6). A line that never got `sent` true reported nothing. Its {r} ("the engine fell r times") is the
+      day's falls: restarts + trips, since each trip follows one fall the parent did not restart (R3's {k} is the
+      trip's restarts + 1)."""
     sup, day, timed = cfg["supervisor"], date.fromisoformat(report["day"]), _timed(rows)
     lines, reported = [], {}
     sec = _by_second(timed, day, cfg)
@@ -191,7 +232,7 @@ def close_lines(report: dict, rows: list[dict], cfg: dict) -> list[dict]:
                      and r.get("kind") in ("R4", "R4b") and r.get("sent") is True and _num(r.get("m"))})
     m = round(report["unprotected_s"] / 60)
     if report["trips"] or m > sum(reported.values()):
-        lines.append(_line("R11", sup, r=report["restarts"], t=report["trips"], m=m))
+        lines.append(_line("R11", sup, r=report["restarts"] + report["trips"], t=report["trips"], m=m))
     return lines
 
 
@@ -220,7 +261,8 @@ def render(reports: list[dict], cfg: dict) -> str:
             "  by cause: " + ", ".join(f"{c} {s}" for c, s in r["by_cause"].items()) + f"; exposed_s {r['exposed_s']}",
             f"  restarts {r['restarts']}, trips {r['trips']}, handovers {_text(r['handovers'])}, longest_blind_s"
             f" {_text(r['longest_blind_s'])}",
-            f"  dead-man alarms {d['alarms']}, ping_failed {d['ping_failed']}, cancel_failed {d['cancel_failed']};"
+            f"  dead-man alarms {d['alarms']} (true {d['alarms_true']}, false {d['alarms_false']}), ping_failed"
+            f" {d['ping_failed']}, cancel_failed {d['cancel_failed']};"
             f" ntfy_failed {r['ntfy_failed']}, left_min {_text(r['left_min'])}",
             f"  commits {_text(r['commits'])}; open_at_close {_text(r['open_at_close'])}; stop_gap_max_s"
             f" {_text(r['stop_gap_max_s'])}",

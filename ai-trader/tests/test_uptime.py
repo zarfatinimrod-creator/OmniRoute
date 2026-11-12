@@ -83,14 +83,21 @@ class Report(unittest.TestCase):
         self.assertEqual((r["session_s"], r["unprotected_s"], r["uptime"]), (12600, 0, 1.0))
 
     def test_close_lines_and_only_the_notify_form_prints_them(self):  # an exit at 20:50 UTC with no up; a tripped row; no alert rows
-        rows = [row("2026-11-12T13:08:00+00:00", "up", down_s=None, blind_s=0, handover_s=None, held={"MU": 708.97})]
+        rows = [row("2026-11-12T13:07:00+00:00", "start", child=2, n=1, backoff_s=0),
+                row("2026-11-12T13:08:00+00:00", "up", down_s=None, blind_s=0, handover_s=None, held={"MU": 708.97})]
         rows += marks("2026-11-12", "14:30:00", "20:50:00", n=1, stop=30)
+        loop = datetime.fromisoformat("2026-11-12T20:48:58+00:00")
+        for n in range(2, 7):  # a crash loop: five restarts (a start's n is restarts_today + 1); the sixth fall trips
+            t = loop + timedelta(seconds=12 * (n - 2))
+            rows += [row(t.isoformat(), "exit", child=n, rc=1, signal=None, ran_s=10.0, why="exit"),
+                     row((t + timedelta(seconds=2)).isoformat(), "start", child=n + 1, n=n, backoff_s=2)]
         rows += [row("2026-11-12T20:50:00+00:00", "exit", child=7, rc=1, signal=None, ran_s=12.0, why="exit"),
                  row("2026-11-12T20:50:00+00:00", "tripped", restarts=5, window_s=600, trips_today=1),
                  row("2026-11-12T20:50:00+00:00", "sup_stop", why="crash_loop", rc=75)]
         r = uptime.day_report(rows, date(2026, 11, 12), CFG)
         self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R4c", "R11"])
         self.assertTrue(all(l["text"].endswith("כסף נייר") for l in uptime.close_lines(r, rows, CFG)))
+        self.assertIn("המנוע נפל 6 פעמים,", uptime.close_lines(r, rows, CFG)[-1]["text"])  # falls: as R3 said, 5 + 1
         tmp = self.state(rows)
         self.assertEqual(("\"notify\"" in out_of("--day", "2026-11-12"), "\"notify\"" in out_of("--day", "2026-11-12", "--notify")), (False, True))
         self.assertEqual([p.name for p in tmp.iterdir()], ["uptime.jsonl"])  # read-only: nothing written beside it
@@ -103,7 +110,9 @@ class Report(unittest.TestCase):
         up_hb_max_seconds in the marks, with stale stops inside it (hang wins). A hang kill: the hang row is written
         after the kill, so the hang's start comes from the marks, and the mark with no beat right after the kill
         goes on with the hang. A handover: the planned exit to the next parent's up. Marks 300 s apart whose later
-        one shows an old beat fit both gap and hang: hang, the first of the two."""
+        one shows an old beat are a gap only: a VM pause freezes the parent and the engine together, so the beat is as
+        old as the pause (spec 4.6 names the mark gap the VM pause, the dead machine, the stalled parent). Marks a
+        minute apart with an old beat (15:01-15:03, 16:01-16:02) are still a hang."""
         held = {"MU": 708.97}
         rows = [row("2026-11-12T13:07:00+00:00", "start", child=7, n=1, backoff_s=0),
                 row("2026-11-12T13:08:00+00:00", "up", down_s=None, blind_s=0, handover_s=None, held=held)]
@@ -123,7 +132,7 @@ class Report(unittest.TestCase):
                  row("2026-11-12T17:18:30+00:00", "start", child=9, n=2, backoff_s=0),
                  row("2026-11-12T17:19:10+00:00", "up", child=9, down_s=None, blind_s=70, handover_s=70.0, held=held)]
         r = uptime.day_report(rows, date(2026, 11, 12), CFG)
-        self.assertEqual(r["by_cause"], {"restart": 0, "hang": 680, "handover": 70, "gap": 0, "stale_stops": 60})
+        self.assertEqual(r["by_cause"], {"restart": 0, "hang": 380, "handover": 70, "gap": 300, "stale_stops": 60})
         self.assertEqual((r["unprotected_s"], r["exposed_s"], r["missing_marks"], r["handovers"], r["restarts"],
                           r["longest_blind_s"]), (810, 810, 4, [70.0], 1, 200))
 
@@ -173,6 +182,34 @@ class Report(unittest.TestCase):
             self.assertEqual((r["by_cause"][cause], r["unprotected_s"]), (s, s))
             self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R11"])
 
+    def test_a_dead_man_alarm_is_true_when_the_engine_was_down_and_false_when_only_ntfy_was(self):
+        """Spec 11.2: dead-man alarms, true and false. A `new_seq` row comes at the first ping after the old message
+        was due, so the delay_seconds - seq_margin_seconds before it lie in the silence the alarm came from. True: the
+        engine was down then (an exit at 15:00, back at 15:08). False: the marks show a fresh beat all through and the
+        pings failed (17:00:30 to 17:05:30). False too: the next morning's new seq after a cancel that failed after the
+        close (what went out was DM3, or the DM1 that R9 calls false), although the night before it is a gap."""
+        rows = marks("2026-11-12", "14:30:00", "21:05:00", outage=("15:00:00", "15:08:00"))
+        rows += [row("2026-11-12T15:00:00+00:00", "exit", child=7, rc=1, signal=None, ran_s=900.0, why="exit"),
+                 row("2026-11-12T15:00:01+00:00", "start", child=8, n=2, backoff_s=1),
+                 row("2026-11-12T15:08:00+00:00", "up", child=8, down_s=480, blind_s=480, handover_s=None, held={}),
+                 row("2026-11-12T15:08:00+00:00", "deadman", what="new_seq")]
+        failed = datetime.fromisoformat("2026-11-12T17:00:00+00:00")
+        rows += [row((failed + timedelta(seconds=30 * k)).isoformat(), "deadman", what="ping_failed", status="URLError")
+                 for k in range(1, 12)]
+        rows += [row("2026-11-12T17:06:00+00:00", "deadman", what="new_seq"),
+                 row("2026-11-12T17:06:00+00:00", "deadman", what="recovered"),
+                 row("2026-11-12T21:03:00+00:00", "deadman", what="cancel_failed", dm3=True),
+                 row("2026-11-12T21:03:01+00:00", "deadman", what="disarmed")]
+        rows += marks("2026-11-13", "13:08:00", "13:12:00")
+        rows.append(row("2026-11-13T13:10:00+00:00", "deadman", what="new_seq"))
+        rows.sort(key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual(r["deadman"],
+                         {"alarms": 2, "alarms_true": 1, "alarms_false": 1, "ping_failed": 11, "cancel_failed": 1})
+        self.assertIn("dead-man alarms 2 (true 1, false 1)", uptime.render([r], CFG))
+        self.assertEqual(uptime.day_report(rows, date(2026, 11, 13), CFG)["deadman"],
+                         {"alarms": 1, "alarms_true": 0, "alarms_false": 1, "ping_failed": 0, "cancel_failed": 0})
+
     def test_the_days_counts_and_r9(self):
         """restarts (the parent's own count: n rises at a counted restart, a handover's start repeats it), commits,
         failed ntfy lines, the lowest `left`, the dead-man's rows, the largest stop gap of the day; R9 when the close
@@ -198,7 +235,8 @@ class Report(unittest.TestCase):
         r = uptime.day_report(sorted(rows, key=lambda x: x["t"]), date(2026, 11, 12), CFG, health)
         self.assertEqual((r["restarts"], r["trips"], r["commits"], r["ntfy_failed"], r["left_min"], r["deadman"],
                           r["stop_gap_max_s"]),
-                         (1, 0, ["abc1234", "abc1234"], 1, 240, {"alarms": 1, "ping_failed": 2, "cancel_failed": 1},
+                         (1, 0, ["abc1234", "abc1234"], 1, 240,
+                          {"alarms": 1, "alarms_true": 0, "alarms_false": 1, "ping_failed": 2, "cancel_failed": 1},
                           31.2))
         self.assertIsNone(uptime.day_report(rows, date(2026, 11, 12), CFG)["stop_gap_max_s"])  # no file: null
         self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R9", "R11"])  # 40 s: one minute untold
