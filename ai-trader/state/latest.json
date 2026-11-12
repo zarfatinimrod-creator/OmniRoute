@@ -1,26 +1,26 @@
 {
   "date": "2026-11-12",
-  "as_of_utc": "2026-11-12T14:52:59+00:00",
+  "as_of_utc": "2026-11-12T17:53:14+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-12T14:30:00+00:00",
     "regular_end_utc": "2026-11-12T21:00:00+00:00",
-    "last_trade_utc": "2026-11-12T14:52:56+00:00",
-    "price": 758.31
+    "last_trade_utc": "2026-11-12T17:53:13+00:00",
+    "price": 761.525
   },
-  "equity": 101347.69,
+  "equity": 101592.85,
   "cash": 23140.98,
-  "gross": 0.7717,
-  "return_since_start": 0.0135,
-  "shadow_return_since_start": 0.0137,
+  "gross": 0.7722,
+  "return_since_start": 0.0159,
+  "shadow_return_since_start": 0.0164,
   "baselines": {
-    "spy_since_start": 0.0313,
-    "equal_weight_since_start": 0.0301
+    "spy_since_start": 0.0358,
+    "equal_weight_since_start": 0.0337
   },
   "started": "2026-11-06",
   "regime": "risk_on",
   "dd_state": "normal",
-  "drawdown": 0.0037,
+  "drawdown": 0.0061,
   "decided_now": false,
   "weights": {
     "tsmom": 0.25,
@@ -350,125 +350,125 @@
     "PM": {
       "qty": 30,
       "avg_cost": 195.42,
-      "last": 197.57,
-      "pnl_pct": 0.011,
+      "last": 199.32,
+      "pnl_pct": 0.02,
       "since": "2026-11-09"
     },
     "CVX": {
       "qty": 30,
       "avg_cost": 211.88,
-      "last": 214.76,
-      "pnl_pct": 0.0136,
+      "last": 216.7,
+      "pnl_pct": 0.0227,
       "since": "2026-11-09"
     },
     "MRK": {
       "qty": 17,
       "avg_cost": 148.44,
-      "last": 147.79,
-      "pnl_pct": -0.0044,
+      "last": 148.53,
+      "pnl_pct": 0.0006,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 24,
       "avg_cost": 297.59,
-      "last": 304.46,
-      "pnl_pct": 0.0231,
+      "last": 304.42,
+      "pnl_pct": 0.0229,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 470.27,
-      "pnl_pct": 0.0105,
+      "last": 471.13,
+      "pnl_pct": 0.0124,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1443.58,
-      "pnl_pct": 0.0567,
+      "last": 1445.84,
+      "pnl_pct": 0.0584,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 93,
       "avg_cost": 96.16,
-      "last": 97.82,
-      "pnl_pct": 0.0173,
+      "last": 98.17,
+      "pnl_pct": 0.0209,
       "since": "2026-11-09"
     },
     "TEVA": {
       "qty": 90,
       "avg_cost": 43.03,
-      "last": 43.56,
-      "pnl_pct": 0.0124,
+      "last": 43.94,
+      "pnl_pct": 0.0211,
       "since": "2026-11-09"
     },
     "DE": {
       "qty": 7,
       "avg_cost": 686.13,
-      "last": 691.41,
-      "pnl_pct": 0.0077,
+      "last": 687.61,
+      "pnl_pct": 0.0022,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 282.44,
-      "pnl_pct": 0.0155,
+      "last": 284.92,
+      "pnl_pct": 0.0244,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 296.99,
-      "pnl_pct": 0.0102,
+      "last": 296.38,
+      "pnl_pct": 0.0081,
       "since": "2026-11-09"
     },
     "XOM": {
       "qty": 27,
       "avg_cost": 163.9,
-      "last": 167.99,
-      "pnl_pct": 0.025,
+      "last": 169.77,
+      "pnl_pct": 0.0358,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 20,
       "avg_cost": 346.27,
-      "last": 357.99,
-      "pnl_pct": 0.0338,
+      "last": 355.58,
+      "pnl_pct": 0.0269,
       "since": "2026-11-09"
     },
     "XLV": {
       "qty": 54,
       "avg_cost": 186.78,
-      "last": 189.2,
-      "pnl_pct": 0.0129,
+      "last": 189.26,
+      "pnl_pct": 0.0133,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 137.9,
-      "pnl_pct": 0.0103,
+      "last": 140.07,
+      "pnl_pct": 0.0262,
       "since": "2026-11-11"
     }
   },
   "day_moves": {
-    "PM": 0.0062,
-    "CVX": 0.0069,
-    "MRK": 0.0041,
-    "UNP": 0.0078,
-    "AMGN": 0.0046,
-    "LLY": 0.0044,
-    "KO": 0.0026,
-    "TEVA": 0.0075,
-    "DE": -0.0005,
-    "JNJ": 0.0072,
-    "ABBV": 0.0068,
-    "XOM": 0.0077,
-    "AAPL": 0.0066,
-    "XLV": 0.0013,
-    "COP": 0.0003
+    "PM": 0.0152,
+    "CVX": 0.016,
+    "MRK": 0.0092,
+    "UNP": 0.0076,
+    "AMGN": 0.0065,
+    "LLY": 0.0059,
+    "KO": 0.0061,
+    "TEVA": 0.0162,
+    "DE": -0.006,
+    "JNJ": 0.0161,
+    "ABBV": 0.0047,
+    "XOM": 0.0184,
+    "AAPL": -0.0002,
+    "XLV": 0.0016,
+    "COP": 0.016
   },
   "events": []
 }
