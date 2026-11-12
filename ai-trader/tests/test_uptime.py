@@ -243,6 +243,58 @@ class Report(unittest.TestCase):
         rows[-1]["dm3"] = True
         self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R11"])
 
+    # Ruling 50 (Task 14c).
+    def test_one_outage_gives_one_line_no_r4c_after_the_r4_that_told_it(self):
+        """Spec 8: one outage gives at most DM1, R4 and W1. The day's last outage began at 15:40 New York (20:40 UTC)
+        and was open at the close; its parent came back at 16:10 and its R4 reached a channel: no R4c, and R11 counts
+        that R4 once against the day's 25 minutes (the trailing 20 and 5 untold minutes at 10:00)."""
+        rows = marks("2026-11-12", "14:30:00", "20:40:00", skip=("15:01", "15:02", "15:03", "15:04"))
+        rows += marks("2026-11-12", "21:10:00", "21:12:00")
+        rows += [row("2026-11-12T21:10:00+00:00", "sup_start", until="16:05", handover=False),
+                 row("2026-11-12T21:10:20+00:00", "up", child=8, down_s=None, blind_s=0, handover_s=None, held={})]
+        r4 = row("2026-11-12T21:10:25+00:00", "alert", id="R4-1", kind="R4", text="...", m=20, sent=True)
+        r = uptime.day_report(sorted(rows + [r4], key=lambda x: x["t"]), date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["gap"]), (1500, 1500))
+        lines = uptime.close_lines(r, sorted(rows + [r4], key=lambda x: x["t"]), CFG)
+        self.assertEqual([l["id"] for l in lines], ["R11"])
+        self.assertIn(" 25 דקות ", lines[0]["text"])
+        for told in ([], [{**r4, "sent": False}]):  # no R4 row, or one that reached no channel: R4c still goes out
+            lines = uptime.close_lines(r, sorted(rows + told, key=lambda x: x["t"]), CFG)
+            self.assertEqual([l["id"] for l in lines], ["R4c", "R11"])
+            self.assertIn("מ-22:40 עד סוף המסחר: 20 דקות ", lines[0]["text"])
+
+    def test_r11_counts_seconds_so_40_untold_seconds_beside_210_told_ones_are_not_lost(self):
+        """A 210 s parent gap told by R4 (`m` 4, `s` 210) and a 40 s restart that no line told: 250 s against 210 s
+        reported. Counted in minutes, each rounded on its own, that was 4 against 4 and no R11."""
+        gap = marks("2026-11-12", "14:30:00", "21:00:00", skip=("15:01", "15:02", "15:03"))
+        gap.append(row("2026-11-12T15:03:30+00:00", "mark", hb=5, stop=None, n=0, open=True, blind=[], dm=None,
+                       left=None))
+        r4 = row("2026-11-12T15:03:31+00:00", "alert", id="R4-1", kind="R4", text="...", m=4, s=210.0, sent=True)
+        restart = [row("2026-11-12T17:00:00+00:00", "exit", child=7, rc=1, signal=None, ran_s=900.0, why="exit"),
+                   row("2026-11-12T17:00:40+00:00", "up", child=8, down_s=40, blind_s=40, handover_s=None, held={})]
+
+        def ids(rows: list[dict]) -> list[str]:
+            rows = sorted(rows, key=lambda x: x["t"])
+            return [l["id"] for l in uptime.close_lines(uptime.day_report(rows, date(2026, 11, 12), CFG), rows, CFG)]
+
+        r = uptime.day_report(sorted(gap + [r4] + restart, key=lambda x: x["t"]), date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["gap"], r["by_cause"]["restart"]), (250, 210, 40))
+        lines = uptime.close_lines(r, sorted(gap + [r4] + restart, key=lambda x: x["t"]), CFG)
+        self.assertEqual([l["id"] for l in lines], ["R11"])
+        self.assertIn(" 4 דקות ", lines[0]["text"])             # {m} stays round(unprotected_s / 60)
+        self.assertEqual(ids(gap + [r4]), [])                    # a fully reported day
+        old = {k: v for k, v in r4.items() if k != "s"}         # a row written before `s`: its m counts as m * 60
+        self.assertEqual((ids(gap + [old]), ids(gap)), ([], ["R11"]))
+
+    def test_days_below_one_are_refused(self):
+        self.state([])
+        for days in ("0", "-1"):
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = cli.main(["uptime-report", "--days", days])
+            self.assertEqual((code, out.getvalue(), len(err.getvalue().splitlines())), (2, "", 1), err.getvalue())
+            self.assertIn(days, err.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

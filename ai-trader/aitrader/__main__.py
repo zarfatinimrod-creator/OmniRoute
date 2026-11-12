@@ -508,6 +508,9 @@ def _run(a: argparse.Namespace) -> int:
         if a.notify and a.day is None:
             print("uptime-report: --notify belongs to --day (the close slot's one reading of its day)", file=sys.stderr)
             return 2
+        if a.days is not None and a.days < 1:
+            print(f"uptime-report: --days takes 1 or more, not {a.days}", file=sys.stderr)
+            return 2
         today = datetime.now(supervise.NY).date()
         try:
             one = date.fromisoformat(a.day) if a.day else today

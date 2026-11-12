@@ -441,7 +441,8 @@ def gap_line(prev: dict | None, up_at: datetime, cold: bool, cal: dict, sup: dic
     row it can read is what git restored); R4b when it is a sup_stop whose `why` has a word in
     ownerlines.WORDS["R4b.why"]. After a sup_stop for a halt, a held lock, the end of the day or a closed day it is
     None: R5a-R5e said that the stops are not checked, and the minutes reach R11. The fields carry `m`, the line's
-    minutes, for its alert row (ruling P6)."""
+    minutes, and `s`, its exact market-open seconds, for its alert row (ruling P6; R11 counts `s`, ruling 50); no
+    template names `s`, so it stays out of the owner's text."""
     t = _when(prev.get("t")) if isinstance(prev, dict) else None
     if t is None:
         return None
@@ -449,7 +450,7 @@ def gap_line(prev: dict | None, up_at: datetime, cold: bool, cal: dict, sup: dic
     if s < sup["outage_report_seconds"]:
         return None
     tz = sup["owner_tz"]
-    fields = {"time": ownerlines.hhmm(t, tz), "time2": ownerlines.hhmm(up_at, tz), "m": round(s / 60)}
+    fields = {"time": ownerlines.hhmm(t, tz), "time2": ownerlines.hhmm(up_at, tz), "m": round(s / 60), "s": s}
     if prev.get("ev") != "sup_stop":
         return "R4", {**fields, **({"cold_time": fields["time"]} if cold else {})}
     why = ownerlines.WORDS["R4b.why"].get(str(prev.get("why")))
@@ -894,7 +895,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             rows. Its id is <kind>-<n>, n counting the day's alerts. Held back by may_send: an alert row "capped".
             With no topic nothing can ever be requested: an alert row `sent` false at once for the watchdog turn to
             relay, one log line, no retries (ruling 36 a). Else it goes to the worker, and drain writes its row when
-            the outcome comes. extra: more fields of the row (R4 and R4b: `m`, ruling P6)."""
+            the outcome comes. extra: more fields of the row (R4 and R4b: `m` and `s`, rulings P6 and 50)."""
             try:
                 if "held" in fields:
                     fields["held"] = ownerlines.held_text(fields["held"], sup["held_names_in_line"])
@@ -999,8 +1000,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 seen["resumed"] = wall
                 line = gap_line({"t": start, "ev": "pause"}, now, False, cal, sup)
                 if line:
-                    say(line[0], now, extra={"m": line[1]["m"]}, held=_held_now(paths, child.pid if child else None),
-                        **line[1])
+                    say(line[0], now, extra={"m": line[1]["m"], "s": line[1]["s"]},
+                        held=_held_now(paths, child.pid if child else None), **line[1])
 
             def look(child, ran_s):
                 """One loop tick's reading of the heartbeat (spec 4.3, 4.6): the lines' outcomes, R7, the mark of a new
@@ -1145,7 +1146,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     (prev_row, was_cold), seen["gap"] = seen["gap"], None
                     line = gap_line(prev_row, now, was_cold, cal, sup)
                     if line:
-                        say(line[0], now, extra={"m": line[1]["m"]}, held=view["held"], **line[1])
+                        say(line[0], now, extra={"m": line[1]["m"], "s": line[1]["s"]}, held=view["held"], **line[1])
 
             def stop(child, how: str) -> None:
                 """A hang stop (spec 4.3): SIGTERM to the child's process group, up to hang_term_grace_seconds for the

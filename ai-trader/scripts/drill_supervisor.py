@@ -3,15 +3,17 @@
 directories of its own with stub children: tests/helpers/dummy_child.py, tests/helpers/engine_child.py behind its
 tripwire, and a NtfyStub on 127.0.0.1. Nothing here reaches the phone, the network, the model or the live state.
 
-    python3 scripts/drill_supervisor.py DRILL... [--fast] [--rounds N]      DRILL: a b c d e f g all
+    python3 scripts/drill_supervisor.py DRILL... [--fast] [--rounds N] [--seed N]      DRILL: a b c d e f g all
     python3 scripts/drill_supervisor.py cloud DIR [--fast]
     python3 scripts/drill_supervisor.py cloud-check [--alive] DIR
 
 A drill prints `PASS <drill> <numbers>` or `FAIL <drill> <why>` (a failed drill keeps its files and says where); the
-exit code is 0 only when every drill passed. Without --fast the numbers are those of config.json; --fast scales them and
-keeps their order (FAST). Each drill has its own state directories, config copies and locks. The parents' clock is moved
-onto a session morning (MORNING), so a drill runs on any day; every child is started with --until 24:00, which never
-comes (ruling P1, controller ruling 16).
+exit code is 0 only when every drill passed. <why> is a pass mark the drill states from its own values, or the class of
+an exception, never its text (constraints, item 11). When a drill ends, by any path, every process it started is
+killed; SIGTERM or SIGHUP to this script ends the drill that runs that way (its FAIL line), starts no other and exits 1.
+Without --fast the numbers are those of config.json; --fast scales them and keeps their order (FAST). Each drill has its
+own state directories, config copies and locks. The parents' clock is moved onto a session morning (MORNING), so a drill
+runs on any day; every child is started with --until 24:00, which never comes (ruling P1, controller ruling 16).
   a  6 kill -9 of the dummy child, each more than healthy_seconds after the last and spread over more than
      restart_window_seconds; then one of the engine child holding 3 names, under a parent and a state directory of its
      own (ruling P3). Pass: every replacement beats within 1 s of its kill, the engine's first look stamps each held
@@ -23,7 +25,8 @@ comes (ruling P1, controller ruling 16).
      the old tree is left, an engine beats within 5 s, no R5c.
   e  --rounds times: kill -9 at a random moment of an engine child that trades on stubs, then a start. Pass: the news
      chains verify after every kill, and wherever the kill left the book disagreeing with the journal's last row the
-     next start says so (ruling P4).
+     next start says so (ruling P4). The moments come from --seed, chosen at the start when it is not given; a FAIL
+     line of e says it, so that the run can be replayed.
   f  quote stubs of 60 s (2 s under --fast) with 3 held names (ruling P2). Pass: one stale_stops start row, one R6, no
      kill.
   g  Task 5's loop: 50 engine starts beside 20 fetch-and-merge rounds, on a temporary repository with a temporary bare
@@ -119,7 +122,22 @@ def guard(argv: list[str], environ, base_url: str) -> str | None:
 
 
 class Failed(Exception):
-    """A pass mark that did not hold; the text says which."""
+    """A pass mark that did not hold; the text says which, from the drill's own values only."""
+
+
+STOPS = {signal.SIGTERM, signal.SIGHUP}  # what ends the drill script from outside (a session's background command)
+
+
+class Interrupted(BaseException):
+    """SIGTERM or SIGHUP to the drill script: the drill that runs ends like a failed one, and no other starts. A
+    BaseException, so that the drills' own `except Exception` lets it through."""
+
+
+def interrupted(signum, frame) -> None:
+    """The handler of STOPS: the first one ends the run; the ones after it would only cut the cleanup short."""
+    for sig in STOPS:
+        signal.signal(sig, signal.SIG_IGN)
+    raise Interrupted(signal.Signals(signum).name)
 
 
 def wait(fn, timeout: float, what: str):
@@ -227,12 +245,12 @@ def unprimed(state: Path) -> Path:
 
 
 class Drill:
-    """One drill's temporary directory, its NtfyStub, its numbers (`sup`) and the processes it started."""
+    """One drill's temporary directory (run makes it), its NtfyStub, its numbers (`sup`), drill e's seed and the
+    processes it started."""
 
-    def __init__(self, name: str, fast: bool, rounds: int):
+    def __init__(self, name: str, tmp: Path, fast: bool, rounds: int, seed: int | None):
         from helpers.http_stub import NtfyStub
-        self.name, self.fast, self.rounds = name, fast, rounds
-        self.tmp = Path(tempfile.mkdtemp(prefix=f"drill-{name}-"))
+        self.name, self.tmp, self.fast, self.rounds, self.seed = name, tmp, fast, rounds, seed
         self.sup = {**supervise.load_cfg()["supervisor"], **(FAST if fast else {})}
         self.stub = NtfyStub()
         self.procs: list[subprocess.Popen] = []
@@ -252,6 +270,9 @@ class Drill:
         return self.tmp / f"{state.name}.sent.jsonl"
 
     def popen(self, cmd: list[str], env: dict) -> subprocess.Popen:
+        # ponytail: a SIGTERM or SIGHUP whose handler runs inside Popen, after the fork and before the child is in
+        # self.procs (a moment of each start), leaves that one child unkilled. Closing it would need the stop held back
+        # across the start, and a blocked signal mask is inherited by the child: a flag the handler reads instead.
         with open(self.path("out", ".log"), "wb") as out:  # the process keeps a descriptor of its own
             p = subprocess.Popen(cmd, cwd=AT, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT)
         self.procs.append(p)
@@ -334,7 +355,10 @@ def drill_a(d: Drill) -> str:
         held = hb.get("held") if hb.get("pid") not in (None, old) else None
         return (isinstance(held, dict) and set(held) == set(HELD) and all(v.get("checked_at") for v in held.values())
                 and [datetime.fromisoformat(v["checked_at"]).timestamp() for v in held.values()])
-    look = max(wait(stamps, LOOK_S + WAIT_S, "the replacement's first look at its 3 names")) - t0
+    looked = wait(stamps, LOOK_S + WAIT_S, "the replacement's first look at its 3 names")
+    if min(looked) < t0:  # a stamp from before the kill is no look of the replacement, not a negative time
+        raise Failed(f"a stamp of the replacement's first look is {t0 - min(looked):.2f} s older than the kill")
+    look = max(looked) - t0
     wait(lambda: said(st2, "R1") >= 1, sup["healthy_seconds"] + WAIT_S, "R1 of the engine's kill")
     d.stop(p2)
     trips, r1_engine = trips + len(rows(st2, "tripped")), said(st2, "R1")
@@ -466,7 +490,7 @@ def drill_e(d: Drill) -> str:
         return sum(r.get("where") == "book_mismatch" for r in supervise.read_rows(state / "news_errors.jsonl"))
 
     sup = supervise.load_cfg()["supervisor"]  # the engine child's own lines are rendered at config.json's sizes
-    rng, state, told, mismatches, trades = random.Random(), fresh(), set(), 0, 0
+    rng, state, told, mismatches, trades = random.Random(d.seed), fresh(), set(), 0, 0
     for r in range(1, d.rounds + 1):
         p = d.bare(state, e_scenario(r))
         time.sleep(rng.uniform(0, E_SPAN_S))
@@ -512,9 +536,14 @@ def drill_g(d: Drill) -> str:
                **{f"GIT_{who}_{what}": "drill" for who in ("AUTHOR", "COMMITTER") for what in ("NAME", "EMAIL")}}
 
     def git(where: Path, *args: str) -> None:
-        p = subprocess.run(["git", *args], cwd=where, env=git_env, capture_output=True, text=True, timeout=WAIT_S)
+        """git in a directory of this drill; a failure says which call and its exit code, never git's own words."""
+        try:
+            p = subprocess.run(["git", *args], cwd=where, env=git_env, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=WAIT_S)
+        except subprocess.TimeoutExpired:
+            raise Failed(f"git {' '.join(args)} in {where.name}: not within {WAIT_S} s") from None
         if p.returncode:
-            raise Failed(f"git {' '.join(args)} in {where.name}: exit {p.returncode}: {(p.stderr or p.stdout)[-300:]}")
+            raise Failed(f"git {' '.join(args)} in {where.name}: exit {p.returncode}")
 
     def commit(where: Path, name: str, text: str) -> None:
         (where / name).write_text(text)
@@ -543,6 +572,7 @@ def drill_g(d: Drill) -> str:
     go, failed = threading.Semaphore(0), []
 
     def rounds():
+        n = 0
         try:
             for n in range(G_ROUNDS):
                 if not go.acquire(timeout=WAIT_S * 2):
@@ -552,7 +582,9 @@ def drill_g(d: Drill) -> str:
                 git(clone, "fetch", "origin", "main")
                 git(clone, "merge", "--no-edit", "origin/main")
         except BaseException as e:  # noqa: BLE001 - a failure of this thread is the drill's
-            failed.append(f"{type(e).__name__}: {e}")
+            failed.append(f"round {n}: {e if isinstance(e, Failed) else type(e).__name__}")
+    # ponytail: a git call of this thread that is in flight when the drill is stopped is not killed; on these local
+    # repositories it ends by itself within moments. Tracking it would need a Popen of its own in Drill.procs.
     beside = threading.Thread(target=rounds, daemon=True)
     beside.start()
     let_go, codes = {n * G_STARTS // G_ROUNDS for n in range(G_ROUNDS)}, []
@@ -607,10 +639,19 @@ def drill_f(d: Drill) -> str:
 DRILLS = {"a": drill_a, "b": drill_b, "c": drill_c, "d": drill_d, "e": drill_e, "f": drill_f, "g": drill_g}
 
 
-def run(name: str, fast: bool, rounds: int) -> bool:
-    """One drill: its PASS or FAIL line. A passed drill's files are removed; a failed one's are kept and named."""
-    d, passed = Drill(name, fast, rounds), False
+def run(name: str, fast: bool, rounds: int, seed: int | None = None) -> bool:
+    """One drill: its PASS or FAIL line. A passed drill's files are removed; a failed one's are kept and named. A FAIL
+    line carries a pass mark in the drill's own words, or an exception's class and never its text (constraints, item
+    11); drill e's carries its seed. Every process the drill started is killed when it ends, by whatever path: with
+    STOPS held back meanwhile, so that a signal cannot cut that short. Interrupted goes on to main once that is done."""
+    tmp = d = None
+    passed, seeded = False, f" seed={seed}" if name == "e" else ""  # e is the drill that draws at random
+
+    def kept() -> str:
+        return f"{seeded} (files kept in {tmp})" if tmp else seeded
     try:
+        tmp = Path(tempfile.mkdtemp(prefix=f"drill-{name}-"))
+        d = Drill(name, tmp, fast, rounds, seed)
         numbers = DRILLS[name](d)
         d.end()
         if d.tripped():
@@ -618,14 +659,22 @@ def run(name: str, fast: bool, rounds: int) -> bool:
         print(f"PASS {name} {numbers}", flush=True)
         passed = True
     except Failed as e:
-        print(f"FAIL {name} {e} (files kept in {d.tmp})", flush=True)
+        print(f"FAIL {name} {e}{kept()}", flush=True)
     except Exception as e:  # noqa: BLE001 - a drill that breaks is a failed drill, and the next one still runs
-        print(f"FAIL {name} {type(e).__name__}: {e} (files kept in {d.tmp})", flush=True)
+        print(f"FAIL {name} {type(e).__name__}{kept()}", flush=True)
+    except Interrupted as e:
+        print(f"FAIL {name} stopped by {e}{kept()}", flush=True)
+        raise
     finally:
-        d.end()
-        d.stub.stop()
-        if passed:
-            shutil.rmtree(d.tmp, ignore_errors=True)
+        mask = signal.pthread_sigmask(signal.SIG_BLOCK, STOPS)
+        try:
+            if d is not None:
+                d.end()
+                d.stub.stop()
+            if passed:
+                shutil.rmtree(tmp, ignore_errors=True)
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
     return passed
 
 
@@ -731,9 +780,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("drills", nargs="+", choices=[*DRILLS, "all"])
     ap.add_argument("--fast", action="store_true", help="the scaled numbers (FAST) in place of config.json's")
     ap.add_argument("--rounds", type=int, default=ROUNDS, help=f"drill e's kills (default {ROUNDS})")
+    ap.add_argument("--seed", type=int,
+                    help="drill e's random moments, to replay a failed run (default: one chosen now)")
     a = ap.parse_args(argv)
     names = dict.fromkeys(n for x in a.drills for n in (DRILLS if x == "all" else [x]))
-    return 0 if all([run(name, a.fast, a.rounds) for name in names]) else 1
+    seed = random.randrange(2 ** 32) if a.seed is None else a.seed
+    for sig in STOPS:
+        signal.signal(sig, interrupted)
+    try:
+        return 0 if all([run(name, a.fast, a.rounds, seed) for name in names]) else 1
+    except Interrupted:
+        return 1
 
 
 if __name__ == "__main__":

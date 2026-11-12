@@ -206,33 +206,38 @@ def _line(line_id: str, sup: dict, **fields) -> dict:
 def close_lines(report: dict, rows: list[dict], cfg: dict) -> list[dict]:
     """The close slot's lines about the day (spec 4.5, 8), in this order:
     - R4c: the day's last outage (restart, hang, handover or gap, not stale stops) was still open at the close and has
-      outage_report_seconds or more inside the session, the size R4 and R4b report; {held} is open_at_close;
+      outage_report_seconds or more inside the session, the size R4 and R4b report; {held} is open_at_close. Not when
+      an R4 or R4b of the day reached a channel at or after that outage began: its parent came back after the close
+      and told it (spec 8: one outage gives at most DM1, R4 and W1; ruling 50);
     - R9: a `deadman` row cancel_failed carries dm3 false (Task 21);
-    - R11: the day had a trip, or more unprotected minutes than its lines reported: the `m` of each R4 and R4b alert
-      row whose line reached a channel (a row of its id with `sent` true, counted once), plus this call's R4c
-      (ruling P6). A line that never got `sent` true reported nothing. Its {r} ("the engine fell r times") is the
-      day's falls: restarts + trips, since each trip follows one fall the parent did not restart (R3's {k} is the
-      trip's restarts + 1)."""
+    - R11: the day had a trip, or unprotected seconds that its lines did not report and that round to a minute or
+      more (R11 says minutes; the rest is rounded once, not each line on its own). Reported: the `s` of each R4 and
+      R4b alert row whose line reached a channel (a row of its id with `sent` true, counted once; a row written
+      before `s` counts m * 60), plus this call's R4c (rulings P6 and 50). A line that never got `sent` true
+      reported nothing. Its {m} is the day's unprotected minutes; its {r} ("the engine fell r times") is the day's
+      falls: restarts + trips, since each trip follows one fall the parent did not restart (R3's {k} is the trip's
+      restarts + 1)."""
     sup, day, timed = cfg["supervisor"], date.fromisoformat(report["day"]), _timed(rows)
-    lines, reported = [], {}
+    today = [(t, r) for t, r in timed if t.astimezone(NY).date() == day]
+    told = [(t, r) for t, r in today if r.get("ev") == "alert" and r.get("kind") in ("R4", "R4b")
+            and r.get("sent") is True]
+    reported = {r.get("id"): r["s"] if _num(r.get("s")) else r["m"] * 60 for _, r in told
+                if _num(r.get("s")) or _num(r.get("m"))}
+    lines = []
     sec = _by_second(timed, day, cfg)
     if sec:
         open_, cause, _ = sec
         run = next((k for k, c in enumerate(reversed(cause)) if c not in OUTAGE), len(cause))
-        if run >= sup["outage_report_seconds"]:
-            reported["R4c"] = round(run / 60)
-            lines.append(_line("R4c", sup, time=ownerlines.hhmm(open_ + timedelta(seconds=len(cause) - run),
-                                                                 sup["owner_tz"]),
-                               m=reported["R4c"], held=ownerlines.held_text(report["open_at_close"],
-                                                                            sup["held_names_in_line"])))
-    today = [r for t, r in timed if t.astimezone(NY).date() == day]
-    if any(r.get("ev") == "deadman" and r.get("what") == "cancel_failed" and r.get("dm3") is False for r in today):
+        began = open_ + timedelta(seconds=len(cause) - run)
+        if run >= sup["outage_report_seconds"] and not any(t >= began for t, _ in told):
+            reported["R4c"] = run
+            lines.append(_line("R4c", sup, time=ownerlines.hhmm(began, sup["owner_tz"]), m=round(run / 60),
+                               held=ownerlines.held_text(report["open_at_close"], sup["held_names_in_line"])))
+    if any(r.get("ev") == "deadman" and r.get("what") == "cancel_failed" and r.get("dm3") is False for _, r in today):
         lines.append(_line("R9", sup))
-    reported.update({r.get("id"): r.get("m") for r in today if r.get("ev") == "alert"
-                     and r.get("kind") in ("R4", "R4b") and r.get("sent") is True and _num(r.get("m"))})
-    m = round(report["unprotected_s"] / 60)
-    if report["trips"] or m > sum(reported.values()):
-        lines.append(_line("R11", sup, r=report["restarts"] + report["trips"], t=report["trips"], m=m))
+    if report["trips"] or round((report["unprotected_s"] - sum(reported.values())) / 60) >= 1:  # R11 says minutes
+        lines.append(_line("R11", sup, r=report["restarts"] + report["trips"], t=report["trips"],
+                           m=round(report["unprotected_s"] / 60)))
     return lines
 
 

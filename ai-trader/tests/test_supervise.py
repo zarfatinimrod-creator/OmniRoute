@@ -1506,6 +1506,18 @@ class ParentLines(Parents):
             self.assertEqual((row["kind"], row["sent"], row["m"]), (kind, True, 10))
         self.assertIn("(החלפה מתוכננת)", row["text"])
 
+    def test_the_row_of_r4_carries_its_seconds(self):                    # Ruling 50 (2): `s` beside `m`, for R11
+        self.fresh({})
+        whole = lambda: self.clock().replace(microsecond=0)              # the up row's t is then the moment the line
+        t = whole() - timedelta(minutes=10, seconds=17)                  # measured to
+        (self.state / "uptime.jsonl").write_text(json.dumps({"t": t.isoformat(), "sup": 1, "ev": "mark"}) + "\n")
+        self.run_parent([{"beats": -1}], clock=whole, stop_after=2)
+        (row,), (up,) = self.urows("alert"), self.urows("up")
+        s = supervise.open_seconds(t, datetime.fromisoformat(up["t"]), supervise.load_cfg()["calendar"])
+        self.assertEqual((row["kind"], row["sent"], row["s"], row["m"]), ("R4", True, s, round(s / 60)))
+        self.assertTrue(isinstance(row["s"], (int, float)) and not isinstance(row["s"], bool), row)
+        self.assertNotIn(f"{s:g}", row["text"])                           # the seconds stay out of the owner's text
+
     def test_with_no_beat_of_its_child_a_line_lists_the_books_names(self):   # ruling P11: the child left with 4 before its first beat
         self.fresh({}); self.write_book({"BBB": 50.0})
         self.assertEqual(self.run_parent([{"beats": 0, "then": "exit", "code": 4}]), 4)
@@ -2048,3 +2060,133 @@ class Drills(unittest.TestCase):
         log.write_text("")                                              # no mark, no sup_stop
         self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split(),
                          ["FAIL", "cloud-check", "--alive", "no", "mark", "row"])
+
+    # Tests of Ruling 50 (Task 14c): the drills kill what they start and print no exception text.
+    @staticmethod
+    def proc_stat(pid: int) -> tuple[int, str, int] | None:
+        """(parent pid, state, start time in clock ticks) of a process; None when there is none."""
+        try:
+            fields = Path(f"/proc/{pid}/stat").read_text().rpartition(")")[2].split()
+        except OSError:
+            return None
+        return int(fields[1]), fields[0], int(fields[19])
+
+    def descendants(self, pid: int) -> dict[int, int]:
+        """{pid: start time} of every live descendant of pid, found by its parent pid in /proc (never by a name)."""
+        kids: dict[int, list[int]] = {}
+        for proc in Path("/proc").iterdir():
+            if proc.name.isdigit() and (st := self.proc_stat(int(proc.name))):
+                kids.setdefault(st[0], []).append(int(proc.name))
+        found, todo = {}, [pid]
+        while todo:
+            for k in kids.get(todo.pop(), []):
+                if k not in found and (st := self.proc_stat(k)):
+                    found[k] = st[2]
+                    todo.append(k)
+        return found
+
+    @staticmethod
+    def argv_of(pid: int) -> list[str]:
+        try:
+            return Path(f"/proc/{pid}/cmdline").read_bytes().decode(errors="replace").split("\0")
+        except OSError:
+            return []
+
+    def alive(self, pid: int, started: int) -> bool:
+        """The process that had this start time still runs (a zombie is dead; a reused pid is another process)."""
+        st = self.proc_stat(pid)
+        return st is not None and st[1] != "Z" and st[2] == started
+
+    def test_a_drill_stopped_by_a_signal_kills_every_child_it_started(self):
+        """SIGTERM, then SIGHUP, to the drill script while drill e's bare engine runs (an engine with no parent, which
+        nothing else stops: --until 24:00 never comes). The engine's pid is read from its heartbeat in the drill's
+        temporary directory (TMPDIR is this test's own); the drill's other processes by their parent pid. Afterwards
+        none of them runs, nothing names the test's directory, and the drill returned 1. Only the drill script, which
+        this test started, is signalled; the cleanup kills only a pid recorded here that still is that process. Seed 23
+        lets the first three engines live 3.70, 3.79 and 3.57 s: the signal comes while the engine that beat runs, and
+        no other starts between the record and the signal."""
+        for sig in (signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(sig=sig.name):
+                tmp = Path(tempfile.mkdtemp())
+                self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+                p = subprocess.Popen([sys.executable, "scripts/drill_supervisor.py", "e", "--fast", "--rounds", "500",
+                                      "--seed", "23"],
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                     env=no_phone.clean_env(TMPDIR=str(tmp)), cwd=TESTS.parent)
+                started: dict[int, int] = {}
+
+                def kill_left(p=p, started=started, tmp=tmp) -> None:   # this round's, not the loop's last
+                    if p.poll() is None:
+                        p.kill()
+                    p.communicate()
+                    for pid, t in started.items():
+                        if self.alive(pid, t) and str(tmp) in " ".join(self.argv_of(pid)):
+                            os.kill(pid, signal.SIGKILL)
+                self.addCleanup(kill_left)
+
+                def engine() -> tuple[int, int] | None:
+                    """(pid, start time) of a heartbeat in the drill's directory whose process runs as the drill's
+                    child."""
+                    for hb in tmp.glob("drill-e-*/state-*/news_heartbeat.json"):
+                        try:
+                            pid = json.loads(hb.read_text()).get("pid")
+                        except (OSError, ValueError):
+                            continue
+                        st = isinstance(pid, int) and self.proc_stat(pid)
+                        if st and st[0] == p.pid and st[1] != "Z":
+                            return pid, st[2]
+                    return None
+                end = time.monotonic() + 60
+                while not (found := engine()) and p.poll() is None and time.monotonic() < end:
+                    time.sleep(0.05)
+                self.assertTrue(found, f"no engine child of the drill ran: {p.poll()}")
+                started[found[0]] = found[1]                               # the engine, and every other process
+                started.update(self.descendants(p.pid))                    # of the drill script by parent pid
+                p.send_signal(sig)
+                out, err = p.communicate(timeout=60)
+                time.sleep(0.5)                                            # a killed child's death is not instant
+                left = [q for q, t in started.items() if self.alive(q, t)]
+                naming = [q for q in map(int, filter(str.isdigit, os.listdir("/proc"))) if q != os.getpid()
+                          and str(tmp) in " ".join(self.argv_of(q))]
+                self.assertEqual((p.returncode, left, naming), (1, [], []), out + err[-2000:])
+                self.assertIn(f"FAIL e stopped by {sig.name}", out)
+
+    def test_a_fail_line_names_the_exceptions_class_and_never_its_text(self):   # constraints.md item 11
+        """A drill that raises, and a Drill that cannot be built (its ntfy stub): each prints one FAIL line with the
+        exception's class and the directory it keeps, never the exception's text, and returns so that the next drill
+        runs."""
+        drill = load_script("scripts/drill_supervisor.py")
+        drill.supervise, drill.no_phone = supervise, no_phone           # what main() imports after its guard
+        secret = "t0p1c-under-test"
+
+        def broken(d):
+            raise OSError(f"https://ntfy.example/{secret}")
+
+        class NoStub:
+            def __init__(self, *a, **k):
+                raise ConnectionError(f"https://ntfy.example/{secret}")
+        for patch, cls in ((mock.patch.dict(drill.DRILLS, {"c": broken}), "OSError"),
+                           (mock.patch("helpers.http_stub.NtfyStub", NoStub), "ConnectionError")):
+            out = io.StringIO()
+            with patch, contextlib.redirect_stdout(out):
+                self.assertFalse(drill.run("c", True, 1))
+            line = out.getvalue()
+            kept = re.search(r"\(files kept in (\S+)\)$", line.strip())
+            self.assertTrue(kept, line)
+            self.addCleanup(shutil.rmtree, kept[1], ignore_errors=True)
+            self.assertEqual((line.count("\n"), line.split()[:3], secret in line, Path(kept[1]).is_dir()),
+                             (1, ["FAIL", "c", cls], False, True), line)
+
+    def test_drill_e_takes_a_seed_and_says_it_when_it_fails(self):   # a failed round can be replayed
+        """--rounds 0 makes drill e fail at once (no round, no trade): its FAIL line carries the seed, the one given
+        by --seed, else one chosen at the start."""
+        for given in ("12345", None):
+            cp = self.drill("e", "--fast", "--rounds", "0", *(["--seed", given] if given else []), timeout=120)
+            line = next((l for l in cp.stdout.splitlines() if l.startswith("FAIL e ")), "")
+            kept = re.search(r"\(files kept in (\S+)\)$", line)
+            if kept:
+                self.addCleanup(shutil.rmtree, kept[1], ignore_errors=True)
+            seed = re.search(r" seed=(\d+) ", line)
+            self.assertEqual((cp.returncode, bool(seed)), (1, True), cp.stdout + cp.stderr[-2000:])
+            if given:
+                self.assertEqual(seed[1], given)
