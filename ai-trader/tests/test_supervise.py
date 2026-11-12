@@ -8,6 +8,7 @@ from helpers import no_phone  # noqa: F401  (first: a test run must never reach 
 import contextlib
 import fcntl
 import functools
+import importlib.util
 import io
 import json
 import os
@@ -1837,3 +1838,70 @@ class Handover(Parents):
             got = [supervise.main(self.parent_argv(("--handover",), sup), child_cmd=self.dummy_cmd([{"beats": -1}]),
                                   env=no_phone.clean_env(), clock=saturday) for sup in bad]
         self.assertEqual((got, err.getvalue().count("a bad argument or config"), self.urows()), ([2] * 6, 6, []))
+
+
+def load_script(path: str):
+    """A script of ai-trader/ (path relative to that folder) as a module, through importlib: importing it runs its
+    definitions and nothing else."""
+    spec = importlib.util.spec_from_file_location(Path(path).stem, TESTS.parent / path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class Drills(unittest.TestCase):
+    """scripts/drill_supervisor.py (supervisor spec 11.1): drills a, c and f at the --fast numbers, its phone guard, and
+    the cloud check that fails a parent which left at once. Every drill runs on temporary directories with stub children
+    and 127.0.0.1 only."""
+
+    def drill(self, *argv: str, timeout: float = 600) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, "scripts/drill_supervisor.py", *argv], capture_output=True, text=True,
+                              env=no_phone.clean_env(), cwd=TESTS.parent, timeout=timeout)
+
+    def test_the_fast_drills_pass(self):
+        cp = self.drill("a", "c", "f", "--fast")
+        self.assertEqual((cp.returncode, [l.split()[:2] for l in cp.stdout.splitlines() if l[:4] in ("PASS", "FAIL")]),
+                         (0, [["PASS", "a"], ["PASS", "c"], ["PASS", "f"]]), cp.stdout + cp.stderr[-2000:])
+
+    def test_only_the_phone_drill_with_the_owner_keeps_the_topic_or_an_outside_address(self):
+        drill = load_script("scripts/drill_supervisor.py")          # importlib; importing it runs no drill
+        env = {"AITRADER_NTFY_TOPIC": "t0p1c-under-test"}
+        self.assertEqual((drill.guard(["c"], env, "http://127.0.0.1:9"), env), (None, {}))
+        env = {"AITRADER_NTFY_TOPIC": "t0p1c-under-test"}
+        self.assertEqual((drill.guard(["phone", "--with-owner", "--phase", "peek"], env, "https://ntfy.sh"), env), ("t0p1c-under-test", {}))
+        for argv in (["c"], ["cloud-check", "x"], ["phone"]):
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):   # its refusal line: not into the test output
+                drill.guard(argv, {}, "https://ntfy.sh")
+
+    def test_cloud_check_alive_fails_for_a_parent_that_left_at_once(self):      # Review Focus 2: DIR holds a log of sup_start, sup_stop "orphaned"
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        now = datetime.now(timezone.utc)
+        supervise.append_row(d / "uptime.jsonl", 4242, "sup_start", now, until="24:00", handover=False)
+        supervise.append_row(d / "uptime.jsonl", 4242, "sup_stop", now, why="orphaned", rc=143)
+        # the lock file's text names a live pid (this one) that holds no lock: the text alone must not pass the check
+        (d / "news_supervisor.lock").write_text(json.dumps({"pid": os.getpid(), "started_at": supervise._utc(now)}) + "\n")
+        cp = self.drill("cloud-check", "--alive", str(d), timeout=60)
+        rc, out = cp.returncode, cp.stdout
+        self.assertEqual((rc, out.split()[:1]), (1, ["FAIL"]), cp.stdout + cp.stderr[-2000:])
+
+    # Test added for behaviour the brief states that the plan's test does not reach alone: its fixture fails all three
+    # conditions at once. --alive is the gate of Task 20's cloud drill, so each condition is held here by itself.
+    def test_cloud_check_alive_wants_a_held_lock_a_mark_and_no_sup_stop(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        now, log = datetime.now(timezone.utc), d / "uptime.jsonl"
+        supervise.append_row(log, os.getpid(), "sup_start", now, until="24:00", handover=False)
+        supervise.append_row(log, os.getpid(), "mark", now, hb=0.1)
+        lock = open(d / "news_supervisor.lock", "a+")                   # this process plays the parent that holds it
+        self.addCleanup(lock.close)
+        self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split()[:1], ["FAIL"])   # no holder
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        cp = self.drill("cloud-check", "--alive", str(d), timeout=60)
+        self.assertEqual((cp.returncode, cp.stdout.split()[:3]), (0, ["PASS", "cloud-check", "--alive"]), cp.stdout + cp.stderr)
+        self.assertIn(f"parent={os.getpid()}", cp.stdout)
+        supervise.append_row(log, os.getpid(), "sup_stop", now, why="orphaned", rc=143)
+        cp = self.drill("cloud-check", "--alive", str(d), timeout=60)
+        self.assertEqual((cp.returncode, cp.stdout.split()[:1], "orphaned" in cp.stdout), (1, ["FAIL"], True))
+        log.write_text("")                                              # no mark, no sup_stop
+        self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split(), ["FAIL", "cloud-check", "--alive", "no", "mark", "row"])
