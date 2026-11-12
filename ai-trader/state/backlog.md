@@ -231,8 +231,9 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     record and passes rule 4 (Basic law 2, item 3).
     **Spec approved by the owner on 2026-11-11 (answer א):** `research/specs/2026-11-11-sec-filings-feed-design.md`.
     Next: its implementation plan; the build joins the one-at-a-time queue after the supervisor and the trading room.
-66. [crypto][gate] Deferred by the quant-critic at the go-live gate of 2026-11-11 (PASS, round 2;
-    `logs/2026-11-11-crypto-go-live.md`). None is blocking for paper.
+69. [crypto][gate] Deferred by the quant-critic at the go-live gate of 2026-11-11 (PASS, round 2;
+    `logs/2026-11-11-crypto-go-live.md`). None is blocking for paper. (Renumbered from 66, which another
+    session also used.)
     - N1: after an expired order the next decision is a full rebalance even when the expired one was exits-only
       (`aitrader/cycle.py` `redo`). Inside caps and vol target, but the backtest always fills, so it is a live/replay
       difference. Narrower option: `expiring and old.rebalance`. Needs its own gate.
@@ -260,6 +261,12 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     38.5% against 38.4%: the same regime and practically the same size. Fix: on a UTC daily calendar the decision bar
     must be yesterday's; when it is not in the panel, skip the run (`stale_skips_run` already says so) or take its close
     from Coinbase. Rule 4 (critic + suite); `aitrader/cycle.py` and `aitrader/data.py` are under no open claim today.
+70. [crypto][defect] The morning summary was not delivered by ntfy on its first night: 2026-11-12 06:04 UTC,
+    `summary --book crypto --send` exit 3, ntfy ConnectionError (`logs/2026-11-12-crypto-night.md`). The fallback
+    worked (the session sent the text by PushNotification, then `--ack`), but every morning now depends on the
+    session being alive. Find out whether ntfy.sh is reachable from the trader session's container at all (network
+    policy) and from where the earlier ntfy deliveries were made; then either allow the host or make PushNotification
+    the documented primary path for the summary.
 
 ## Done
 - 2026-11-10 (final gate of wave 3, PASS on base 0215537a; the merge onto e6a82895 has had no gate round: item 54):
