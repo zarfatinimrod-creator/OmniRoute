@@ -81,7 +81,9 @@ def _by_second(timed: list[tuple[datetime, dict]], day: date, cfg: dict):
     close = datetime(day.year, day.month, day.day, ch, cm, tzinfo=NY)
     size = int((close - open_).total_seconds())
 
-    def fill(seconds: list, spans, value) -> None:  # ponytail: one slot a second (23,400 a day), the simplest union
+    # ponytail: one slot a second (23,400 a day) is the simplest exact union; a far longer span would want merged
+    # sorted intervals instead
+    def fill(seconds: list, spans, value) -> None:
         for a, b in spans:
             lo = max(0, int((a - open_).total_seconds()))
             hi = size if b is None else min(size, int((b - open_).total_seconds()))
@@ -116,7 +118,7 @@ def day_report(rows: list[dict], day: date, cfg: dict, health: list[dict] | None
     the first of CAUSES. restarts: the parent's own count (a start's `n` is its restarts_today + 1: it rises at a
     counted restart and repeats at a handover or a lock refusal). ntfy_failed: the day's alert rows `sent` false (a line
     whose call failed, or that had no topic). open_at_close: the `held` of the day's last `up` row (ruling P11)."""
-    sup, timed = cfg["supervisor"], _timed(rows)
+    timed = _timed(rows)
     today = [r for t, r in timed if t.astimezone(NY).date() == day]
 
     def of(ev: str) -> list[dict]:
