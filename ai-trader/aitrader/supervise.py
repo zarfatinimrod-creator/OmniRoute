@@ -497,7 +497,8 @@ NUMBERS = ("loop_seconds", "healthy_seconds", "backoff_first_seconds", "backoff_
            "hang_term_grace_seconds", "stops_stale_seconds", "outage_report_seconds", "max_alerts_per_hour",
            "alert_retry_seconds", "alert_retry_minutes", "send_timeout_seconds", "max_line_bytes",
            "held_names_in_line", "free_text_max_chars")  # what main and the core read
-POSITIVE = ("loop_seconds", "start_grace_seconds", "hang_term_grace_seconds", "planned_stop_grace_seconds")  # 0 spins
+# above 0, or the parent refuses the config: a zero loop would spin, a zero grace would kill at once
+POSITIVE = ("loop_seconds", "start_grace_seconds", "hang_term_grace_seconds", "planned_stop_grace_seconds")
 
 
 def _holder(lock: Path):
@@ -547,8 +548,9 @@ def status(paths: Paths, cfg: dict, now: datetime, *, watchdog: bool = False, en
     nothing and probes no lock. A parent is alive when its lock file names a live pid whose command line names
     aitrader.supervise; an engine, the same with the engine's lock and news-live.
     - action: the first row of the spec's table that applies: closed_today; after_hours (outside launch_from_ny to
-      launch_until_ny, New York); none (a live parent whose last mark is at most parent_stale_seconds old);
-      replace_parent (a live parent, no such mark); halted; kill_stray (a live engine whose parent pid is no live
+      launch_until_ny, New York); none (a live parent, and the uptime log's last mark is at most parent_stale_seconds
+      old: one parent runs at a time, so it is that parent's unless it has not ticked yet); replace_parent (a live
+      parent, no such mark); halted; kill_stray (a live engine whose parent pid is no live
       parent; why carries its pid); wait_for_watchdog (a second trip today, the call not from a watchdog slot, and the
       log's last row no sup_stop of a handover, a signal or an orphaned parent: after a planned stop the session
       launches at once); launch.
@@ -697,9 +699,10 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     alerts.ntfy_base_url with the topic of env (default os.environ), through a worker thread that the loop never waits
     for. --net-check asks ntfy's health once, prints what came back and returns 0 only on 200 (spec 6, "Not verified":
     that urllib reaches ntfy through the session's proxy and CA bundle).
-    The forms of a woken session (spec 4.4) take no lock of a parent's and start no child: --status [--watchdog]
-    prints status() as JSON and returns 0; --relayed ID... (relay) and --clear-halt (clear_halt, which runs child_cmd,
-    default `python3 -m aitrader news-live`, with --check) are its only two writers."""
+    The forms of a woken session (spec 4.4) run no loop and need no --until: --status [--watchdog] prints status() as
+    JSON and returns 0, and writes nothing; --relayed ID... (relay) and --clear-halt (clear_halt: it runs child_cmd,
+    default `python3 -m aitrader news-live`, with --check, and clears the halt under the parent's lock) are its only
+    two writers."""
     ppid = os.getppid()  # before anything else: what "orphaned" is measured against
     began = time.time()  # real time: up.sold of the first child counts the sales from here
     ap = argparse.ArgumentParser(prog="python3 -m aitrader.supervise")
