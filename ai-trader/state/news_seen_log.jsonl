@@ -3997,3 +3997,4 @@
 {"key": "fdc6956088fb500d", "symbol": "CRM", "published": "2026-11-13T20:40:03+00:00", "first_seen": "2026-11-13T20:48:08.924506+00:00", "outcome": "scored"}
 {"key": "06401b9bf633cf4f", "symbol": "PANW", "published": "2026-11-13T20:41:11+00:00", "first_seen": "2026-11-13T20:48:49.305486+00:00", "outcome": "scored"}
 {"key": "051cb04540a1d7dd", "symbol": "NVDA", "published": "2026-11-13T20:44:58+00:00", "first_seen": "2026-11-13T20:50:08.940375+00:00", "outcome": "scored"}
+{"key": "985f4e6159636d47", "symbol": "NVDA", "published": "2026-11-13T20:18:36+00:00", "first_seen": "2026-11-13T20:51:19.486785+00:00", "outcome": "stale"}
