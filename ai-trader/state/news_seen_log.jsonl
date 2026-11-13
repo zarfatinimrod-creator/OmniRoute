@@ -3692,3 +3692,5 @@
 {"key": "376aed73b5d8fbc1", "symbol": "GOOGL", "published": "2026-11-13T17:30:00+00:00", "first_seen": "2026-11-13T17:37:33.308921+00:00", "outcome": "scored"}
 {"key": "e5545966a610d8fa", "symbol": "META", "published": "2026-11-13T17:30:00+00:00", "first_seen": "2026-11-13T17:37:33.308959+00:00", "outcome": "scored"}
 {"key": "cfdb200dcfbdda4c", "symbol": "COP", "published": "2026-11-13T17:30:50+00:00", "first_seen": "2026-11-13T17:37:33.309353+00:00", "outcome": "scored"}
+{"key": "d76ad0c4e8d9bb29", "symbol": "AMZN", "published": "2026-11-13T16:35:52+00:00", "first_seen": "2026-11-13T17:37:53.290422+00:00", "outcome": "stale"}
+{"key": "932218c3b681d8fd", "symbol": "NVDA", "published": "2026-11-13T17:33:26+00:00", "first_seen": "2026-11-13T17:37:53.290140+00:00", "outcome": "scored"}
