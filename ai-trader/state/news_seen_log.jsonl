@@ -3357,3 +3357,4 @@
 {"key": "37cfb17190879f98", "symbol": "CSCO", "published": "2026-11-13T14:12:00+00:00", "first_seen": "2026-11-13T15:27:00.370601+00:00", "outcome": "stale"}
 {"key": "84ea7e7d6aaef4c1", "symbol": "NVDA", "published": "2026-11-13T15:26:46+00:00", "first_seen": "2026-11-13T15:28:00.678159+00:00", "outcome": "scored"}
 {"key": "211a64b3dc4b5860", "symbol": "NVDA", "published": "2026-11-13T15:21:02+00:00", "first_seen": "2026-11-13T15:29:20.839393+00:00", "outcome": "scored"}
+{"key": "09feadadfd0ea819", "symbol": "TSLA", "published": "2026-11-13T15:21:00+00:00", "first_seen": "2026-11-13T15:30:20.923872+00:00", "outcome": "scored"}
