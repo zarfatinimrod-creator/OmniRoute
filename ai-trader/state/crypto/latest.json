@@ -1,27 +1,27 @@
 {
   "date": "2026-11-13",
-  "as_of_utc": "2026-11-13T06:41:46+00:00",
+  "as_of_utc": "2026-11-13T07:03:07+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-13T00:00:00+00:00",
     "regular_end_utc": "2026-11-13T23:59:00+00:00",
-    "last_trade_utc": "2026-11-13T06:41:39+00:00",
-    "price": 68843.89
+    "last_trade_utc": "2026-11-13T07:03:03+00:00",
+    "price": 69129.08
   },
-  "equity": 94053.54,
-  "cash": 20317.46,
-  "gross": 0.784,
-  "return_since_start": -0.0595,
-  "shadow_return_since_start": -0.0595,
+  "equity": 93819.73,
+  "cash": 93819.73,
+  "gross": 0.0,
+  "return_since_start": -0.0618,
+  "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.0662,
-    "equal_weight_since_start": -0.0662
+    "bench_since_start": -0.0623,
+    "equal_weight_since_start": -0.0623
   },
   "started": "2026-11-10",
   "regime": "risk_off",
   "dd_state": "normal",
-  "drawdown": -0.0595,
-  "decided_now": true,
+  "drawdown": -0.0618,
+  "decided_now": false,
   "weights": {
     "tsmom": 0.0,
     "xsmom": 0.0,
@@ -34,7 +34,7 @@
   },
   "pending": {
     "decision_date": "2026-11-12",
-    "status": "pending",
+    "status": "executed",
     "rebalance": true,
     "targets": {},
     "overrides": [],
@@ -53,13 +53,21 @@
       }
     ]
   },
-  "executed": [],
-  "top_scores": {
-    "BTC-USD": 0.262
-  },
-  "bottom_scores": {
-    "BTC-USD": 0.262
-  },
+  "executed": [
+    {
+      "date": "2026-11-13",
+      "symbol": "BTC-USD",
+      "side": "SELL",
+      "qty": 1.071071,
+      "price": 68969.865,
+      "value": 73871.62,
+      "realized_pnl": -5783.84,
+      "fee": 369.3581,
+      "reason": "exit"
+    }
+  ],
+  "top_scores": null,
+  "bottom_scores": null,
   "stopped": [],
   "scorecard": {
     "open": 6,
@@ -70,22 +78,13 @@
     "congress_buy": null,
     "logged": null
   },
-  "positions": {
-    "BTC-USD": {
-      "qty": 1.071071,
-      "avg_cost": 74025.07,
-      "last": 68843.31,
-      "pnl_pct": -0.07,
-      "since": "2026-11-12"
-    }
-  },
-  "day_moves": {
-    "BTC-USD": -0.0354
-  },
-  "alert_channels": [],
+  "positions": {},
+  "day_moves": {},
+  "alert_channels": [
+    "ntfy"
+  ],
   "events": [
     "השורה היומית של 2026-11-12 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 71,369.90)",
-    "מתוכנן ל-2026-11-13T07:00:00+00:00: SELL 1.071071 BTC-USD",
-    "שינוי משטר שוק: risk_on -> risk_off"
+    "בוצע ב-2026-11-13T07:00:00+00:00 (1h): SELL 1.071071 BTC-USD @ 68969.865"
   ]
 }

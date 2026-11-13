@@ -1,6 +1,6 @@
 {
   "decision_date": "2026-11-12",
-  "status": "pending",
+  "status": "executed",
   "rebalance": true,
   "exits_only": false,
   "targets": {},
@@ -45,5 +45,21 @@
         "volume": 8944824320.0
       }
     }
-  }
+  },
+  "executed_on": "2026-11-13",
+  "fills": [
+    {
+      "date": "2026-11-13",
+      "symbol": "BTC-USD",
+      "side": "SELL",
+      "qty": 1.071071,
+      "price": 68969.865,
+      "value": 73871.62,
+      "realized_pnl": -5783.84,
+      "fee": 369.3581,
+      "reason": "exit"
+    }
+  ],
+  "fill_source": "1h",
+  "fill_ts": "2026-11-13T07:00:00+00:00"
 }
