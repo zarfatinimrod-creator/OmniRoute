@@ -245,6 +245,16 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     - Not measured: whether Yahoo's close of bar D is final at 00:12 UTC. The R6 audit
       (`market.revised_close_alert_bps` 5) checks every decision; read `close_audit` in `state/crypto/pending.json`
       and `revised_close` rows in `state/crypto/decisions.jsonl` after the first week.
+70. [crypto][defect-timing] Yahoo's daily row for the day that just closed has close null at 00:12 UTC, two nights
+    running (2026-11-12 for bar 11-11, backlog 68; 2026-11-13 for bar 11-12: the chart call at 00:14 UTC returned the
+    11-12 timestamp with close None, which `_bars_from_chart` drops). Since the backlog 68 fix the 00:12 decide slot
+    then makes no decision, and the decision waits for a later run. On 2026-11-13 this delayed a rule exit: with the
+    Coinbase close of 11-12 (71,369.90) BTC was -2.34% under its 200-day average (73,081.1), below the 2% hysteresis
+    band (71,619.5) -> risk_off -> flat under crypto_base (`logs/2026-11-13-crypto-night.md`). Options, each through
+    rule 4: (a) the cycle retries inside the slot until the row fills or a deadline before exec_ts; (b) take the
+    Coinbase daily close when Yahoo's row is null (a data-source change: log-only first, compare the two closes);
+    (c) move the decide slot later (the owner's schedule; measure first when Yahoo fills the row - the poll of
+    2026-11-13 is in the night log). Answers the "not measured" line of item 69.
 66. [news][rule 4] An engine whose lock call fails (not a held lock) runs unlocked and checks the stops, as before;
     the quant-critic (gate of 2026-11-11) recommends that such an engine opens no new position ("no_lock" in
     `_buys_blocked`), which removes a double-buy risk. A new check: log mode first, then rule 4 and the owner.

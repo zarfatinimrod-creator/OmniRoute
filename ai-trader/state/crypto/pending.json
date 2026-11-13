@@ -50,5 +50,12 @@
     }
   ],
   "fill_source": "1h",
-  "fill_ts": "2026-11-12T01:00:00+00:00"
+  "fill_ts": "2026-11-12T01:00:00+00:00",
+  "close_audit": {
+    "gaps_bps": {
+      "BTC-USD": 0.0
+    },
+    "alert": false,
+    "logged_at": "2026-11-13T00:13:25+00:00"
+  }
 }
