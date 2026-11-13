@@ -3998,3 +3998,13 @@
 {"key": "06401b9bf633cf4f", "symbol": "PANW", "published": "2026-11-13T20:41:11+00:00", "first_seen": "2026-11-13T20:48:49.305486+00:00", "outcome": "scored"}
 {"key": "051cb04540a1d7dd", "symbol": "NVDA", "published": "2026-11-13T20:44:58+00:00", "first_seen": "2026-11-13T20:50:08.940375+00:00", "outcome": "scored"}
 {"key": "985f4e6159636d47", "symbol": "NVDA", "published": "2026-11-13T20:18:36+00:00", "first_seen": "2026-11-13T20:51:19.486785+00:00", "outcome": "stale"}
+{"key": "bb8f14393f7ec90f", "symbol": "NVDA", "published": "2026-11-13T20:47:00+00:00", "first_seen": "2026-11-13T20:52:19.955724+00:00", "outcome": "scored"}
+{"key": "10ce51df0c2d2187", "symbol": "MSFT", "published": "2026-11-13T20:39:40+00:00", "first_seen": "2026-11-13T20:52:39.581840+00:00", "outcome": "scored"}
+{"key": "1ef710df148e471a", "symbol": "CRM", "published": "2026-11-13T20:39:40+00:00", "first_seen": "2026-11-13T20:52:39.581915+00:00", "outcome": "scored"}
+{"key": "4b69a039a4456e0a", "symbol": "CAT", "published": "2026-11-13T20:47:00+00:00", "first_seen": "2026-11-13T20:52:39.582390+00:00", "outcome": "scored"}
+{"key": "0047199ea0d1dc35", "symbol": "BAC", "published": "2026-11-13T20:47:00+00:00", "first_seen": "2026-11-13T20:52:59.590088+00:00", "outcome": "scored"}
+{"key": "14fdd078fabc3c2b", "symbol": "LLY", "published": "2026-11-13T20:47:00+00:00", "first_seen": "2026-11-13T20:52:59.590134+00:00", "outcome": "scored"}
+{"key": "fc5654aa35340029", "symbol": "NOW", "published": "2026-11-13T20:31:37+00:00", "first_seen": "2026-11-13T20:53:19.578170+00:00", "outcome": "scored"}
+{"key": "5a0760c1f38adfd1", "symbol": "NVDA", "published": "2026-11-13T20:45:03+00:00", "first_seen": "2026-11-13T20:54:39.963853+00:00", "outcome": "scored"}
+{"key": "3354477a8c5202f5", "symbol": "JPM", "published": "2026-11-13T20:45:00+00:00", "first_seen": "2026-11-13T20:56:59.612414+00:00", "outcome": "scored"}
+{"key": "71a5717f3588a409", "symbol": "JNJ", "published": "2026-11-13T20:47:11+00:00", "first_seen": "2026-11-13T20:57:59.706400+00:00", "outcome": "scored"}
