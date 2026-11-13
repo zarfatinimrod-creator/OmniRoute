@@ -16,13 +16,14 @@ LLM layer adds or removes value. Every step is idempotent: re-running the same d
 from __future__ import annotations
 
 import copy
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from . import journal, notify
+from . import data, journal, notify
 from .broker import PaperBroker
 from .data import (Unreachable, apply_close_source, coinbase_close, corporate_actions, earnings_on, fetch_panel, load_config,
                    load_market, market_status, official_opens, stale_symbols)
@@ -344,6 +345,104 @@ def _execute_pending_utc(cfg: dict, main, shadow, events, now: datetime) -> list
     return fills
 
 
+OHLCV = ("open", "high", "low", "close", "volume")
+
+
+def _price(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v > 0
+
+
+def _day_hours(day) -> range:
+    """Start stamps (epoch seconds) of the 1h bars of the UTC day `day`: 24 by definition, not a setting."""
+    start, end = UtcDailyCalendar.session_window(day)
+    return range(int(start.timestamp()), int(end.timestamp()), data.INTRADAY_SECONDS["1h"])
+
+
+def hourly_day_bars(sym: str, day) -> dict | None:
+    """Backlog 70: the UTC day `day` of `sym` folded from Yahoo's 1h bars into one daily row: first open, highest high,
+    lowest low, last close, summed volume (a null volume counts 0). One chart call, period1 = day 00:00 UTC, period2 =
+    the next 00:00 UTC (as data.intraday_open asks). Only the rows stamped inside the day count (Yahoo also sends the
+    next day's 00:00 row, all null, seen 2026-11-13), and they must be exactly the hours 00:00..23:00, each with a
+    finite, positive open/high/low/close. Anything else - a missing, null, extra or misaligned hour, a failed fetch
+    (RuntimeError, data.Unreachable) or a reply of another shape - is None: no rebuild."""
+    want = _day_hours(day)
+    t0, t1 = want.start, want.stop
+    try:
+        got = data._get_json(data.CHART_URL.format(sym=sym), {"period1": t0, "period2": t1, "interval": "1h"})
+        res = got["chart"]["result"][0]
+        q = res["indicators"]["quote"][0]
+        rows: dict[int, list] = {}
+        for i, t in enumerate(res.get("timestamp") or []):
+            if t0 <= t < t1:
+                if t != int(t) or int(t) in rows:  # a fractional or repeated stamp
+                    return None
+                rows[int(t)] = [q[f][i] for f in OHLCV]
+    except Exception:  # noqa: BLE001 - any failure is "no rebuild"; the backlog 68 rule then makes no decision
+        return None
+    if sorted(rows) != list(want):
+        return None
+    hours = [rows[t] for t in sorted(rows)]
+    if not all(_price(v) for h in hours for v in h[:4]):
+        return None
+    return {"open": float(hours[0][0]), "high": float(max(h[1] for h in hours)), "low": float(min(h[2] for h in hours)),
+            "close": float(hours[-1][3]),
+            "volume": float(sum(h[4] for h in hours if isinstance(h[4], (int, float)) and math.isfinite(h[4])))}
+
+
+def _rebuild_from_hourly(panel: dict, day, symbols, events: list) -> dict:
+    """Backlog 70 (utc_daily only): Yahoo's daily reply can lack the row of the UTC day that just closed for hours (its
+    prices null, dropped by data._bars_from_chart; 2026-11-12 and 2026-11-13). When the final bar `day` has no prices at
+    all for some of `symbols` (universe + benchmark) and the daily reply was fetched after that bar ended, each such
+    symbol's day is built from Yahoo's 1h bars (hourly_day_bars). All or none: one symbol without 24 complete hours
+    leaves the panel as fetched, and the backlog 68 rule makes no decision. A coin absent from the reply, a daily row
+    with some prices but no close, or a reply fetched before the bar ended is never rebuilt (the stale rule handles
+    them), so a bar never mixes daily and hourly values and a Yahoo value is never overwritten. Frames are copied, never
+    changed in place; out["_hourly_rebuild"] logs the rows (the decision record and pending.json carry it; R6 compares
+    the decision close with Yahoo's daily close once that row arrives)."""
+    close = panel["close"]
+    d = pd.Timestamp(day)
+    need = sorted(s for s in symbols if d not in close.index or s not in close.columns or pd.isna(close.at[d, s]))
+    if not need or any(s not in close.columns for s in need):
+        return panel
+    if any(d in panel[f].index and pd.notna(panel[f].at[d, s]) for f in OHLCV[:4] for s in need):
+        return panel
+    fetched, end = panel.get("_fetched_at") or {}, UtcDailyCalendar.bar_end(d) + UtcDailyCalendar.FINAL_AFTER
+    if any(fetched.get(s) is not None and fetched[s] < end for s in need):
+        return panel
+    rows = {}
+    for s in need:
+        rows[s] = hourly_day_bars(s, d)
+        if rows[s] is None:
+            return panel
+    out = dict(panel)
+    for f in OHLCV:
+        ix = panel[f].index
+        fr = panel[f].copy() if d in ix else panel[f].reindex(ix.append(pd.DatetimeIndex([d])).sort_values())
+        for s in need:
+            if pd.isna(fr.at[d, s]):
+                fr.at[d, s] = rows[s][f]
+        out[f] = fr
+    n = len(_day_hours(d))
+    out["_hourly_rebuild"] = {"bar": str(d.date()), "source": "yahoo_1h", "hours": n, "inserted": d not in close.index,
+                              "symbols": rows}
+    events.append(f"השורה היומית של {d.date()} ב-Yahoo ריקה - היום נבנה מ-{n} נרות שעתיים של Yahoo (close "
+                  + ", ".join(f"{s} {rows[s]['close']:,.2f}" for s in need) + ")")
+    return out
+
+
+def _without_rebuild(close: pd.DataFrame, log: dict | None) -> pd.DataFrame:
+    """The closes as Yahoo's daily reply had them: a forecast is graded only on Yahoo's daily close, never on a row
+    built from hourly bars (grades are permanent, and the R6 audit does not reach them). It waits for the daily row."""
+    if not log or pd.Timestamp(log["bar"]) not in close.index:
+        return close
+    d = pd.Timestamp(log["bar"])
+    if log["inserted"]:
+        return close.drop(index=d)
+    c = close.copy()
+    c.loc[d, sorted(log["symbols"])] = float("nan")
+    return c
+
+
 def _audit_revised_close(panel: dict, dec_bar: pd.Timestamp, cfg: dict, events: list) -> None:
     """Ruling R6 (spec 4): the closes the last decision used against the history values of that bar, once it is no
     longer the decision bar (Yahoo rewrites the latest completed close). A gap above market.revised_close_alert_bps
@@ -360,13 +459,15 @@ def _audit_revised_close(panel: dict, dec_bar: pd.Timestamp, cfg: dict, events: 
         return
     gaps = {s: round((hist[s] / used[s] - 1) * 1e4, 6) for s in sorted(used)}
     big = {s: g for s, g in gaps.items() if abs(g) > limit}
-    pend["close_audit"] = {"gaps_bps": gaps, "alert": bool(big), "logged_at": journal.now_utc()}
+    src = {"decision_close_source": pend["hourly_rebuild"]["source"]} if pend.get("hourly_rebuild") else {}  # backlog 70
+    pend["close_audit"] = {"gaps_bps": gaps, "alert": bool(big), **src, "logged_at": journal.now_utc()}
     journal.save_json("pending.json", pend)
     if big:
         journal.append("decisions.jsonl", {"event": "revised_close", "date": pend["decision_date"], "decision_close": used,
-                                           "history_close": hist, "gaps_bps": gaps, "limit_bps": limit, "logged_at": journal.now_utc()})
+                                           "history_close": hist, "gaps_bps": gaps, "limit_bps": limit, **src, "logged_at": journal.now_utc()})
         events.append(f"סגירה מתוקנת: ההחלטה של {pend['decision_date']} השתמשה בסגירה שההיסטוריה שינתה - "
-                      + ", ".join(f"{s} {g:+.1f}bp" for s, g in big.items()) + f" (סף {limit}bp). לבדוק את market.close_source")
+                      + ", ".join(f"{s} {g:+.1f}bp" for s, g in big.items()) + f" (סף {limit}bp). לבדוק את market.close_source"
+                      + (" (סגירת ההחלטה נבנתה מנרות שעתיים, backlog 70)" if src else ""))
 
 
 def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, persist: bool, events, frozen: set | None = None) -> dict:
@@ -445,6 +546,9 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
             events.append(f"אזהרה: Coinbase לא זמין ({', '.join(guard['unreachable'])}) - ממשיכים בלי בדיקת המחיר")
     if panel.get("_close_source"):  # next_open: both closes of the decision bar, for the revised-close check
         diag["close_source"] = panel["_close_source"]
+    rebuilt = panel.get("_hourly_rebuild") if (panel.get("_hourly_rebuild") or {}).get("bar") == ds else None
+    if rebuilt:  # backlog 70: this decision bar was built from Yahoo's 1h bars
+        diag["hourly_rebuild"] = rebuilt
     _, sdiag = build_targets(dec, panel, signals, weights, cfg, shadow.peak_ratio(px), shadow.positions, set(shadow.state.get("blocked", {})), aux, frozen)
     if utc:  # planning decision 12: execute on the first full hour after the decision is logged; overrides count until then
         logged_at = journal.now_utc()
@@ -463,6 +567,7 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
                 **({"frozen": sorted(frozen)} if frozen else {}),
                 **({"carried_stops": carried} if carried else {}),
                 **({"exec_ts": exec_ts, "decision_close": px} if utc else {}),  # decision_close: the revised-close audit (R6)
+                **({"hourly_rebuild": rebuilt} if rebuilt else {}),
                 **({"coinbase_breach": True} if guard and guard["status"] == "breach" else {})}  # R9a: the fill is exits-only
     if not persist:
         journal.save_json("proposal.json", decision)
@@ -526,6 +631,15 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
     no_decision = None
     # Bar-final rule (planning decision 10): the clock says the session ended AND the data was fetched after it.
     if mk.get("stale_skips_run"):  # crypto: any stale or absent coin (or benchmark) skips the run before any decision or fill
+        want = UtcDailyCalendar.last_final_bar(now) if utc else None
+        if want:  # backlog 70: a final day missing from Yahoo's daily reply is built from its 24 hourly bars, if complete
+            try:
+                panel = _rebuild_from_hourly(panel, want, set(cfg["universe"]) | {bench}, events)
+            except Exception as e:  # noqa: BLE001 - never stops the cycle; the panel stays as fetched (backlog 68 rule)
+                print(f"[cycle] backlog 70: no rebuild of {want} ({type(e).__name__})")
+            close = panel["close"]
+            last = close.index[-1]
+            prev = close.index[-2] if len(close) > 1 else last
         dec_bar = last if clock_final(last) else prev
         stale = stale_symbols(panel, dec_bar, _bar_end_utc(dec_bar, cfg), set(cfg["universe"]) | {bench})
         if stale:
@@ -534,7 +648,6 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
                 journal.append("skips.jsonl", {"logged_at": journal.now_utc(), "reason": msg})
             return {"skipped": msg, "executed": [], "decided_now": False, "events": [msg]}
         frozen = set()
-        want = UtcDailyCalendar.last_final_bar(now) if utc else None
         if want and dec_bar.date() != want:  # backlog 68: a daily row missing from the reply; never decide on an older close
             no_decision = (f"אין שורה יומית של {want} בנתונים (הנר האחרון הסופי הוא {dec_bar.date()}) - אין החלטה בריצה הזו,"
                            " הזמנה ממתינה עדיין מתמלאת, ריצה מאוחרת תנסה שוב")
@@ -595,10 +708,11 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
 
     journal.save_json("portfolio.json", main.state)
     journal.save_json("shadow_portfolio.json", shadow.state)
-    card = journal.evaluate_predictions(_eval_close(close.loc[:dec_bar]), bench, market=cfg.get("market"))  # final bars only
+    graded = _without_rebuild(close, panel.get("_hourly_rebuild")).loc[:dec_bar]  # final bars, Yahoo's daily closes only
+    card = journal.evaluate_predictions(_eval_close(graded), bench, market=cfg.get("market"))
     try:  # the news book's calls; a failure here must not cost the quant book its records and alerts
         nfiles = ("news_predictions.jsonl", "news_grades.jsonl")
-        journal.evaluate_predictions(_eval_close(close.loc[:dec_bar], *nfiles), bench, *nfiles)
+        journal.evaluate_predictions(_eval_close(graded, *nfiles), bench, *nfiles)
     except Exception as e:  # noqa: BLE001 - logged, not hidden
         events.append(f"news grading failed: {type(e).__name__}: {str(e)[:120]}")
 
