@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Runs a command with no phone variables, no model CLI on PATH and no route to the network (dead proxies).
+# Usage: /home/user/OmniRoute/.superpowers/sdd/2026-11-10-supervisor/safe python3 -m unittest ...
+here="$(cd "$(dirname "$0")" && pwd)"
+exec env -u AITRADER_NTFY_TOPIC -u AITRADER_TELEGRAM_TOKEN -u AITRADER_TELEGRAM_CHAT -u AITRADER_DASH_URL \
+  HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 https_proxy=http://127.0.0.1:9 http_proxy=http://127.0.0.1:9 \
+  ALL_PROXY=http://127.0.0.1:9 all_proxy=http://127.0.0.1:9 NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 \
+  PATH="$here/bin:$PATH" "$@"

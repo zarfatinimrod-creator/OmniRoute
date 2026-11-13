@@ -1,0 +1,357 @@
+[
+ {
+  "range": "10-17",
+  "table_file": "/home/user/OmniRoute/.superpowers/sdd/2026-11-10-supervisor/preflight-10-17.md",
+  "confirmed": [
+   {
+    "tasks": "11, 12, 17 (and 20)",
+    "kind": "task-vs-code",
+    "what": "An engine child run under a parent ends at once when the real New York clock is past the --until the parent hands it. The parent's clock is injected, the engine's own end test is not. With --until 16:05, every test and drill that runs engine_child.py under a parent passes in the morning and fails from 16:05 New York on (the child returns 0, the parent at its 10:00 clock counts a crash, the loop trips). The gate's suite and Task 20's drills run after 16:05 New York by rule.",
+    "evidence": "Plan 733 (child = child_cmd + [\"--until\", until, \"--supervised\", pid]); 734 and 742 (injected clock, \"10:00 New York on Thursday 2026-11-12\"); 877 (Task 12 test_the_real_engine_gets_a_code_row_after_its_up_row); 1154, 1158, 1161, 1163 (drills a, d, f; test_the_fast_drills_pass); only `cloud` names --until 23:59 (1165). Code: ai-trader/aitrader/news_live.py:1427-1428 (`now = datetime.now(NY)`; `(now.hour, now.minute) >= (hh, mm)` breaks the loop). Global Constraints line 32 (a landing and its gate run after 16:05 New York); Task 20 lines 1270-1271.",
+    "suggested_ruling": "Every parent that a test or a drill starts with engine_child.py gets --until 23:59 (as start() of Tasks 5 and 7 already does); the minute 23:59 New York is the known ceiling. The dummy child takes --until and ignores it.",
+    "refuter": "Confirmed. main appends `--until <until>` to child_cmd (plan 733) and only the parent's clock is injected (734, 742); the engine's end test is the real clock (news_live.py:1427-1428; baseline.md 4.4 says so). Nothing fixes the `--until` of a test or drill parent except the `cloud` row (1165). With 16:05 (config `until_ny`, the natural default) the engine child skips its loop from 16:05 to 23:59 New York: no beat with `code`, exit 0, and the parent at its 10:00 clock counts crashes and trips. That breaks Task 12's test (877) and drills a (engine part), d, f (1158-1163), and the gate's suite and Task 20 run after 16:05 by rule (line 32). Suggested ruling is right and smallest. Widen it to every engine_child start, also without a parent (drills e, g): `__main__.py:90` defaults `--until` to 16:05, and the same default reaches `Procs.start_engine` of Tasks 3, 6, 8 (outside this scan, same cause)."
+   },
+   {
+    "tasks": "17 (and 20)",
+    "kind": "task-vs-code",
+    "what": "Drill f at the real numbers sits exactly on the threshold. One held name with 60 s quote stubs against stops_stale_seconds 120: a name's stamp is the START of the look and looks follow back to back, so the stamp the parent sees is 60 s old when it appears and 120-121 s when the next one replaces it. \"One stale_stops start row, one R6\" then happens zero times or many times by the half-second tick. --fast hides it: 4 s quotes against a 3 s threshold is the opposite order.",
+    "evidence": "Plan 1163 (drill f: quote stubs of 60 s with one held name), 1154 (--fast: stops_stale_seconds 3, quote stubs of 4 s; without --fast the numbers of config.json). Code: news_live.py:834 (`now` taken before the quotes), 869 (`_stops_checked_at = now`), 903 (`_covered[sym] = self._stops_checked_at`), 1451 (1 s minimum sleep between steps). Spec 10 stops_stale_seconds 120; spec 11.1 (f) says only \"quote stubs that take 60 s each\".",
+    "suggested_ruling": "Drill f holds three names (as drill a's engine part does): one look costs 180 s at the defaults (12 s fast), the stamp stays over the threshold, and the beat after every quote keeps the hang rule quiet. Spec 11.1 (f) does not fix the number of names.",
+    "refuter": "Confirmed. A name's stamp is the START of the look (news_live.py:834, 869, 903). One held name with 60 s quotes: the stamp is about 60 s old when a beat first shows it and 120 s (two looks of one step back to back, 1349-1350 and 1372-1373) or 121 s (across steps, the 1 s sleep at 1451) when replaced, against 'above stops_stale_seconds' 120 (plan 840). So zero or several start/end pairs and R6 lines, by sub-second timing. `--fast` (4 s quotes against 3 s, plan 1154) reverses the order, so the unit test cannot show it; Task 20 runs the real numbers. Ruling right: three names (spec 11.1 f fixes no count; 180 s per look stays over 120 and never turns fresh, one start row, one R6). Add to it: under `--fast` the 4 s quote stub equals `hang_seconds` 4 and beats come once per quote, so the hang rule sits on its own threshold; make the fast quote stub shorter than hang_seconds (2 s x 3 names = 6 s, still over 3 s) or pin the kill switch off in drill f's config copy, since Task 20 turns it on in config.json."
+   },
+   {
+    "tasks": "13, 17",
+    "kind": "task-vs-task",
+    "what": "Drill a asks for seven R1 lines inside one clock hour; the cap lets six out. Drill a is 6 kills of the dummy \"then once with the engine child\", pass mark \"one R1 per kill\"; R1 is counted against max_alerts_per_hour (6) and held back above it, and the count lives in the state file across parents. At the real numbers (Task 20) the seventh R1 is \"capped\" and drill a fails.",
+    "evidence": "Plan 1158 (drill a and its pass mark), 931 (R1 and R2 over the count are held back; the count is in the state file), 965-967 (the test: the seventh counted line is refused), 1154 (without --fast the numbers are those of config.json). Spec 10 max_alerts_per_hour 6; spec 11.1 (a) is \"6 kills of the child\".",
+    "suggested_ruling": "The engine-child part of drill a is its own parent on its own state directory (its own alert count); the first part stays at the spec's six kills.",
+    "refuter": "Confirmed. Each spaced kill is its own episode and gets its own R1 (plan 929, 1158); the cap lets exactly six counted lines out per hour (965-967) and the count is in the state file (931, 634); drill a asks for a seventh R1 from the engine-child kill, and 'each drill has its own temporary state directory' (1154). The cap is not scaled by `--fast`, so already the unit test's `PASS a` (1175-1177) cannot hold on one state directory: the implementer stops, or bends the pass mark (counts capped rows, raises the cap in the drill's config). Suggested ruling is right and smallest: the engine part needs another child_cmd, so it is a second parent anyway; giving it its own state directory keeps the cap and the spec's six kills untouched."
+   },
+   {
+    "tasks": "5, 17",
+    "kind": "task-vs-task",
+    "what": "Drill e's pass mark cannot hold after the first mismatch. It wants \"wherever the book disagrees with the journal's last row the next start sent E1\", but E1 goes out once per New York day and symbol, and a mismatch blocks every new buy for the process. After a BUY the book does not know, the last row stays that BUY: every later round starts on the same mismatch with no E1 and no more buys for the rest of the 200 rounds.",
+    "evidence": "Plan 1162 (drill e), 316 (E1 once per New York day and symbol, by the heartbeat's mismatch_told), 315 (_buys_blocked answers book_mismatch; a news_errors.jsonl row with where \"book_mismatch\"). Spec 5.4 row 4; spec 11.2 step 2: \"no mismatch that check 4 missed\".",
+    "suggested_ruling": "A mismatch counts as said when the next start left a news_errors.jsonl row with where \"book_mismatch\" (or buys_blocked \"book_mismatch\" in the heartbeat); E1 is asked for only the first time a symbol mismatches; after a round that found a mismatch the next round starts from a fresh state directory.",
+    "refuter": "Real, low odds. E1 is not sent again for the same New York day and symbol (plan 316) and a BUY the book does not know stays the last row because buys are blocked (315), so every later round still 'disagrees' and its start sends no E1: a checker written to the letter of 1162 prints FAIL e after the first mismatch. It will not show at build (e is in no unit test, 1175; a mismatch needs a kill inside the append-to-save window of `_log_trade`, news_live.py:1096-1103), only possibly at Task 20's 200 rounds, where it would stop the landing for a false reason. Suggested ruling is right: the `news_errors.jsonl` row with where 'book_mismatch' is written at every mismatched start (315) and is what spec 11.2 asks for ('no mismatch that check 4 missed'). Add one clause: the start that must say it is left to reach its first idle beat before it is judged or killed, because E1 goes out only after the first look (Task 7, step 5)."
+   },
+   {
+    "tasks": "12, 13 (and drill b of 17)",
+    "kind": "task-vs-spec",
+    "what": "R2's kill form cannot be filled \"at a hang row\", and nothing stops R1 from following it. The R2 text carries the restart time and {blind_s}, both known only at the next `up`. A hang kill also takes the core's crash path, and R1 is sent \"when a restart episode ends\" with no exception: one hang gives R2 and, 60 s later, R1 (two counts against the cap).",
+    "evidence": "Plan 929 (\"R2 at a hang row\"; R1 when a restart episode ends), 839 (hang kill, then the core's crash path, counted), 1159 (drill b: one R2). Spec 8 R2 text (\"נהרג והופעל מחדש ב-{HH:MM:SS}. סטופים לא נבדקו {blind_s} שניות\"); spec 3 row 2 (the owner is told R2); spec 11.2 step 2 (\"the frozen child replaced within 190 s, one R2\").",
+    "suggested_ruling": "Switch on: R2 is sent at the first `up` after the hang kill, with that up's time and blind_s, and that episode sends no R1. Switch off: the \"not killed\" form at the hang row, as written.",
+    "refuter": "Confirmed. R2's kill form needs the restart time and `{blind_s}` (spec 8, R2 row); `render` raises KeyError on a missing field (plan 95); at the `hang` row (839) neither exists, the restart and its `up` with `blind_s` (843) come after the kill and the core's crash path (728). Sending there means inventing both numbers and claiming a restart that has not happened. And 929 sends R1 at the end of every episode with no exception, so one hang gives R2 and, 60 s later, R1 (two cap counts), where spec 3 row 2 and spec 11.2 step 2 name R2 alone. No test covers the kill form (957-958 tests the switch-off form only). Suggested ruling is right. One refinement: R1 is dropped only when the hang kill was the episode's only fall; if the replacement falls again before it is healthy, R1 goes out as written (first fall = the hang, cause 'נהרג'), otherwise that second fall is never said."
+   },
+   {
+    "tasks": "13, 16",
+    "kind": "task-vs-task",
+    "what": "R11's rule needs minutes that the alert rows do not carry. close_lines sends R11 on \"more unprotected minutes than the day's R4, R4b and R4c alert rows reported\", but an alert row is id, kind, sent, text: the minutes exist only inside the Hebrew text. An R4c row can never exist (the parent is the log's only writer, uptime-report is read-only). Task 16's file list has no supervise.py.",
+    "evidence": "Plan 1114 (R11 rule), 928 (alert row), 1111 (uptime-report read-only; R4c pushed by the close slot), 1101 (Task 16 files). Spec 4.6 alert fields `id`, `kind`, `sent`, `text`; spec 4.1 (uptime.jsonl written only by the parent).",
+    "suggested_ruling": "Task 13 writes the numbers of a line into its alert row (`m` for R4 and R4b at least). Task 16 sums `m` over the day's R4/R4b rows and counts the R4c of the same call as reported.",
+    "refuter": "Confirmed. An alert row is id, kind, sent, text (plan 928; spec 4.6); plan 1114 compares the day's unprotected minutes with what the R4/R4b/R4c rows 'reported', and the only place those minutes exist is inside the Hebrew text. Task 16 may not touch supervise.py (1101), so its implementer would parse `{m} דקות` out of rendered text (fragile) or rebuild gap_line's arithmetic from sup_start/up rows. An R4c row can never exist: the close slot pushes R4c from a read-only command (1111) and the log has one writer (spec 4.1), so by the letter a day whose outage is open at the close gets R4c and R11 for the same minutes. The plan's test (1134-1135) has a trip and no alert rows, so this branch is untested. Suggested ruling is right and smallest: Task 13 is not built yet, and an extra `m` field breaks no reader."
+   },
+   {
+    "tasks": "16, 21",
+    "kind": "task-vs-task",
+    "what": "deadman.alarms would count one \"alarm\" on every normal morning. Task 16 reads each new_seq row as an alarm that went out; Task 21 writes new_seq whenever the stored seq is past its due time, and after a normal close (DM3, then the cancel) yesterday's seq is past due, so the first ping of the next day writes new_seq. The two-week page that decides question 3 would show an alarm a day.",
+    "evidence": "Plan 1112 (`alarms` = the day's new_seq rows: \"each is an alarm that went out\"), 1304 (a new seq and row new_seq when now is not more than seq_margin_seconds before due_at), 1303 (close: DM3 then cancel; the file is not removed), 1310 (the file is removed only in the undo case). Spec 11.2 two-week report: \"dead-man alarms (true and false)\".",
+    "suggested_ruling": "After a confirmed cancel (the close, a trip or a halt whose line was said) the parent removes state/news_deadman.json; the next arming writes `armed`; new_seq keeps the meaning Task 16 reads. Task 21's test for an alarm that already went out still passes.",
+    "refuter": "Confirmed. `news_deadman.json` is rewritten after each accepted ping and removed only in the undo case (plan 1304, 1310); after the close's DM3 and cancel (1303) the stored `due_at` lies hours behind, so the next morning's first ping takes a new seq and writes `new_seq`. Task 21's own test uses an 18-hour-old `due_at` for exactly that (1364-1368). Task 16 counts every `new_seq` row as 'an alarm that went out' (1112): one alarm a day on the two-week page that decides question 3 (spec 11.2). Nothing else in the plan removes or resets the file. Suggested ruling is right: remove the file after a confirmed cancel (close, a said trip or halt), the next arming writes `armed`; a cancel that failed keeps the file, and the `new_seq` that follows is then a true count. The 1364 test still passes because it writes the old file itself."
+   },
+   {
+    "tasks": "11, 15, 21",
+    "kind": "task-vs-task",
+    "what": "leave() has no window, so a stop after the window closed arms DM2. main calls leave on every way out and \"handover\", \"signal\", \"orphaned\" leave one last ping with DM2 for 10 minutes. The window closes at 16:01 (13:01 on 2026-11-27) while the engine runs to 16:05 with a handover listed at 14:17: the 14:17 handover of 2026-11-27, and any stop signal or 110-minute handover between 16:01 and 16:05 (after which --status answers after_hours and nobody relaunches), puts \"the supervisor stopped, stops are not checked\" on the phone with the market closed.",
+    "evidence": "Plan 1299 (leave signature: no window), 1305 (DM2 for handover, signal, orphaned), 1311 (leave on every way out), 1292 and 1354-1357 (window closes one minute after the close; 13:01 on 2026-11-27), 649 (handover_times_ny ... 14:17), 636 (until_ny 16:05), 1021 (16:00 is after_hours). Spec 6: pings only while the window is open; \"closes one minute after the session's close by the calendar\".",
+    "suggested_ruling": "main calls leave for \"handover\", \"signal\" and \"orphaned\" only while window_open; after the window nothing is published.",
+    "refuter": "Confirmed. `leave` takes no window (plan 1299) and main calls it 'as they are' for handover, signal and orphaned (1305, 1311), while the parent lives on after the window has closed (1292: close + 60 s; the engine runs to 16:05, 636; a handover is listed at 14:17, 649). On 2026-11-27 the 14:17 handover arms DM2 an hour after the 13:00 close; on any day a stop signal or a max-leg handover between 16:01 and 16:05 arms a DM2 that nobody pushes back, since `--status` answers after_hours from 16:00 (1021). Spec 6 says pings go out only while the window is open and that after about 16:05 only DM3 can arrive. Suggested ruling is right and smallest: tick has already disarmed at the window's close, so nothing is waiting and nothing needs publishing."
+   },
+   {
+    "tasks": "13, 21",
+    "kind": "task-vs-task",
+    "what": "A third trip of a day has no line, and leave needs one. Task 13 sends R3, then R3b, then nothing; Task 21 passes said = whether the trip's line was delivered and text = that line, and replaces the waiting message with \"נשלח באיחור: \" + text when it was not said. With no line, said and text are undefined (a None in a message, or a crash on the way out).",
+    "evidence": "Plan 929 (\"R3, then R3b, then nothing, at the first, second and later trips of a day\"), 1305 and 1311 (leave at a trip: said, text). Spec 4.3 (\"nothing on later trips\"), spec 6 (\"at a trip or a halt ...\"). R3b's own text: \"היום לא אשלח על זה עוד שורות\".",
+    "suggested_ruling": "At a third or later trip main calls leave(\"crash_loop\", held, said=True): the waiting message is cancelled, as R3b already told the owner that no more lines come today.",
+    "refuter": "Real, minor. A third or later trip has no line (plan 929; spec 4.3), yet main must pass `said` = whether 'its line' was delivered and `text` = that line (1311), and said false builds the waiting message from `text` (1305). Read to the letter ('not delivered', text None) that is a TypeError on the way out, or a line reading 'None', on a day R3b promised no more lines; no test runs a third trip with the dead-man on (950 is before Task 21). Suggested ruling is right and costs nothing: it is what the signature's own defaults give (said=True, text=None, line 1299), and R3b has already told the owner that only the close summary follows."
+   },
+   {
+    "tasks": "13, 21, 25",
+    "kind": "task-vs-task",
+    "what": "The stub's poll lines are too thin for the leak tests that read them. NtfyStub answers the poll with lines of sequence_id, priority, time only. Task 21 tests that the topic reaches no file on the poll path and Task 25 tests that watch-check never prints a body against \"a NtfyStub that holds BODY-123\": with the stub as specified both pass on any code. Neither task may edit tests/helpers/http_stub.py.",
+    "evidence": "Plan 926 (poll: \"each with sequence_id, priority, time\"), 1321 (\"every line ntfy returns carries the topic\"), 1390-1391 (Task 21 topic test on the cancel and poll paths), 1601-1605 (Task 25 body test), 1286 and 1521 (file lists without http_stub.py). Rubric: a test that asserts nothing.",
+    "suggested_ruling": "Task 13's stub returns ntfy's full line for every message: id, time, event, topic, message, title, priority, sequence_id.",
+    "refuter": "Confirmed. Plan 926 gives a poll line three fields (sequence_id, priority, time). Task 25's check that watch-check never prints a body (1601-1605) then cannot fail: 'BODY-123' is never in a reply, whatever the code prints. Task 21's check on the poll path (1390-1391) only catches the topic in an error's URL, not a returned line, although every real line carries the topic (1321). Neither task lists tests/helpers/http_stub.py (1286, 1521), so it must be settled in Task 13. Suggested ruling is right: the stub returns ntfy's full line (id, time, event, topic, message, title, priority and the sequence id); Task 22 confirms the field names on a real reply."
+   },
+   {
+    "tasks": "13, 14, 16",
+    "kind": "task-vs-spec",
+    "what": "{held} has no source when the child never wrote a beat. R3, R3b, R3c, R5a, R5b, R5e and R4c all say \"פתוח: {held}\". The parent's only source of names and stops is the heartbeat (Paths has no book file), the log carries them only in `up` rows, and the heartbeat is git-ignored. A child that leaves with 5, 6 or 7 leaves before the trader is built and writes no beat; on a rebuilt VM there is no old beat either. held_text({}) is \"אין פוזיציות\": the owner would be told that nothing is open in a line that says the stops are not checked. open_at_close in day_report has no stated source either.",
+    "evidence": "Plan 624 (Paths: no book path), 927 (`held` is held_text(...)), 312 (start_checks before the trader is built), 126 (held_text({}) == \"אין פוזיציות\"), 946-950 (R5a/R5b/R3 from a child with 0 beats on a fresh directory), 1012 (R5e text built in status), 1112 (open_at_close). Spec 8 texts; spec 3 row 9 (\"heartbeat and seen-list are gone\"); ai-trader/.gitignore:4.",
+    "suggested_ruling": "When there is no beat of the current child, the parent (and status() for R5e) reads positions and stops from state/news_book.json as plain JSON, the way it already reads news_trades.jsonl; Paths gets `.book`. In Task 16, open_at_close and R4c's {held} are the `held` of the day's last `up` row.",
+    "refuter": "Confirmed. The parent's only source for names and stops is the beat (plan 833-834, 927; Paths has no book path, 624). A child that leaves with 5, 6 or 7 ends before the trader is built (312) and a crash at import leaves no beat either; the plan's own tests send R5a, R5b, R3 and R3c from 0 beats on a fresh directory (946-950) and check ids only. What gets built is `held_text({})` = 'אין פוזיציות' (126) inside 'סטופים לא נבדקים. פתוח: ...': a false all-clear in an urgent line. Same for R5e built in status (1012) after a rebuilt VM (the heartbeat is git-ignored, .gitignore:4), and R4c and `open_at_close` (1112) have no stated source at all. Suggested ruling is right: `state/news_book.json` is tracked and every position carries `stop_price` (news_live.py:811), so it reads as plain JSON like news_trades.jsonl; on exit 6 the book is unreadable, but R5d has no {held}."
+   },
+   {
+    "tasks": "16, 22, 28",
+    "kind": "task-vs-task",
+    "what": "The day's block of uptime-report has no `dm` and no way to see how fast `left` falls, yet Task 22 and list A of Task 28 read both from it (\"dm true through the window\", \"left falling by about one per 3 minutes and no faster\", \"no ping_failed from a 429\"). No later task adds keys to day_report.",
+    "evidence": "Plan 1424 (Task 22: \"uptime-report --day shows dm true through the window, left_min 30 or more, ...\"), 1664 (list A), 1112 (day_report keys: deadman {alarms, ping_failed, cancel_failed}, left_min). Spec 11.2: the two-week page lists alarms, failed ntfy calls and the lowest left; the first-day checklist is read against the log.",
+    "suggested_ruling": "The report stays as Task 16 has it. Tasks 22 and 28 read `dm` and `left` from the mark rows of `git show origin/<branch>:ai-trader/state/uptime.jsonl`.",
+    "refuter": "Real, small. day_report (plan 1112) has `left_min` and a `ping_failed` count, but no `dm`, no rate of `left` and no cause of a failed ping; Task 22 (1424) says `uptime-report --day` shows all of them. For list A the plan already names the log as a source (1659) and the gate clone holds the merged `state/uptime.jsonl`, so `dm` and `left` are read from the mark rows: the suggested ruling is right and changes no build. It leaves one hole: 'no ping_failed from a 429' (spec 11.2 step 3: 'no 429') cannot be read from the pushed state unless the `deadman` row itself carries the status, because `.cache/supervise.log` never reaches git (plan line 35) and Task 21 fixes no field but `what`. Add to the ruling: Task 21's `ping_failed` row carries `status` (the code or the exception's class name)."
+   },
+   {
+    "tasks": "10, 13, 14",
+    "kind": "task-vs-task",
+    "what": "Alert ids must stay unique across the five parents of a day, and nothing says where the day's count lives. id is <kind>-<n>, \"n counting the day's alerts\"; unsent and --relayed match by id within a day; the state file has alerts {hour, sent, capped} only. A counter kept in the process starts at 1 after every handover: a second \"R1-1\" would read as already relayed, or as sent.",
+    "evidence": "Plan 928 (id), 634 (state file layout), 1012-1013 (unsent by id; news_relayed.json {day, ids}). Spec 4.5 (5 launches a day); spec 4.3 (\"alert counts per hour and day\" in the state file).",
+    "suggested_ruling": "At sup_start, n continues from the alert rows of that New York day already in uptime.jsonl (the log outlives a parent).",
+    "refuter": "Confirmed. The id is `<kind>-<n>`, 'n counting the day's alerts' (plan 928), and `unsent` and `--relayed` match by id within a day (1012-1013) across up to five parents (spec 4.5). The state file's layout (634) keeps only the hourly counts, where spec 4.3 has 'alert counts per hour and day', so the plan gives the day's count no home. A counter kept in the process starts at 1 after every handover: a second 'R1-1' hides an unsent line behind a sent or an already relayed one. Every test of Tasks 13-14 runs one parent (1039), so nothing would catch it. Suggested ruling is right and smallest: n continues from that New York day's alert rows in uptime.jsonl at sup_start, with no new state key."
+   },
+   {
+    "tasks": "12",
+    "kind": "task-vs-code",
+    "what": "`sold` compares a whole-second stamp with a float. sold = the SELL rows whose logged_at is at or after the real time (time.time()) at which the previous child ended; logged_at is cut to whole seconds. A sale the new child makes in the same clock second in which the old one ended is left out of up.sold and of R1's \"נמכר בהפעלה\". No test in Tasks 12-17 has a non-empty sold.",
+    "evidence": "Plan 843 (sold) and 871 (the only assertion: sold == []). Code: ai-trader/aitrader/journal.py:54-55 (now_utc: replace(microsecond=0)); news_live.py:1096 (logged_at = journal.now_utc()).",
+    "suggested_ruling": "The reference time is cut to its whole second before the comparison.",
+    "refuter": "Real, small. `logged_at` is cut to whole seconds (journal.py:54-55, news_live.py:1096) and the reference is a float `time.time()` (plan 843). After an at-once restart the first look can sell inside the same clock second in which the old child ended (0.73 s measured for one name, spec target 3): the row's stamp is then below the float, and the sale drops out of `up.sold` and R1's `{sold}`. Only `sold == []` is ever asserted (871). Suggested ruling is right and matches spec 4.6 (sales since `down_from`, a whole-second `t`); its cost is that a sale the old child logged in its own last second is listed too. An exact alternative of the same size: remember the size of news_trades.jsonl when the child ended and read the SELL rows after that offset."
+   },
+   {
+    "tasks": "17 (and 21)",
+    "kind": "task-vs-controller",
+    "what": "The by-hand drill run against \"run only unit tests\". The plan asks the implementer to run `python3 scripts/drill_supervisor.py all --fast --rounds 20` (seven PASS); controller-notes.md says \"Run only unit tests\" and wins over the brief. Drills b, d, e and g are in no unit test, so a subagent that obeys the notes hands them untested to Task 20's landing.",
+    "evidence": "Plan 1195 (Task 17) and 1411 (Task 21); controller-notes.md lines 3 and 37-39; plan 1175 (the unit test runs drills a, c, f only).",
+    "suggested_ruling": "The Task 17 and Task 21 briefs say that this one command is required and allowed (temporary directories, stub children, the `env -u AITRADER_NTFY_TOPIC ...` prefix), and its seven lines go into the report.",
+    "refuter": "Confirmed. Plan 1195 and 1411 require the by-hand `python3 scripts/drill_supervisor.py all --fast --rounds 20`; controller-notes line 37 says 'Run only unit tests' and line 3 says the notes win over the brief. An obedient implementer skips the run and says so; drills b, d, e and g are in no unit test (1175 runs a, c, f) and would run for the first time at Task 20's landing, at the real numbers. Suggested ruling is right: the briefs of Tasks 17 and 21 name this one command as required and allowed (temporary directories, stub children, 127.0.0.1 only, the `env -u ...` prefix) and its seven lines go into the report."
+   },
+   {
+    "tasks": "11, 12",
+    "kind": "task-vs-itself",
+    "what": "Whether a stop stamp ages between beats is not said. \"A stamp inside a beat is aged against that beat's own at\" read alone gives a stop_age_s that stands still until the next beat: an engine 100 s into one call, whose stamp was 100 s old at its last beat, shows 100 and not 200 in the mark, in the stale-stops rule and in the uptime number.",
+    "evidence": "Plan 734 (ages), 833-834 (beat_view returns age_s and stop_age_s), 840 (stale stops: stop_age_s above stops_stale_seconds). Spec 4.3 (\"the oldest per-name stamp is older than stops_stale_seconds\"), spec 4.6 (mark `stop`: \"age of the oldest per-name stamp\").",
+    "suggested_ruling": "stop_age_s = (the beat's `at` - the oldest checked_at) + the beat's own age (age_s, by mtime).",
+    "refuter": "Confirmed. Plan 734 read alone gives stop_age_s = the beat's `at` minus the oldest `checked_at`, which stands still until the next beat; beat_view receives `now` and `mtime` (833) but no rule joins them. Inside one long call (a scorer call 90 s, a poll up to 100 s: no beat inside) the parent would never see the stamp pass 120 s, which is the 'long call' case of spec 3 row 3, and `mark.stop` (spec 4.6: the stamp's age) and the stale-stops part of the uptime number come out too low. The plan's stale test (866) passes under both readings, so no test decides it. Suggested ruling is right: (beat `at` - oldest `checked_at`) + the beat's own age by mtime."
+   },
+   {
+    "tasks": "15",
+    "kind": "rubric",
+    "what": "A plan-mandated assertion with a date in it: `self.state_file()[\"handover\"][\"last_look\"][:4] == \"2026\"`. last_look is taken from the beat and the dummy stamps real time, so the test fails from 2027-01-01 (fragile test under the reviewer's rubric).",
+    "evidence": "Plan 1083 (the assertion), 1068 (last_look = the oldest checked_at of the last beat, or that beat's at), 734 and 637 (the child stamps real time; ages never use the injected clock).",
+    "suggested_ruling": "Assert that last_look parses as an aware time (datetime.fromisoformat(...).tzinfo is not None), not its year.",
+    "refuter": "Confirmed. `last_look` is taken from the beat (plan 1068) and the dummy child stamps real time (637, 734), so `[:4] == '2026'` (1083) fails from 2027-01-01 and turns the whole suite red, and with it every later gate; controller-notes lines 49-51 forbid the implementer to change the assertion on his own. Suggested ruling is right: assert that it parses as an aware time."
+   },
+   {
+    "tasks": "10, 13 (and 23)",
+    "kind": "rubric",
+    "what": "Things the plan mandates that the reviewer's rubric may call a defect, to be ruled before the wave: (a) timing asserts \"within 1 s\"; (b) `send_timeout_seconds + 1 s`, a literal second in the logic against \"no literal threshold\"; (c) load_state \"never raises\": a state file that does not parse becomes a new day's state and a halt is forgotten in silence (swallowed error; safe, because the engine's start checks find the cause again); (d) repeated logic: supervise.session_hours beside journal.session_hours, the lock-file write in news_live.run and in take_lock, the prctl lines in news_live and in dummy_child.py, supervise.read_rows and Task 23's slots.read_receipts.",
+    "evidence": "(a) plan 780-782, 807-808, 941-942; spec 4.3 and target 2 name these tests. (b) plan 932 against Global Constraints line 21. (c) plan 628, 634, 687-688; spec 4.3 (\"a halt stays until --clear-halt clears it\"). (d) plan 623 and 672-676 (mandated by spec 4.5 with the equality test), 630 (\"as the engine's\"), 637 (\"honours --supervised as the engine does\"), 626 against 1439 (the same contract: a line that does not parse is skipped). Ledger Ruling 3: plan-mandated findings return to the controller.",
+    "suggested_ruling": "(a) kept: they are the spec's named tests. (b) accept the second as a margin, or wait send_timeout_seconds alone. (c) kept, and the parent writes the exception's class to .cache/supervise.log. (d) accepted for session_hours (spec), the lock write and the prctl lines (the dummy must not import pandas; supervise must not import the engine); Task 23's read_receipts calls supervise.read_rows.",
+    "refuter": "Real for (b) only. (b) '+ 1 s' (plan 932) is a literal number in the logic against Global Constraints line 21 and controller-notes line 41, and a fourth new config key would break 'three keys are added' (21): the implementer cannot meet all three. Smallest ruling: wait `send_timeout_seconds` alone (a result that misses by a hair counts as not delivered, the safe side), or take the margin from `loop_seconds`, a number already in config. (a), (c), (d) are not conflicts. (a): the 1 s asserts are the spec's named tests (4.3 'replaced within 1 s', target 2, 5.3); a reviewer's finding on them returns to the controller by Ruling 3, as the ledger already noted for Task 3 (line 60). (c): the plan's own decision (Review Focus 4, line 52), safe because the start checks and the chain check halt again; the log line is fine, but Task 10 has no log to write to, so `main` (Task 11) writes it. (d): `session_hours` is spec 4.5 with its equality test; the lock write and the prctl lines are a few lines across the import ban of line 39; `slots.read_receipts` may simply return `supervise.read_rows(path)`, since slots.py imports supervise already (1434)."
+   }
+  ],
+  "dropped": []
+ },
+ {
+  "range": "18-28",
+  "table_file": "/home/user/OmniRoute/.superpowers/sdd/2026-11-10-supervisor/preflight-18-28.md",
+  "confirmed": [
+   {
+    "tasks": "19",
+    "kind": "task-vs-code",
+    "what": "The leak test `test_no_prompt_and_no_fixture_names_a_session_a_task_a_topic_or_an_address` reads every file under tests/fixtures/ as text and fails on a fixture that is already in the tree: the binary panel tests/fixtures/stock_panel.pkl matches the address pattern. Nothing Task 19 may edit changes that, so \"4 tests, OK\" cannot be reached.",
+    "evidence": "Plan lines 1229-1230 (LEAKS), 1244-1247 (rglob of tests/fixtures, errors=\"replace\"), 1262 (\"4 tests, OK\"). Ran the test's own four patterns over the 14 tracked fixture files, read the way the test reads them: 13 clean, tests/fixtures/stock_panel.pkl (tracked, 632,110 bytes) hits the third pattern with `<email>`.",
+    "suggested_ruling": "The fixture half of the test reads only the text fixtures this plan adds (tests/fixtures/ntfy/** and tests/fixtures/list_triggers_sample.json), or skips *.pkl. Review Focus 5 is about files that could carry a topic or an id; a price panel is neither.",
+    "refuter": "Confirmed by running the plan's four LEAKS patterns (1229-1230) over the 14 tracked fixtures, read as the test reads them (1245-1246): 13 clean, tests/fixtures/stock_panel.pkl hits pattern 3 with `<email>`. Task 19's file list (1214) cannot change that file, so \"4 tests, OK\" (1262) is unreachable. Ruling is right; the smallest form is to skip `*.pkl` (or any file that is not strict UTF-8) rather than narrow to the plan's own fixtures: the existing text fixtures stay under Review Focus 5 (line 53), and tests/fixtures/ntfy/** (1420) and list_triggers_sample.json (1432) are still read."
+   },
+   {
+    "tasks": "21",
+    "kind": "task-vs-itself",
+    "what": "The test class cannot run as written. (a) `DeadmanSwitch(unittest.TestCase)` gets a helper named `run(seconds, **tick)`; that name is `TestCase.run`, which the runner calls with the result object, so the runner raises and no test body runs. (b) `test_a_delay_that_is_not_whole_minutes_is_refused_before_any_child_starts` uses the rc of a parent run and `self.urows`, helpers of `Parents`, inside the plain TestCase. (c) \"`answers([...])` and `new_deadman()` start a new stub and a new switch\": if `new_deadman()` starts a new stub, the handover test's `self.stub.delivered == []` asserts nothing, because the DM2 message waits in the old stub.",
+    "evidence": "Plan line 1323 (class and helpers), every `self.run(` from 1327 to 1383, 1387-1388, 742 (`urows`, `run_parent` belong to `Parents`), 1342-1346. Checked with a 10-line TestCase that has a helper `run(self, seconds, **tick)`: the runner raises `TypeError: 'TextTestResult' object cannot be interpreted as an integer`.",
+    "suggested_ruling": "The helper gets another name (for example `ticks`) in the class and in each fragment line; the whole-minutes test moves to `DeadmanWiring(Parents)` (the count stays 17); `new_deadman()` is a new switch on the same state directory and the same stub, and only `answers()` starts a new stub.",
+    "refuter": "(a) is decisive and reproduced: a TestCase helper `run(self, seconds, **tick)` gives `TypeError: 'TextTestResult' object cannot be interpreted as an integer`; plan 1323 names it and every fragment 1327-1383 calls `self.run(`. (b) true: 1387-1388 uses a parent's rc and `self.urows`, which belong to `Parents` (742), inside a plain TestCase; moving it to `DeadmanWiring(Parents)` keeps the 17 of line 1411. (c) alone is an ambiguous sentence (1323), not a contradiction, but the reading \"new stub\" makes 1345-1346 assert nothing, so pinning it costs nothing. Ruling is the right smallest decision."
+   },
+   {
+    "tasks": "18 -> 19",
+    "kind": "task-vs-controller",
+    "what": "Task 18 pushes the slot files to the live branch. Task 19 edits \"every file under skills/trader/slots/\" on supervisor-build in the gate clone, whose last merge of the live branch was Task 9's landing, and an implementer may not fetch or merge. Task 19 finds no folder and stops at its first step.",
+    "evidence": "Plan lines 1208 (commit, fetch, merge, push), 1214-1216 (\"Each file is edited from its Task 18 text\"), 1260 (the expected RED needs close.md); Global Constraints line 34 (BUILD tasks commit on the work branch in the gate clone); controller-notes.md line 26 (\"Never push, fetch, pull, merge\").",
+    "suggested_ruling": "Task 18 stays as written (commit in the controller's checkout on the live branch, push). Before Task 19 is dispatched the controller runs `git fetch origin <branch>` and `git merge --no-edit origin/<branch>` in the gate clone and sees ai-trader/skills/trader/slots/*.md there.",
+    "refuter": "Task 18's commit goes to the live branch (1208; Global Constraints 19). It cannot be made in the gate clone: a push of that HEAD would land Tasks 10-17 (line 32). The gate clone merges the live branch only at a landing (606, 32) and nothing does so between Task 9 and Task 19. controller-notes.md 26 forbids an implementer to fetch or merge. Task 19 edits those files (1214-1216) and its expected RED needs close.md (1260); with no folder it fails on the count at 1235. Ruling is right and smallest."
+   },
+   {
+    "tasks": "19, 24 x 25",
+    "kind": "task-vs-task",
+    "what": "Task 25 creates skills/trader/slots/watcher.md in the folder that two earlier \"every file\" tests read. Task 19's first test asks every slots/*.md that holds \"git \" for `git merge --no-edit origin/`, `git merge --abort` and the S2 text; Task 24 adds \"every file holds slot-done <its slot> --start, slot-done <its slot> and re-run: slot-done\". watcher.md must hold `git fetch`, `merge --ff-only` and the git stash ban, and no push, no receipt and no merge of its own. Task 25's list of test changes does not take it out of the two older tests, so they fail once the file exists.",
+    "evidence": "Plan lines 1233-1242 (test 1 globs *.md), 1512 (Task 24's addition), 1521 (Task 25 creates watcher.md), 1543 (its text), 1622 (Task 25's test changes); spec 7.2 lines 607-608 and 647-650.",
+    "suggested_ruling": "Both tests run over the slot files that have an entry in `supervisor.slots` (or over *.md except watcher.md); watcher.md keeps only Task 25's own assertions. Said in the briefs of Tasks 24 and 25.",
+    "refuter": "Test 1 globs `*.md` (1234) and asks every file that holds \"git \" for `git merge --no-edit origin/`, `git merge --abort` and the S2 text (1239-1242). watcher.md (1543) holds `git fetch`, `merge --ff-only` and the stash ban, never commits (line 39; spec 647-650), so it fails. Task 24's \"every file holds slot-done <its slot> --start ...\" (1512) fails too: the watcher writes no state and is not in `supervisor.slots` (1632). Task 25's test changes (1622) exempt nothing, and controller-notes 49-51 forbid weakening a test. Ruling right; simplest wording: both tests skip `watcher.md` by name (`supervisor.slots` does not exist at Task 19)."
+   },
+   {
+    "tasks": "19 x 20, 22, 24, 26, 27",
+    "kind": "task-vs-task",
+    "what": "The first turn after a landing runs in the old checkout. The trader's checkout gets a landing only when one of its own turns fetches and merges. The new watchdog prompt runs `supervise --status --watchdog` and the launch \"before any git work\", syncs only at its end, and no longer starts the bare engine. A landing is pushed after 16:05; the syncs left that day are the close slot's (16:22) and, from Task 24 on, the 16:57 dashboard turn. A later push is first merged at the end of the 08:07 turn of the next morning. Then: after Task 20 `python3 -m aitrader.supervise` does not exist at 08:07 (no parent and no engine until the 09:07 slot, and the plan's own check says \"undo\" at 09:00); after Task 24 the prompt's first line `slot-done ... --start` is an unknown command; after Tasks 22 and 27 the 08:07 parent runs on the old config until the 09:18 handover, so \"dm true through the window\" and \"one sup_start with handover false\" fail on the first day; after Task 26 `--watcher` is an unknown option at the first :37.",
+    "evidence": "Plan lines 32, 1219, 1275-1277, 1423-1424, 1512-1514, 1630, 1651; spec 4.4 lines 246-249, 7.1 lines 555-557; research/2026-11-10-supervisor-evidence.json, triggers_T.prompt_facts.dashboard (\"do not pull or commit for this step\") and the crypto go-live row (bound to the crypto session, so no crypto slot syncs the trader's checkout at night).",
+    "suggested_ruling": "Each landing gets one more proof before its `update_trigger` and before its next-day reading counts: the pushed state shows a trader-session commit that descends from the landing commit (`git merge-base --is-ancestor <landing> origin/<branch>` after the trader's next state commit). If no trader turn will sync before 08:07: a one-time scheduled task bound to the trader session, on the owner's word, whose prompt is `git fetch origin <branch> && git merge --no-edit origin/<branch>` (the third way of Global Constraints line 35). The spec's order inside the watchdog turn stays.",
+    "refuter": "Real for Tasks 20, 24, 22 and 27. Old prompts sync first (evidence file, every_trading_prompt_step_1: git pull --rebase); the new news-watch.md runs `--status --watchdog` before any git work and syncs last (1219; spec 246-249). A landing is after 16:05 (32) and Task 20's drills run after the close (1271), so the 16:22 slot is normally gone; the dashboard does not pull (prompt_facts.dashboard). At 08:07 `aitrader.supervise` is absent, no bare engine is started, and 1277 orders undo at 09:00. Task 27's \"next trading day\" proof (1651) fails the same way. One sub-claim is wrong: `--watcher` exists from Task 23 (1447) and two turns sync before the first 09:37. Ruling is right."
+   },
+   {
+    "tasks": "23, 24 x 25",
+    "kind": "task-vs-task",
+    "what": "Nobody pushes what `slot-done` prints under `notify`. W6 and W7 exist only as that list. Task 24's receipt lines and Task 25's :37 step run the command and say nothing about its output; W6 comes out of `slot-done close`, and close.md is not among Task 25's files. Both lines would be computed and never reach the owner.",
+    "evidence": "Plan lines 1447 (\"Task 25 fills notify\"), 1512, 1521, 1542, 1544; spec 7.2 lines 631-632 (\"without it the trader sends W6\"), section 8 rows W6 and W7.",
+    "suggested_ruling": "Task 24's edit of every slot file adds \"push each text that slot-done prints under notify through the Claude app\", with one assertion for it in tests/test_slot_files.py.",
+    "refuter": "`slot-done` prints `notify` (1447); Task 25 puts W6 and W7 there (1542). No prompt text tells the trader to push it: Task 24's receipt lines (1512) and Task 25's :37 step (1544) only run the command; close.md pushes the `notify` of `uptime-report` (1220) and the S1 line (1512), nothing else; close.md is not in Task 25's file list (1521). Spec 631-632 and rows W6, W7 of section 8 need both lines to reach the owner, and line 1536 says the model only carries out what it is told. Ruling (one sentence in every slot file in Task 24, one assertion) is the right smallest place: Task 24 edits every file anyway."
+   },
+   {
+    "tasks": "25",
+    "kind": "task-vs-itself",
+    "what": "The last assertion of `test_a_missing_slot_is_fired_once_then_w3_then_nothing` asks for no W2 and no W3 from any slot at NOW + 60 minutes (19:22:31Z) with the receipts of NOW. By then news-watch 18:07Z and 18:37Z and dashboard 18:57Z are past their 20-minute grace with no line and refire true, and each gives W2 or W3. RECEIPTS cannot hold later news-watch lines, because the first test needs its open start to read \"running\" at NOW and \"stuck\" at NOW + 25 minutes, and \"a later receipt closes its older due times\". The assertion holds only with a fixture that carries receipts dated after NOW and code that ignores a receipt whose `at` is later than `now`; the plan says neither.",
+    "evidence": "Plan lines 1546 (the fixtures), 1550-1553 (test 1), 1555-1562 (test 2), 1535-1536 (states and rules); spec 7.1 table lines 583 and 587 (news-watch :07 and :37, dashboard :57, grace 20). The times were checked: NOW is 13:22:31 New York on a Wednesday.",
+    "suggested_ruling": "The assertion is about midday, as its `fire` half already is: W2 and W3 lines that name midday (its `he`) are absent.",
+    "refuter": "NOW is 13:22:31 New York, Wednesday (1546). At NOW+60 min (19:22:31Z) dashboard 18:57Z is past its 20-minute grace (19:17Z) with no line and refire true: W2 by the rule of 1536; news-watch 18:37Z likewise (spec 583, 587). RECEIPTS cannot hold later lines for either slot: test 1 needs news-watch \"running\" then \"stuck\" and dashboard \"failed\" (1550-1553), and a later receipt closes older due times (1535). So the assertion at 1562 fails for any code that follows the rules. Ruling is right: filter on midday, as the `fire` half at 1561 already does."
+   },
+   {
+    "tasks": "13 -> 21",
+    "kind": "task-vs-task",
+    "what": "`Sender.results()` as Task 13 defines it does not carry what `Deadman` needs. (a) DM4 and the pause after it use \"the header's t\"; a result has `left` and `retry_after` only. (b) `results()` is one queue \"drained by the loop\" for the parent's lines, and `Deadman.tick(now, *, fresh, held, window)` takes no outcomes, so in `main` one of the two readers loses the other's results.",
+    "evidence": "Plan lines 917 (the result dict), 932, 1298 (`tick`), 1307-1308 (\"its time = now + the header's t\").",
+    "suggested_ruling": "In Task 13's brief (not dispatched yet): each result also has `reset_s` (the `t` of the RateLimit header), and `results(prefix=None)` returns only the outcomes whose tag starts with the prefix; `Deadman` tags its requests `dm-` and reads its own.",
+    "refuter": "(a) real: the result dict of line 917 has `left` and `retry_after` only, while DM4 and R10's `{HH:MM}` need \"the header's t\" (1308; spec 508-510). The stub already sends `t=3600` (926), so one field `reset_s` in Task 13's brief closes it; otherwise Task 21 must change `Sender`, which its file line (\"class Deadman\", 1286) does not name. (b) is weaker: both readers of the one queue (917, 932 against 1298, 1304) live in files Task 21 owns (`main`, deadman.py), so its implementer can route by tag or filter without stopping. Take `reset_s` as the ruling; `results(prefix)` is a sound option, not a necessity."
+   },
+   {
+    "tasks": "13, 21, 22",
+    "kind": "task-vs-task",
+    "what": "The phone drill's parent also sends the parent's own lines to the owner's phone, through the same `Sender` and topic: R2 180 s after the freeze in phase `stop` (the kill switch is off there, so its \"not killed\" form), R1 60 s after the restart in phase `restart`, R4b after the handover when the relaunch takes 180 s or more. Task 22 passes each phase on \"he reports nothing\" or \"nothing before\", so by the letter three of five phases fail.",
+    "evidence": "Plan lines 1316-1319 (the phases), 1422 (the pass marks), 839 (switch off: one `hang` row, nothing signalled), 929-930 (R2 at a `hang` row, R1 when an episode ends, R4/R4b at the first `up`); spec 11.2 row 3 (\"his phone shows the alarm 5-7 minutes after the last ping and nothing before\").",
+    "suggested_ruling": "Spec 11.2 step 3 is about the alarm. \"Nothing\" in Task 22 means no message titled \"AI Trader - דממה\", and the owner is told before the drill which lines titled \"AI Trader - מפקח\" belong to it. (With code instead: `phone` mode gives the topic to the dead-man only.)",
+    "refuter": "The `pings` phase is the parent itself on the real topic with hang kill off (1312, 1316). After `stop` the frozen child gives a `hang` row with \"none\" (839) and R2 goes out at that row (929) 180 s after the freeze, before DM1 (at most 450 s after it): \"nothing before\" (1422 step 2; spec 858) fails. R1 follows the `restart` phase after `healthy_seconds` (929), against \"nothing\" in step 3; R4b after a relaunch of 180 s or more (930). Ruling right: reading \"nothing\" as no message titled \"AI Trader - דממה\" and telling the owner beforehand costs no code; topic to the dead-man only is cleaner for him but adds a path in `main`."
+   },
+   {
+    "tasks": "21 (and the drill of 22)",
+    "kind": "task-vs-spec",
+    "what": "`leave` posts DM2 also when the window is closed. \"handover\", \"signal\" and \"orphaned\" post one last DM2 \"as they are\", and `leave` has no `window`. After `tick` has disarmed, a stop by a signal puts a new 10-minute alarm at ntfy: the drill's `close` phase has to end its own parent after the `disarmed` row, so \"nothing arrives in the 10 minutes after\" fails at minute 10; `test_the_end_of_the_day_puts_dm3_then_cancels` fails when its parent is ended by SIGTERM; and live, a parent stopped between 16:01 and 16:05 leaves a false \"stops are not checked\" line for the night.",
+    "evidence": "Plan lines 1305, 1311, 1320, 1404-1406, 1422 step (5); spec 6 lines 474-475 (pings \"while the window is open\") and 479-480.",
+    "suggested_ruling": "DM2 goes out only while the window is open (the last `tick` had `window` true and no `disarmed` followed); otherwise `leave` posts nothing. One test line for it.",
+    "refuter": "`leave` has no `window` (1299) and posts DM2 for \"handover\", \"signal\", \"orphaned\" \"as they are\" (1305, 1311). Spec 474 pings only while the window is open, and 519-521 says that after the close only DM3 can arrive. A parent started 14:11-14:15 hands over by `max_leg_minutes` (1067) after 16:01, `--status` answers after_hours, and a DM2 \"stops are not checked\" arrives at night. The `close` phase must end its own parent after `disarmed` (1320), so step 5 of 1422 gets a DM2 at minute 10. The test at 1404-1406 fails only if its parent is ended by a signal. Ruling (DM2 only while the window is open, one test line) is right."
+   },
+   {
+    "tasks": "11, 13, 14, 17 x 20, 22, 26, 27",
+    "kind": "task-vs-task",
+    "what": "A switch flip in the real config moves every test that copies it, and the suite must print OK at each landing. `Parents` copies the real config with three numbers changed and the drill script uses \"the numbers of config.json\"; nothing pins the five switches there. After Task 22's flip every `Parents` test runs a dead-man: `ParentLines` reads `q[\"json\"][\"message\"]` over all requests (a DELETE or a GET has no JSON) and the scripted `answers` are used up by pings. After Task 20's flip a hang is killed where a test counts one `hang` row. After Task 27, `test_the_launch_pair` meets `long_timeout_proven` true, and the gate clone's VM, in the same environment as the card, holds BASH_MAX_TIMEOUT_MS.",
+    "evidence": "Plan lines 658-659 (SWITCHES, SWITCHES_ON), 742 (the config copy of `Parents`), 1154 (the drill's config), 863-864, 938, 941, 1031-1033; the flips at 1273, 1423, 1637, 1651.",
+    "suggested_ruling": "In the briefs of Tasks 11, 14 and 17 (not dispatched yet): the config copy of `Parents` and of the drill script sets all five switches explicitly (false unless the test or the drill says so), and `status()` in a test always gets an explicit `environ`. A flip then moves `SWITCHES_ON` only.",
+    "refuter": "`Parents` copies the real config with three numbers changed (742); `SWITCHES_ON` (658-659) is the only test edit a flip makes (1273, 1423, 1637, 1651), and the flips are OPS commits that need the suite OK. After Task 22's flip `ParentLines` (topic set, stub, 934) runs a dead-man: its first ping eats the scripted 500 of `test_a_line_that_failed...` (971-973), and a DELETE or GET has no JSON for `q[\"json\"][\"message\"]` (938). After Task 27, `self.status()` with no `environ` (1033) reads the gate VM's own BASH_MAX_TIMEOUT_MS. Tasks 11, 14, 17 are not dispatched, so pinning the five switches and an explicit `environ` in their briefs is the right smallest decision."
+   },
+   {
+    "tasks": "22",
+    "kind": "task-vs-itself",
+    "what": "The leak proof of step 2.5 cannot pass: \"`grep -r \"aitrader-drill-\" ai-trader/` prints nothing\", but the plan itself holds that string and is on the branch.",
+    "evidence": "Plan line 1420 (the string is there twice); `grep -rn \"aitrader-drill-\" ai-trader/` on the live tip gives one file, ai-trader/research/plans/2026-11-10-supervisor.md, which is tracked.",
+    "suggested_ruling": "Grep for the value: `grep -rF -- \"$T\" ai-trader/` in the same Bash call that holds `$T` (a shell variable does not outlive a call, so the publish, the saves and this grep are one call).",
+    "refuter": "Confirmed: `grep -rn \"aitrader-drill-\" ai-trader/` on the live tip prints ai-trader/research/plans/2026-11-10-supervisor.md:1420, a tracked file, so the proof \"prints nothing\" of line 1420 can never pass by the letter. Minor, but it is a proof that fails every time. Ruling is right and better than the original: `grep -rF -- \"$T\" ai-trader/` tests the value itself, and it must be in the same Bash call as the publish and the saves, because a shell variable does not outlive a call."
+   },
+   {
+    "tasks": "20",
+    "kind": "task-vs-controller",
+    "what": "A deadline for a session that no clock can wake: \"No such rows by 09:00 New York ... undo\", on the next trading morning. The controller runs on the owner's messages or when its own background work ends. On that morning there is no dead-man (Task 22) and no watcher (Task 26) yet: if `--status` or the launch is broken, nothing else says so.",
+    "evidence": "Plan line 1277; the controller's facts (not woken by a scheduled task); spec 7.2 line 601.",
+    "suggested_ruling": "At the landing the controller starts a chain of tracked background waits (each under the 2-hour cap) that ends at 08:20 New York of the next session day and then reads the pushed state; the owner is told the evening before that the result comes then. (Or he agrees to write at that time.)",
+    "refuter": "Line 1277 sets a check \"after the 08:07 slot\" with an undo at 09:00 New York for the controller, which no scheduled task can wake. That morning the turn's own \"engine was down\" push is gone (1219) and neither the dead-man (Task 22) nor the watcher (Task 26) exists, so this check is the only net if `--status` or the launch is broken. Nothing in the plan says how the controller is awake then; Global Constraints 35 covers how a proof is read, not when. Ruling right: a chain of tracked background waits is the one way that needs nobody; the owner writing at that hour (15:20 in Israel) is the cheaper second."
+   },
+   {
+    "tasks": "26",
+    "kind": "task-vs-itself",
+    "what": "\"One full run\" proves Bash only. Line 1631 says that run finds out whether a pre-approval was dropped. It happens with both switches false: `fire` and `notify` are empty, so the run never calls `list_triggers` (not in `extra_allowed_tools` at all), the fire tool or the push tool. A waiting permission prompt first appears at the first real fault, when the watcher must act.",
+    "evidence": "Plan lines 1631, 1633, 1635, 1543 (the prompt calls `list_triggers`, the fire tool and the push only for `fire` and `notify` entries); spec 7.2 lines 668-669, 11.2 row 5.",
+    "suggested_ruling": "`list_triggers` joins `extra_allowed_tools`; \"no prompt is waiting\" is read again on the first run that fires (the Saturday drill's transcript) and on the first run that pushes a line, and until that push has been seen the session log says the watcher's push is not proven.",
+    "refuter": "Line 1631 says the \"one full run\" finds out whether a pre-approval was dropped; spec 668-669 and row 5 of 11.2 want that run to prove `fire_trigger` and the push. The run (1633) comes before the dry day with both switches false (1630, 1635): `fire` and `notify` are empty (1540), so the prompt calls neither tool, nor `list_triggers`, which it uses only per `fire` entry (1543) and which is not in `extra_allowed_tools` at all. A waiting prompt would first show at a real fault. The fire is later proven by the Saturday drill (1638); the push by nothing. Ruling is right."
+   },
+   {
+    "tasks": "26",
+    "kind": "task-vs-controller",
+    "what": "`last_served_model` is read before any turn. It is the model of the latest turn; right after `create_session` with no first prompt there is none, and the step reads an empty field as \"stop, only he can switch it\".",
+    "evidence": "Plan line 1631; the `get_session` tool's own text (\"the model the CLI ran the latest turn on\"); spec 7.2 lines 596-598.",
+    "suggested_ruling": "Right after creation read `<session-id>.model` (and `configured_model`); read `last_served_model` in the \"one full run\" step, after the first turn.",
+    "refuter": "Line 1631 reads `external_metadata.last_served_model` right after `create_session`, which carries no first prompt, and stops if it is not `claude-fable-5-2`. The `get_session` tool defines that field as the model \"the CLI ran the latest turn on\"; with no turn there is none, so the step would read an empty field as \"only the owner can switch it\". Spec 596-598 has the same wording. Not tested here (platform behaviour), but the tool's own text supports it. Ruling is right: `<session-id>.model` at creation, `last_served_model` in the \"one full run\" step (1633)."
+   },
+   {
+    "tasks": "18 -> 23; 23 x 24, 25",
+    "kind": "task-vs-task",
+    "what": "The `list_triggers` fixture. (a) The sample is made \"from the Task 18 reply\", which sits in the controller's scratch folder and holds session, task and environment ids; the implementer has no path to it. (b) `slots_check(clean_sample, CFG, SLOTS_DIR) == []`: if SLOTS_DIR is the real slot folder or CFG the real config, the test breaks when Task 24 rewrites every slot file and adds the crypto slots, and again when Task 25 edits news-watch.md; neither task's `git add` holds the fixture or test_slots.py.",
+    "evidence": "Plan lines 1204 (the reply is kept in scratch), 1432, 1495-1499, 1503, 1512, 1521.",
+    "suggested_ruling": "The controller hands Task 23 a copy of the reply with the ids already replaced, by path in the brief; the `slots_check` test builds its own config and its own slot folder in the temporary directory from the sample and never reads skills/trader/slots/ or the real `supervisor.slots`.",
+    "refuter": "(a) Line 1503 builds the fixture \"from the Task 18 reply\", which line 1204 keeps in the controller's scratch folder with real ids; a BUILD implementer has no path to it and a raw copy puts ids in the hands of a public-repo commit. (b) The fragment at 1495-1499 does not say whether CFG and SLOTS_DIR are real. The Task 18 prompts already differ from the files after Task 19, and Task 24 rewrites every slot file and adds crypto slots (1511-1512) while its `git add` holds neither the fixture nor test_slots.py; Task 25 edits news-watch.md again (1521). Ruling right: a sanitised copy by path, and a test that builds its own config and slot folder."
+   },
+   {
+    "tasks": "21-26 (the order of BUILD and landings)",
+    "kind": "task-vs-constraints",
+    "what": "There is one work branch and a landing pushes HEAD. Task 22's first landing is \"no gate: no gated file changes\", which is true only while Task 21 alone is ahead of the live branch. A wave that builds Task 23 (it changes config.json) or Task 25 before that landing sends them along, ungated and before their own step's drill.",
+    "evidence": "Plan lines 32 (`git push origin HEAD:<branch>`), 38 (each step passes its drill before the next starts), 1418, 1432; ledger Ruling 3 (the task loop runs in waves).",
+    "suggested_ruling": "From Task 21 on a BUILD task is dispatched only after the landing that stands before it in the plan (21, Task 22's two landings, 23, Task 24's landing, 25, Task 26).",
+    "refuter": "A landing pushes HEAD (32). \"No gate: no gated file changes\" (1418) holds only while Task 21 alone is ahead; Task 23 changes config.json (1432), which line 24 gates. In plan order nothing collides, but Ruling 3 runs BUILD tasks in waves, and the plan itself lets Task 27 land \"any time after Task 20\" (1646) and has undo landings (1426, 1642): each would carry unlanded BUILD commits of another step past that step's adversarial review (line 33). Ruling right; add that Task 27's landing and any undo landing happen only when the work branch holds nothing unlanded from another step."
+   },
+   {
+    "tasks": "22",
+    "kind": "task-vs-constraints",
+    "what": "\"No gate\" for Task 21's landing against the owner's ruling in CLAUDE.md. Spec 12 agrees with the plan (operations code: tests, drills, one adversarial review). The owner's later ruling says that for a change \"that touches only how the news engine is run, supervised or measured\" the sweep is skipped and \"the quant-critic and the unit suite stay mandatory\". The dead-man is such a change.",
+    "evidence": "Plan line 1418; Global Constraints lines 24 and 33; ai-trader/CLAUDE.md:156-160; spec 12 lines 893-894.",
+    "suggested_ruling": "Run the critic at this landing too (one agent; its verdict says no time-machine file is touched). That meets both texts.",
+    "refuter": "Plan 1418 lands Task 21 with \"no gate\"; spec 893-894 and Global Constraints 33 agree for operations code. The owner's later ruling in ai-trader/CLAUDE.md (rule 4, 2026-11-11) covers by its letter \"a change that touches only how the news engine is run, supervised or measured\" and keeps \"the quant-critic and the unit suite\" mandatory; the dead-man is supervision, and that file ranks above the plan. Two readings exist (the ruling sits under rule 4, whose scope is strategy, risk, learning). This is the only landing with no critic, so one critic run meets both texts for the price of one agent. Ruling is right."
+   },
+   {
+    "tasks": "19 x 28",
+    "kind": "task-vs-task",
+    "what": "List A reads from the trader's close log what no prompt writes there: the day's uptime, the longest `blind_s` and the commit of each engine start. Task 19 gives close.md only `uptime-report --day --notify` and the push of `notify`.",
+    "evidence": "Plan lines 1220 and 1669; spec 11.2 lines 867-868.",
+    "suggested_ruling": "Task 19's edit of close.md adds: copy the day's block of `uptime-report --day` (uptime, `longest_blind_s`, `commits`) into the close log.",
+    "refuter": "Task 28's list A (1669) and spec 867-868 read the day's uptime, the longest `blind_s` and each start's commit from the trader's close log. The only text Task 19 gives close.md is `uptime-report --day --notify` and the push of `notify` (1220); the SKILL edit (1221) adds nothing about the log. The numbers are printed in the turn, but no prompt tells the trader to write them down, so the last line of list A rests on chance. Ruling (one sentence in Task 19's close.md edit: copy uptime, `longest_blind_s` and `commits` into the close log) is the right smallest decision."
+   },
+   {
+    "tasks": "16, 21 -> 22, 28",
+    "kind": "task-vs-task",
+    "what": "Readings that no producer gives in that shape. Task 22 reads from `uptime-report --day` that `dm` is true through the window, that `left` falls by about one per 3 minutes and that no `ping_failed` came from a 429; `day_report` has `left_min` and the counts under `deadman` only. Its first proof wants marks with `dm` null while the switch is off; Task 21 has `Deadman.ok: bool` and does not say what a mark holds then.",
+    "evidence": "Plan lines 1112 (the keys of `day_report`), 1296, 1310, 1418, 1424, 1664.",
+    "suggested_ruling": "The three readings come from the `mark` and `deadman` rows of state/uptime.jsonl (Task 28 already names both sources); Task 21's brief adds \"with the switch off or no topic, a mark's `dm` is null\".",
+    "refuter": "Real in two places. `Deadman.ok` is a bool and is \"the `dm` of a mark\" (1296), while Task 22's first proof wants `dm` null with the switch off (1418) and line 841 says null only \"until Tasks 13 and 21\": a mark with `dm` false would fail the proof and show `deadman_ok` false in `--status`. And `day_report` (1112) has `left_min` and counts only, so 1424 cannot read `dm` through the window or `left` per 3 minutes from `uptime-report --day`; those are in the `mark` rows (Task 28 names both sources, 1659). Ruling right; add that a `ping_failed` row carries the status code or class, since `.cache` never reaches git (35)."
+   },
+   {
+    "tasks": "20 -> 26",
+    "kind": "task-vs-task",
+    "what": "The stop drill's pass marks assume a signal the parent can catch: \"DM2 10 minutes after the stop\" and \"`up` follows a `sup_stop` signal\". Task 20's cloud drill records which it is; with a kill there is no DM2 and no `sup_stop`, and the alarm is the last DM1.",
+    "evidence": "Plan lines 1271 (\"sup_stop signal, or no sup_stop at all\") and 1639; spec 4.2 lines 173-174 (not verified which signal TaskStop sends).",
+    "suggested_ruling": "The marks are read against what Task 20 recorded. Caught signal: as written. Kill: DM1 within 6 minutes of the last ping, no `sup_stop`, the rest unchanged.",
+    "refuter": "Line 1271 records both outcomes as possible (\"`sup_stop` signal, or no `sup_stop` at all\"; spec 950-951: the signal is not documented), but the pass marks of 1639 are written for a caught signal only: \"DM2 10 minutes after the stop\" and \"the next `up` row follows a `sup_stop` signal\". If TaskStop kills, no `leave` runs: the alarm is the last DM1 and no `sup_stop` exists, so a working system fails its drill by the letter. Conditional on Task 20's record, cheap to fix now. Ruling is right: caught, as written; killed, DM1 within 6 minutes of the last ping and no `sup_stop`, the rest unchanged."
+   },
+   {
+    "tasks": "18, 20, 24",
+    "kind": "task-vs-controller",
+    "what": "A `list_triggers` reply reaches a file only by the model typing it again. \"Each prompt, unchanged, into its file\", \"diff each prompt against its file\", and `.cache/triggers.json` every Friday in the trader session (up to ten prompts) all rest on that copy. The diff compares two texts the same model typed, and one slip reads as \"someone changed it, stop\" (Task 20) or as a false S1 line.",
+    "evidence": "Plan lines 1206, 1276, 1512-1513; spec 7.1 lines 569-571.",
+    "suggested_ruling": "Accept the limit and write it in the session log; a difference is read again for that one task before a stop or an S1 line.",
+    "refuter": "Low severity, but true: no tool writes a `list_triggers` reply to disk, so \"unchanged, into its file\" (1206), the diff of 1276 and `.cache/triggers.json` every Friday (1512; spec 569-571) all pass through a model retyping up to ten prompts, on Fridays as hand-escaped JSON. The plan treats a difference as hard evidence: \"stop, someone changed it\" (1276) and an S1 line pushed to the owner. Ruling right, with one addition: the Friday check is run by the trader session, so the re-read before S1 must be a sentence in close.md (Task 24's edit), not only a note in the controller's log."
+   }
+  ],
+  "dropped": [
+   {
+    "tasks": "27",
+    "what": "The card has no \"refused by the tool\" branch. The environment tools refuse variable names \"that steer the session runtime\" when an environment is created; BASH_",
+    "why_dropped": "Not shown to exist. The refusal of names \"that steer the session runtime\" is in `create_environment`'s text; `update_environment`'s own text for `set_environment_variables` says only \"non-secret configuration\", and the finding itself is unt"
+   },
+   {
+    "tasks": "19 (gate of 20)",
+    "what": "The edit of CLAUDE.md is a change to the scorer, by the code's own words. The scorer's `claude -p` runs in the engine's directory, and `context_id` says \"an edi",
+    "why_dropped": "The docstring is as quoted (news_live.py:292-297; the stamp is written at 1139), but nothing stops or is built wrong. Spec 334 orders the edit; the plan already sends CLAUDE.md through the gate at Task 20 (1275, \"with the gate, for config.j"
+   },
+   {
+    "tasks": "23 -> 25",
+    "what": "Which task is fired for the slot with two tasks is not said. `news-watch` is one slot with two tasks, \"a schedule entry carries its own task\". `watch-check` fir",
+    "why_dropped": "Resolved by the spec and of no effect either way. Spec 575 keeps a slot-level `\"task\"` in the news-watch entry and spec 583 says \"yes (the :07 task)\"; plan 1445 lists `\"task\"` among the entry's keys and adds a per-schedule one only \"where a"
+   },
+   {
+    "tasks": "23, 25 (and the slot files of 19, 24)",
+    "what": "What the plan orders and a reviewer may call a defect. (a) Errors dropped by design: `watch.load_memory` and `slots.read_receipts` turn an unreadable file or li",
+    "why_dropped": "(a) and (b) are the plan's own stated shape, and the ledger already rules on them: Review Focus 4 (line 52: a bad line is skipped, an unreadable memory is empty), Global Constraints 23 (a class name, never the text), spec 293 and 610-611, s"
+   }
+  ]
+ }
+]

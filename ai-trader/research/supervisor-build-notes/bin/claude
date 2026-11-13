@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Stand-in for the model CLI: a test or an experiment of the build must never reach the model.
+echo "blocked: the model CLI is not available to the build's tests (controller's safe wrapper)" >&2
+exit 97

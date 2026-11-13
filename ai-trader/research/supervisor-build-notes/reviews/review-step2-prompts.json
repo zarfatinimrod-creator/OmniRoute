@@ -1,0 +1,273 @@
+{
+  "summary": "Adversarial check of the new scheduled-prompt texts (slot files, SKILL 3ב/4א) against the supervisor code before update_trigger",
+  "agentCount": 4,
+  "logs": [],
+  "result": [
+    {
+      "lens": "consistency",
+      "covered": "Read at 9663262e and compared with a89e6c83: all 9 slot files (and the deleted news-watch-37.md), SKILL.md sections 0, 3א, 3ב and 4א, and CLAUDE.md rule 8. Checked them against the code: supervise.py (status, relay, clear_halt, main and its last lines, restart_core, look/mark/hang, the launch pair), uptime.py, the __main__.py parsers and uptime-report, ownerlines.py, config.json's supervisor block, .gitignore. Also read spec 4.4-4.7, 6, 7.1 and 8, Rulings 55/56, P23/P37/P40, plan Task 19/20 and the Task 20 runbook.\n\nEvery command, flag and JSON field the texts name exists and behaves as described: --status [--watchdog], action, why (holds the engine pid), parent.pid, today.halt, unsent[id,kind,text], launch.command/timeout_ms, --relayed (refused with no ids, so 'nothing to run' is right), --clear-halt (0/1/3, runs news-live --check), uptime-report --day --notify (block plus one JSON line {\"notify\":[{id,priority,text}]}), news-status, postmortem ('pending' key), verify [--book crypto], cycle [--propose|--book crypto], summary --send/--ack, veto/shrink --book crypto, news, scorecard, predict, desk, brief, placebo, backtest --sweep, dashboard. S2, R8 and R12 match ownerlines character for character in every file.\n\nRan in the exported copy (scratch --state-dir, safe wrapper, short lock holders only): launch, halted plus R5e plus unsent, --relayed, --clear-halt, none, replace_parent, kill_stray, wait_for_watchdog (plain only; --watchdog gives launch), and a parent that exits at start. All eight action values are handled by news-watch.md and the SKILL table (--status --watchdog never returns wait_for_watchdog). The launch command starts `aitrader.supervise --until 16:05 --handover` with timeout 7200000 (long timeout only once long_timeout_proven and BASH_MAX_TIMEOUT_MS allow it). The handover times keep every leg under 110 min. The parent and engine locks stop a second parent or engine on any double launch. The git blocks (stock prose and crypto loop) never rebase, never reset, cannot loop forever and cannot end with a merge in progress if followed as written. Nothing for the stock or crypto books was lost except what the brief or rulings removed (bare-engine launch, the 3-min heartbeat rule, the 'engine was down' push), apart from consistency-3.\n\nNot filed: P23 (covered by the crypto slots' overnight sync and runbook step 11), and the items Ruling 56 parked (S2 dedupe, news-status leftover, R8 row, close verify wording). Also not filed: the dependency on runbook step 7, hang_kill_enabled true; without it a hung engine under a live parent is no longer restarted by any prompt.\n\nNothing is must-fix in my reading. Scratch folder: <SCRATCH>/review-step2/prompts-consistency.",
+      "findings": [
+        {
+          "id": "consistency-1",
+          "severity": "should-fix",
+          "where": "ai-trader/skills/trader/slots/news-watch.md:9 (wake sentence); ai-trader/skills/trader/SKILL.md 3ב last-line table (the sentence \"הטבלה היא לקורא היומן\")",
+          "what": "After a woken turn, the prompt says only \"read its last line, run --status, do what action says\". The parent's last-line table in SKILL 3ב is labelled \"for the log reader\". Its acting cells are therefore in no text the session follows: launch at most once and send R12 on code 1 or any other code; read news_live.log first on 75 tripped, and finish or abort a merge on tree_busy; send R8 at the cap. Spec 8 names the trader session as the sender of R12 and R8, so no prompt sends either line, and the relaunch has no limit. The woken turn also does not relay `unsent`.",
+          "scenario": "Ran in the exported copy with a config copy whose supervisor.loop_seconds is 0. A key that --status does not read can break the same way, as can any startup exception (rc 1). Result: `--status` returns action launch with `cd ai-trader && exec python3 -u -m aitrader.supervise --until 16:05 --handover`. The parent prints `supervise: a bad argument or config (ValueError)`, exits 2 and writes nothing: no row, no trip, no state. The next `--status` returns launch again (checked twice). In the trader session: the background task ends in under 1 s, the session wakes, plain --status says launch, the parent dies, the session wakes again. One model turn per round, with no limit, through market hours, and the owner never gets R12. Likewise a 75 tripped caused by tree_busy (R3c says the trader session handles it now) is relaunched without touching the merge and trips again at once. An urgent R3 or R5a whose ntfy send failed sits in `unsent` until the next watchdog, up to 30 min later.",
+          "fix": "Replace the wake sentence in news-watch.md with: \"read its last line and act by the last-line table of SKILL.md section 3ב (75 tripped: first read the last 20 lines of .cache/news_live.log and complete or abort a merge on tree_busy; 1, 2 or any code not in the table: read the last 20 lines of .cache/supervise.log, launch at most once that day, send R12 as ownerlines has it; stopped at the cap with the long timeout: R8). Then run --status and do what action says, and relay `unsent` as in step 3.\" Drop \"the table is for the log reader\" from SKILL 3ב.",
+          "verdict": {
+            "id": "consistency-1",
+            "real": true,
+            "severity": "should-fix",
+            "evidence": "I checked the text at 9663262e. In news-watch.md the wake sentence is only \"read its last line, run `python3 -m aitrader.supervise --status`, and do what `action` says\". SKILL 3ב gives the same instruction, then introduces the last-line table with \"הטבלה היא לקורא היומן\" (the table is for the log reader). The only places that say \"launch once\", R12 or R8 are cells of that table; spec 4.4 also calls it \"for the person reading the log\". Spec 8 lines 698 and 702 still name the trader session as the sender of R8 and R12, so no instruction the session follows sends them. In supervise.status() nothing tracks a parent that crashed: rc 2 returns before any write, and an uncaught exception (rc 1) leaves no sup_stop and no trip. The action therefore stays `launch`.\n\nI reproduced this in a private export at 13:02 NY on a session day, using a config copy with supervisor.loop_seconds 0. `--status` returned launch with `cd ai-trader && exec python3 -u -m aitrader.supervise --until 16:05 --handover`. The parent printed `supervise: a bad argument or config (ValueError)`, exited rc=2 and left the state dir empty (no .cache, no rows). `--status` then returned launch again with trips 0. The relaunch is unbounded and R12 is never sent.\n\nThe woken-turn text also has no relay step for `unsent`. An R3 that failed in ntfy waits for the next watchdog's step 3. The tree_busy part is weaker: the session's turns run one at a time, so a merge is normally finished before the woken turn, and the watchdog's step 6 clears any merge left in progress.\n\nR8 cannot be reached yet (config long_timeout_proven false). Not must-fix: every action is handled and none starts a second parent. The engine is already down because of the parent bug. The cost is the unbounded relaunch turns and the missing R12."
+          }
+        },
+        {
+          "id": "consistency-2",
+          "severity": "should-fix",
+          "where": "ai-trader/skills/trader/slots/news-watch.md:8 (`halted`); SKILL.md 3ב halted row",
+          "what": "When `--clear-halt` exits 0, neither text says to launch. The engine stays down until the next watchdog's `--status --watchdog`. The sync is step 6, after the engine step, so a fix pushed by the controller reaches the checkout only at the end of a watchdog turn. The next turn clears the halt and still does not launch; the launch waits for the turn after that.",
+          "scenario": "Halt 4 at 10:00 NY with a position held. The controller pushes a repair at 10:20. The 10:37 turn: step 2 halted, --clear-halt fails because the repair is not merged yet; step 6 merges it. The 11:07 turn: --clear-halt prints `supervise: the halt is cleared` (exit 0, checked in the exported copy), then the turn goes on to steps 3-7. The 11:37 turn launches. That is about an hour of market time with stops unchecked after the cause was fixed.",
+          "fix": "In the `halted` bullet and the SKILL halted row: \"if --clear-halt exits 0, run --status --watchdog again and do what action says (normally launch)\".",
+          "verdict": {
+            "id": "consistency-2",
+            "real": true,
+            "severity": "should-fix",
+            "evidence": "In news-watch.md step 2, the `halted` bullet ends with --clear-halt and never says to launch after it. The SKILL 3ב halted row says \"לא מפעילים ... ואז --clear-halt\" and nothing after. Spec 4.4 says the same. I reproduced it in my private export. I wrote state/news_supervisor.json with halt code 4, and `--status --watchdog` returned `halted halt 4 (journal)`. `--clear-halt` ran news-live --check (all checks ok), printed `supervise: the halt is cleared` and returned rc=0. An immediate `--status --watchdog` then returned `launch no live parent`, but no step in the text runs it: the turn goes on to steps 3-7. The launch waits for the next :07/:37 watchdog, up to 30 minutes of market time with stops unchecked after the cause was fixed. Kept at should-fix: the outage is caused by a rare halt, and the text adds at most one watchdog interval to it, not an open-ended gap."
+          }
+        },
+        {
+          "id": "consistency-3",
+          "severity": "should-fix",
+          "where": "open.md step 4, midday.md step 4, close.md step 7, weekly.md step 6, crypto-summary.md step 5 (closing git block: \"... send the S2 line ... and stop\")",
+          "what": "The closing block says \"and stop\" on a conflict. In five slots that block is not the last step, so stop also skips the duties after it. The old texts went on to those steps after their push retries. The brief's \"stop\" assumed the block comes last, and Ruling 56(5) only ruled on the start-of-turn \"stop\".",
+          "scenario": "A conflict that lasts (for example backlog.md edited by both the controller and a loss review). Steps skipped while it lasts:\n- open: step 5 (postmortem of the losing sales the cycle just journaled) and step 6 (the fills/gap push).\n- midday: step 5 and step 6 (the push for a holding down 6% or with material news).\n- close: step 8 (daily digest with tomorrow's orders, stops and realized losses).\n- weekly: the two-line summary push.\n- crypto-summary: step 6 (crypto loss review).\nOnly S2 reaches the owner. Trading itself is not affected: the cycles ran earlier in those turns.",
+          "fix": "In the closing block of those five files, replace \"and stop\" with \"and do not push; the slot's remaining steps still run (discard nothing)\". Or move the closing block after the steps that follow it.",
+          "verdict": {
+            "id": "consistency-3",
+            "real": true,
+            "severity": "should-fix",
+            "evidence": "At 9663262e the closing git block says \"On a conflict: `git merge --abort`, send the S2 line ... - and stop; discard nothing\", and in each of these files more duties follow it:\n- open.md: step 4, then step 5 (postmortem) and step 6 (fills/gap push).\n- midday.md: step 4, then step 5 (postmortem) and step 6 (push for a 6% drop or news).\n- close.md: step 7, then step 8 (the daily digest).\n- weekly.md: step 6 ends with \"and stop\", then \"PushNotification with a two-line Hebrew weekly summary\" in the same step.\n- crypto-summary.md: step 5, then step 6 (crypto loss review).\nThe old texts at a89e6c83 had no \"stop\": they retried with pull --rebase and went on to the next steps. The commit message of 9663262e says it assumed \"send S2 and stop\" sits \"in the closing block, after the duty\", and Ruling 56(5) rules only on the start-of-turn conflict. Read literally, the session skips those steps for as long as a conflict lasts. Soft impact: the trading steps (verify, cycle, close postmortem) run earlier in each turn; news losses are still reviewed by the watchdog's step 5, which comes before its git step; the weekly postmortem still catches pending losses. So should-fix, not must-fix."
+          }
+        },
+        {
+          "id": "consistency-4",
+          "severity": "minor",
+          "where": "ai-trader/skills/trader/slots/close.md steps 6-7",
+          "what": "The close slot runs at 16:22 NY, which is 23:22 Israel time, inside 23:00-08:00. Step 6 now pushes R4c, R9 and R11, and step 7 pushes S2, at that hour. Not must-fix in my reading: spec 6 says the stock book has no quiet hours (market.quiet_hours is null). SKILL 4א's rule of no push from 23:00 to 08:00 covers crypto only. The old close slot already pushed its digest at the same hour. Reported because the brief's must-fix wording (a push in the owner's quiet hours from a slot that runs then) literally covers this slot.",
+          "scenario": "Any day with an outage still open at the close or a trip. R4c or R11 reach the phone at about 23:22 Israel time (22:22 in the DST gap weeks). Checked in the exported copy: `uptime-report --day --notify` with no uptime rows prints `{\"notify\": [{\"id\": \"R4c\", ...}]}`.",
+          "fix": "None if the controller confirms spec 6's reading. Otherwise hold the step-6/7 pushes for the 08:03 crypto summary.",
+          "verdict": {
+            "id": "consistency-4",
+            "real": false,
+            "severity": "not-a-defect",
+            "evidence": "The pushes at about 23:22 Israel time are the specified design, not a defect:\n- Spec 6 (line 518): \"Quiet hours: the stock book has none (`market.quiet_hours` is null [C config.json:38]), so engine alerts already go out at any hour\". config.json at 9663262e has \"quiet_hours\": null for the market. The only 23:00-08:00 windows are the crypto book (SKILL 4א line 350: \"אין PushNotification על קריפטו\") and the watcher (spec line 641; owner summary item 11 limits the night rule to the watcher's lines \"כמו בקריפטו\").\n- Spec 4.5 explicitly assigns R4c, R9 and R11 to \"The 16:22 close slot\".\n- R9 exists to warn, before it happens, of a false dead-man alarm that night. Holding it until 08:03 would defeat its purpose.\n- The old close slot at a89e6c83 already pushed its digest at the same hour.\nThe brief's must-fix wording means the owner's quiet hours, and for the stock book there are none."
+          }
+        },
+        {
+          "id": "consistency-5",
+          "severity": "minor",
+          "where": "news-watch.md step 2 (`launch`) and line 9 (wake command)",
+          "what": "Both commands depend on the working directory, and the Bash tool keeps `cd` between calls in the session.\n- Launch: step 2 runs `cd ai-trader && python3 -m aitrader.supervise --status --watchdog`, which leaves the shell in ai-trader/. `launch.command` begins `cd ai-trader && exec ...`, so it fails at once from there unless the model first returns to the repo root as \"(from the repo root)\" asks. The old text had the same pattern.\n- Wake: `python3 -m aitrader.supervise --status` has no cd. From the repo root, where the last git step usually leaves the shell, it fails with No module named aitrader (/home/user/OmniRoute has no aitrader package).",
+          "scenario": "Launch from ai-trader/: `cd: ai-trader: No such file or directory`, the background task exits 1, the session wakes and relaunches. No parent for one turn. In the woken turn the first --status call fails and the model has to retry with the cd. Both recover on their own and cost a turn each.",
+          "fix": "Write the launch as `cd /home/user/OmniRoute && <launch.command>` and the wake command as `cd /home/user/OmniRoute/ai-trader && python3 -m aitrader.supervise --status`.",
+          "verdict": {
+            "id": "consistency-5",
+            "real": true,
+            "severity": "minor",
+            "evidence": "The wake command is `python3 -m aitrader.supervise --status` with no cd. aitrader is not an installed package: install-skills.sh installs only requirements.txt, and the repo root has `ai-trader/` (hyphen), not `aitrader`. So from the repo root the command fails with No module named aitrader. The watchdog turn ends with `git add ai-trader/state/` etc., which needs the repo root as cwd, so a woken turn can easily start there. The launch half is weaker: the text does say \"run `launch.command` (from the repo root)\", and the old text had the same `cd ai-trader && ...` pattern with the same parenthetical, so a model that follows it literally is covered. Both failures are visible at once, recover on the next try, and cost at most a turn. Minor."
+          }
+        },
+        {
+          "id": "consistency-6",
+          "severity": "minor",
+          "where": "ai-trader/CLAUDE.md:236 (One builder at a time)",
+          "what": "The line still says \"Before changing one of these: `git pull`\". The trader session follows it for a defect fix from the loss protocol, in the live checkout. Hard rule 8 now says fetch, then merge --no-edit. pull.rebase is not set in this container, so plain `git pull` fast-forwards or refuses; it does not rebase. If pull.rebase=true were set in the trader container, this line would rebase the live checkout, the hazard spec 4.7 forbids.",
+          "scenario": "A loss review during market hours makes a code fix: it runs `git pull` in the checkout the engine writes to.",
+          "fix": "Replace `git pull` with `git fetch origin <branch>` and `git merge --no-edit origin/<branch>` in that line.",
+          "verdict": {
+            "id": "consistency-6",
+            "real": true,
+            "severity": "minor",
+            "evidence": "ai-trader/CLAUDE.md line 236 at 9663262e still says \"Before changing one of these: `git pull`\". Hard rule 8 (lines 188-190) and spec 4.7 (\"Rule, in this spec, in `CLAUDE.md` and in every scheduled prompt ... Sync is `git fetch` ... `git merge --no-edit`\") say otherwise. I tested in a throwaway local repo with a bare remote, on git 2.43.0 with no pull.rebase or pull.ff config. On divergent branches plain `git pull` printed \"fatal: Need to specify how to reconcile divergent branches\" and changed nothing. So today it fast-forwards or refuses; it never rebases. A refusal leaves the model to choose `--rebase` or `--no-rebase`, and hard rule 8 in the same file points to the merge. The rebase hazard needs pull.rebase=true in the trader container, which is not shown. A real inconsistency with a small, conditional effect: minor."
+          }
+        }
+      ]
+    },
+    {
+      "lens": "gitflow",
+      "covered": "Nothing is must-fix by my lens.\n\nRead at 9663262e: all nine slot files, SKILL.md sections 0, 3א, 3ב, 4א, CLAUDE.md rule 8 and the claims rule, spec 4.4, 4.5 and 4.7, .gitignore, test_slot_files.py, and supervise.py and news_live.py (tree_busy, the news_exits writer). Also read the old texts at a89e6c83, Rulings 55 and 56, rulings-10-28 (Task 19, P23, P37, P40), and the Task 20 runbook.\n\nRan in throwaway bare-remote repos, under <SCRATCH>/review-step2/prompts-gitflow/lab1 to lab9, with the crypto loop exactly as written:\n- forced conflict, rejected pushes, permanently failing push, unreachable origin;\n- start-sync refusal, conflict and abort, with engine-style writes to unrelated files during the conflict (survive, abort OK);\n- an engine-style write to a file the merge had staged (abort fails, merge left in progress);\n- a corrected loop, and `git merge-tree` as a side-effect-free conflict pre-check.\n\nNo commit was lost and no file was discarded in any run.\n\nMorning after the landing: OK. The first new-text 08:07 watchdog runs supervise from a checkout that already holds the landing. The runbook (steps 11-12, P23) holds update_trigger until the 00:12 UTC crypto decide (old text, pull --rebase) has made a state commit that descends from the landing. After that, the three crypto slots sync every night. The last one before 08:07 NY is crypto-summary at 08:03 Israel (01:03 NY), and a conflict at its start now only aborts and goes on.\n\nQuiet hours hold: crypto-decide (00:12 UTC) and crypto-fill (01:07 UTC) write S2 to the night log and never push; crypto-summary pushes only after 08:00 Israel. The 16:22 NY close (23:22 Israel) does push, but the stock book has no quiet hours by design (market.quiet_hours is null, spec line 518).\n\nParked by Ruling 56, so not repeated here: S2 is not sent once per conflict, and a lasting conflict sends it again from each slot.",
+      "findings": [
+        {
+          "id": "gitflow-1",
+          "severity": "should-fix",
+          "where": "ai-trader/skills/trader/slots/crypto-decide.md step 4, crypto-fill.md step 3, crypto-summary.md step 5, SKILL.md 4א (push loop)",
+          "what": "The one-line loop `for i in 1 2 3 4 5; do git fetch ...; git merge --no-edit origin/B || break; git push -u origin B && break; sleep $((2**i)); done` exits 0 whatever happens. A conflict leaves the merge in progress (MERGE_HEAD present, `UU` file) and returns 0, because `break` returns 0. A merge refused over local changes also returns 0, with no merge to abort. Five failed pushes return 0, from the last `sleep`. In each case the commit stays local (ahead 1). The text then expects the model to notice the conflict from the output alone. SKILL 4א shows the same loop with no conflict instruction at all.",
+          "scenario": "Ran in throwaway repos, exactly as written. With a forced conflict on state/backlog.md: LOOP EXIT=0 and MERGE_HEAD present (lab1). With a pre-receive hook that always rejects: LOOP EXIT=0 after 63 s, branch ahead 1 (lab3). With origin unreachable: 5 fetch and push failures, LOOP EXIT=0 after 62 s (lab4). A night turn that runs unattended and trusts the exit code ends with a merge in progress, or reports a push that never happened. The next morning's engine start then exits 7 (tree_busy), the parent trips after about 31 s, and the woken turn has to clean up. Not lost, but masked.",
+          "fix": "Abort inside the loop and end on a status test: `ok=; for i in 1 2 3 4 5; do git fetch origin B; git merge --no-edit origin/B || { git merge --abort; break; }; git push -u origin B && { ok=1; break; }; sleep $((2**i)); done; test -n \"$ok\"`. The conflicted file name is still printed by the merge before the abort. Tested: conflict gives rc 1 with no MERGE_HEAD, success gives rc 0, five failures give rc 1 (lab7-9). Put the same form in SKILL 4א, and say that a nonzero end with no conflict means the push failed and the commit waits for the next slot.",
+          "verdict": {
+            "id": "gitflow-1",
+            "real": true,
+            "severity": "minor",
+            "evidence": "I reproduced it at git 2.43 with the loop exactly as the crypto slots write it. lab1 (forced conflict on state/backlog.md): LOOP EXIT=0, .git/MERGE_HEAD present, `UU ai-trader/state/backlog.md`. lab3 (a pre-receive hook that always rejects): LOOP EXIT=0 after 62 s, branch `[ahead 1]`. lab7 (merge refused because news_exits.json has local changes): LOOP EXIT=0, no MERGE_HEAD, and the `git merge --abort` the text then calls fails with rc 128 ('There is no merge to abort'). SKILL.md 4א lines 358-362 show the bare loop with no conflict rule. So the exit code means nothing, as claimed. I downgrade the harm, though. In every case the output names the failure plainly: 'CONFLICT (content): Merge conflict in ai-trader/state/backlog.md ... Automatic merge failed', or five '! [remote rejected]' blocks, or 'error: Your local changes ... Aborting'. The slot text itself says 'On a conflict (the loop stops at the merge): git merge --abort ...', so it already expects the model to read the output, not the exit code. A model that follows it literally sees the CONFLICT line and aborts. Five failed pushes leave the commit local, and the morning loop pushes it; a correct exit code would not change that. A merge left in progress at night also gets cleared: the 08:03 summary's own merge fails with 'MERGE_HEAD exists', and its step 1 aborts before the engine starts at 08:07 NY. This is a real weakness that could hide a failure, but it does not lead to a lost commit or a merge left in progress under literal execution. Minor, not should-fix. The proposed `ok=` form is still a cheap improvement."
+          }
+        },
+        {
+          "id": "gitflow-2",
+          "severity": "should-fix",
+          "where": "open.md step 4 (then 5-6), midday.md step 4 (then 5-6), close.md step 7 (then 8), weekly.md step 6 (summary push after 'stop'), crypto-summary.md step 5 (then 6)",
+          "what": "The closing block ends a conflict with 'send S2 ... and stop'. Commit 9663262e reads 'stop' as ending the turn, and the test comment says the block comes 'after the slot's work'. In five files it does not: work still follows it. Under a conflict, open skips its postmortem and the fills notification. Midday skips its postmortem and the down-6% alert. Close skips the daily digest (tomorrow's planned orders, a stop, a realized loss with its review, a failure). Weekly skips its two-line summary push. Crypto-summary skips the crypto loss review. In the old texts (a89e6c83) these steps ran after the push no matter what. The new 'and stop' cuts them off.",
+          "scenario": "A conflict that lasts, for example on state/backlog.md after the controller and a loss review both appended to it. The 09:52 open fills orders. Step 4 aborts, sends S2 and stops. The owner never gets the fills line, and the open's loss review waits for the 10:07 watchdog. At 16:22 the digest with tomorrow's planned orders is never sent, only S2.",
+          "fix": "In these five files, change the conflict clause to: 'git merge --abort, send S2 ..., push nothing, then go on with the remaining steps'. Or move the sync block to the end of each prompt, after the postmortem and the notification. That also commits the postmortem records the same turn, where today they wait for the next slot.",
+          "verdict": {
+            "id": "gitflow-2",
+            "real": true,
+            "severity": "should-fix",
+            "evidence": "Confirmed by reading 9663262e. Five closing blocks end with 'send the S2 line with PushNotification ... - and stop; discard nothing', and work still follows them: open.md step 4, then 5 (postmortem) and 6 (fills notification); midday.md step 4, then 5 (postmortem) and 6 (down-6%/material-news alert); close.md step 7, then 8 (the daily digest with tomorrow's planned orders); weekly.md step 6, with 'PushNotification with a two-line Hebrew weekly summary' after the 'stop' in the same step; crypto-summary.md step 5, then 6 (crypto loss review). The authors read 'stop' as ending the turn. The test_slot_files.py comment says 'S2 and \"stop\" belong to the closing block, after the slot's work', and Ruling 56(5) speaks of 'the fix round's reading of \"stop\"' at the start sync as ending the slot. The old texts at a89e6c83 (open step 4, close step 6, weekly step 6, crypto-summary step 5) had no 'stop', so steps 5-8 always ran. The regression is real. The impact is soft: every trading duty runs before the closing block (open's cycle fill in step 2, close's cycle and postmortem in steps 3-4), so no trade or stop look is delayed. A news loss skipped by the open or midday postmortem is picked up by the next watchdog, whose postmortem (news-watch step 5) comes before its own closing block. What is lost is the owner's fills line, the digest, the weekly summary and an hours-later crypto review; S2 goes out instead."
+          }
+        },
+        {
+          "id": "gitflow-3",
+          "severity": "should-fix",
+          "where": "every closing block and start sync that runs while the engine is live (news-watch step 6; open, midday, close steps 1 and the closing step)",
+          "what": "`git merge --abort` (which is `reset --merge`) fails, and the merge stays in progress, when a file that the conflicted merge wrote cleanly is changed during the conflict. The prompts offer only two ways out: complete the merge, or abort it. Neither is possible without discarding. The engine itself can cause this. During a conflicted merge, the cleanly merged upstream files sit in the working tree. state/news_exits.json has two writers by design: the news-exit command, run by any session (CLAUDE.md lets every session write state/), and the engine, which rewrites the file after selling. A background defect-fix workflow in the trader's checkout is another writer.",
+          "scenario": "Lab6: upstream changes backlog.md (conflict) and news_health.jsonl (clean); the engine appends to news_health.jsonl during the conflict. `git merge --abort` gives 'Entry ... not uptodate. Cannot merge. fatal: Could not reset index file', rc 128, and MERGE_HEAD is still there. In market hours, a pushed exit request that arrives in the same merge as a backlog.md conflict is read by the running engine, which sells and rewrites the file, so the abort fails. From then on every engine start exits 7 (tree_busy). At the next handover the new parent trips, and the woken turn's own abort fails too: no engine and no stop looks for the rest of the day. Likely to be rare, but the cost is large.",
+          "fix": "In the live checkout, test before merging, with no side effects: `git merge-tree --write-tree --name-only HEAD origin/B`. Exit 1 lists the conflicted files and touches neither the index nor the tree (lab5, lab7). Run `git merge` only when it exits 0; otherwise send S2 with the names it printed. This never creates MERGE_HEAD in the engine's tree. It needs git 2.38 or later; this container has 2.43. At minimum, add a rule for a failed abort: push nothing, send S2 naming the files the abort printed, and do not touch them.",
+          "verdict": {
+            "id": "gitflow-3",
+            "real": true,
+            "severity": "should-fix",
+            "evidence": "Reproduced in lab6 at git 2.43. Upstream changes backlog.md (conflict) and news_exits.json (clean). After `git merge` (rc 1, `UU backlog.md`, `M  news_exits.json`), news_exits.json was rewritten in the working tree as the engine would after a sale. Then `git merge --abort` printed \"error: Entry 'ai-trader/state/news_exits.json' not uptodate. Cannot merge. fatal: Could not reset index file to revision 'HEAD'.\", rc 128, and MERGE_HEAD was still there (`MM news_exits.json`). The trigger exists by design. news_live.update_exits (news_live.py:517-545) is 'the only writer of state/news_exits.json, for news-exit and for the engine'. A news-exit pushed from another session reaches the engine only through this merge, and the engine polls every 20 s (config poll_seconds 20), so it can sell and rewrite the file inside the merge-to-abort window. The prompts give no path for a failed abort: they say 'complete it, or run git merge --abort' and 'discard nothing'. Spec 5.4 check 2 then makes every engine start exit 7 while MERGE_HEAD exists. In SKILL 3ב the woken turn's fix for 7 is to complete the merge or abort it, and the abort fails again. I also confirmed the proposed pre-check: `git merge-tree --write-tree --name-only HEAD origin/B` returned rc 1, listed ai-trader/state/backlog.md, and created no MERGE_HEAD and no change to the tree (lab7). Severity stays should-fix, not must-fix. Three things must coincide: an exit request in the same merge as a conflict on another file, plus a sale inside a seconds-long window. The engine is the only writer of every other news_* file it saves (book, seen, queue). The close start sync at 16:22 is not exposed, because the engine is down by then; the finding lists it anyway. Rare, but the cost is large."
+          }
+        },
+        {
+          "id": "gitflow-4",
+          "severity": "minor",
+          "where": "ai-trader/CLAUDE.md:236 ('One builder at a time')",
+          "what": "'Before changing one of these: `git pull`'. The loss protocol's defect fix (SKILL 3א step 5) runs in the trader session, so this plain pull happens in the live checkout, against hard rule 8 at :188-190 (fetch, then merge --no-edit, never rebase). Git 2.43 with divergent branches and no pull config stops with a hint that offers `pull.rebase true`. In a container with pull.rebase set, it rebases under the running engine, which is the spec 4.7 hazard.",
+          "scenario": "A defect fix in market hours: the session runs `git pull` per CLAUDE.md, the branch has diverged, and the session follows git's hint or a pull.rebase config. State files are rewritten under the engine.",
+          "fix": "Replace it with `git fetch origin <branch> && git merge --no-edit origin/<branch>`.",
+          "verdict": {
+            "id": "gitflow-4",
+            "real": true,
+            "severity": "minor",
+            "evidence": "ai-trader/CLAUDE.md:236 at 9663262e still says 'Before changing one of these: `git pull`'. It is unchanged from a89e6c83:234 and contradicts hard rule 8 at :188-190 ('`git fetch`, then `git merge --no-edit`'). SKILL 3א contains no `git pull` (grep is empty). I checked the harm in lab10, git 2.43 with a clean HOME and no system config. With divergent branches a plain `git pull` refuses: 'fatal: Need to specify how to reconcile divergent branches', rc 128, changes nothing, and prints the hint offering pull.rebase true. With pull.rebase=true and a dirty tree, which is the normal state while the engine writes tracked state files, it also refuses: 'cannot pull with rebase: You have unstaged changes', rc 128. A rebase under the engine therefore needs three things together: the session ignores rule 8 in the same file, the tree is fully committed, and the branches have diverged. It is a real inconsistency in the text with a small, unlikely hazard. Minor."
+          }
+        },
+        {
+          "id": "gitflow-5",
+          "severity": "minor",
+          "where": "open.md and midday.md step 1 ('commit the state first (step 4) and merge again'); every closing block",
+          "what": "The start sync's refusal clause points at 'step 4'. Step 4 holds the closing block, whose conflict rule is 'send S2 and stop', the same path 9663262e removed for a direct conflict. A model that runs step 4 whole on a refusal can still skip the cycle. Separately, the closing blocks have no rule for a merge refused over local changes. With the engine live, files written between the commit and the merge can trigger one. Neither a 'rejected push' nor a 'conflict' covers it.",
+          "scenario": "The 09:52 open: the merge is refused because the engine changed a file that upstream also changed. The model runs 'step 4', its merge conflicts, step 4 says stop, and yesterday's decision is never filled at the open.",
+          "fix": "Write 'commit the state (only the commit of step 4) and merge again; a conflict then follows this step's rule'. In each closing block add: 'if the merge is refused over local changes, commit the state again and retry within the same 5 tries'.",
+          "verdict": {
+            "id": "gitflow-5",
+            "real": true,
+            "severity": "minor",
+            "evidence": "Both parts are confirmed in the text. open.md and midday.md step 1 say 'commit the state first (step 4) and merge again', and step 4 is the closing block, which ends 'send the S2 line ... and stop'. close.md step 1 has no '(step 4)'. None of the closing blocks (open 4, midday 4, close 7, weekly 6, news-watch 6, the crypto loops) has a rule for a merge refused because of local changes. lab7 shows a refusal prints 'Please commit your changes or stash them before you merge', and then the text's `git merge --abort` fails with 'There is no merge to abort'. The impact is small. Step 1's own conflict rule ('git merge --abort ... then go on with this slot's work') follows in the same sentence group and governs the 'merge again', so the cycle is skipped only by a model that runs all of step 4. A refusal needs a file with local changes that upstream also changed. The engine is the only writer of its files except news_exits.json, so a refusal is rare, and a refusal followed by a conflict is rarer still. Real wording gaps, minor."
+          }
+        }
+      ]
+    }
+  ],
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Find"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Verify"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "find:consistency",
+      "phaseIndex": 1,
+      "phaseTitle": "Find",
+      "agentId": "add1b9b4fc6b36faa",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794505601696,
+      "queuedAt": 1794505601654,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Read at 9663262e and compared with a89e6c83: all 9 slot fil…",
+      "promptPreview": "You are one of two independent checkers of the new scheduled-prompt texts. Your lens: PROMPT VS CODE. For every slot file and SKILL 3ב/4א: list every command, subcommand, flag and JSON field the text names (for example `--status --watchdog`, `action`, `launch.command`, `launch.timeout_ms`, `unsent`, `text`, `id`, `--relayed`, `why`, `today.halt`, `--clear-halt`, `uptime-report --day --notify` and …",
+      "promptFramed": true,
+      "lastProgressAt": 1794506495500,
+      "tokens": 324609,
+      "toolCalls": 50,
+      "durationMs": 893803,
+      "resultPreview": "{\"findings\":[{\"id\":\"consistency-1\",\"severity\":\"should-fix\",\"where\":\"ai-trader/skills/trader/slots/news-watch.md:9 (wake sentence); ai-trader/skills/trader/SKILL.md 3ב last-line table (the sentence \\\"הטבלה היא לקורא היומן\\\")\",\"what\":\"After a woken turn, the prompt says only \\\"read its last line, run --status, do what action says\\\". The parent's last-line table in SKILL 3ב is labelled \\\"for the log …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "find:gitflow",
+      "phaseIndex": 1,
+      "phaseTitle": "Find",
+      "agentId": "aabd257a2b12ff6fc",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794505601697,
+      "queuedAt": 1794505601654,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Nothing is must-fix by my lens. Read at 9663262e: all nine …",
+      "promptPreview": "You are one of two independent checkers of the new scheduled-prompt texts. Your lens: GIT FLOW AND FAILURE MODES. Every git sequence in the slot files and SKILL.md: the start-of-turn sync (fetch + merge; on a refused merge because of uncommitted files; on a conflict: merge --abort and go on with the slot on the local state), the closing commit + fetch + merge + push retry loops (including the cryp…",
+      "promptFramed": true,
+      "lastProgressAt": 1794506449671,
+      "tokens": 261552,
+      "toolCalls": 39,
+      "durationMs": 844674,
+      "resultPreview": "{\"findings\":[{\"id\":\"gitflow-1\",\"severity\":\"should-fix\",\"where\":\"ai-trader/skills/trader/slots/crypto-decide.md step 4, crypto-fill.md step 3, crypto-summary.md step 5, SKILL.md 4א (push loop)\",\"what\":\"The one-line loop `for i in 1 2 3 4 5; do git fetch ...; git merge --no-edit origin/B || break; git push -u origin B && break; sleep $((2**i)); done` exits 0 whatever happens. A conflict leaves the m…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "verify:gitflow",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "afe10ed7d6e092dc6",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794506449702,
+      "queuedAt": 1794506449676,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial verifier. REFUTE each finding below if you can: read the exact text and code, check the scenario can really happen when a model follows the text literally, and where possible reproduce it (a throwaway repo, a read-only command in an exported copy). Default to real=false without evidence. Re-grade severity by the definition.\n\nFindings (JSON):\n[\n {\n  \"id\": \"gitflow-1\",\n  \"seve…",
+      "promptFramed": true,
+      "lastProgressAt": 1794506848099,
+      "tokens": 206489,
+      "toolCalls": 24,
+      "durationMs": 398395,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"gitflow-1\",\"real\":true,\"severity\":\"minor\",\"evidence\":\"I reproduced it at git 2.43 with the loop exactly as the crypto slots write it. lab1 (forced conflict on state/backlog.md): LOOP EXIT=0, .git/MERGE_HEAD present, `UU ai-trader/state/backlog.md`. lab3 (a pre-receive hook that always rejects): LOOP EXIT=0 after 62 s, branch `[ahead 1]`. lab7 (merge refused because news_exits.j…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "verify:consistency",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "a26cc1a0b90cbe266",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794506495510,
+      "queuedAt": 1794506495504,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial verifier. REFUTE each finding below if you can: read the exact text and code, check the scenario can really happen when a model follows the text literally, and where possible reproduce it (a throwaway repo, a read-only command in an exported copy). Default to real=false without evidence. Re-grade severity by the definition.\n\nFindings (JSON):\n[\n {\n  \"id\": \"consistency-1\",\n  \"…",
+      "promptFramed": true,
+      "lastProgressAt": 1794506796229,
+      "tokens": 213283,
+      "toolCalls": 33,
+      "durationMs": 300719,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"consistency-1\",\"real\":true,\"severity\":\"should-fix\",\"evidence\":\"I checked the text at 9663262e. In news-watch.md the wake sentence is only \\\"read its last line, run `python3 -m aitrader.supervise --status`, and do what `action` says\\\". SKILL 3ב gives the same instruction, then introduces the last-line table with \\\"הטבלה היא לקורא היומן\\\" (the table is for the log reader). The on…"
+    }
+  ],
+  "totalTokens": 1005933,
+  "totalToolCalls": 146
+}

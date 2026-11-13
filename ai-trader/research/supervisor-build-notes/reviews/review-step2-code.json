@@ -1,0 +1,953 @@
+{
+  "summary": "Adversarial pre-landing review of the supervisor (rollout step 2): 6 lens finders, per-lens refuters, one synthesis",
+  "agentCount": 13,
+  "logs": [
+    "31 findings from 6 lenses go to synthesis"
+  ],
+  "result": {
+    "synth": {
+      "must_fix": [
+        {
+          "title": "False urgent R6 and then R6b at the session open whenever a news position is held overnight",
+          "where": "ai-trader/aitrader/supervise.py:1054-1077. look() judges stale stops on _stamp_ages whenever the beat says market_open. _looks and _stamp_ages at :357-368 fall back to stops_checked_at and measure the age in wall-clock time. The mark's stop at :1034-1035 has the same problem. On the engine side: news_live.py:1575-1619. step() skips the early look when a step began before 09:30, then writes the 'poll', 'quotes' and 'score' beats with market_open taken at write time and checked_at still null until the end look. The per-quote beat at :982 is written before :1017 stamps _covered. adopt_previous at :1645-1652 carries yesterday's stops_checked_at.",
+          "scenario": "BBB is held overnight, which max_hold_days 5 makes normal. The 08:07 child carries over yesterday's last look, about 16:00. The first beats with market_open true are written before this process has looked at the stop: the poll, quotes and score beats of a step that crosses 09:30 (the score call can take up to 90 s), or each per-quote beat when 2+ names are held. Those beats carry an age of about 63,000 s, or about 236,000 s on a Monday. That is above stops_stale_seconds 120. The parent writes stale_stops start and sends an urgent R6: 'מנוע החדשות חי, אבל הסטופים לא נבדקו כבר 63001 שניות (BBB). כנראה המחירים מ-Yahoo מגיעים לאט'. R6b follows once the look lands. The 09:30 mark also books stale_stops seconds that feed R11. Both verifiers reproduced it on the real NewsTrader and through supervise.main. They disagreed only on how often it happens. One verifier said about 7% of mornings with one name; the other said one name is enough on any step that crosses 09:30. My own reading of step() supports the wider window (the scorer phase lies inside it). In both readings it is near-certain with 2+ names. Ruling 45 fixed the same overnight stamp for handover_s only. Ruling 35 covers restarts inside the session, not the closed night. This is a recurring false urgent line about stops, and its stated cause is false.",
+          "fix": "In look(), count stamp ages in market-open seconds only. The smallest form caps each age and the unknown-stamp `born` at the seconds since today's session open, next to Ruling 53's resume cap. The cleaner form uses open_seconds(stamp, now, cal), the measure blind_s and gap_line already use. Apply the same cap to R6's {s}, to the stale_stops row's stop and to the mark's stop, so neither the line nor R11 counts the night. Add one test: yesterday's stamp and a beat with market_open true at 09:30:05 give no stale_stops row and no R6; at 09:32:05, with the stamp still old, R6 goes out with s about 125. A late first start (12:40) still gets an R6 at its boot beat with this fix. That is Ruling 35's accepted case, and must-fix 2's R4 goes beside it.",
+          "owning_file": "ai-trader/aitrader/supervise.py",
+          "source_ids": "ownerlines-1, time-1"
+        },
+        {
+          "title": "No R4 when the day's first parent comes up late after a normal close (a regression: tonight's slot prompt drops the old 'engine was down' push)",
+          "where": "ai-trader/aitrader/supervise.py:454-457. gap_line returns None after a sup_stop whose why has no R4b word; the docstring at :441-443 names end_of_day and closed_today. It is called from up() at :1160-1164, with prev = the last row (:851). The old prompt, news-watch.md at 95d51f44 line 6, pushed 'the engine was down' itself when it started the engine after 09:30. Task 19's news-watch.md (commit 9663262 on supervisor-build, which lands with this wave) no longer does; R4 was meant to own that line.",
+          "scenario": "Thursday ends normally with sup_stop end_of_day at 16:05:01. On Friday the 08:07, 08:37 and 09:07 slots fail on the shared usage limit, which happened on 2026-11-11 and 11-12 (progress.md:239). The 09:37 slot (or the 12:37 one) launches, and the first up comes at 09:40 (or 12:40). gap_line returns None, although open_seconds is 600 (or 11,400); the verifier ran it. With nothing held, the owner gets no line until R11 at 16:22 NY, and only if the close slot runs. With names held, the only line is the boot-beat R6, which blames a slow Yahoo. The brief's reason for the None ('R5a-R5e said that the stops are not checked') does not hold for end_of_day or closed_today, because no line said anything. A line that should go out never does.",
+          "fix": "In gap_line, treat a prev sup_stop whose why is 'end_of_day' or 'closed_today' like a row that is no sup_stop, so R4 applies. open_seconds already gives 0 on a normal night and on closed days, so this adds no noise. Update the docstring. Add tests: prev = Thursday's 16:05:01 end_of_day and an up on Friday at 12:40 gives R4 with s 11400; the same prev and an up on Friday at 08:05 gives None. Optional, and the same change as should-fix time-4: when prev is from an earlier NY day, show max(prev.t, today's open) as {time}, so the line does not read 'from 23:05' (yesterday).",
+          "owning_file": "ai-trader/aitrader/supervise.py",
+          "source_ids": "time-2"
+        },
+        {
+          "title": "Drill a prints PASS when an episode says R1 twice: it cannot see 'one R1 per episode'",
+          "where": "ai-trader/scripts/drill_supervisor.py:178-180: said() counts only alert ids with sent true. :343-349: the waits before each kill and after the last only ask for >= k. :381 is the final check. The hourly cap at supervise.py:410-433, with config.json max_alerts_per_hour 6, equals KILLS = 6.",
+          "scenario": "The verifier made a private mutant whose second episode says R1 twice. `drill_supervisor.py a --fast` still printed `PASS a kills=6+1 ... r1=6+1`. The rows were R1-1, R1-2 and R1-3 (both for kill 2), then R1-4 to R1-6. After kill 6 the wait for >= 6 was already met, so the parent was stopped before kill 6's own R1. Had that R1 been said, it would have been the 7th counted line of the hour: held back as capped and not counted by said(). Drill a is the only check of many episodes under one parent; the unit test covers one episode. Spec 11.2 lists 'one R1 per episode' as a pass mark of step 2. This is a drill that can print PASS while the property it gates is broken.",
+          "fix": "Count R1 alert ids whatever `sent` says (capped rows keep kind R1). After each wait before kill k, fail unless there are exactly k ids. After the last wait, settle for a few ticks and require exactly KILLS ids, all with sent true; require exactly 1 in the engine part. Keep Ruling P3: same six kills and same cap, and max_alerts_per_hour is not raised. Re-run the duplicate-R1 mutant and see FAIL before the landing run.",
+          "owning_file": "ai-trader/scripts/drill_supervisor.py",
+          "source_ids": "gate-1"
+        }
+      ],
+      "should_fix": [
+        {
+          "title": "R11 goes out on every clean trading day, and the handover bookkeeping overstates the minutes without stop checks",
+          "where": "ai-trader/aitrader/uptime.py:46-50 (every exit-to-up after a handover is booked as unprotected), :60-66 (a pair whose later mark has a null hb is booked as gap for the whole pair), :222-225 and :238 (R11 counts as told only R4/R4b rows); supervise.py:987-990 (watch returns 'handover' before look, so the handover minute gets no mark) and :248-250 (the new parent's first mark has a null hb)",
+          "fix": "(a) Write the minute's mark before watch returns 'handover', or book a null-hb pair as gap only from the last exit or sup_stop row inside it. Golden test: one 46 s handover gives unprotected_s 46, not 107. (b) Count handover stretches under outage_report_seconds as reported, or fire R11 only when the untold seconds reach outage_report_seconds. Test: four handovers under 60 s and no fall send no R11. Until (b) lands, or the controller amends spec 11.2's first-day item 'a quiet phone', that check fails by construction on day 1. Decide before the first live day. The bias in (a) alone also puts a perfect day under the 99% uptime that decides question 3 (move to a paid server). Severity: finder and verifier agree on should-fix. Under the literal must-fix wording, a wrong number about stops is borderline, but it errs toward caution.",
+          "source_ids": "ownerlines-2, time-3"
+        },
+        {
+          "title": "R4c names the positions of the day's last up, not the book",
+          "where": "ai-trader/aitrader/uptime.py:175, :195, :235 (open_at_close = ups[-1]['held'])",
+          "fix": "Take R4c's {held} from news_book.json read as plain JSON, as supervise._held_now already does. Fall back to the last up's held only when the book cannot be read. This goes against Ruling P11, with harm shown. When a position changed after the last up and an outage is open at the close, R4c names a name that was sold and omits a name that is held unprotected, and it contradicts the R3/R3b of the same day.",
+          "source_ids": "ownerlines-5"
+        },
+        {
+          "title": "Relayed unsent lines carry no time, so present-tense alarms reach the owner after the engine has recovered",
+          "where": "ai-trader/aitrader/supervise.py:638-641 (unsent entries are {id, kind, text}); finish() at :949-959 gives the lines in flight only 5 s; the relay is news-watch.md step 3",
+          "fix": "Add the first row's `t` to each unsent entry, and have the relay prefix it ('נשלח באיחור, מ-HH:MM שעון ישראל'). Leave out an R6 whose R6b went out with sent true. This touches the slot prompt as well as supervise.py.",
+          "source_ids": "ownerlines-3"
+        },
+        {
+          "title": "One outage is told twice across days (R4c at the close, then R4 or R4b the next morning), and earlier-day seconds count as today's reported seconds in R11",
+          "where": "ai-trader/aitrader/supervise.py:449-457 (gap_line counts session seconds of earlier days); uptime.py:221-235 (R4c is suppressed only by today's told rows)",
+          "fix": "When prev is from an earlier NY day, count s from today's open and show today's open as {time}. Or skip R4/R4b when that day's R4c was sent. This is naturally done in the same edit as must-fix 2.",
+          "source_ids": "time-4"
+        },
+        {
+          "title": "No 'back' line after an urgent R3, R3c or R5c when the relaunch comes back quickly",
+          "where": "ai-trader/aitrader/supervise.py:450-457 (no line under outage_report_seconds); ownerlines.py:92 (WORDS['R4b.why'] has no lock_held)",
+          "fix": "At the first up after a sup_stop of crash_loop or lock_held, send a short line whatever the gap: R4b without the threshold for these causes, or a new id in ownerlines with a word for lock_held. This follows the spec's letter, so it is a design gap and not a coding slip.",
+          "source_ids": "ownerlines-4"
+        },
+        {
+          "title": "Drill e's PASS does not depend on check 4: no mismatch is ever produced",
+          "where": "ai-trader/scripts/drill_supervisor.py:479-539 (PASS needs only trades > 0); news_live.py:1240-1247",
+          "fix": "Plant one deterministic mismatch per run: after a kill, append a BUY row of a name the book does not hold, then require the book_mismatch row and E1. Or print `mismatch_clause=not_exercised` so the PASS is not read as coverage. Check 4 and E1 are pinned by unit tests, so nothing broken lands through this gap alone.",
+          "source_ids": "gate-2"
+        },
+        {
+          "title": "Dead-man (Task 21/22): a confirmed cancel leaves news_deadman.json armed, so every morning books a phantom new_seq alarm",
+          "where": "ai-trader/aitrader/uptime.py:83-104, :155, :189; the plan's Task 21 (plan.md:1304-1368)",
+          "fix": "In Task 21, after a confirmed cancel (at the close, or a trip or halt with said), clear due_at. Or put the old due_at on the new_seq row and count only messages that were neither cancelled nor replaced. Must land before deadman.enabled is turned on and before the two-week report decides question 3. Inert tonight.",
+          "source_ids": "gate-4"
+        }
+      ],
+      "minor": [
+        "lifecycle-1: with the hang switch on, R2 is said only at the replacement's first up (supervise.py:1156-1159). A planned end (handover, signal, orphaned) between the hang kill and that up drops R2 with no alert row, so --status cannot relay it. The verifier reproduced it and corrected the window to seconds (boot plus first look), not 300 s. R6 during the hang and R11 partly cover it. It is the same 'silent line' class as must-fix 2, and the fix is cheap: before the planned-end branch at :1227 (and the halt, lock and trip ends), send R2 or write an unsent row. It can ride in the same round.",
+        "lifecycle-2: the loop form with --state-dir or --config and no child_cmd still starts the live engine on the live book and watches the wrong heartbeat. With the switch on it kills a healthy engine, and after 5 restarts the owner gets a false R3. This is operator misuse only; no drill, test or launch path does it. Fix: refuse a non-ROOT --state-dir or --config with exit 2 when child_cmd is None, as clear_halt does (supervise.py:805-808).",
+        "lifecycle-3 + engine-2 (merged; both about config.json supervisor._note on planned_stop_grace_seconds): the note guards mark_gap_max_seconds, but --status uses parent_stale_seconds. Worst case: last mark about 60 s old, plus grace 120, plus send_timeout 5, is about 185 s against 180. The note also ignores the step's closing sends (the look's own line, the closing resend and the late-line retry, each up to 15 s), which can push a planned stop past 120 s into a group SIGKILL during an ntfy outage. No harm tonight: the verifiers showed only finish() rows are exposed for at most 5 s, the kill is filed as planned, and in an outage nothing was told, so no duplicate. But following the note when guards go to 'enforce' would make replace_parent readable while the engine is still stopping. Fix: rewrite the note as parent_stale_seconds >= planned_stop_grace_seconds + 60 + send_timeout_seconds plus the closing sends, raise the keys together, and optionally skip the step-tail late-line retry when STOP is set.",
+        "lifecycle-4: a timely planned stop never signals the child's process group (supervise.py:1184-1191), so trial `claude -p` grandchildren started by _ask_later (news_live.py:1416-1436) outlive the engine, and their 60 s timeout dies with it. They hold no lock and write no state. The verifier reproduced it. One-line fix: call _signal_group(child.pid, SIGKILL) after the planned wait returns (Ruling 36f says this is safe).",
+        "ownerlines-6: a stale-stops episode that opened with only blind names (so its R6 was suppressed) never sends R6 for a non-blind name that goes stale later (supervise.py:1065-1077). Rare.",
+        "ownerlines-7: R1's {sold} says 'בסטופ' for every SELL since the last exit, including owner exit requests and time exits (supervise.py:1141-1144, ownerlines.py:120-127). List only sales whose reason is a stop under that word. Its TypeError half is unreachable (see refuted robustness-2), but using held_text's stop_text in sold_text is a cheap consistency fix.",
+        "ownerlines-8: a halt under the parent gives two urgent lines: the engine's own calendar or chain line (news_live.py:1885-1891, 1916-1921, 1984-1989), then R5b or R5a. The spec keeps this on purpose (spec 3 row 12, spec 8). Gate the engine's line on supervised is None, or record the choice.",
+        "ownerlines-9: with no ntfy channel, the engine counts a line as told once it is in the log (news_live.py:1489, 1237, E1). Under the parent that log is .cache/news_live.log, which nobody relays. Latent: the live environment has the topic, and the child inherits it. Fix: have the landing check that the topic variable is set (print set or unset only, never the value).",
+        "time-5 (lowered from should-fix to minor; the verifier's evidence is solid): before each hang kill, R6 goes out first, then R6b, then R2, because stops_stale_seconds 120 < hang_seconds 180. The same pair comes at the boot beat after a slow restart. This is by design under Ruling P16 (R6 fires during a long call) and Ruling 35. The real defect is the test: test_supervise.py:1298-1303 runs hang 1 < stale 2, the opposite order to config.json, so its name claims more than it proves. Re-run it with stale < hang.",
+        "time-6: an R6 episode still open at the bell is ended by market_open turning false (supervise.py:1055, :1072-1077), and R6b then says the stops are checked again. Fix: end it with only the row and no R6b when the market has closed.",
+        "engine-1: a planned stop that cuts a first start's priming still writes the 'primed' row (news_live.py:796-797). _run then throws the marks away (:1960-1962), so the next start writes a second primed row for the same headlines. Measurement only, and news_seen_log.jsonl is tracked. Fix: skip the row when STOP.is_set().",
+        "gate-3 (lowered from should-fix to minor; spec 5.1's order is pinned by test_news_supervised.py:900-916, :982-993): drill a's 'first look within 3 s' passes with the start's first look removed, because code_stamp, feed and send are instant stubs (engine_child.py:113-126). Its engine_look_s is stub timing, not evidence of the order. Possible fix: give the stubs slow modes such as commit_delay_s and feed_delay_s.",
+        "gate-5: drill g never holds a merge open during a start and never touches state/, so it passes with tree_busy disabled (rc7=0 in every run). It is a smoke test of restarts beside git, not evidence for spec 4.7's guard; the 7 path is unit-tested. Fix: one conflicting merge held open during some starts, requiring rc7 >= 1.",
+        "gate-6: drill e's bare engine (--until 24:00, no --supervised) survives a SIGKILL sent to the drill script's pid alone. The tripwire keeps it harmless. Fix: start bare engines with --supervised os.getpid(), and have signal_child also check that the drill's state path is in argv.",
+        "gate-7: cloud-check --alive passes on a single mark after sup_start without reading its age or hb (drill_supervisor.py:737-743). The cloud parent's last stdout line (supervise.py:1257, AFTER) names --status with no --state-dir, so it points at the live directory. No harm after the close. Fix: require a fresh mark with a non-null hb, and print the state dir in cloud mode.",
+        "gate-8 (Task 21): drain() drops every Sender result whose tag is not a pending owner line (supervise.py:927-947). Sender.close() only queues None on a daemon worker and main does not wait (deadman.py:95-98), so a later leave ping could die with the interpreter. Inert tonight; Ruling P26 already gives tag routing to Task 21."
+      ],
+      "refuted": [
+        "robustness-1: refuted. The verifier showed no input the parent really meets reaches the unguarded loop path. Every real read is type-guarded, and the state file is written only by save_state with ints via tmp+rename. The PDEATHSIG SIGKILL on a parent crash is the designed protection against an unwatched engine, and exit code 1 is handled by R12 plus a relaunch. Keep 'wrap look()'s bookkeeping, move finish() into a finally, type-check load_state' as backlog hardening.",
+        "robustness-2: refuted. No SELL with a null or missing stop can enter R1's window: _buy sets stop_price in the same block as the fill, before any save, and _sell copies it. The cited 2026-11-10 MU row has no stop but falls before `ref`. Ruling 38 deferred this class, and the verifier re-checked the reason at d639d8ec. The real wording issue survives as ownerlines-7.",
+        "lifecycle-1 (partial): the finding's 300 s window is wrong. A no-quote name enters the beat's blind list at its first look (news_live.py:1225), so the loss window is boot plus first look, a few seconds. The finding is kept as minor.",
+        "lifecycle-3 (partial): the claimed harm today does not hold. The mark age passes 180 s only after the grace, when the child has already been killed, so only finish()'s rows (at most 5 s) are exposed, and the :07/:37 watchdog reads do not overlap. Kept as a minor note for future tuning.",
+        "engine-2 (partial): the 'duplicate late line' and 'lost stopping beat' harms are refuted. In the outage nothing was told, so the next 'דווח באיחור' is the first delivery. Nothing reads the 'stopping' phase. The SIGKILL is the designed bound and is filed as planned. Kept, merged with lifecycle-3.",
+        "ownerlines-1 (partial): 'every trading morning' is overstated. With one held name and a step that starts after the bell, the stale beat lives only milliseconds. The severity stands, because steps that cross 09:30 and mornings with 2+ names make it recurrent (see must-fix 1)."
+      ],
+      "verdict": "Yes, tonight's landing can go ahead once the three must-fix items are in: two small changes in ai-trader/aitrader/supervise.py, each with one test (count stop-look age in market-open seconds only; R4 after an end_of_day or closed_today sup_stop), and one change in ai-trader/scripts/drill_supervisor.py (count R1 ids exactly, then re-run the duplicate-R1 mutant to see FAIL). The full suite and drills a-g must then re-run green. Best done in the same pre-landing round as the planned Task 14f. lifecycle-1 is optional in that round: the same silent-line class, one guard. No lens found two engines, an engine nobody watches, a delayed or skipped stop look, a parent crash on input it will really meet, a leak of topic or exception text, or any change to buy, sell or stop behaviour. On severity, I took the verifier's lower rating for time-5 and gate-3; both rest on cited rulings and unit tests, not thin evidence. Note that must-fix 2 is a regression made by Task 19's prompt (commit 9663262), which is not in 95d51f44..d639d8ec but lands with this wave. What to watch in the drills:\n- Drill a: exactly 6 R1 ids in the dummy part and 1 in the engine part, none capped.\n- Drill b: one hang row and one R2.\n- Drill e's mismatches=0 and drill g's rc7=0 are expected, and they are not evidence for check 4 or for the spec 4.7 git rule (unit tests carry those). Drill a's engine_look_s is stub timing.\n- Cloud drills: record which signal TaskStop and the 2-hour cap send, and confirm in /proc that no parent or engine survives the stop. cloud-check --alive alone proves only one tick.\nOn the first live day:\n- Expect R11 at 16:22 from handover seconds. Spec 11.2's 'quiet phone' item cannot pass until the R11 should-fix lands or the controller amends the checklist; decide that before day 1.\n- At the first open with an overnight-held name, confirm there is no R6 at 09:30.\n- At each handover (09:18, 10:48, 12:28, 14:17), read the exit-to-up seconds, confirm each planned stop ends inside 120 s with no group SIGKILL, and check that no `claude -p` outlives the old engine.\n- Confirm that any relayed unsent line is not a stale present-tense alarm."
+    },
+    "merged": [
+      {
+        "lens": "lifecycle",
+        "covered": "Lens: process lifecycle and signals at d639d8ec. I found nothing must-fix.\n\nWhat I read in full:\n- supervise.py: main, restart_core, spawn, watch, look, paused, up, stop, core_emit, fall, finish, status, clear_halt, take_lock, _live.\n- deadman.Sender.\n- news_live.py: run, _run, step, _step, _look_at_stops, check_stops, catch_up_stops, poll_headlines, handle_scored, drain_trial, _beat, _log_trade, score_batch, data._chart/_get_json, journal.append and verify_chain.\n- drill_supervisor.py: drills a, b, c, d, f, cloud and cloud-check.\n- Spec 4.2-4.5 and the plan's Tasks 19-20.\n- Rulings 23, 35-41, 47-53, P2, P5, P18 and 37.\n\nI ran no processes. The engine reasoning comes from the code, plus the tracked news_health.jsonl rows (poll_s_max 1.75 s).\n\nWhat holds:\n- **Child always reaped.** Every return of restart_core happens after the child is reaped. stop() waits after SIGTERM and after SIGKILL. A signal that arrives during a wait, a back-off or a hang stop is checked at the next watch, and the core never spawns after a stop order. The parent's lock is freed only in main's finally, after the child is gone. The exception is an uncaught exception escaping watch(): it frees the lock for a few milliseconds before PR_SET_PDEATHSIG kills the engine. I found no such exception on any real input (garbage or torn heartbeat, uptime log, trades, book or state file).\n- **Death with the parent.** PR_SET_PDEATHSIG is set from the main thread. An engine whose parent died before the prctl returns 143 on its getppid check, and the top-of-round getppid check backs it up if prctl fails.\n- **One parent, one engine.** Both run under an flock on a non-inheritable descriptor. A second parent exits 3, and a refused child exits 3 with lock waits that are not counted.\n- **--status order.** It answers kill_stray only when no live parent holds the lock. It never answers launch while /proc/locks shows a live holder, so a woken watchdog cannot start a second parent or engine. A wrongly launched parent exits 3 and writes nothing.\n- **Hang kill on a slow engine.** Each stretch without a beat is one bounded call:\n  - a Yahoo chart call with 3 retries at timeout 20: up to about 66 s on a blackhole, about 126 s at worst;\n  - the scorer, up to 90 s (subprocess.run kills it and does not wait for its pipes);\n  - a feed poll: 1.4 s measured, about 100 s on a blackhole;\n  - a send, up to 15 s per channel, followed by a beat.\n\n  All of these stay under hang_seconds 180. drill f checks that slow looks raise no hang row.\n- **A kill mid-write.** It leaves a torn journal line that the chain tolerates (after_torn), or a stale .tmp file next to an intact book, heartbeat or state file (tmp file plus rename). _log_trade saves the book right after the trade row, so a kill between the two is a tiny window, and start_checks finds it (E1).\n- **Machine pause.** Ruling 49 exempts it from the hang rule.\n- **Other paths.** --clear-halt is bounded by its timeout and takes the lock briefly. The sender never blocks the loop. finish() is bounded by send_timeout_seconds.\n- **Drills.** b and d check the hang kill and the parent kill (d fails on any exit-3 refusal), and cloud-check checks that nothing is left after a stop from outside.\n\nNot checked: which signal TaskStop and the 2-hour cap send. That is only known after the cloud drills. The slot prompts (Task 19) are not in this diff; I judged them against spec 4.4's table.\n\nScratch files: <SCRATCH>/review-step2/find-lifecycle (nl.py, spec.md, plan.md, drill.py).",
+        "findings": [
+          {
+            "id": "lifecycle-1",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/supervise.py:1156-1159 (R2 is sent only from up()), 1217-1218 (fall stores ep[\"r2\"]), 1227-1228 (planned end only closes an episode that has an up)",
+            "what": "With the hang switch on, R2 goes out only at the replacement child's first `up`. If a planned end (handover, signal, orphaned) comes after the hang kill but before that `up`, R2 is never said. No alert row is written for it, so --status `unsent` cannot relay it. The next parent's gap_line measures from the sup_stop row, not from the fall, so the blind time before the kill (at least hang_seconds) is in no line.",
+            "scenario": "10:47:50: the engine has written no beat for more than 180 s, gets killed, and a replacement starts at once (ran >= healthy). The market is open and one name is held with no fresh quote. That name enters `blind` only after stop_blind_alert_seconds = 300, so first_look_done stays false and no `up` comes. At 10:48:00 handover_due fires: watch returns \"handover\", ep[\"ups\"] is empty, Ruling 37's branch sends nothing, and the parent exits 76. The next parent's first up builds R4b, if one is due at all, from the 10:48 sup_stop onward. The owner never reads that the engine hung and was killed. Normally the window is the replacement's 1-3 s boot. It grows to 300 s only when a held name has no quote. With names held, R6 already fired at the replacement's boot beat (Ruling 35), so the owner knows the stops were unchecked. With nothing held, nothing is at risk.",
+            "why": "The hang kill is the one event that Ruling P5 says R2 reports. Neither P5 nor Ruling 37 covers a planned end before the first up. The rest of the gap goes to R4b, and that line starts counting at the wrong row.",
+            "fix": "Before the planned-end branch at line 1227, and at the halt, lock_held and crash_loop ends: if ep[\"r2\"] is still set, send R2. Use the kill row's time and a blind_s from the dead engine's last look (kid[\"last_look\"]) to now. If that cannot be built, write an alert row with sent false so the watchdog relays it.",
+            "against_ruling": "not against a ruling: P5 and 37 do not cover this case; Ruling 37's premise that 'the handover gap measures it' does not hold for a hang kill",
+            "verdict": {
+              "id": "lifecycle-1",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "both",
+              "evidence": "The mechanism is real, but the finding's 300 s window is wrong. Reproduced in <SCRATCH>/review-step2/verify-lifecycle/repro/r2_lost.py: dummy run 1 beats then hangs (hang_seconds 2, switch on); run 2 beats but never makes a first look. The parent then ends planned, once by SIGTERM and once by --handover with the clock moved past 10:48. Both logs read: hang (killed_with TERM), exit why=hang, start, code, stale_stops, alert R6, exit why=planned, sup_stop signal/handover. There is no R2 alert row, neither sent nor unsent, so --status cannot relay it. Cause: R2 is said only in up() at supervise.py:1156-1159. The planned-end branch at :1227 needs ep[\"ups\"]. Nothing else reads ep[\"r2\"] before the return.\n\nWhy the window is seconds: in news_live.py:1225 `self._blind.setdefault(sym, [now, False])` puts a no-quote name into the beat's blind list at its FIRST no-live look. stop_blind_alert_seconds (300) only gates the urgent alert. The replacement also adopts the dead engine's blind clocks (:1655-1658). _run (:1906-1920) writes the boot beat, checks the chain, makes the first look and then writes beat \"stops\" before anything slow. So first_look_done turns true and `up` comes right after that first look. The window is boot plus the first look: normally a few seconds, and tens of seconds only if the first look raises or quotes time out. A hang kill is always followed by an immediate restart (ran > start_grace 60 >= healthy 60). So the loss needs a hang kill within a few seconds before a handover time (4 a day), or a rare signal or orphaning in that window.\n\nWhat the owner still gets: R6 fires during the hang itself, before the kill, because the stamp ages grow with the beat's age (120 < 180). R11 at the close counts the restart and the minutes. With nothing held, nothing is at risk. Real, but very rare and partly covered: minor. The finding's fix stands (send R2 or write an unsent alert row before the planned-end branch).",
+              "how_checked_note": ""
+            }
+          },
+          {
+            "id": "lifecycle-2",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/supervise.py:791-792 and 964-965 (the default child is the live engine whatever --state-dir/--config say); compare clear_halt's guard at 805-808",
+            "what": "The loop form takes --state-dir DIR and --config FILE, but with no child_cmd it still starts `python3 -u -m aitrader news-live`. That engine has no --state-dir and always reads ai-trader/state and ai-trader/config.json. The parent then watches DIR/news_heartbeat.json, which the real engine never writes, and judges the real engine by FILE's calendar.",
+            "scenario": "A session runs `python3 -m aitrader.supervise --until 16:05 --state-dir /tmp/try` from the module docstring's usage line, as a manual check. The real engine starts on the live book, or exits 3 if the live engine holds the lock. In the first case the parent never sees a beat of its own. After start_grace_seconds (60), with hang_kill_enabled true, it sends SIGTERM and then SIGKILL to a healthy engine that is checking live stops. Each run lasts at least healthy_seconds, so the restart is immediate. After 5 restarts in 600 s the parent trips, and R3 reaches the owner's phone through the inherited topic, saying the engine fell repeatedly. The live --status meanwhile reads an engine lock held by a pid whose parent is not the live parent, and answers kill_stray.",
+            "why": "No two engines result: the engine lock prevents that. But a healthy live engine gets repeated SIGKILLs, and the owner gets a false crash-loop line. Ruling 41/52 already refused this mismatch for --clear-halt.",
+            "fix": "In main, when child_cmd is None, refuse --state-dir other than ROOT/state, and --config other than ROOT/config.json, with exit 2 and one line, before the lock. Do it as clear_halt does. The drills and tests always pass child_cmd and are unaffected.",
+            "against_ruling": "",
+            "verdict": {
+              "id": "lifecycle-2",
+              "real": true,
+              "severity": "minor",
+              "evidence": "The code path is as described. main builds the default child as `[sys.executable, \"-u\", \"-m\", \"aitrader\", \"news-live\"] + --until/--supervised` (supervise.py:964-965). It passes no --state-dir, and news-live has none (aitrader/__main__.py:98-103; journal.STATE = ROOT/state at journal.py:21). Paths(state_dir) meanwhile watches DIR/news_heartbeat.json. A beat never appears there, so after start_grace_seconds the loop judges a hang (:1103), and with the switch on it kills a healthy live-book engine. Only clear_halt has the ROOT/state guard (:805-808). Reachability: only a session that types the loop form with --state-dir and no child_cmd triggers this. No production or test path does it. The launch command from --status has no --state-dir (:658). Every drill passes child_cmd: drill_supervisor.py:102, :305, :705 and the cloud drill at :694-706. The Task 20 runbook runs the loop form only through drill_supervisor.py cloud. The help text says '(drills and tests)'. Real footgun, operator misuse only, cheap fix: minor.",
+              "how_checked": "read-code"
+            }
+          },
+          {
+            "id": "lifecycle-3",
+            "severity": "minor",
+            "where": "ai-trader/config.json supervisor._note (\"planned_stop_grace_seconds must stay at or under mark_gap_max_seconds\"); supervise.py:404-406 (one mark per clock minute), 1184-1191 (planned stop blocks the loop), 949-959 (finish), 619-622 (--status none vs replace_parent on parent_stale_seconds)",
+            "what": "While a planned stop runs, the parent writes no mark for up to 60 s + planned_stop_grace_seconds + send_timeout_seconds. The 60 s is the age of the minute's mark when the stop begins. At today's numbers that is 185 s, against parent_stale_seconds 180. The config note gives the wrong limit: it names mark_gap_max_seconds and not parent_stale_seconds, the number --status actually uses. It also ignores the up to 60 s since the last mark.",
+            "scenario": "Today: the 12:28:59 handover comes with the last mark from 12:28:00. The engine overruns its 120 s grace and is SIGKILLed at 12:30:59, and finish() waits up to 5 s for an R1 in flight (Ruling 37). A --status in that window answers replace_parent. The session TaskStops or kill -9s the parent: the line in flight gets no row, and no sup_stop is written. This is tiny today. The note itself, though, says to raise planned_stop_grace_seconds when news.guards goes to \"enforce\" (second check up to 180 s). Done as written (grace 240, mark_gap_max 240, parent_stale_seconds left at 180), every slow planned stop reads as replace_parent after about 2 minutes. Through PR_SET_PDEATHSIG the session's kill -9 of the parent then SIGKILLs an engine that is finishing its last stop look.",
+            "why": "The documented invariant guards the wrong number. Following it later puts kills by the watchdog into the planned-stop path.",
+            "fix": "State the bound in the note as parent_stale_seconds >= planned_stop_grace_seconds + 60 + send_timeout_seconds, and raise the keys together. Add a pin test on the config values, as Ruling 11 does for the line texts. Optionally write one mark (or a 'stopping' row) just before stop(child, \"planned\") blocks, so --status can tell a stopping parent from a stuck one.",
+            "against_ruling": "Ruling 36(h) wrote the note; it is incomplete rather than wrong in intent",
+            "verdict": {
+              "id": "lifecycle-3",
+              "real": true,
+              "severity": "minor",
+              "evidence": "The arithmetic holds. A clock handover is checked in watch() before look() (supervise.py:1013-1016), so the tick that fires it writes no mark. The last mark is the previous minute's, about 60 s old, when stop(child, \"planned\") starts blocking (:1184-1191, wait up to planned_stop_grace_seconds 120). Then come episode_end, the handover save and finish() (up to send_timeout_seconds 5, :949-959). Worst case is about 185 s against parent_stale_seconds 180 (:619-622). The config _note and the pin test (test_supervise.py:637-638) guard mark_gap_max_seconds, which only uptime.py:61 uses for gap accounting. Nothing ties planned_stop_grace_seconds to parent_stale_seconds.\n\nThe harm claimed for today does not hold. The mark age can pass 180 s only when 60 + x > 180, so x > 120 s into the stop. By then the grace is over and the child has already been SIGKILLed, or it ended in the last instants. A replace_parent read today can only cut finish(): rows of lines in flight and sup_stop. It never reaches a running engine through PR_SET_PDEATHSIG. That window lasts at most 5 s, at handover + 120 s (09:20, 10:50, 12:30, 14:19). The scheduled --status readers (watchdog slots :07/:37, late up to about 6.5 min, spec line 246/272) do not overlap it.\n\nThe hazard is real only for future tuning. Following the note (grace 240, mark_gap_max 240, parent_stale 180) would make replace_parent readable while the engine is still finishing its last step. Note too that the finding's proposed pin (parent_stale >= grace + 60 + send_timeout = 185) would fail on today's config, so it implies changing a spec number. Documentation and invariant gap with no harm tonight: minor.",
+              "how_checked": "read-code"
+            }
+          },
+          {
+            "id": "lifecycle-4",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/supervise.py:1184-1191 (a planned stop whose child ends within the grace never signals the child's process group); news_live.py:2017 (drain_trial(wait=0) on a planned stop) and 1424-1436 (_ask_later's daemon threads run `claude -p` through subprocess.run with a timeout)",
+            "what": "After a timely planned stop, the engine's process group is left alone. Trial second-check `claude -p` processes, started by daemon threads under guards \"log\", outlive the engine. Their 60 s timeout was enforced by the engine's subprocess.run, which died with it. Spec 4.2's 'until its own timeout' is therefore not true once the engine is gone. The hang path already sends SIGKILL to the group (Ruling 36 f).",
+            "scenario": "11:59: a headline scored 9 is bought, and _ask_later starts 2 verify calls plus 1 rescore (`claude -p`). At the 12:28 handover the engine stops in a few seconds, drain_trial does not wait, and the engine exits 143. The parent's wait succeeds, so no killpg follows. The `claude -p` processes run on, unparented and unbounded, next to the next engine. They use model quota, CPU and memory until they finish or hit EPIPE on their closed output pipe. They hold no lock and write nothing to state.",
+            "why": "Soft: these are no engines, but they are unsupervised processes of the old tree. They compete with the new engine on a small machine.",
+            "fix": "In stop(), after child.wait() returns in the planned branch, call _signal_group(child.pid, SIGKILL), as the hang branch does. Ruling 36(f) already covers why this is safe: the group number stays reserved while it has members.",
+            "against_ruling": "",
+            "verdict": {
+              "id": "lifecycle-4",
+              "real": true,
+              "severity": "minor",
+              "evidence": "Reproduced in <SCRATCH>/review-step2/verify-lifecycle/repro/orphan.py: a child starts `sleep 60` in its own process group and exits 143 on SIGTERM. The parent is sent SIGTERM. main returned 143, and the grandchild was still alive in pgid = the child's pid; I then killed it by its pid. The cause is stop()'s planned branch (supervise.py:1184-1191): it calls _signal_group only when child.wait times out.\n\nIn the engine, _ask_later starts daemon threads (news_live.py:1416-1436). _ask_second (:1346-1375) runs verify_calls 2 plus 1 rescore, i.e. 3 `claude -p` processes via subprocess.run(timeout=60) (:237, :314). They inherit the engine's group, and the 60 s timeout is enforced only by the engine's thread. drain_trial(wait=0 if market open or STOP) at :2017 does not wait. So after a timely planned stop these processes outlive the engine, and spec 4.2's 'until its own timeout' does not hold.\n\nHow far it matters: a trial exists only after a buy, so an orphan needs a buy within about 60 s before a planned stop. Each orphan ends when its model call returns and it writes to the closed stdout pipe (EPIPE), or at claude's own API timeout, so 'unbounded' is overstated. Orphans hold no lock and write no state. The class predates the diff: a bare engine ending in market hours already used wait=0. The landing adds about 4 planned stops a day, and `or STOP.is_set()` extends wait=0 to planned stops after the close. Soft harm, safe one-line fix (Ruling 36 f): minor.",
+              "how_checked": "both"
+            }
+          }
+        ]
+      },
+      {
+        "lens": "ownerlines",
+        "covered": "What I read in full at d639d8ec:\n- ownerlines.py and notify.py\n- deadman.py (Sender: publish, results, error naming)\n- supervise.py: say, drain, finish, may_send, R7, gap_line, paused, look (stale/R6/R6b, hang/R2), up, episode_end (R1), the trip/halt/lock lines (R3/R3c/R3b, R5a/b/d, R5c), status() (unsent, R5e, held), relay, clear_halt, every print in main\n- uptime.py: day_report, close_lines (R4c, R9, R11)\n- the line paths in news_live.py that the diff changed, plus the engine's heartbeat and stop-look code that feeds them\n- drills a, b, c and f in drill_supervisor.py\n- spec sections 4.4, 4.5, 8 and 11.2; plan Task 19\n- Rulings 34-55 and P5, P6, P9, P11, P13, P18\n\nReproductions, run in my export through the safe wrapper:\n1. Worst-case byte length of every line in the table. The largest is R1 at 930 bytes (6 held, 6 sold, a long commit), under max_line_bytes 1200 and ntfy's 4096. No line can be over the limit.\n2. The real NewsTrader._look_at_stops beats at the open, read by the parent's stale rule. Result: an age of 63000 s on the first beat.\n3. An end-to-end supervise.main run with a child writing those beats. Result: alert R6 '63001 שניות' and then R6b. The child process ended with the parent; nothing was left running.\n4. A synthetic normal day with 30-70 s handovers through day_report and close_lines. Result: R11 every time.\n\nNo leaks found:\n- The ntfy topic, tokens and exception text appear in no parent line, no uptime.jsonl row and nothing on stdout. Every log, row and print names a status code or an exception's class, and --status prints only state.\n- Every parent line and R5e come from ownerlines.render.\n\nCorrect as built:\n- Dedup and once-only rules hold as ruled: R7 resets its hour, R3, then R3b, then nothing; R5e repeats until relayed; capped lines are never relayed; a late success writes a sent-true row.\n- Held names: the book fallback and 'לא ידוע' behave as Rulings 39, 53 and 55 say.\n\nAlready known, not reported again: the OverflowError of a huge int stop escaping say() and status(), which is Task 14f item 2.",
+        "findings": [
+          {
+            "id": "ownerlines-1",
+            "severity": "must-fix",
+            "where": "ai-trader/aitrader/supervise.py:1055 (stale ages are read whenever the beat says market_open), with _looks at supervise.py:357-361 and _stamp_ages at 364-368; R6 at 1071, R6b at 1077. Engine side: news_live.py:1700-1711 (until this process makes its first live look, a held name's checked_at is None and stops_checked_at is the previous run's stamp); beats with market_open true are written before that look at news_live.py:1583 (\"poll\") and 982 (per quote).",
+            "what": "Every trading morning with a news position held overnight, the parent sends a false urgent R6 at the open (\"the stops have not been checked for about 63,000 seconds, Yahoo is probably slow\"), followed by an R6b. The stale-stops rule counts a stamp's age in wall-clock seconds, so the last look of the previous session counts as unchecked time across the closed night.",
+            "scenario": "A news position BBB is held overnight (max_hold_days 5 makes this normal). The 08:07 parent's child comes up before the open; no look happens before the open, so the beats carry checked_at null and stops_checked_at at yesterday's last look, about 16:00. At 09:30 the first step of the open writes a beat with market_open true while BBB's checked_at is still null: the \"poll\" beat when the step began before 09:30, or the per-quote \"stops\" beat. _looks falls back to yesterday's stamp, and _stamp_ages gives about 63,000 s, well over stops_stale_seconds (120). The beat's blind list is still empty, because _stop_sight runs only after all the quotes. On its next 0.5 s tick the parent writes a stale_stops start row and sends R6 (urgent). When the live look lands it sends R6b. After a weekend the age is about 236,000 s. Reproduced twice. (1) The real NewsTrader._look_at_stops in a temp state with an adopted 17.5 h-old stamp: its first beats give _stamp_ages {'BBB': 63000}, which makes BBB stale. (2) supervise.main end to end, with a child writing those beats, wrote: alert R6 'מנוע החדשות חי, אבל הסטופים לא נבדקו כבר 63001 שניות (BBB). כנראה המחירים מ-Yahoo מגיעים לאט. פתוח: BBB (סטופ 48.50). כסף נייר', then stale_stops end and R6b '...אחרי 63002 שניות'. The R6 also counts against max_alerts_per_hour. The 09:30 mark's `stop` books stale_stops seconds that feed R11.",
+            "why": "A daily false urgent alarm about stops, and its stated cause (\"Yahoo slow\") is false: the market was closed, so no look was due. Ruling 35 covers a slow restart, where the stops really were unchecked; it does not cover this. The same root cause, the adopted overnight stamp, was found at Task 15 for handover_s and fixed only there (Ruling 45). This sibling reader was left as it was. The first occurrence is the first overnight hold after the landing (the book holds 0 positions today).",
+            "fix": "Count a stamp's age only inside the session, in the R6 rule and in the mark's `stop`: for example min(age, seconds since today's open), or open_seconds(stamp, now, cal), the same measure blind_s already uses. Add a test with a beat that turns to market_open true while it still carries the previous session's stamp: no stale_stops row and no R6.",
+            "verdict": {
+              "id": "ownerlines-1",
+              "real": true,
+              "severity": "must-fix",
+              "how_checked": "both",
+              "evidence": "Confirmed in code and by running it. Engine side: a new process starts with _covered={} (news_live.py:606). adopt_previous sets _prev_look to the previous run's stops_checked_at (1648-1652), and every beat repeats it until this process's first own look (1686-1711). The per-quote beat at 982 is written before _covered is stamped at 1017. The 'poll' beat at 1583 is written with market_open_now() true when the step began before 09:30. Parent side: supervise.py:1055 ages those stamps in wall-clock time through _looks/_stamp_ages (357-368). Nothing caps them except Ruling 53's resume cap (1060), which applies only after a pause. Ruling 45 fixed only handover_s, and no test covers this. Repro (scratch tests/repro_f1.py, real NewsTrader.step with the poll, scorer and quotes stubbed, the adopted stamp 63,000 s old): (a) step after the bell, one name: the first beat after the bell is ('stops', {'BBB': 63000}, blind [], R6 true). (b) Step straddling 09:30: both the 'poll' and the first 'stops' beat are 63000 and non-blind. (c) Two names: two consecutive stale non-blind beats. supervise.main end to end with a child writing such beats: alert R6 'מנוע החדשות חי, אבל הסטופים לא נבדקו כבר 63001 שניות (BBB). כנראה המחירים מ-Yahoo מגיעים לאט...' and a stale_stops start row. Frequency: it is not literally every morning. With one name and a step starting after the bell, the stale beat lives only ms (beat 982 to the 'stops' beat at 1193), so a 0.5 s tick rarely sees it. It is caught almost surely when the step straddles 09:30 (poll ~1.4 s of a 20 s period per state/news_health.jsonl, so ~7% of mornings), and on most mornings with 2+ held names (the stale beat sits through each later name's Yahoo call). The line is a recurring false urgent alarm, and its 'Yahoo slow' cause is false, so it falls under the must-fix definition (misleading line about stops)."
+            }
+          },
+          {
+            "id": "ownerlines-2",
+            "severity": "should-fix",
+            "where": "ai-trader/aitrader/uptime.py:238 (R11 condition), with _stretches at uptime.py:46-50 booking every handover's exit->up as unprotected 'handover' seconds; reported seconds count only R4/R4b rows (uptime.py:222-225)",
+            "what": "R11 fires on every normal trading day from handover seconds alone, even with nothing held: three in-session handovers whose total is over 30 s leave an untold remainder that rounds to 1 minute or more.",
+            "scenario": "A perfect day: handovers at 09:18 (before the open), 10:48, 12:28 and 14:17. Each of the three in session takes 30 s from the old child's exit row to the new child's up, well under handover_target_seconds (60) and under outage_report_seconds (180), so no R4b is sent. unprotected_s is 90, round(90/60) = 2, and the 16:22 close slot pushes 'סיכום יום: המנוע נפל 0 פעמים, המפקח עצר 0 פעמים, 2 דקות בשעות המסחר בלי בדיקת סטופים. כסף נייר'. Reproduced with a synthetic day through day_report and close_lines: 30 s handovers give R11 with '2 דקות', 60-70 s handovers give '4 דקות'. A handover needs a model turn to relaunch, so a total under about 30 s is not reachable. unprotected_s counts every cause whether a name was held or not (uptime.py:167-168).",
+            "why": "The owner gets an R11 every trading day. The first-day checklist of spec 11.2 ('the day ends with sup_stop end_of_day and a quiet phone') cannot pass on the first day after the landing. A routine R11 trains the owner to ignore the line that, per Ruling 55, is the only report of some parked outages. Ruling 54 named the cost as an occasional noisy line for 30-59 s untold; handovers make it daily.",
+            "fix": "Count handover stretches under outage_report_seconds (or handover_target_seconds) as reported. Alternatively, fire R11 on the untold seconds only when a name was held (exposed_s), or only when the remainder reaches outage_report_seconds. Add a test: a day with four sub-60 s handovers and no fall sends no R11.",
+            "against_ruling": "Ruling 54",
+            "verdict": {
+              "id": "ownerlines-2",
+              "real": true,
+              "severity": "should-fix",
+              "how_checked": "ran-code",
+              "evidence": "uptime._stretches books every exit->up after a sup_stop 'handover' as 'handover' (uptime.py:46-50). close_lines counts as reported only R4/R4b rows with sent true (222-225). gap_line gives R4b only at >=180 s (supervise.py:450-451). Repro (scripts/repro_f2.py through day_report + close_lines, handovers at 09:18, 10:48, 12:28 and 14:17, no falls, nothing held): handovers of 20 s each give unprotected 60 and R11 '...נפל 0 פעמים, המפקח עצר 0 פעמים, 1 דקות...'. 30 s gives '2 דקות', 60 s gives '3 דקות'. Same with a name held. Three in-session handovers totalling more than 30 s fire R11, and a handover needs a model turn plus child boot. Task 16 already logged this as a deferred minor, 'controller to confirm' (progress.md:507), and no ruling settled it. Ruling 54 priced only an occasional 30-59 s remainder. R11 is default priority and its text is true, so the harm is daily noise and a first-day checklist ('quiet phone', spec line 867) that cannot pass. That is should-fix, not must-fix."
+            }
+          },
+          {
+            "id": "ownerlines-3",
+            "severity": "should-fix",
+            "where": "ai-trader/aitrader/supervise.py:638-641 (unsent entries are {id, kind, text}, with no time); finish() at 949-959 gives the lines said on the way out only send_timeout_seconds (5 s)",
+            "what": "--status --watchdog hands the relay a line's text with no time, and the watchdog pushes it 15-45 minutes later. The alarms written in the present tense, which carry no time (R3, R3c, R5c, R6), then reach the owner as if they were current, after the engine has recovered. An R6 can arrive after its R6b.",
+            "scenario": "At 11:00 NY a crash loop trips. R3 ('... המפקח הפסיק להפעיל אותו. סטופים לא נבדקים עכשיו ...') is published inside finish()'s 5 s, a proxy flake (the known flake of Ruling 44) loses it, and the row says sent false. The woken turn relaunches at 11:02 and the engine runs. At the 11:37 watchdog the first row is older than alert_retry_minutes, so --status --watchdog lists R3, and the turn pushes the text verbatim: at 11:37 the owner reads that the stops are not checked now. In the same way an R6 that failed for 15 minutes while its R6b got through (R6b is sent whether or not R6 was delivered, supervise.py:1070-1077) is relayed after the all-clear.",
+            "why": "A relayed line can tell the owner that the stops are not checked when they are. Plan Task 19 relays each unsent text as it is.",
+            "fix": "Add the first row's `t` to each unsent entry, and have the relay prefix it ('נשלח באיחור, מ-HH:MM שעון ישראל'). In addition, --status can leave out an R6 whose R6b was sent true.",
+            "verdict": {
+              "id": "ownerlines-3",
+              "real": true,
+              "severity": "should-fix",
+              "how_checked": "read-code",
+              "evidence": "supervise.py:638-641 builds each unsent entry as {id, kind, text} with no time, as spec 4.4 also specifies. Per spec 4.4 only the :07/:37 watchdog turns relay unsent. The turn woken after a trip runs --status and launches. So an R3 that finish() (949-959, send_timeout_seconds 5, no retries) records sent false is listed once a parent is alive again only after alert_retry_minutes (15), at the next watchdog turn. The engine has been running since the relaunch by then, and the relayed text says 'סטופים לא נבדקים עכשיו'. In the same way, an R6 whose 15 minutes of retries all failed is relayed after an R6b that got through (R6b is sent whatever R6's outcome, 1070-1077). Narrowing: while no parent lives, an entry is listed at once (parent is None), so a relay in the same turn as the relaunch would be timely. The harm needs an ntfy failure inside the 5 s window or one lasting 15+ minutes, so it is rare. The line is misleading when it happens."
+            }
+          },
+          {
+            "id": "ownerlines-4",
+            "severity": "should-fix",
+            "where": "ai-trader/aitrader/supervise.py:450-457 (gap_line: no line under outage_report_seconds) with ownerlines.py:92 (WORDS['R4b.why'] has no 'lock_held')",
+            "what": "After R3, R3c or R5c the owner's last line is an urgent 'stops not checked now', and a successful relaunch is silent: R4b comes only for a gap of 180 or more market-open seconds, and a lock_held stop never gets one.",
+            "scenario": "R3 at 11:00:10. The woken turn launches once, and the new child's up comes at 11:01:40, 90 open seconds later. gap_line returns None, and the new parent has no restart episode, so it sends no R1. The phone shows the urgent R3 ('... סשן הסוחר מנסה שוב פעם אחת') and nothing more until R11 at 16:22. R3c is the same after the merge is fixed. R5c (another engine held the book) is followed by kill_stray and a launch with no line at all, whatever the gap.",
+            "why": "After an urgent line the owner believes for hours that the stops are unchecked. Nothing tells him that the retry the line promised worked. Only the absence of R3b hints at it.",
+            "fix": "At the first up after a sup_stop of crash_loop or lock_held, send a short 'back' line whatever the gap: R4b without the threshold for these causes, or a new id in ownerlines with a word for lock_held.",
+            "verdict": {
+              "id": "ownerlines-4",
+              "real": true,
+              "severity": "should-fix",
+              "how_checked": "read-code",
+              "evidence": "gap_line returns None when open_seconds < outage_report_seconds (supervise.py:450-451). WORDS['R4b.why'] has no 'lock_held' (ownerlines.py:92), so a lock_held sup_stop never gets R4b; gap_line's docstring says so on purpose. A new parent starts with ep['falls']=[], so episode_end/R1 never runs for the relaunch. After R3/R3c (urgent, 'סטופים לא נבדקים עכשיו... סשן הסוחר מנסה שוב') and a relaunch whose up comes within 180 open seconds, the owner gets no line until R11 at the close. The same holds after R5c whatever the gap. This matches the spec's letter (R4b row's 180 s threshold, row 4 'R3, then R3b, then nothing more that day but R11'), so it is a design gap, not a coding slip. The harm is soft: a stale belief after an accurate urgent line, and only after a rare crash loop or lock refusal."
+            }
+          },
+          {
+            "id": "ownerlines-5",
+            "severity": "should-fix",
+            "where": "ai-trader/aitrader/uptime.py:175 and 195 (open_at_close = the day's last up row's held), used for R4c's {held} at 235",
+            "what": "R4c's 'פתוח: {held}' is the held of the day's last up row, which can be hours older than the outage, so it names positions already sold and omits positions bought later. During an outage that is open at the close, no engine writes the book, so the book on disk is the truth.",
+            "scenario": "The 14:17 handover's up holds MU. MU's stop sells at 14:50, and the engine buys AAPL at 15:05. From 15:30 every child crashes at boot before its up (for example a pulled commit that breaks an import): R3, a relaunch, R3b. The outage is still open at 16:00. At 16:22 R4c says 'פתוח: MU (סטופ 708.97)': MU is no longer held, and AAPL, which went unprotected through the close, is not named. state/news_book.json holds AAPL with its stop.",
+            "why": "A wrong line about positions and stops, on exactly the day the owner most needs it right.",
+            "fix": "Take R4c's {held} from the book as plain JSON, as supervise._held_now already does, and use the last up's held only when no book can be read.",
+            "against_ruling": "P11",
+            "verdict": {
+              "id": "ownerlines-5",
+              "real": true,
+              "severity": "should-fix",
+              "how_checked": "ran-code",
+              "evidence": "day_report sets open_at_close = ups[-1]['held'] (uptime.py:175, 195), and R4c renders it (235), as Ruling P11 chose. Repro (scripts/repro_f5.py): an up at 14:18 holds MU, then children crash at boot from 15:30 with no further up, and the trip comes at 15:31. close_lines gives R4c '...מ-22:30 עד סוף המסחר: 30 דקות בלי בדיקת סטופים. פתוח: MU (סטופ 708.97)...', whatever was sold or bought after 14:18. Marks carry only n, so nothing later corrects it. In the same scenario R3/R3b take {held} from the book via _held_now (no beat of the child, supervise.py:494), so the owner receives two contradictory position lists. This contradicts P11 with real harm (a wrong position/stop line), but it needs an outage of 180 s or more still open at the close plus a position change after the last up. Rare, so should-fix."
+            }
+          },
+          {
+            "id": "ownerlines-6",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/supervise.py:1065-1077",
+            "what": "A stale-stops episode keeps the names it started with. If it opened with only blind names, so that its R6 was suppressed in favour of the engine's blind alert, a name that goes stale later gets no R6 until the whole episode ends.",
+            "scenario": "MU is halted, has no live quote and is blind; the engine's own alert owns it, so the episode opens with names [MU] and no R6. Then the engine sits 3 minutes in scorer calls and makes no looks, so AAPL (live, not blind) passes stops_stale_seconds. Because `names and not seen['stale']` is false, no R6 is sent for AAPL.",
+            "why": "A missed alarm in a rare combination.",
+            "fix": "When the set of stale names gains a name outside blind and no R6 is out, send R6 for the new names, or re-judge the episode.",
+            "verdict": {
+              "id": "ownerlines-6",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "read-code",
+              "evidence": "supervise.py:1065-1077: seen['stale'] is set only when an episode starts (`if names and not seen['stale']`). While the episode is open, nothing re-judges a growing name set, and R6 was suppressed at the start because names were a subset of blind. A later non-blind stale name (AAPL) gets no R6 until the whole episode ends, which takes as long as MU stays blind. Real, but it needs a blind name plus another name going stale without a hang (the hang rule takes over at 180 s without a beat). Rare."
+            }
+          },
+          {
+            "id": "ownerlines-7",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/supervise.py:1143-1144 (up.sold = every SELL since the last exit) and 902-904; ai-trader/aitrader/ownerlines.py:120-127 (sold_text)",
+            "what": "R1's {sold} says 'נמכר בהפעלה: {sym} בסטופ {stop}, במחיר {fill}' for every sale since the previous child ended, including an owner's exit request or a time exit made at the first look, not only stop sales. sold_text also formats `stop` with :.2f, so a SELL row with stop None (from pos.get('stop_price')) raises TypeError. say() then drops the whole R1 and logs only to .cache: the same failure Ruling 53 removed from held_text.",
+            "scenario": "A news-exit request waits while the engine is down. The new child's first look sells MU at 750 with stop 708.97, and R1 says it was sold 'at the stop 708.97, at price 750'.",
+            "why": "A misleading reason for a sale, and a whole line that can vanish for a field that is only nice to have.",
+            "fix": "List only stop sales under 'בסטופ' (check the row's reason), and render a stop that is not a number as unknown, as held_text does.",
+            "verdict": {
+              "id": "ownerlines-7",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "read-code",
+              "evidence": "up() collects every SELL with logged_at >= the previous child's end (supervise.py:1141-1144), whatever its reason. sold_text renders each as 'נמכר בהפעלה: {sym} בסטופ {stop}, במחיר {fill}' (ownerlines.py:81, 120-127). So an exit-request, time-exit or catch-up sale by the restarted child's first look reads as 'at the stop'. The TypeError half is latent: f\"{None:.2f}\" would raise, and say() catches TypeError and drops the whole R1 (supervise.py:906-908). But every buy sets stop_price (news_live.py:923) and _sell copies it into the row (936-939), so stop None needs a hand-made position. Rare and soft."
+            }
+          },
+          {
+            "id": "ownerlines-8",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/news_live.py:1885-1891 (code 5), 1916-1921 and 1984-1989 (ChainBroken), with supervise.py:1245-1246 (R5a/R5b)",
+            "what": "Under the parent one halt produces two urgent lines. The engine sends its own (an English calendar line, or the ChainBroken exception's own text plus '(כסף נייר)'), and then the parent sends R5b or R5a. Only code 6 was made the parent's alone (`supervised is None`).",
+            "scenario": "The calendar lacks the new year: the engine sends 'config.json calendar does not cover 2027...' and exits 5, and the parent sends R5b. Or a broken chain at the first look: the engine's 'news hash chain broken: ...' and then R5a.",
+            "why": "Two lines for one event, and one of them is not text from ownerlines.py. Spec 8 keeps the engine's chain and calendar alerts, so this is reported as minor.",
+            "fix": "Gate the engine's chain and calendar lines on supervised is None, as code 6 already is, or record that the spec keeps them.",
+            "verdict": {
+              "id": "ownerlines-8",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "read-code",
+              "evidence": "Confirmed: on code 5, _run sends the English calendar line whatever `supervised` is (news_live.py:1885-1891). On ChainBroken it sends the exception's own constructed text + '(כסף נייר)' at start and in the loop (1916-1921, 1984-1989). The parent then sends R5b/R5a. Only code 6 is gated on supervised is None. This is the spec's design: spec section 3 row 12 says 'the existing urgent alert, then R5a', and spec 8 keeps the engine's chain and calendar alerts. The ChainBroken text is built by the engine from file names, not foreign exception text. A double line for a rare halt, as designed."
+            }
+          },
+          {
+            "id": "ownerlines-9",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/news_live.py:1489 (_say), 1237 (_stop_sight), say_late and E1 (`or not notify.channels(cfg)`), with supervise.py:975-977 (the child's stdout goes to .cache/news_live.log)",
+            "what": "With no channel configured, the engine now counts a line as told because 'the log took it', and notify's docstring says the Claude session relays what is printed. Under the parent, the engine's stdout is a gitignored file that nobody reads or relays, so in an environment without the topic every trade line (buys and sales) is lost silently. --net-check does not check that the topic variable is set.",
+            "scenario": "The trader session's environment lacks AITRADER_NTFY_TOPIC. The parent's own lines still reach the owner late through unsent, but the engine's 'bought/sold' lines are printed into .cache/news_live.log and marked told.",
+            "why": "A line that should go out never does. This is latent only, because the live environment has the topic set.",
+            "fix": "Make the landing check that the topic variable is set (print only whether it is set, never its value), or keep the engine's lines owed while it runs supervised with no channel.",
+            "verdict": {
+              "id": "ownerlines-9",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "read-code",
+              "evidence": "_say, _stop_sight and E1 count a line as told when notify.channels() is empty (news_live.py:1489, 1237, ~1952). This logic is new in this diff (it was not in 95d51f44). Under the parent the child's stdout goes to .cache/news_live.log (supervise.py:975-977), which nobody relays. --net-check checks only ntfy health and needs no topic (supervise.py:777-778). It is latent: the child inherits the parent's environment (Popen env=env, with main defaulting to os.environ), and the live trader session has the topic set. Only a topic-less environment would lose the engine's trade lines silently."
+            }
+          }
+        ]
+      },
+      {
+        "lens": "time",
+        "covered": "Read in full at d639d8ec: uptime.py (whole file), the relevant parts of supervise.py (session_hours, closed_day, open_seconds, near_until, handover_due, gap_line, beat_view/_looks/_stamp_ages, status, main's loop: watch, paused, look, up, episode_end, core_emit/fall, the end-of-run lines), the uptime-report CLI in __main__.py, the config supervisor and calendar blocks, the engine's beat, stop-look and run-loop code in news_live.py, drills b and f, and the dummy child.\n\nChecked and found correct:\n- DST and early close: open_seconds across the 2027-03-12..15 DST weekend gives 5400, and across 2026-11-27 12:50 to 11-30 09:40 gives 1200. _session and day_report give 12600 s and 210 minutes on 11-27, and 23400 s on 2027-03-15.\n- Same-tzinfo naive arithmetic: in _by_second, near_until and handover_due it is only used within one session day, so it is safe.\n- The engine runs to --until 16:05 on an early-close day, so there is no crash loop after 13:00.\n- Rounding: R11 follows Ruling 54. The R4c run and began, and its suppression within one day, are correct. missing_marks set membership works across zones.\n- status' launch window, the per-NY-day unsent filter (the parent's own end at 16:05 wakes the session, which relays), and the uptime-report --day/--days/--notify argument checks are correct.\n- The scheduled slots use CRON_TZ=America/New_York, so they are DST-safe.\n- Clock injection only touches the calendar and row times; ages use time.time().\n- The Ruling 53/55 resume cap only lowers ages, and {s} stays the true age.\n\nReproductions, all run through the safe wrapper (none reached the network), are in <SCRATCH>/review-step2/find-time/scripts/: open_beat.py, test_open_r6.py, cross_day.py, handover_count.py, handover_day.py, test_hang_r6.py.\n\nNot reviewed: the dead-man and watcher logic (they ship disabled and deadman.py holds only the Sender), and Task 19's prompt text, which is not in d639d8ec. Only its brief was read, for time-2.",
+        "findings": [
+          {
+            "id": "time-1",
+            "severity": "must-fix",
+            "where": "ai-trader/aitrader/supervise.py:1054-1071 (look: R6 judged on _stamp_ages, raw wall-clock age, gated only by the beat's market_open); _stamp_ages/_looks supervise.py:357-368; engine side ai-trader/aitrader/news_live.py:982 (check_stops beats after each quote) before :1017 (where _covered is first stamped), _beat :1690-1711, adopt_previous :1645-1647",
+            "what": "At every session open with a news position held overnight, the parent sends an urgent R6 saying the stops have not been checked for about 63,000 s (about 235,000 s on a Monday) and that Yahoo is probably slow, then R6b a moment later. The stop-look age counts the closed night.",
+            "scenario": "An engine started at 08:07 or after the 09:18 handover holds BBB. Before the open it looks at no stops, so its _covered is empty and every beat carries yesterday's stops_checked_at (about 15:59:50). In the first step after 09:30 it quotes BBB and writes a 'stops' beat with market_open true and checked_at null, before line 1017 stamps the name. The parent ticks every 0.5 s and reads that beat: open is true, the beat is fresh, and the age is (at - yesterday's stamp) = 63,000 s > 120. It writes stale_stops start and sends R6 urgent: 'מנוע החדשות חי, אבל הסטופים לא נבדקו כבר 63000 שניות (BBB). כנראה המחירים מ-Yahoo מגיעים לאט'. After the loop the next beat is fresh, so R6b follows. Reproduced on the real engine (scripts/open_beat.py): the first three beats of the first open step have open=True and ages {AAA: 63000, BBB: 63000}. The parent half is reproduced too (scripts/test_open_r6.py, default stops_stale_seconds 120): R6 says 63000 s, then R6b. With two or more held names the window covers a network quote, so the R6 is near certain. With one name it depends on whether a tick lands inside the window. Ruling 48's 'born' variant does the same: an unknown stamp of a child started at 08:07 gives R6 with s about 5,000 at 09:30.",
+            "why": "This is a false, urgent line about stops on every trading day with a held position, and it blames Yahoo. It costs one of the six counted lines in that hour, and it teaches the owner to ignore R6. The same overnight stamp broke handover_s at the 09:18 handover (Task 15). Ruling 45 fixed that caller only; this is the sibling caller.",
+            "fix": "Judge stale stops, and state R6's {s}, on stop-look age that counts only market-open time. Either use open_seconds(stamp, now, cal) in place of the raw age, or cap each age (and born) at the seconds since today's session open, the same form as Ruling 53's resume cap. Add a test: yesterday's stamp, a beat with market_open true at 09:30:05, no R6 until stops_stale_seconds after the open.",
+            "verdict": {
+              "id": "time-1",
+              "real": true,
+              "severity": "must-fix",
+              "evidence": "Confirmed on both halves. Engine side: news_live.py:982 writes a 'stops' beat after each quote. The beat's market_open comes from market_open_now() at write time (:1709), and its held checked_at is null until :1017 stamps _covered. supervise._looks (357-361) then falls back to stops_checked_at, which an engine that has made no look of its own carries over from the run before (adopt_previous :1645-1647, _beat :1690-1711). In my exported copy, open_beat.py printed the first three beats of the first open step as open=True with ages {AAA: 63000, BBB: 63000}. Parent side: supervise.py:1054-1055 judges any beat up to 180 s old on raw wall-clock _stamp_ages. Running the Parents test at stops_stale_seconds 120 gives R6 'לא נבדקו כבר 63000 שניות ... Yahoo מגיעים לאט', then R6b. The window is wider than the finder says, so one held name is enough. A step that straddles 09:30 writes its 'poll', 'quotes' and 'score' beats (news_live.py ~1583-1600) with market_open true and yesterday's stamp, and the scorer call can last up to 90 s, until the look at the end of the step (:1619). The parent ticks every 0.5 s and is certain to read one. Overnight holds are normal (news.max_hold_days 5). No test covers this. Ruling 45 states the principle ('before the open no look is due, so yesterday's last look is not a handover cost') but fixed only handover_s. Ruling 35 is about time a restart left unchecked inside the session, not the closed night. The result is an urgent false line about stops on most mornings with a held name, plus R6b.",
+              "how_checked": "both"
+            }
+          },
+          {
+            "id": "time-2",
+            "severity": "must-fix",
+            "where": "ai-trader/aitrader/supervise.py:454-457 (gap_line returns None after a sup_stop whose why is not in WORDS['R4b.why']), docstring :441-443; called from up() :1160-1164",
+            "what": "When the day's first parent comes up after the open, the owner gets no R4. The row before it is yesterday's sup_stop 'end_of_day' (or 'closed_today'), and gap_line returns None for it. Task 19 removes the watchdog turn's own 'the engine was down' push, because R4 owns that line. After tonight, nothing tells the owner until R11 at 16:22 NY (23:22 Israel).",
+            "scenario": "Thursday ends normally (sup_stop end_of_day 16:05:01). On Friday the 08:07 and 09:07 watchdog turns fail: the shared usage limit, as on 2026-11-11 and today per progress.md:239,575. The limit resets and the 12:37 slot launches a parent, whose first up comes at 12:40. gap_line(prev=sup_stop end_of_day, up 12:40) returns None, although open_seconds = 11,400 s (reproduced). The stops of every held name went unchecked from 09:30 to 12:40, and no line goes out at 12:40. The owner hears it only from R11 at the close.",
+            "why": "A line that should go out never does. The brief's reason for None after end_of_day and closed_today ('R5a-R5e said that the stops are not checked') does not hold for those two words: no line said anything. Before tonight the slot prompt pushed this case itself (news-watch.md step 3). Task 19 deletes that push on the strength of R4.",
+            "fix": "In gap_line, treat a prev sup_stop with why 'end_of_day' or 'closed_today' like a non-sup_stop row (R4). open_seconds already counts only session seconds, so a normal night gives 0 and no line, and only a late first start of the day reaches outage_report_seconds. Add one test: prev = yesterday's end_of_day sup_stop, up at 12:40 gives R4 with s 11400.",
+            "against_ruling": "Task 13 brief (task-13-brief.md:38: 'After why halt, lock_held, end_of_day or closed_today it is None'); not a numbered ruling",
+            "verdict": {
+              "id": "time-2",
+              "real": true,
+              "severity": "must-fix",
+              "evidence": "I ran gap_line with prev = sup_stop end_of_day at Thu 16:05:01 and an up at Fri 12:40. It returned None while open_seconds = 11400. closed_today, halt and lock_held also give None, and handover gives R4b. prev is rows[-1] (supervise.py:851). finish() writes the line rows before sup_stop (:1243), and uptime.py is read-only, so nothing comes after a normal close and Friday's first parent reads that sup_stop. The turn's own 'engine was down' push is removed by Task 19 (commit 9663262, news-watch.md at 9663262 has no push; it lands tonight with the wave). The dead-man and the watcher ship disabled. The engine's catch_up_stops sends a line only if a stop was crossed or bars cannot be read. So the only notice is R11 at 16:22 NY, and only if the close slot itself runs. The spec's R4b row ('when the last line before it was a sup_stop') has no end_of_day exclusion: that came from the Task 13 brief, and its stated reason (R5a-R5e already spoke) does not hold for end_of_day or closed_today. The 08:07, 08:37 and 09:07 slots must all fail first. That is plausible: watchdog turns failed on the usage limit on 11-11 and 11-12 (progress.md:239). On a normal night open_seconds is 0 ('normal None' in my run), so the proposed fix adds no noise.",
+              "how_checked": "both"
+            }
+          },
+          {
+            "id": "time-3",
+            "severity": "should-fix",
+            "where": "ai-trader/aitrader/uptime.py:60-66 (a pair whose later mark has a null hb is booked as gap for the whole pair); ai-trader/aitrader/supervise.py:987-990 (watch returns 'handover' before look, so the old parent writes no mark in the handover minute) and :1032-1039 with restart_core :245-246 (the next parent's first mark comes before its spawn, hb null)",
+            "what": "Each in-session handover is booked about 61 s longer than it lasts. The gap runs from the old parent's last mark, a minute before the handover, while the engine was still running and looking at its stops. On a clean day R11 states about 2.3 times the real minutes, and the uptime percent drops below the 99% target from bookkeeping alone.",
+            "scenario": "Handover at 10:48. The old parent's last mark is at 10:47:00.2, the engine exits at 10:48:01, the next parent starts at 10:48:45 with a first mark of hb null, and its child is up at 10:48:47. The real outage is 46 s. day_report books 107 s (handover 46 + gap 61; scripts/handover_count.py). A clean day with the four handover times (10:48, 12:28 and 14:17 in session, 46 s each) books 321 s, uptime 0.9863, and R11 says 'המנוע נפל 0 פעמים, המפקח עצר 0 פעמים, 5 דקות ... בלי בדיקת סטופים'. Honest booking would be 138 s, uptime 0.9941 (scripts/handover_day.py).",
+            "why": "R11 overstates 'minutes without stop checks' to the owner every session day. R11 fires daily in any case, because the true handover cost rounds to 2 minutes (progress.md:507, never ruled). The two-week report decides spec question 3 (move to a paid server only if uptime is under 99%), and this bias alone puts a perfect day under 99%.",
+            "fix": "Have the parent write its minute's mark before it returns 'handover' (move the mark emission in watch/look ahead of handover_due). Or book a null-hb pair as gap only from the last exit or sup_stop row inside (ta, tb], since the exit-to-up stretch already covers the outage. Add a golden test: one 46 s handover gives unprotected_s 46.",
+            "against_ruling": "Task 16 dispatch fact 'a mark with a null hb counts as unprotected' and the pair-interval reading ratified by Ruling 46",
+            "verdict": {
+              "id": "time-3",
+              "real": true,
+              "severity": "should-fix",
+              "evidence": "Code confirms the mechanism. watch() returns 'handover' at supervise.py:989, before look(), so the old parent writes no mark in the handover minute, and none while stop(child, 'planned') waits (up to 120 s). In restart_core (:248-250), the new parent's first watch(None) writes its first mark with hb null (child None) before spawn(). uptime.py:65 books the pair (old parent's last mark, new parent's null-hb mark) as 'gap'. My runs of handover_count.py and handover_day.py: one 46 s handover books 107 s (handover 46 + gap 61), and a clean day books 321 s, uptime 0.9863, below the 0.99 target, with R11 saying 5 minutes against a true 138 s. Through the planned-stop wait the engine still looks at its stops (news_live.py:1619), so the overstatement can reach 60-180 s per handover. It follows from the null-hb pair reading ratified in Ruling 46. The harm is soft: an overstated R11 and a biased two-week uptime number, which feeds the 99% decision on the paid server. Nothing tonight depends on it.",
+              "how_checked": "both"
+            }
+          },
+          {
+            "id": "time-4",
+            "severity": "should-fix",
+            "where": "ai-trader/aitrader/uptime.py:221-235 (R4c suppression looks only at today's told rows) and :238; ai-trader/aitrader/supervise.py:449-455 (gap_line's s counts the session seconds of earlier days)",
+            "what": "One outage that is open at one day's close and still open at the next day's first up is told twice: R4c at 16:22 and R4 or R4b the next morning, for the same minutes. The next day's R11 then counts those earlier-day seconds as reported today.",
+            "scenario": "Thursday: the parent is killed at 15:45 (container restart, no sup_stop), and no slot relaunches it before 16:00. The 16:22 close slot sends R4c: 'היום המנוע לא רץ מ-22:45 עד סוף המסחר: 15 דקות'. Friday: the 08:07 parent's first up comes at 08:01-08:08, and gap_line(prev = Thursday's 15:45 mark) gives R4 with time 22:45, time2 15:01, m 15, s 900 (reproduced in scripts/cross_day.py). The owner reads the same 15 minutes a second time, in a line that reads as an outage from 22:45 until now. The 900 s also enter Friday's reported sum and can hide up to 15 minutes of Friday's own untold outage from R11.",
+            "why": "Spec 8 allows one outage at most DM1, R4 and W1. Ruling 50 enforces that within one day only. The duplicate line is not covered by any ruling.",
+            "fix": "In gap_line, count only the seconds after the last session close whose close slot has already run (for prev before today's NY date: open_seconds from today's open), or skip R4/R4b when prev is from an earlier NY day and that day's trailing outage reached outage_report_seconds (R4c told it). Count only today's seconds in s.",
+            "against_ruling": "Ruling 46 (concern 6) accepted the R11 half only; the double line is not ruled",
+            "verdict": {
+              "id": "time-4",
+              "real": true,
+              "severity": "should-fix",
+              "evidence": "My run of cross_day.py: Thursday's close_lines gives R4c 'היום המנוע לא רץ מ-22:45 עד סוף המסחר: 15 דקות', and Friday's first up gives gap_line R4 {time 22:45, time2 15:01, m 15, s 900}. gap_line counts session seconds of earlier days (supervise.py:449-457; spec R4 says 'today's or an earlier one'). The R4c suppression at uptime.py:222 looks only at today's R4/R4b rows. So one outage gets two lines, against spec 8's one-outage rule, which Ruling 50 enforces within a day only. Ruling 46 concern 6 already accepted the R11 half (the 900 s counted as reported on Friday). Both lines are literally true. The case is rare: a parent killed without a sup_stop between the 15:37 slot and 16:00, and no relaunch that day.",
+              "how_checked": "both"
+            }
+          },
+          {
+            "id": "time-5",
+            "severity": "should-fix",
+            "where": "ai-trader/aitrader/supervise.py:1054 (a beat counts as fresh while age_s <= hang_seconds, 180) and :1061-1071; config.json supervisor stops_stale_seconds 120 < hang_seconds 180; tests/test_supervise.py:1298-1303",
+            "what": "Before every hang kill, the parent first sends R6 urgent ('the engine is alive ... Yahoo slow'), then R6b, then R2: three lines for one hang. The hung beat still counts as fresh up to 180 s, while its stop stamps pass 120 s. The same R6 plus R6b pair also comes at the boot beat of a child after any outage or handover longer than 120 s, because the boot beat carries the adopted stamp (news_live.py:1906), next to R4 or R4b.",
+            "scenario": "The kill switch is on (flipped tonight). The engine blocks in a call with BBB held, and its last beat is at T. At about T+115 s the beat's age is still at most 180, the stamp age (at - stamp) + age passes 120, and R6 goes out. At T+180 the hang kill restarts the child, the new child's look ends the episode with R6b, and its up sends R2. Reproduced with the config's order of thresholds scaled to stale 2 s and hang 3 s (scripts/test_hang_r6.py): stale_stops start, then R6 'מנוע החדשות חי...', then hang TERM, then R6b, then up, then R2. The test that claims 'a hung child is a hang and not stale stops' uses hang 1 < stale 2, the opposite order to config.json, so it cannot catch this. Drill b holds no name.",
+            "why": "An urgent line tells the owner the engine is alive and blames Yahoo while the engine is hung, and one event gives three lines. This is rare (hangs only), and R2 corrects it within about 60 s.",
+            "fix": "Judge R6 only on a beat at most up_hb_max_seconds (60) old, the bound uptime already uses for 'hang', or no R6 while the beat is older than stops_stale_seconds. Skip R6 at a new child's boot beat while that child's first up is pending (its R1, R2 or R4 carries blind_s). Run the hang test with stale < hang, as in config.json.",
+            "verdict": {
+              "id": "time-5",
+              "real": true,
+              "severity": "minor",
+              "evidence": "The behaviour is real. With the config's order of thresholds scaled (stale 2 s < hang 3 s, kill on), test_hang_r6 printed R6, then the hang TERM, then R6b, then up, then R2. But it is designed and ruled. The spec's failure table row 3 lists 'a long call' as a cause of stale stops, and section 10 sets stops_stale_seconds 120 below hang_seconds 180. Ruling P16 says outright that 'R6 fires during a long call' (the stamp age grows with the beat's age), and before 180 s a hang cannot be told from a long call. R6 at a new child's boot beat after a slow restart or handover is Ruling 35 ('one or two extra lines on a slow restart with a name held'). R2 follows within about 60 s. The first proposed fix (no R6 on a beat older than up_hb_max_seconds 60) would remove the R6 that P16 requires for a 90 s scorer call. The second contradicts Ruling 35. What is really wrong is test_supervise.py:1298-1303: it runs hang 1 < stale 2, so its name ('a hung child is a hang and not stale stops') claims more than it proves under config.json. One soft inconsistency: uptime already books hb > 60 as 'hang' while the parent's R6 calls the engine 'alive' up to 180 s.",
+              "how_checked": "both"
+            }
+          },
+          {
+            "id": "time-6",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/supervise.py:1055 (ages = {} when the beat's market_open is false) and :1072-1077",
+            "what": "A stale-stops episode still open at the bell is closed by the market closing. The R6b line then tells the owner the stops are checked again, when they are not: the session ended.",
+            "scenario": "An R6 episode is open at 15:58. At 16:00 (13:00 on 2026-11-27) the engine's beat says market_open false, so ages is {}, names is empty, stale_stops end is written, and R6b says 'הסטופים נבדקים שוב, אחרי N שניות'.",
+            "why": "A wrong line about stops, but rare: it needs an episode open at the close.",
+            "fix": "With the market closed, end the episode with no R6b, or write only the row.",
+            "verdict": {
+              "id": "time-6",
+              "real": true,
+              "severity": "minor",
+              "evidence": "supervise.py:1055 sets ages to {} when the beat's market_open is false. With an episode open, the branch at :1072-1077 then writes stale_stops end and sends R6b 'הסטופים נבדקים שוב'. Nothing guards on the close. After 16:00 (13:00 on an early close) the stops are not checked; the session has simply ended. This needs an R6 episode still open at the bell, so it is rare, and the line is misleading but harmless.",
+              "how_checked": "read-code"
+            }
+          }
+        ]
+      },
+      {
+        "lens": "engine",
+        "covered": "Lens: the engine (news_live.py, __main__.py, the config.json news and supervisor blocks) at 95d51f44..d639d8ec. I read every diff hunk and the whole functions around them at d639d8ec: NewsTrader.__init__, poll_headlines, _step, step (its finally: earlier-row throttle, _carried_at, late-line retry), _look_at_stops, check_stops, catch_up_stops, _stop_sight, handle_scored, run_queue_at_open, _say, _mark_told, say_late, adopt_previous, _beat, start_checks, _check, run, _run. Also notify.channels/send, journal.save_json/append/read, and on the parent side spawn/restart_core/beat_view/first_look_done/_read_beat (supervise.py), to check how the heartbeat and the exit codes are read.\n\nChecked and found sound:\n(1) Buy, sell and stop logic is untouched. No new guard sits on a sale. _buys_blocked/E1 is unchanged. The only buy-adjacent change: a batch whose scorer call failed while STOP was set goes back to unseen, so the next engine scores it (intended, Ruling 29).\n(2) No stop look is skipped or moved by new code. The new beats (handle_scored, run_queue_at_open, the step tail) are local atomic file writes that never raise. The late-line retry is throttled to once per 120 s and sits after the end-of-step look (Ruling 28/31). The new guards keep send failures from ending the engine. The sleep_slice clamp prevents a spin.\n(3) The heartbeat is written atomically (tmp + replace). The parent reads bytes and fstat from one open file. No second writer exists (news-score never calls _beat).\n(4) Exit codes are unchanged (0/3/4/5/6/7/143, 1 on a traceback) and match restart_core's table. The engine's stdout goes to .cache/news_live.log (a file, not a pipe), so prints cannot block the engine. The child inherits the parent's environment, so notify.channels() is non-empty in production. The 'no channel = said to the log' path does not trigger there.\n(5) Bare runs (the undo path): the only differences are throttled resends, the late-line retry, the prime-cut and failed-batch handling under STOP, drain_trial wait 0 under STOP, and the guards. None changes what is bought or sold, or when a stop is checked.\n(6) Two engines cannot run at once. The flock is unchanged. After a prime cut, the leftover executor threads keep the process alive a few seconds after the lock is released, while the parent is already ending it.\n(7) Beat gaps stay well under hang_seconds 180 with the hang kill on. The worst is the step poll: 74 feeds, 8 workers, 10 s timeout, about 100 s.\n(8) uptime-report in __main__: argument errors return 2. It is read-only and survived a 3000-case fuzz of odd row fields with no exception.\n(9) No new leak path: the new guards journal the exception class only, and news_errors.jsonl is git-ignored.\n\nRan in <SCRATCH>/review-step2/find-engine/ai-trader through the safe wrapper: tests/test_news_supervised.py (117 OK), uptime-report --day --notify and --days 2, an uptime fuzz, and a prime-cut reproduction. Scripts are in <SCRATCH>/review-step2/find-engine/scripts/. No long-lived process was started.\n\nNothing must-fix under this lens.",
+        "findings": [
+          {
+            "id": "engine-1",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/news_live.py:797 (poll_headlines, prime branch) with ai-trader/aitrader/news_live.py:1959-1962 (_run, cut priming)",
+            "what": "When a planned stop cuts a first start's priming, the engine still writes the summary row {\"outcome\": \"primed\", \"count\": N} to news_seen_log.jsonl. _run then throws those N marks away (nt.seen = {}), and the next start primes again and writes a second primed row.",
+            "scenario": "First start on a fresh VM (news_seen.json is git-ignored, so it is absent). SIGTERM arrives after the first feed answers. Reproduced in a private copy with a stub _feed and STOP set at the first beat: poll_headlines returned after 0.2 s with seen = ['AAA1'], and news_seen_log.jsonl held {'outcome': 'primed', 'count': 1}. _run then empties seen, and the next start primes every feed again and writes its own primed row.",
+            "why": "This is a measurement only. No buy, sale or stop depends on it, and no code reads the primed rows today. But the log says headlines were primed when none were kept, and a count over primed rows counts the same headlines twice.",
+            "fix": "In poll_headlines, skip the primed row when STOP.is_set() (or have _run write it after its STOP check). That keeps the row true to what is kept.",
+            "verdict": {
+              "id": "engine-1",
+              "real": true,
+              "severity": "minor",
+              "evidence": "Reproduced at d639d8ec in a private copy (<SCRATCH>/review-step2/verify-engine). I re-ran the existing test GateFollowUps.test_a_planned_stop_that_cuts_the_first_priming_leaves_the_next_start_to_prime_again (tests/test_news_supervised.py:1785) and then read news_seen_log.jsonl. It holds two primed rows, [{'outcome':'primed','count':1}, {'outcome':'primed','count':2}], while news_seen.json ends as ['key-AAA','key-BBB']: key-AAA is counted in both rows. Cause: poll_headlines writes the row unconditionally under `if prime:` (news_live.py:796-797), even when STOP cut the poll at :772-774. Then _run throws the marks away with `nt.seen = {}` (:1960-1962), and the next start primes again (:1958-1959). The existing test checks only `seen`, never the row count, so nothing catches this. The impact is as the finding says and no wider: the only reader of 'primed' rows is the test at tests/test_news_measure.py:337. No buy, sale or stop reads them. state/news_seen_log.jsonl is not in ai-trader/.gitignore (only news_seen.json is), so the false row can reach a tracked log. It is a measurement only, and it needs a first start (news_seen.json absent) plus a planned stop during the few seconds of the priming poll. The suggested fix (skip the row when STOP.is_set()) is correct. Minor.",
+              "how_checked": "both"
+            }
+          },
+          {
+            "id": "engine-2",
+            "severity": "minor",
+            "where": "ai-trader/config.json supervisor._note (planned_stop_grace_seconds 120) against ai-trader/aitrader/news_live.py:1550-1565 (step() finally: the closing send and the late-line retry)",
+            "what": "The config note says planned_stop_grace_seconds (120 s) covers one scorer call (90 s) plus one look. It leaves out the sends that now end a step. A step stopped by a planned stop still makes the look's own send, the closing message and, when it is due, the late-line retry this landing added, each up to 15 s per channel. In an ntfy outage a planned stop can therefore pass 120 s and end with SIGKILL to the process group.",
+            "scenario": "Handover at 10:48 NY. ntfy is timing out, today has late rows owed, and only the ntfy channel is configured. SIGTERM lands just after a scorer batch started. Timeline: the call answers at about 90 s. The final look sells a name and sends its line (15 s, not taken). The step saves. The closing message resends that line (15 s). The late line is due and is tried (15 s). That is about 135 s, so the parent's SIGKILL lands inside the closing send or the late line.",
+            "why": "No money is lost: the sale, the book save and the end-of-step save all happen before 120 s. What is lost is the \"stopping\" beat (the kill reads as a forced end, not a clean 143) and the told_through mark of that last send. The next engine then repeats lines as late ('דווח באיחור'), so the owner can get a duplicate. Rare: it needs an outage, a planned stop and an in-flight scorer call at the same time.",
+            "fix": "Skip the step-tail late-line retry when STOP.is_set(), since the next start says it anyway. Or extend the note to say that the grace must also cover the step's closing sends, and raise it together with mark_gap_max_seconds if that is wanted.",
+            "against_ruling": "Ruling 28/31 accepted the late-line send between a step's end look and the next step's first look; they do not address the planned-stop grace. The harm shown is soft (a duplicate late line, a lost 'stopping' beat), not money.",
+            "verdict": {
+              "id": "engine-2",
+              "real": true,
+              "severity": "minor",
+              "evidence": "The arithmetic gap is real. I ran a private reproduction: one real step(), a held name (BBB at 50), a scorer stand-in that drops BBB to 40 and sets STOP mid-call, an ntfy channel configured that takes nothing, and a late row owed with _late_tried_at None. Three notify.send calls happen after STOP: the final look's own sale line (news_live.py:1194-1203), the closing message resending the same line (:1549-1560, owed lines are not rate-limited), and the late line (:1563-1567, the step-tail retry this landing added, gated only by unsent_resend_seconds=120, which a ~90 s step nearly always passes). notify.send uses requests timeout=15 per channel (notify.py:53), so an outage costs up to 45 s on top of a 90 s scorer call (score_batch timeout=90, :219; the planned SIGTERM goes to the child pid alone, so the call runs on, supervise.py:1184). Total about 135 s, against planned_stop_grace_seconds=120 (supervise.py:1186-1190), then SIGKILL to the group. Spec 5.3 and the config _note (and spec table row :770) count only the call plus one look. The harm is softer than the finding claims. (1) The SIGKILL is the designed bound (spec 5.3: 'then sends SIGKILL to the group and logs it'). restart_core still files the exit as why='planned', so no fall and no R1 or other owner line follows (supervise.py core_emit: fall() only when why != 'planned'). (2) Nothing in supervise.py, deadman.py, uptime.py or ownerlines.py reads the 'stopping' phase (grep finds none), so a missing 'stopping' beat misleads no reader. (3) In the outage of the scenario no channel took the line, so _mark_told never runs and told_through is correct. The next engine's 'דווח באיחור' is then the first delivery, not a duplicate. A duplicate needs ntfy to accept a send whose reply the kill cuts off, the usual at-least-once window that any crash has. (4) The book, seen and the end-of-step stop look are all saved before the tail sends. The kill shortens the handover, it does not delay a stop look. Ruling 28/31 accepted the step-tail retry and do not address the grace. It needs an ntfy outage, a planned stop, a slow scorer call near its 90 s timeout and owed lines, all at the same time. Fixing the note, or skipping the tail late-line retry when STOP.is_set(), is cheap. Minor, not must-fix.",
+              "how_checked": "both"
+            }
+          }
+        ]
+      },
+      {
+        "lens": "robustness",
+        "covered": "Read in full at d639d8ec: supervise.py (load_cfg, append_row/read_rows/prune_rows/_older, load_state/save_state, take_lock, restart_core, beat_view/_looks/_stamp_ages/first_look_done, may_send, gap_line, _read_beat, _held_now, _signal_group, _live/_argv/_ppid, _relayed, status, relay, clear_halt, main with spawn/watch/look/paused/up/episode_end/stop/core_emit/fall/say/drain/finish), deadman.py (Sender, _opener, _ask/_run, health), ownerlines.py, uptime.py, and the news_live.py diff (run/_run, the start checks, _beat via journal.save_json tmp+rename, error_once/_note_error, the poll shutdown). Also the config.json supervisor block, the .gitignore coverage (supervise.log, *.tmp, news_errors.jsonl are ignored; uptime.jsonl is tracked and carries no topic, token or exception text), the drill cloud/cloud-check paths, and spec 4.3-4.7.\n\nRuns in my exported copy (<SCRATCH>/review-step2/find-robustness), every one through the safe wrapper with the dummy child, a moved clock and SIGTERM after 3 s:\n- state file holding a list: the class name was logged and the parent ran.\n- uptime.jsonl with a naive t, a list row, NaN, Infinity, a bad byte, a huge alert number and a torn last line: the parent ran and the next row was appended whole.\n- book with a list for positions: held read as 'unknown'.\n- same-day state file with restarts_today null: TypeError traceback after spawn (robustness-1).\n- R1 at its worst size (6 held, 6 sold, falls and code parts) is 844-869 bytes, under max_line_bytes 1200.\n- /proc/locks inode matching works on this VM's filesystem.\n- stdout is UTF-8 even under env -i / LC_ALL=C, so Hebrew in --status cannot raise UnicodeEncodeError.\n\nChecked and found sound:\n- ntfy sender: DNS, timeout, 4xx/5xx and proxy failures yield a status or a class name only, and the worker outlives every job. --net-check uses the same opener.\n- --status: catches its own OSError, and every other read is type-guarded.\n- Heartbeat: written atomically, so a torn beat cannot cause a false hang.\n- Uptime log: one writer under the lock (handover is sequential because the old parent frees the lock last), and prune is tmp+rename.\n- Engine lock: no two engines (CLOEXEC lock fd, the group killed on hang and planned stop, PDEATHSIG on parent death).\n- Lines: first failures get a sent-false row and are relayed, and finish() writes rows for lines still in flight on every planned or normal end.\n- Exception text: none in owner lines, the parent's stdout, the tracked uptime log or supervise.log.\n\nNot covered: drill correctness beyond its I/O handling, and timing and owner-text semantics (other lenses). Nothing in this lens is must-fix.",
+        "findings": [
+          {
+            "id": "robustness-1",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/supervise.py:1223 (restart_core called with no guard), :259 (emit('start') runs after spawn() has returned a live child), :1249 (finish() is not in a finally), :171-176 (load_state merges a same-day file without checking field types)",
+            "what": "Nothing guards the loop. look(), up(), episode_end(), core_emit() and the counts can raise an exception the code does not expect. That exception unwinds main() as a full Python traceback. The parent exits with code 1, PR_SET_PDEATHSIG then sends SIGKILL to the engine in the middle of its step (not a planned stop), and finish() is skipped. Every line still in `pending` therefore gets no alert row, so --status never lists it as unsent and it is never relayed. load_state checks only that the file is a JSON object, never the types of the same-day fields.",
+            "scenario": "Reproduced in my exported copy: state/news_supervisor.json for today holds {\"day\": \"<today>\", \"restarts_today\": null}. main() loads it, spawn() starts the child, then `counts[\"restarts_today\"] + 1` at supervise.py:259 raises TypeError. The traceback (with the exception's text) goes to the tracked command's output, the parent exits, and the child is killed by PDEATHSIG. I found no real input that triggers this. Every file the parent really reads (garbage, torn, wrong-typed or NaN rows in uptime.jsonl, a list-valued state file, a garbage book or heartbeat, a missing trades file, ntfy DNS/timeout/4xx/5xx/proxy refusal) was handled in code and in runs. The state file is gitignored and written only by save_state with ints. So only a hand edit or a future bug in the measurement code reaches this path.",
+            "why": "The supervisor adds a failure mode the bare engine did not have. A bug in the parent's bookkeeping or owner-line code now takes the trading engine down with SIGKILL, which can split the journal from the book (E1, buys blocked). Lines on their way to the owner are also lost without a trace. Spec 4.4 covers code 1 with R12 and one relaunch, so the gap is the hard kill and the lost lines, not the lack of a restart.",
+            "fix": "Next task: wrap the measurement and owner-line part of look() (everything after the hang decision's inputs) in `except Exception as e: log(f\"look: {type(e).__name__}\")` so the tick goes on. Move finish() and the sup_stop emit into a finally. In load_state, reset any of restarts_today and trips_today that is not an int, recording load_error the same way.",
+            "verdict": {
+              "id": "robustness-1",
+              "real": false,
+              "severity": "minor",
+              "how_checked": "both",
+              "evidence": "I confirmed what the code does but found no production input that reaches it. Code at d639d8ec: restart_core (supervise.py:1223) sits inside a try/finally with no except. finish() (:1249) and the sup_stop emit run only on the normal path. The engine sets PR_SET_PDEATHSIG to SIGKILL (news_live.py:104). Reproduction in my export: a same-day state file holding {\"restarts_today\": null}, run with the dummy child under the safe wrapper, gives parent rc 1 and a TypeError traceback on stderr from :259. uptime.jsonl holds only sup_start and mark (no sup_stop), and the child was gone before its first beat. No process was left over (checked by path, none found). Reachability: supervise.py is a new file in this landing. state/news_supervisor.json is gitignored and written only by save_state (tmp file plus rename, so never torn), and no older schema of it can exist. Every input the loop really reads is guarded. read_rows skips non-dict and torn lines. _read_beat returns None for non-objects and catches OSError. _when catches TypeError and ValueError and rejects naive times. beat_view, _looks, _held, first_look_done and _held_now all type-check. load_state catches any exception for a non-object file. The ntfy worker turns every failure into its class name (deadman.py:121,138). spawn's OSError, ValueError and SubprocessError are a counted crash (ruling 36c). In up(), a failed read of the trades file is caught as OSError. say() catches render and format failures. So only a hand edit or a future bug triggers this, as the reviewer also concedes. The SIGKILL is also by design: it is what stops an unwatched engine from staying alive (a must-fix property). Spec 4.4 already handles exit code 1 with R12 and a relaunch. Not a landing defect. Wrapping look()'s bookkeeping and moving finish() into a finally is a fair hardening item for the backlog, not a defect tonight."
+            }
+          },
+          {
+            "id": "robustness-2",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/ownerlines.py:124 (sold_text formats s['stop'] and s['fill'] with :.2f); ai-trader/aitrader/supervise.py:903-904 (say reads r['symbol'], r['stop'], r['price'] with []), :907-909 (the failure is only logged)",
+            "what": "If one SELL row in a restart's window has a missing or non-numeric `stop` (or `price`), sold_text raises KeyError or TypeError. say() catches it, writes `line R1 not built (...)` to .cache/supervise.log, and returns. The whole R1 restart line then never goes out and gets no alert row, so --status cannot relay it. held_text was hardened for exactly this shape (Rulings 53 and 55); sold_text was not.",
+            "scenario": "The shape is real. The tracked state/news_trades.jsonl at d639d8ec holds a SELL of MU logged 2026-11-10T15:56:16+00:00 with no `stop` key (an older engine wrote it). Scenario: the engine crashes, the replacement's first look sells a name whose book position has no stop_price, so _sell writes \"stop\": null (news_live.py:935-939). The episode ends healthy, and episode_end -> say('R1', sold=[...]) raises TypeError on format(None, '.2f'). The owner never hears about the crash, the blind seconds or the sale. Today every position bought by _buy carries stop_price and the book is empty, so nothing triggers this tonight.",
+            "why": "This is the 'a line that should go out and silently never does' class. The guard against it already exists in held_text and is one helper away.",
+            "fix": "In sold_text, use held_text's stop_text() for both stop and fill, and in say() read r.get('symbol'), r.get('stop') and r.get('price'). A sale with an unknown stop then reads 'סטופ לא ידוע' and the R1 line still goes out. Add one test with a SELL row whose stop is null.",
+            "against_ruling": "38",
+            "verdict": {
+              "id": "robustness-2",
+              "real": false,
+              "severity": "minor",
+              "how_checked": "both",
+              "evidence": "The code fact holds: ownerlines.sold_text([{'sym':'MU','stop':None,'fill':707.95}], 3) raises TypeError in my export. say() catches it at supervise.py:907 and only logs `line R1 not built`. But no production path delivers a SELL with a null or missing stop. Every SELL goes through _sell (news_live.py:930-939; the only callers are :979 and :1342), which writes stop = pos.get('stop_price'). The only thing that creates a position is broker._fill with qty>0, and its only caller is _buy (news_live.py:919). _buy sets pos['stop_price'] in the same synchronous block (:923), before any save. The tracked book at d639d8ec is empty. The cited MU SELL row without a stop key was logged 2026-11-10T15:56:16Z by an older engine, and it can never enter `sold`. The window starts at ref = int(seen['ended']) or `began` (time.time() at this parent's start, supervise.py:751,1141), and only rows logged at or after ref count, so a row from two days ago is always outside it. The `price` field is always a rounded float from _fill (broker.py:205). Ruling 38 deferred exactly this class ('a line that cannot be built (a null stop) - the engine and the book always carry a number'), and I re-verified that reason at d639d8ec. No real harm is shown, so the against_ruling bar is not met. The asymmetry with held_text's stop_text (Rulings 53 and 55) is a cheap consistency fix for a later task, not a defect tonight."
+            }
+          }
+        ]
+      },
+      {
+        "lens": "gate",
+        "covered": "Method: I read drill_supervisor.py whole at d639d8ec, plus supervise.py (main, restart_core, look, up, episode_end, stop, status, clear_halt, the helpers), deadman.py, the deadman parts of uptime.py, and from news_live.py tree_busy, start_checks, _run, check_stops, _look_at_stops, catch_up_stops and _log_trade. I also read the helpers (dummy_child, engine_child, http_stub, no_phone), the Drills tests, spec 4.2, 4.7, 6, 11.1 and 11.2, plan Tasks 5, 17, 20 and 21, and Rulings P2-P5, P29, 16, 47, 50 and 54. I ran code only in my private export (<SCRATCH>/review-step2/find-gate) through the safe wrapper, with TMPDIR inside it. The bug injections went into separate copies (dup/, nocheck4/, nolook/). Results: baseline `a --fast` PASS; a second R1 on the second episode still gave PASS (gate-1); `e --fast` at 60 rounds gave mismatches=0, and with check 4 removed e still gave PASS (gate-2); with tree_busy removed, g still gave PASS with rc7=0 (gate-5); with the start's first look removed, a still gave PASS (gate-3). No process of mine is left running (checked in /proc), and the temp directories are empty.\n\nWhat I found sound:\n- Drill b: replaced within hang_seconds + 10 s, measured from SIGSTOP to the new beat's mtime; one hang row, one R2, no R1 checked after a healthy run.\n- Drill c: restarts = start rows - 1, one tripped row, R3 and not R3c, return code 75.\n- Drill d: a beat of a new pid implies the lock was taken and the start checks passed, because a refused start writes no boot beat. A dead PDEATHSIG would show as refused > 0 or a beat later than 5 s. A surviving scorer child is accepted by spec 4.2.\n- Drill f: with the switch pinned off (P2, P29), 'no hang row' is equivalent to 'no kill' with the switch on. A numeric `stop` excludes the unknown-stamp path.\n- Drill a: the 1 s beat mark separates 'at once' from the 1 s back-off at the real numbers (not under --fast). The look stamps are the look's start with microseconds, and the lower bound refuses stamps from before the kill.\n- Cloud drills: cloud-check reads the right lock (by inode in /proc/locks) and the last parent's rows. A leftover parent fails the lock check even when its argv names DIR in another form. The dummy dies through PDEATHSIG under any signal. Its own relaunch is stopped by its own pid.\n\nSafety:\n- guard() strips the phone variables before any import.\n- Every config copy points ntfy at 127.0.0.1, and children get clean_env. Parents get only the made-up topic, sent to the local stub, and the engine's tripwire stops any outside call.\n- `cloud` has no topic and a dead port.\n- Drill g uses only a temporary bare origin, with GIT_CONFIG_GLOBAL=/dev/null.\n- The drills signal only their own Popen objects and the stub pid in their own heartbeat (see gate-6 for the hole).\n- run() kills the drill's processes on every path except SIGKILL (gate-6).\n\nDead-man: disabled is truly inert. There is no Deadman class, nothing reads deadman.enabled, dm is null, and no `delay` or `sequence_id` is ever sent. gate-4 and gate-8 are about turning it on later.\n\nOnly gate-1 is must-fix under this lens. It is a two-line change in the drill and does not touch the code under test, which I believe is correct in this respect.",
+        "findings": [
+          {
+            "id": "gate-1",
+            "severity": "must-fix",
+            "where": "ai-trader/scripts/drill_supervisor.py:178-180 (said), :343-349 (the per-kill and final R1 waits), :381 (the r1 check); with ai-trader/aitrader/supervise.py:410-433 (R1 counted and held back over max_alerts_per_hour) and ai-trader/config.json:324 (max_alerts_per_hour 6)",
+            "what": "Drill a's pass mark 'one R1 per kill' is too loose. said() counts only R1 lines whose row says sent true, and it checks only the running total (>= k before kill k, == KILLS at the end). The dummy part makes exactly KILLS = 6 R1 lines inside one clock hour of the parent's clock (MORNING 10:00, all six kills done by about 10:13), and 6 is also the cap. So an extra R1 for one episode is never seen. Either it goes out and meets a later kill's wait early, and the last kill's R1 is never waited for, or it is held back as 'capped' and not counted.",
+            "scenario": "I took a private copy of supervise.py and changed episode_end so the second episode says R1 twice. Then I ran `drill_supervisor.py a --fast`. It printed `PASS a kills=6+1 next_beat_max_s=0.41 engine_beat_s=0.41 engine_look_s=0.41 r1=6+1 tripped=0`. With the duplicate on the second kill, the R1 rows were 1, 2+dup, 3, 4, 5. Before kill 6 the wait for >= 5 was already met. After kill 6 the wait for >= 6 was met at once, so the parent was stopped before kill 6's own R1 came, or that R1 was capped. The cap (6) and KILLS (6) are the same at the real numbers, so tonight's run of `all` is just as blind. The engine part has only one episode on its own state directory, so it catches only a duplicate on a parent's first episode.",
+            "why": "Spec 11.2 makes 'one R1 per episode' a pass mark of step 2. Drill a is the only check of many separate episodes under one parent (the unit test test_one_r1_for_an_episode_of_three_falls covers one episode). A doubled or missing owner line on the second and later restarts would land with a PASS line.",
+            "fix": "In drill a, count R1 alert rows by id whatever `sent` says: len({r['id'] for r in rows(st,'alert') if r.get('kind')=='R1'}). Fail on any R1 row whose sent is not True. After kill k, wait until there are exactly k+1 R1 ids, and fail if a (k+2)th appears before the next kill. Also give the dummy part's parent a max_alerts_per_hour above KILLS (d.parent(..., max_alerts_per_hour=KILLS + 2)), so the cap cannot hide a duplicate. Ruling P3 is not changed: six kills, the cap and may_send stay as they are.",
+            "verdict": {
+              "id": "gate-1",
+              "real": true,
+              "severity": "must-fix",
+              "how_checked": "both",
+              "evidence": "Reproduced. In a private copy (verify-gate/mut1) I changed episode_end (supervise.py:1098-1115) so the second episode says R1 twice. `drill_supervisor.py a --fast` still printed `PASS a kills=6+1 ... r1=6+1 tripped=0`. A debug print of the dummy part's R1 rows showed R1-1 (kill 1), R1-2 and R1-3 (both for kill 2, same second), then R1-4..R1-6. Kill 6's own R1 was never written: after kill 6 the wait `said(st,'R1') >= KILLS` at :349 was already met, so d.stop(p) came before that episode's R1. Had the R1 been said, it would have been the 7th line of the hour, held back as 'capped' by may_send (:417-433, cap 6 = config.json:324), and said() at :178-180 counts only rows with sent True. So a duplicate on any episode after the engine part's first passes. No unit test counts R1 across several episodes under one parent: test_one_r1_for_an_episode_of_three_falls (test_supervise.py:1482) covers one episode, and test_a_stub_that_never_answers runs two episodes but counts no R1. Drill a is the only guard of spec 11.2's 'one R1 per episode', and it prints PASS with that property broken. That is the must-fix clause word for word. The fix does not have to go against Ruling P3 (the cap stays). Count R1 alert rows by id whatever `sent` says (capped rows keep kind R1), and require exactly k R1 ids after kill k's episode. Raising max_alerts_per_hour in the drill's config copy is not needed and would change what P3 kept."
+            }
+          },
+          {
+            "id": "gate-2",
+            "severity": "should-fix",
+            "where": "ai-trader/scripts/drill_supervisor.py:502-539 (drill e: PASS needs only trades > 0); ai-trader/aitrader/news_live.py:1240-1247 (the journal row, then save at once); ai-trader/aitrader/journal.py:142-165 (one small write per append)",
+            "what": "Drill e's clause 'wherever the book disagrees with the journal's last row the next start says so' is never exercised, and its PASS does not depend on check 4. The journal-to-book window is one save() long, and in practice no kill lands in it. Each append is one write of a few hundred bytes, so a kill -9 alone very rarely tears one, and the chain clause bites rarely too.",
+            "scenario": "`drill_supervisor.py e --fast --rounds 60 --seed 7` gave `PASS e rounds=60 trades=296 mismatches=0 e1=0 chains=ok`. Task 17's run gave mismatches=0 as well. In a private copy I made start_checks never return a mismatch (news_live.py:1774 returns None). `e --fast --rounds 20 --seed 7` then printed `PASS e rounds=20 trades=96 mismatches=0 e1=0 chains=ok`. At 200 real rounds I expect about 0 to 1 mismatches.",
+            "why": "Spec 11.2 lists '(e): no mismatch that check 4 missed' as a step-2 pass mark, and rule 5 says a detector that has not fired in a drill is not trusted. The PASS line reads as proof of check 4 and of the torn-append repair, but it proves neither. Nothing is known to be broken: check 4 and E1 are pinned by unit tests (test_news_supervised.py:405-558). That is why this is should-fix and not must-fix.",
+            "fix": "Add one deterministic round per run. After a kill, write the state a kill between the journal and the book leaves: journal.append a BUY row of a name the book does not hold into the drill's temporary state. Then start the engine and require the book_mismatch row and E1. Alternatively, add a scenario key that stalls between journal.append and save. Make PASS require mismatches >= 1, or print `mismatch_clause=not_exercised` so the controller does not read it as covered. Do the same for a torn fragment, injected the way reviewer 1 did, if the chain clause is meant to bite.",
+            "verdict": {
+              "id": "gate-2",
+              "real": true,
+              "severity": "should-fix",
+              "how_checked": "both",
+              "evidence": "Ran the unchanged drill: `drill_supervisor.py e --fast --rounds 100 --seed 11` gave `PASS e rounds=100 trades=544 mismatches=0 e1=0 chains=ok`. Task 17's 20-round runs also gave 0 (task-17-report.md:174, concern 3). drill_e (:479-539) asks check 4's questions (book_mismatch row, buys_blocked, E1) only when disagreement() finds one, and PASS needs only trades > 0. So at 200 real rounds the clause will very likely not be exercised, and a broken start_checks would still print PASS. Spec 11.2 says 'A detector that has not fired in a drill is not trusted'. Not must-fix: check 4 and E1 are pinned by unit tests in the suite, which also gates the landing. Task 17's planted run (`PASS e rounds=6 ... mismatches=2 e1=2`) exercised the judging path, and the controller settled that item as VERIFIED (progress.md:517). Nothing broken can land through this gap alone. The PASS line should still not be read as proof of check 4: one planted mismatch per run, or printing `mismatch_clause=not_exercised`, would close it."
+            }
+          },
+          {
+            "id": "gate-3",
+            "severity": "should-fix",
+            "where": "ai-trader/scripts/drill_supervisor.py:355-370, :379 (the engine part's look mark); ai-trader/tests/helpers/engine_child.py:113-126 (code_stamp, feed and send answer at once); ai-trader/aitrader/news_live.py:1913 (the start's first look), :1952-1959 (say_late, code_stamp, the priming poll)",
+            "what": "Drill a's 'first stop look within 3 s' cannot tell spec 5.1's first look from the loop's first look. Every call that 5.1 orders after the first look is an instant stub in the drill: the two git calls of code_stamp, the sends of say_late and E1/E2, and the priming poll. Live, each of these can take up to 15 s.",
+            "scenario": "In a private copy I removed the start's first look entirely (news_live.py:1913, `if False and ...`). `drill_supervisor.py a --fast` still printed `PASS a kills=6+1 ... engine_look_s=0.47 ...`, because the loop's first step looks at once. Live, the same build would look first only after up to 30 s of git plus sends plus a network priming poll.",
+            "why": "The 3 s mark is a step-2 pass mark (spec 11.2). Because of the stubs it is met by a build that breaks the order 5.1 requires, which is the order that keeps a stop from being missed after a restart. The order itself is pinned by unit tests (test_news_supervised.py:907, :989), so nothing is known to be broken, but the drill's number is not evidence for it.",
+            "fix": "Give engine_child scenario keys for a slow code_stamp and a slow feed and send (for example commit_delay_s and feed_delay_s), and set them above LOOK_S in drill a's engine part. Then only the first look of 5.1 can meet the 3 s mark.",
+            "verdict": {
+              "id": "gate-3",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "both",
+              "evidence": "Reproduced. In verify-gate/mut2 I disabled the start's first look (news_live.py:1913, `if False and ...`). `drill_supervisor.py a --fast` printed `PASS a ... engine_look_s=0.37`, the same as engine_beat_s. In the drill, code_stamp, the feed and send are instant stubs (engine_child.py:113-126), so the loop's first step looks at once. Lowered from should-fix to minor: spec 5.1's order is pinned by the suite, which gates the landing as well. FirstLook asserts calls[0] == 'quote:BBB' before git and feed, and that the start's sends come after the first look and before git (test_news_supervised.py:900-916). TheOrderOfAStart asserts the beat at git time is phase 'stops' with a fresh checked_at (:982-993). A build that broke the order would fail those tests whatever drill a says. In production a restart rarely has a long stretch there anyway: git is local, E1/E2/late lines are conditional, and priming runs only on a first start with an empty seen. The drill's number is stub-world timing, not evidence of the order, and should not be cited as such."
+            }
+          },
+          {
+            "id": "gate-4",
+            "severity": "should-fix",
+            "where": "ai-trader/aitrader/uptime.py:83-104, :155, :189 (every `new_seq` counts as an alarm); ai-trader/aitrader/deadman.py (no Deadman yet; for Task 21/22)",
+            "what": "Disabled really does mean nothing. At d639d8ec, deadman.py holds only the Sender. Nothing reads deadman.enabled. Marks write dm=None (supervise.py:1036). The parent's own lines publish with no `delay` and no `sequence_id`, so nothing is scheduled at ntfy. But uptime.py, which lands tonight, counts every `new_seq` row as 'an alarm that went out'. Spec 6 and plan Task 21 take a new seq whenever now is past due_at, and nothing in the plan clears news_deadman.json after a confirmed cancel.",
+            "scenario": "This matters once Task 22 enables the switch. On the close, the parent puts DM3 and cancels, and news_deadman.json keeps due_at of about 16:06. The next morning the first ping (about 08:07 New York) finds due_at in the past, takes a new seq and writes `new_seq`. uptime-report then counts one dead-man alarm every trading day, true or false according to _true_alarms. The same happens after a trip or halt whose line was delivered and the message cancelled.",
+            "why": "The two-week report is where the hosting question (question 3) is decided, and it shows 'dead-man alarms (true and false)'. A phantom alarm every day would mislead the owner and the controller.",
+            "fix": "In Task 21: after a confirmed cancel (the disarm at the close, or a trip or halt with said), remove news_deadman.json or write due_at null, so the next ping arms the same way without a `new_seq` row. Or put the old seq's due_at on the `new_seq` row (the ponytail at uptime.py:91-92 already asks for it), and have uptime count only a `new_seq` whose old message was neither cancelled nor replaced by DM3.",
+            "verdict": {
+              "id": "gate-4",
+              "real": true,
+              "severity": "should-fix",
+              "how_checked": "both",
+              "evidence": "Reproduced with uptime.day_report on a made-up log. Yesterday: marks to 16:01, `deadman disarmed`, exit planned, sup_stop end_of_day. Today: sup_start 08:07, `deadman new_seq` at 08:07:01, `up`, marks. Result: {'alarms': 1, 'alarms_true': 1, ...}. The overnight exit-to-up 'gap' stretch in _stretches makes _true_alarms (uptime.py:83-104) call it true, though no alarm went out. Plan Task 21 produces exactly this row every morning after a clean close: news_deadman.json is written after each accepted ping and never cleared after a confirmed cancel (plan.md:1304, 1310). A stored due_at in the past means a new seq and a `new_seq` row, and the plan's own test does this with due_at 18 h earlier (plan.md:1364-1368). Not tonight's harm: deadman.enabled is false, deadman.py holds only Sender, no code writes deadman rows, and marks write dm=None. Should-fix for Task 21/22 before the two-week report decides question 3."
+            }
+          },
+          {
+            "id": "gate-5",
+            "severity": "minor",
+            "where": "ai-trader/scripts/drill_supervisor.py:542-617 (drill g), :599-611 (its pass mark); ai-trader/aitrader/news_live.py:1722-1739 (tree_busy)",
+            "what": "Drill g never puts a start inside an open merge, and its merges never touch state/. So it passes with the pull-in-progress check removed, and it cannot tell a merge sync from a rebase sync. It is a smoke test of restarts beside git, not of spec 4.7's hazard or its second line of defence.",
+            "scenario": "In a private copy I made tree_busy return False (news_live.py:1738). `drill_supervisor.py g --fast` printed `PASS g starts=50 rounds=20 rc0=50 rc7=0`. Task 17's run also showed rc7=0. A merge without conflict keeps MERGE_HEAD for milliseconds, and the second clone changes only other.txt, so the book and chains stay as they were by construction.",
+            "why": "The 7 path is pinned by test_a_merge_left_open_refuses_the_start_with_7..., so nothing is known to be broken. But the drill's PASS should not be read as evidence about the git rule.",
+            "fix": "Hold one merge open while some starts run: a conflict on notes.txt, as the unit test does, then `git merge --abort`. Require rc7 >= 1. Between rounds, commit the clone's state/ the way a trader turn does.",
+            "verdict": {
+              "id": "gate-5",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "read-code",
+              "evidence": "drill_g (:542-617) merges commits of the second clone that touch only other.txt. The merges never conflict and never touch state/, and every recorded run returned rc7=0 (Task 17: `rc0=50 rc7=0`; Task 17 concern 3 says so). tree_busy (news_live.py:1722-1739) is therefore never true during a start, so turning it off cannot change the outcome, and the PASS cannot tell the 4.7 guard apart from its absence. The 7 path is pinned by a unit test. The drill is a smoke test of restarts beside git and should not be read as evidence about the git rule. No production harm."
+            }
+          },
+          {
+            "id": "gate-6",
+            "severity": "minor",
+            "where": "ai-trader/scripts/drill_supervisor.py:280-288, :310-312 (bare engines: no --supervised, no tie to the drill's life), :207-211 (signal_child)",
+            "what": "Cleanup on every exit has one hole. Drill e's bare engine runs with --until 24:00, which never comes, and has nothing that ends it when the drill script is SIGKILLed. Parents end themselves through the orphan check (supervise.py:985-986), but bare engines do not. Separately, signal_child accepts any process whose argv names the stub script, not one of this drill's state directories.",
+            "scenario": "Task 20 runs `all` at real numbers as a tracked background command for 35-40 min. If the session stops it with TaskStop, or the cap hits, and the signal is SIGKILL to the drill's pid only (which signal is still unknown, and the cloud drill exists to learn it), the engine of drill e's current round keeps polling its stubs in TMPDIR for ever. If the whole group is killed, it dies, because popen sets no new session. For signal_child: the suite's Drills test (a c f --fast) and a background `all` share DUMMY and ENGINE, so a stale heartbeat pid reused by the other run's stub would pass the check (a very small race).",
+            "why": "The safety rule is 'clean up on every exit, signal only pids it started'. The leak cannot reach the network (tripwire, clean_env), but it never ends.",
+            "fix": "Start bare engines with `--supervised <os.getpid()>` (PDEATHSIG plus the ppid check; this is also the mode every live engine runs in after tonight). In signal_child, also require that the drill's state path is in the argv (`--state-dir` for the engine, `--heartbeat` for the dummy).",
+            "verdict": {
+              "id": "gate-6",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "read-code",
+              "evidence": "Drill.bare (:310-312) starts engine_child with --until 24:00, which the loop's `(now.hour, now.minute) >= (24, 0)` never reaches. It passes no --supervised and no --minutes (drill e). Ruling 50(4) made the drill kill its children on SIGTERM and SIGHUP. A SIGKILL to the drill script's pid alone cannot be caught and leaves drill e's current engine running. A whole-group kill does end it, since popen sets no new session. The leak is harmless to trading. The tripwire and stubs keep it off the network. Its state is a /tmp drill directory, and the live --status finds engines by the live lock's inode in /proc/locks (supervise.py:556-607), so a stray drill engine is never mistaken for the live one. The signal_child pid-reuse race (:207-211) needs a reused pid to land on the other run's stub between a heartbeat read and the kill: negligible."
+            }
+          },
+          {
+            "id": "gate-7",
+            "severity": "minor",
+            "where": "ai-trader/scripts/drill_supervisor.py:737-743 (cloud-check --alive); ai-trader/aitrader/supervise.py:1257 with :511 (the last stdout line of the `cloud` parent)",
+            "what": "cloud-check --alive passes on a single mark row anywhere after the last sup_start, and it never reads the child. A parent that wrote one mark and then stalled, or whose child never beats (marks with hb null), prints PASS. Also, the `cloud` parent's last stdout line, which the session sees as the background command's output, tells the session to run `python3 -m aitrader.supervise --status` with no --state-dir, so it points at the live directory.",
+            "scenario": "The parent is launched under the harness. Its loop writes the 10:00 mark, then blocks, or its dummy dies at once with marks hb=null. At 90 s, --alive finds holder != None, marks=1 and no sup_stop, and prints PASS. After the drill's TaskStop, the session reads 'supervise: 143 signal. Run python3 -m aitrader.supervise --status and do what action says.' After the close this gives after_hours, so no harm tonight.",
+            "why": "--alive is the gate that the parent stays up under the harness. Today it proves only that the parent ticked once.",
+            "fix": "Require that the last mark is at most parent_stale_seconds old and that its hb is not null. In cloud mode, print the --state-dir in the last line, or say that it is a drill directory.",
+            "verdict": {
+              "id": "gate-7",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "read-code",
+              "evidence": "cloud_check --alive (:737-743) passes when the parent lock has a holder, at least one mark row follows the last sup_start, and there is no sup_stop. It does not read the mark's age or its hb, so a parent that ticked once and then stalled, or whose child never beats, prints PASS. The `cloud` parent's last line is supervise.py:1257 with the constant AFTER ('Run python3 -m aitrader.supervise --status ...'), which carries no --state-dir and so points at the live directory. The runbook runs the cloud drills after the close (task-20-runbook.md:23-25), when --status gives an after-hours answer, so following it does no harm tonight. Spec 11.1's pass marks for the cloud drills cover cleanup after the stop, which cloud-check without --alive checks. A weak extra check, minor."
+            }
+          },
+          {
+            "id": "gate-8",
+            "severity": "minor",
+            "where": "ai-trader/aitrader/supervise.py:927-947 (drain), :949-959 (finish), :1262 (sender.close in finally); ai-trader/aitrader/deadman.py:95-98 (close), :63-65 (daemon worker)",
+            "what": "For Task 21/22, nothing is live today: two things in the shared Sender would misbehave once the dead-man shares it. (a) drain() takes every result from sender.results() and drops each tag that is not an owner line in `pending`. Ping, cancel and poll outcomes would vanish, and the marks' `left` is taken from owner lines only. (b) Sender.close() only queues None on a daemon thread, and main does not wait for it. finish() waits only for owner lines.",
+            "scenario": "After Task 22, at a handover or a SIGTERM, leave() queues the last ping with DM2 and '10m'. main writes sup_stop and returns, and the interpreter exits while the worker is mid-request, so DM2 never reaches ntfy. The waiting DM1 then rings the owner 6 minutes after the last ping with 'no heartbeat', while the next parent is starting. Separately, each ping's result would be consumed by drain() and dropped, so the Deadman never sees 'armed', 'ping_failed' or a 429.",
+            "why": "These are the misbehaviours the brief asks about for when the switch is turned on. Ruling P26 says Task 21 routes outcomes by tag, but drain() as built discards them today.",
+            "fix": "In Task 21, route results by tag before the Deadman uses this Sender, or give it a Sender of its own. Make finish() also wait, up to send_timeout_seconds, for the outcome of the leave ping before close, and record a row when none came.",
+            "verdict": {
+              "id": "gate-8",
+              "real": true,
+              "severity": "minor",
+              "how_checked": "read-code",
+              "evidence": "Latent, for Task 21 only. Tonight only owner lines publish on the Sender (deadman.enabled false; deadman.py has no Deadman). drain() (supervise.py:927-947) skips a result whose tag is not in pending. finish() (:949-959) waits send_timeout_seconds for the owner lines in flight and writes a sent=false row for each that had no outcome, before sup_stop and sender.close() (:1262). So no owner line is lost silently tonight. (a) is what Ruling P26 already gives to Task 21 ('Task 21 routes the queue's outcomes between main and Deadman itself, by tag'). (b) Sender.close only queues None on a daemon thread, so a leave ping queued after finish() could die with the interpreter. It is a real design note for Task 21's leave(), but no code path tonight reaches it."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Find"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Verify"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 3,
+      "title": "Synthesize"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "find:lifecycle",
+      "phaseIndex": 1,
+      "phaseTitle": "Find",
+      "agentId": "a9f888a61b4e57dab",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794502152649,
+      "queuedAt": 1794502152621,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Lens: process lifecycle and signals at d639d8ec. I found no…",
+      "promptPreview": "You are one of six independent reviewers of tonight's landing; your lens is: PROCESS LIFECYCLE AND SIGNALS. supervise.py main loop, child start/stop/kill, process groups, kill_ours-style cleanup, the parent lock (flock) and any lock the engine holds (news_live.py), handover, crash-loop trip, planned stop, SIGTERM/SIGHUP/SIGKILL of the parent or the child, the hang kill path once hang_kill_enabled …",
+      "promptFramed": true,
+      "lastProgressAt": 1794503456763,
+      "tokens": 405411,
+      "toolCalls": 57,
+      "durationMs": 1304113,
+      "resultPreview": "{\"nothing_must_fix\":true,\"findings\":[{\"id\":\"lifecycle-1\",\"severity\":\"minor\",\"where\":\"ai-trader/aitrader/supervise.py:1156-1159 (R2 is sent only from up()), 1217-1218 (fall stores ep[\\\"r2\\\"]), 1227-1228 (planned end only closes an episode that has an up)\",\"what\":\"With the hang switch on, R2 goes out only at the replacement child's first `up`. If a planned end (handover, signal, orphaned) comes afte…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "find:ownerlines",
+      "phaseIndex": 1,
+      "phaseTitle": "Find",
+      "agentId": "ad0bfe44571656a6b",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794502152649,
+      "queuedAt": 1794502152621,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "What I read in full at d639d8ec: - ownerlines.py and notify…",
+      "promptPreview": "You are one of six independent reviewers of tonight's landing; your lens is: LINES TO THE OWNER. Every path that sends or queues a line: say(), drain(), the unsent queue that --status --watchdog relays, every R/S/DM line kind in ownerlines.py and where supervise.py and uptime.py raise it, dedup and once-per-day rules, the held-names rendering, notify.py. Look for false alarms (a line saying the en…",
+      "promptFramed": true,
+      "lastProgressAt": 1794503183290,
+      "tokens": 368229,
+      "toolCalls": 55,
+      "durationMs": 1027204,
+      "resultPreview": "{\"nothing_must_fix\":false,\"findings\":[{\"id\":\"ownerlines-1\",\"severity\":\"must-fix\",\"where\":\"ai-trader/aitrader/supervise.py:1055 (stale ages are read whenever the beat says market_open), with _looks at supervise.py:357-361 and _stamp_ages at 364-368; R6 at 1071, R6b at 1077. Engine side: news_live.py:1700-1711 (until this process makes its first live look, a held name's checked_at is None and stops_…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "find:time",
+      "phaseIndex": 1,
+      "phaseTitle": "Find",
+      "agentId": "aeb69e4319789f46d",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794503183306,
+      "queuedAt": 1794502152621,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Read in full at d639d8ec: uptime.py (whole file), the relev…",
+      "promptPreview": "You are one of six independent reviewers of tonight's landing; your lens is: TIME, CALENDAR AND ACCOUNTING. New York time vs UTC vs the owner's zone, the trading calendar (holidays, 13:00 early closes such as 2026-11-27, weekends), window_open and the market-open seconds a gap or outage counts, day boundaries (an outage across midnight New York, a parent that runs past 16:05, a start before 09:30)…",
+      "promptFramed": true,
+      "lastProgressAt": 1794504246537,
+      "tokens": 337882,
+      "toolCalls": 65,
+      "durationMs": 1063231,
+      "resultPreview": "{\"nothing_must_fix\":false,\"findings\":[{\"id\":\"time-1\",\"severity\":\"must-fix\",\"where\":\"ai-trader/aitrader/supervise.py:1054-1071 (look: R6 judged on _stamp_ages, raw wall-clock age, gated only by the beat's market_open); _stamp_ages/_looks supervise.py:357-368; engine side ai-trader/aitrader/news_live.py:982 (check_stops beats after each quote) before :1017 (where _covered is first stamped), _beat :1…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "find:engine",
+      "phaseIndex": 1,
+      "phaseTitle": "Find",
+      "agentId": "a7a3fe48568eb218e",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794503456775,
+      "queuedAt": 1794502152622,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Lens: the engine (news_live.py, __main__.py, the config.jso…",
+      "promptPreview": "You are one of six independent reviewers of tonight's landing; your lens is: THE ENGINE CHANGES. The diff of aitrader/news_live.py and aitrader/__main__.py (and config.json's news and supervisor blocks). The engine now writes a richer heartbeat (per-name stop stamps, phase, code commit/dirty, buys_blocked), may detect a book mismatch (E1, news_errors.jsonl), and is started under the parent with --…",
+      "promptFramed": true,
+      "lastProgressAt": 1794504297828,
+      "tokens": 311115,
+      "toolCalls": 56,
+      "durationMs": 841052,
+      "resultPreview": "{\"nothing_must_fix\":true,\"findings\":[{\"id\":\"engine-1\",\"severity\":\"minor\",\"where\":\"ai-trader/aitrader/news_live.py:797 (poll_headlines, prime branch) with ai-trader/aitrader/news_live.py:1959-1962 (_run, cut priming)\",\"what\":\"When a planned stop cuts a first start's priming, the engine still writes the summary row {\\\"outcome\\\": \\\"primed\\\", \\\"count\\\": N} to news_seen_log.jsonl. _run then throws thos…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "find:robustness",
+      "phaseIndex": 1,
+      "phaseTitle": "Find",
+      "agentId": "a5bb071130f210511",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794504246548,
+      "queuedAt": 1794502152622,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Read in full at d639d8ec: supervise.py (load_cfg, append_ro…",
+      "promptPreview": "You are one of six independent reviewers of tonight's landing; your lens is: FAILURE AND I/O ROBUSTNESS. Every file the parent reads or writes (heartbeat, uptime.jsonl, alert rows, its own state file, the book, news_errors.jsonl, the lock file, config.json): missing, empty, torn last line, garbage JSON, a JSON value of the wrong type (a list where a dict is expected, a string where a number is exp…",
+      "promptFramed": true,
+      "lastProgressAt": 1794505207309,
+      "tokens": 346218,
+      "toolCalls": 47,
+      "durationMs": 960760,
+      "resultPreview": "{\"nothing_must_fix\":true,\"findings\":[{\"id\":\"robustness-1\",\"severity\":\"minor\",\"where\":\"ai-trader/aitrader/supervise.py:1223 (restart_core called with no guard), :259 (emit('start') runs after spawn() has returned a live child), :1249 (finish() is not in a finally), :171-176 (load_state merges a same-day file without checking field types)\",\"what\":\"Nothing guards the loop. look(), up(), episode_end()…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "find:gate",
+      "phaseIndex": 1,
+      "phaseTitle": "Find",
+      "agentId": "ab43a9327119a70a4",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794504297836,
+      "queuedAt": 1794502152622,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Method: I read drill_supervisor.py whole at d639d8ec, plus …",
+      "promptPreview": "You are one of six independent reviewers of tonight's landing; your lens is: THE DRILLS AS A GATE, AND THE DEAD-MAN. scripts/drill_supervisor.py: for each drill a-g and the cloud drills (cloud, cloud-check, cloud-check --alive), what property it is meant to prove (spec 11.1, plan Task 17, Rulings P2, P4, 47) and whether it can print PASS while that property is broken (a pass mark that is too loose…",
+      "promptFramed": true,
+      "lastProgressAt": 1794505779054,
+      "tokens": 367607,
+      "toolCalls": 63,
+      "durationMs": 1481218,
+      "resultPreview": "{\"nothing_must_fix\":false,\"findings\":[{\"id\":\"gate-1\",\"severity\":\"must-fix\",\"where\":\"ai-trader/scripts/drill_supervisor.py:178-180 (said), :343-349 (the per-kill and final R1 waits), :381 (the r1 check); with ai-trader/aitrader/supervise.py:410-433 (R1 counted and held back over max_alerts_per_hour) and ai-trader/config.json:324 (max_alerts_per_hour 6)\",\"what\":\"Drill a's pass mark 'one R1 per kill'…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "verify:ownerlines",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "a934acb650ea53e58",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794505207336,
+      "queuedAt": 1794503183379,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial verifier for one reviewer's findings on tonight's landing (lens: ownerlines). Your job is to REFUTE each finding if you can: read the exact code, check the scenario really reaches that line with real inputs, check whether a test, a guard elsewhere or a ruling already covers it, and where possible run a reproduction in your exported copy. Default to real=false when the scenar…",
+      "promptFramed": true,
+      "lastProgressAt": 1794505774489,
+      "tokens": 275242,
+      "toolCalls": 52,
+      "durationMs": 567153,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"ownerlines-1\",\"real\":true,\"severity\":\"must-fix\",\"how_checked\":\"both\",\"evidence\":\"Confirmed in code and by running it. Engine side: a new process starts with _covered={} (news_live.py:606). adopt_previous sets _prev_look to the previous run's stops_checked_at (1648-1652), and every beat repeats it until this process's first own look (1686-1711). The per-quote beat at 982 is writ…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 8,
+      "label": "verify:lifecycle",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "a81260f020cf5e395",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794505774499,
+      "queuedAt": 1794503456822,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial verifier for one reviewer's findings on tonight's landing (lens: lifecycle). Your job is to REFUTE each finding if you can: read the exact code, check the scenario really reaches that line with real inputs, check whether a test, a guard elsewhere or a ruling already covers it, and where possible run a reproduction in your exported copy. Default to real=false when the scenari…",
+      "promptFramed": true,
+      "lastProgressAt": 1794506227036,
+      "tokens": 246945,
+      "toolCalls": 40,
+      "durationMs": 452536,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"lifecycle-1\",\"real\":true,\"severity\":\"minor\",\"how_checked\":\"both\",\"evidence\":\"The mechanism is real, but the finding's 300 s window is wrong. Reproduced in <SCRATCH>/review-step2/verify-lifecycle/repro/r2_lost.py: dummy run 1 beats then hangs (hang_seconds 2, switch on); run 2 beats but never makes a first look. The …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 9,
+      "label": "verify:time",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "ad144bbaf8f8f2665",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794505779063,
+      "queuedAt": 1794504246591,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial verifier for one reviewer's findings on tonight's landing (lens: time). Your job is to REFUTE each finding if you can: read the exact code, check the scenario really reaches that line with real inputs, check whether a test, a guard elsewhere or a ruling already covers it, and where possible run a reproduction in your exported copy. Default to real=false when the scenario can…",
+      "promptFramed": true,
+      "lastProgressAt": 1794506318957,
+      "tokens": 254493,
+      "toolCalls": 46,
+      "durationMs": 539893,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"time-1\",\"real\":true,\"severity\":\"must-fix\",\"evidence\":\"Confirmed on both halves. Engine side: news_live.py:982 writes a 'stops' beat after each quote. The beat's market_open comes from market_open_now() at write time (:1709), and its held checked_at is null until :1017 stamps _covered. supervise._looks (357-361) then falls back to stops_checked_at, which an engine that has made …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 10,
+      "label": "verify:engine",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "a7a3e5fc9f6f598eb",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794506227049,
+      "queuedAt": 1794504297862,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial verifier for one reviewer's findings on tonight's landing (lens: engine). Your job is to REFUTE each finding if you can: read the exact code, check the scenario really reaches that line with real inputs, check whether a test, a guard elsewhere or a ruling already covers it, and where possible run a reproduction in your exported copy. Default to real=false when the scenario c…",
+      "promptFramed": true,
+      "lastProgressAt": 1794506503618,
+      "tokens": 191888,
+      "toolCalls": 36,
+      "durationMs": 276567,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"engine-1\",\"real\":true,\"severity\":\"minor\",\"evidence\":\"Reproduced at d639d8ec in a private copy (<SCRATCH>/review-step2/verify-engine). I re-ran the existing test GateFollowUps.test_a_planned_stop_that_cuts_the_first_priming_leaves_the_next_start_to_prime_again (tests/test_news_supervised.py:1785) and then read news_s…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 11,
+      "label": "verify:robustness",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "ae7047caa9221bda2",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794506318968,
+      "queuedAt": 1794505207362,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial verifier for one reviewer's findings on tonight's landing (lens: robustness). Your job is to REFUTE each finding if you can: read the exact code, check the scenario really reaches that line with real inputs, check whether a test, a guard elsewhere or a ruling already covers it, and where possible run a reproduction in your exported copy. Default to real=false when the scenar…",
+      "promptFramed": true,
+      "lastProgressAt": 1794506615066,
+      "tokens": 193994,
+      "toolCalls": 30,
+      "durationMs": 296097,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"robustness-1\",\"real\":false,\"severity\":\"minor\",\"how_checked\":\"both\",\"evidence\":\"I confirmed what the code does but found no production input that reaches it. Code at d639d8ec: restart_core (supervise.py:1223) sits inside a try/finally with no except. finish() (:1249) and the sup_stop emit run only on the normal path. The engine sets PR_SET_PDEATHSIG to SIGKILL (news_live.py:104)…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 12,
+      "label": "verify:gate",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "ae3ef784d39e47ed2",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794506503625,
+      "queuedAt": 1794505779094,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial verifier for one reviewer's findings on tonight's landing (lens: gate). Your job is to REFUTE each finding if you can: read the exact code, check the scenario really reaches that line with real inputs, check whether a test, a guard elsewhere or a ruling already covers it, and where possible run a reproduction in your exported copy. Default to real=false when the scenario can…",
+      "promptFramed": true,
+      "lastProgressAt": 1794506995353,
+      "tokens": 252874,
+      "toolCalls": 45,
+      "durationMs": 491727,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"gate-1\",\"real\":true,\"severity\":\"must-fix\",\"how_checked\":\"both\",\"evidence\":\"Reproduced. In a private copy (verify-gate/mut1) I changed episode_end (supervise.py:1098-1115) so the second episode says R1 twice. `drill_supervisor.py a --fast` still printed `PASS a kills=6+1 ... r1=6+1 tripped=0`. A debug print of the dummy part's R1 rows showed R1-1 (kill 1), R1-2 and R1-3 (both fo…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 13,
+      "label": "synthesize",
+      "phaseIndex": 3,
+      "phaseTitle": "Synthesize",
+      "agentId": "a286d249755c798c0",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794506995388,
+      "queuedAt": 1794506995358,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Yes, tonight's landing can go ahead once the three must-fix…",
+      "promptPreview": "You merge the verified findings of six review lenses on tonight's landing of a paper-money trading bot's supervisor (rollout step 2) into one ranked list for the controller. Drop findings a verifier refuted with evidence (list them under refuted with one line each: id and why). Merge duplicates across lenses (keep all source ids). Rank by the must-fix definition below; when a verifier and a finder…",
+      "promptFramed": true,
+      "lastProgressAt": 1794507282538,
+      "tokens": 202140,
+      "toolCalls": 9,
+      "durationMs": 287149,
+      "resultPreview": "{\"must_fix\":[{\"title\":\"False urgent R6 and then R6b at the session open whenever a news position is held overnight\",\"where\":\"ai-trader/aitrader/supervise.py:1054-1077. look() judges stale stops on _stamp_ages whenever the beat says market_open. _looks and _stamp_ages at :357-368 fall back to stops_checked_at and measure the age in wall-clock time. The mark's stop at :1034-1035 has the same problem…"
+    }
+  ],
+  "totalTokens": 3754038,
+  "totalToolCalls": 601
+}
