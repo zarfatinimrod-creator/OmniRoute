@@ -3724,3 +3724,5 @@
 {"key": "b5e995a2bc779b0a", "symbol": "BLK", "published": "2026-11-13T17:07:00+00:00", "first_seen": "2026-11-13T17:51:33.655671+00:00", "outcome": "stale"}
 {"key": "0cd570900f3946d8", "symbol": "JPM", "published": "2026-11-13T17:50:42+00:00", "first_seen": "2026-11-13T17:51:33.655608+00:00", "outcome": "scored"}
 {"key": "8e432df4eead0ae3", "symbol": "AMD", "published": "2026-11-13T16:52:07+00:00", "first_seen": "2026-11-13T17:52:14.096979+00:00", "outcome": "stale"}
+{"key": "5538c8ef71c83353", "symbol": "NVDA", "published": "2026-11-13T17:40:02+00:00", "first_seen": "2026-11-13T17:54:14.157216+00:00", "outcome": "scored"}
+{"key": "c1ba2c3cf4d92970", "symbol": "NVDA", "published": "2026-11-13T17:40:02+00:00", "first_seen": "2026-11-13T17:54:14.157236+00:00", "outcome": "scored"}
