@@ -3917,3 +3917,12 @@
 {"key": "a6b12be107be049a", "symbol": "TSLA", "published": "2026-11-13T19:45:02+00:00", "first_seen": "2026-11-13T19:56:28.219113+00:00", "outcome": "scored"}
 {"key": "097c05ce216c150c", "symbol": "PG", "published": "2026-11-13T19:42:02+00:00", "first_seen": "2026-11-13T19:56:48.237042+00:00", "outcome": "scored"}
 {"key": "b4d4e8d6a15a55ba", "symbol": "KO", "published": "2026-11-13T19:42:02+00:00", "first_seen": "2026-11-13T19:56:48.237065+00:00", "outcome": "scored"}
+{"key": "85920d8c9156b8b0", "symbol": "CSCO", "published": "2026-11-13T19:55:51+00:00", "first_seen": "2026-11-13T20:02:08.704843+00:00", "outcome": "scored"}
+{"key": "40b6ec5cd4fbf174", "symbol": "AMAT", "published": "2026-11-13T19:55:51+00:00", "first_seen": "2026-11-13T20:02:28.386405+00:00", "outcome": "scored"}
+{"key": "a6d9d1f0cec874b5", "symbol": "AAPL", "published": "2026-11-13T19:55:51+00:00", "first_seen": "2026-11-13T20:03:08.376200+00:00", "outcome": "scored"}
+{"key": "fb7b6c1afb10309c", "symbol": "NVDA", "published": "2026-11-13T19:55:51+00:00", "first_seen": "2026-11-13T20:03:08.376236+00:00", "outcome": "scored"}
+{"key": "55ae50fc89482239", "symbol": "AMD", "published": "2026-11-13T19:55:51+00:00", "first_seen": "2026-11-13T20:03:08.376302+00:00", "outcome": "scored"}
+{"key": "b5b8ea7c121dfdac", "symbol": "NFLX", "published": "2026-11-13T19:54:40+00:00", "first_seen": "2026-11-13T20:07:08.465653+00:00", "outcome": "scored"}
+{"key": "c7db11ba91799e37", "symbol": "DIS", "published": "2026-11-13T19:54:40+00:00", "first_seen": "2026-11-13T20:07:28.472458+00:00", "outcome": "scored"}
+{"key": "0779c59ea70f58a4", "symbol": "PEP", "published": "2026-11-11T11:00:07+00:00", "first_seen": "2026-11-13T20:07:48.524232+00:00", "outcome": "stale"}
+{"key": "aad9c70d0b097bf0", "symbol": "XOM", "published": "2026-11-13T19:48:48+00:00", "first_seen": "2026-11-13T20:08:28.538067+00:00", "outcome": "scored"}
