@@ -1,26 +1,26 @@
 {
   "date": "2026-11-13",
-  "as_of_utc": "2026-11-13T00:13:25+00:00",
+  "as_of_utc": "2026-11-13T01:08:37+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-13T00:00:00+00:00",
     "regular_end_utc": "2026-11-13T23:59:00+00:00",
-    "last_trade_utc": "2026-11-13T00:13:21+00:00",
-    "price": 71241.7
+    "last_trade_utc": "2026-11-13T01:08:31+00:00",
+    "price": 70848.46
   },
-  "equity": 96622.38,
+  "equity": 96201.19,
   "cash": 20317.46,
-  "gross": 0.7897,
-  "return_since_start": -0.0338,
-  "shadow_return_since_start": -0.0338,
+  "gross": 0.7888,
+  "return_since_start": -0.038,
+  "shadow_return_since_start": -0.038,
   "baselines": {
-    "bench_since_start": -0.0336,
-    "equal_weight_since_start": -0.0336
+    "bench_since_start": -0.039,
+    "equal_weight_since_start": -0.039
   },
   "started": "2026-11-10",
   "regime": "risk_on",
   "dd_state": "normal",
-  "drawdown": -0.0338,
+  "drawdown": -0.038,
   "decided_now": false,
   "weights": {
     "tsmom": 0.0,
@@ -72,13 +72,13 @@
     "BTC-USD": {
       "qty": 1.071071,
       "avg_cost": 74025.07,
-      "last": 71241.7,
-      "pnl_pct": -0.0376,
+      "last": 70848.46,
+      "pnl_pct": -0.0429,
       "since": "2026-11-12"
     }
   },
   "day_moves": {
-    "BTC-USD": -0.0368
+    "BTC-USD": -0.0421
   },
   "alert_channels": [
     "queued"
