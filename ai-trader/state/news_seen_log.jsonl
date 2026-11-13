@@ -3524,3 +3524,4 @@
 {"key": "a43d5e9f10220b5e", "symbol": "WMT", "published": "2026-11-13T16:20:00+00:00", "first_seen": "2026-11-13T16:25:22.249117+00:00", "outcome": "scored"}
 {"key": "417ba06168673baa", "symbol": "NVDA", "published": "2026-11-13T16:20:00+00:00", "first_seen": "2026-11-13T16:26:21.778020+00:00", "outcome": "symbol_mismatch"}
 {"key": "d1ccd2add498a374", "symbol": "BAC", "published": "2026-11-13T16:16:07+00:00", "first_seen": "2026-11-13T16:27:02.263433+00:00", "outcome": "scored"}
+{"key": "9cd829fd7979d289", "symbol": "AMD", "published": "2026-11-13T16:16:07+00:00", "first_seen": "2026-11-13T16:27:22.154804+00:00", "outcome": "scored"}
