@@ -3599,3 +3599,5 @@
 {"key": "c84e59410b986efa", "symbol": "V", "published": "2026-11-13T15:51:00+00:00", "first_seen": "2026-11-13T16:56:42.485359+00:00", "outcome": "stale"}
 {"key": "1ea832eb844f998f", "symbol": "CSCO", "published": "2026-11-13T16:19:54+00:00", "first_seen": "2026-11-13T16:57:22.888933+00:00", "outcome": "stale"}
 {"key": "a5e888bcb3a39f4a", "symbol": "AMAT", "published": "2026-11-13T16:19:54+00:00", "first_seen": "2026-11-13T16:57:22.889355+00:00", "outcome": "stale"}
+{"key": "1270c1f9deaf8889", "symbol": "MSFT", "published": "2026-11-13T16:19:54+00:00", "first_seen": "2026-11-13T16:58:22.526165+00:00", "outcome": "stale"}
+{"key": "7de04a8c144dc2d9", "symbol": "ORCL", "published": "2026-11-13T16:19:54+00:00", "first_seen": "2026-11-13T16:58:22.526456+00:00", "outcome": "stale"}
