@@ -5,6 +5,14 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
+- **2026-11-13 06:15 - trader session (AI Trader slots)** - files: `aitrader/cycle.py`, new file
+  `tests/test_crypto_hourly_rebuild.py`. Purpose: backlog 70, a defect found by the crypto night of 2026-11-13: Yahoo's
+  daily row for the UTC day that just closed is all-null for 6+ hours (two nights running), so since df8042e2 the
+  crypto cycle makes no decision, and the crypto_base exit (BTC under its 200-day band since the 11-12 close) is not
+  taken. Fix: on the utc_daily calendar only, when that day's daily row is missing and Yahoo's 24 hourly bars of the
+  same UTC day are complete, build the day from them; otherwise the backlog 68 skip stays. Stocks path untouched; no
+  file the time machine loads is touched. Rule 4: failing test first, quant-critic, suite.
+
 - **2026-11-11 10:09 (refreshed 21:10; rollout step 1 landed at 21:08 UTC, ab7b27f9) - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,

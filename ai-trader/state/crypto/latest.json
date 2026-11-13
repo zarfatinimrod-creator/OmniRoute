@@ -1,26 +1,26 @@
 {
   "date": "2026-11-13",
-  "as_of_utc": "2026-11-13T01:08:37+00:00",
+  "as_of_utc": "2026-11-13T06:04:58+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-13T00:00:00+00:00",
     "regular_end_utc": "2026-11-13T23:59:00+00:00",
-    "last_trade_utc": "2026-11-13T01:08:31+00:00",
-    "price": 70848.46
+    "last_trade_utc": "2026-11-13T06:04:54+00:00",
+    "price": 68191.01
   },
-  "equity": 96201.19,
+  "equity": 93354.87,
   "cash": 20317.46,
-  "gross": 0.7888,
-  "return_since_start": -0.038,
-  "shadow_return_since_start": -0.038,
+  "gross": 0.7824,
+  "return_since_start": -0.0665,
+  "shadow_return_since_start": -0.0665,
   "baselines": {
-    "bench_since_start": -0.039,
-    "equal_weight_since_start": -0.039
+    "bench_since_start": -0.075,
+    "equal_weight_since_start": -0.075
   },
   "started": "2026-11-10",
   "regime": "risk_on",
   "dd_state": "normal",
-  "drawdown": -0.038,
+  "drawdown": -0.0665,
   "decided_now": false,
   "weights": {
     "tsmom": 0.0,
@@ -72,16 +72,16 @@
     "BTC-USD": {
       "qty": 1.071071,
       "avg_cost": 74025.07,
-      "last": 70848.46,
-      "pnl_pct": -0.0429,
+      "last": 68191.01,
+      "pnl_pct": -0.0788,
       "since": "2026-11-12"
     }
   },
   "day_moves": {
-    "BTC-USD": -0.0421
+    "BTC-USD": -0.0781
   },
   "alert_channels": [
-    "queued"
+    "ntfy"
   ],
   "events": [
     "אין שורה יומית של 2026-11-12 בנתונים (הנר האחרון הסופי הוא 2026-11-11) - אין החלטה בריצה הזו, הזמנה ממתינה עדיין מתמלאת, ריצה מאוחרת תנסה שוב"
