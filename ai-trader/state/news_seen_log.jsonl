@@ -3975,3 +3975,4 @@
 {"key": "93fa19359957ba94", "symbol": "GOOGL", "published": "2026-11-13T20:33:02+00:00", "first_seen": "2026-11-13T20:37:09.177288+00:00", "outcome": "scored"}
 {"key": "3bc523f006bf8dd0", "symbol": "DIS", "published": "2026-11-13T19:27:00+00:00", "first_seen": "2026-11-13T20:37:29.135180+00:00", "outcome": "stale"}
 {"key": "7e8e6304e11b8240", "symbol": "HD", "published": "2026-11-13T19:27:00+00:00", "first_seen": "2026-11-13T20:37:29.135433+00:00", "outcome": "stale"}
+{"key": "e2bb039934e7c627", "symbol": "SBUX", "published": "2026-11-13T19:56:18+00:00", "first_seen": "2026-11-13T20:38:09.213376+00:00", "outcome": "stale"}
