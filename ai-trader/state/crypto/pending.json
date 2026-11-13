@@ -1,61 +1,49 @@
 {
-  "decision_date": "2026-11-10",
-  "status": "executed",
+  "decision_date": "2026-11-12",
+  "status": "pending",
   "rebalance": true,
   "exits_only": false,
-  "targets": {
-    "BTC-USD": 0.7968257771145335
-  },
-  "targets_raw": {
-    "BTC-USD": 0.7968257771145335
-  },
+  "targets": {},
+  "targets_raw": {},
   "stopped_shadow": [],
-  "shadow_hold": {},
+  "shadow_hold": {
+    "BTC-USD": 0.790021429204906
+  },
   "stopped": [],
   "overrides": [],
   "earnings_blackout": {},
   "preview_at_close": [
     {
-      "date": "2026-11-10",
-      "symbol": "BTC-USD",
-      "side": "BUY",
-      "qty": 1.074964,
-      "price": 73756.9772,
-      "value": 79286.1,
-      "realized_pnl": -396.43,
-      "fee": 396.4305,
-      "reason": "entry"
-    }
-  ],
-  "new_entries": [
-    "BTC-USD"
-  ],
-  "logged_at": "2026-11-12T00:14:26+00:00",
-  "exec_ts": "2026-11-12T01:00:00+00:00",
-  "decision_close": {
-    "BTC-USD": 73720.1171875
-  },
-  "executed_on": "2026-11-12",
-  "fills": [
-    {
       "date": "2026-11-12",
       "symbol": "BTC-USD",
-      "side": "BUY",
+      "side": "SELL",
       "qty": 1.071071,
-      "price": 74025.0722,
-      "value": 79286.11,
-      "realized_pnl": -396.43,
-      "fee": 396.4305,
-      "reason": "entry"
+      "price": 71334.2135,
+      "value": 76404.01,
+      "realized_pnl": -3264.12,
+      "fee": 382.02,
+      "reason": "exit"
     }
   ],
-  "fill_source": "1h",
-  "fill_ts": "2026-11-12T01:00:00+00:00",
-  "close_audit": {
-    "gaps_bps": {
-      "BTC-USD": 0.0
-    },
-    "alert": false,
-    "logged_at": "2026-11-13T00:13:25+00:00"
+  "new_entries": [],
+  "logged_at": "2026-11-13T06:41:46+00:00",
+  "exec_ts": "2026-11-13T07:00:00+00:00",
+  "decision_close": {
+    "BTC-USD": 71369.8984375
+  },
+  "hourly_rebuild": {
+    "bar": "2026-11-12",
+    "source": "yahoo_1h",
+    "hours": 24,
+    "inserted": true,
+    "symbols": {
+      "BTC-USD": {
+        "open": 73922.75,
+        "high": 74118.96875,
+        "low": 71050.40625,
+        "close": 71369.8984375,
+        "volume": 8944824320.0
+      }
+    }
   }
 }

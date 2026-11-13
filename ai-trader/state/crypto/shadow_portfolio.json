@@ -6,12 +6,12 @@
       "avg_cost": 74025.0721640625,
       "entry_date": "2026-11-12",
       "peak_close": 73988.078125,
-      "last_price": 73988.078125
+      "last_price": 71369.8984375
     }
   },
   "peak_equity": 100000.0,
   "blocked": {},
-  "last_mark": "2026-11-10",
+  "last_mark": "2026-11-12",
   "fees_paid": 396.430540339173,
   "last_rebalance": "2026-11-10"
 }
