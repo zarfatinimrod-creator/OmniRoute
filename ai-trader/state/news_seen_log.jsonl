@@ -3619,3 +3619,5 @@
 {"key": "95fd5680f019a281", "symbol": "AMAT", "published": "2026-11-13T17:03:57+00:00", "first_seen": "2026-11-13T17:07:22.734421+00:00", "outcome": "scored"}
 {"key": "37bafcfd006c5d93", "symbol": "NVDA", "published": "2026-11-13T16:46:37+00:00", "first_seen": "2026-11-13T17:09:02.792072+00:00", "outcome": "scored"}
 {"key": "332a43d20a24fc6d", "symbol": "AMZN", "published": "2026-11-13T16:53:42+00:00", "first_seen": "2026-11-13T17:09:43.200424+00:00", "outcome": "scored"}
+{"key": "4b37fc58adce1c22", "symbol": "ORCL", "published": "2026-11-13T16:56:21+00:00", "first_seen": "2026-11-13T17:10:32.920602+00:00", "outcome": "scored"}
+{"key": "898425ed1efa9480", "symbol": "TSLA", "published": "2026-11-13T17:05:00+00:00", "first_seen": "2026-11-13T17:10:32.920838+00:00", "outcome": "scored"}
