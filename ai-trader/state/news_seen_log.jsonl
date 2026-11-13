@@ -3350,3 +3350,10 @@
 {"key": "8be95663ced0157b", "symbol": "AMAT", "published": "2026-11-13T15:18:05+00:00", "first_seen": "2026-11-13T15:24:00.678017+00:00", "outcome": "scored"}
 {"key": "517f53b86672ee9c", "symbol": "AMZN", "published": "2026-11-13T15:08:49+00:00", "first_seen": "2026-11-13T15:24:20.671433+00:00", "outcome": "scored"}
 {"key": "3b902dc3aadc4127", "symbol": "NVDA", "published": "2026-11-13T15:18:05+00:00", "first_seen": "2026-11-13T15:24:40.325409+00:00", "outcome": "scored"}
+{"key": "28efc2f23362480b", "symbol": "AAPL", "published": "2026-11-13T14:10:00+00:00", "first_seen": "2026-11-13T15:26:00.345023+00:00", "outcome": "stale"}
+{"key": "bae54c6a3faf7971", "symbol": "MU", "published": "2026-11-13T14:12:00+00:00", "first_seen": "2026-11-13T15:26:00.345410+00:00", "outcome": "stale"}
+{"key": "65d12a7882b74d1d", "symbol": "GOOGL", "published": "2026-11-13T14:10:00+00:00", "first_seen": "2026-11-13T15:26:20.384234+00:00", "outcome": "stale"}
+{"key": "988a76f038855294", "symbol": "AMZN", "published": "2026-11-13T14:10:00+00:00", "first_seen": "2026-11-13T15:26:20.384537+00:00", "outcome": "stale"}
+{"key": "37cfb17190879f98", "symbol": "CSCO", "published": "2026-11-13T14:12:00+00:00", "first_seen": "2026-11-13T15:27:00.370601+00:00", "outcome": "stale"}
+{"key": "84ea7e7d6aaef4c1", "symbol": "NVDA", "published": "2026-11-13T15:26:46+00:00", "first_seen": "2026-11-13T15:28:00.678159+00:00", "outcome": "scored"}
+{"key": "211a64b3dc4b5860", "symbol": "NVDA", "published": "2026-11-13T15:21:02+00:00", "first_seen": "2026-11-13T15:29:20.839393+00:00", "outcome": "scored"}
