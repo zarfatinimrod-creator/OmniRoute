@@ -3926,3 +3926,5 @@
 {"key": "c7db11ba91799e37", "symbol": "DIS", "published": "2026-11-13T19:54:40+00:00", "first_seen": "2026-11-13T20:07:28.472458+00:00", "outcome": "scored"}
 {"key": "0779c59ea70f58a4", "symbol": "PEP", "published": "2026-11-11T11:00:07+00:00", "first_seen": "2026-11-13T20:07:48.524232+00:00", "outcome": "stale"}
 {"key": "aad9c70d0b097bf0", "symbol": "XOM", "published": "2026-11-13T19:48:48+00:00", "first_seen": "2026-11-13T20:08:28.538067+00:00", "outcome": "scored"}
+{"key": "f83c902e4bdb95c6", "symbol": "CVX", "published": "2026-11-13T19:48:48+00:00", "first_seen": "2026-11-13T20:09:08.577166+00:00", "outcome": "scored"}
+{"key": "15a6993d4f008cc0", "symbol": "COP", "published": "2026-11-13T19:48:48+00:00", "first_seen": "2026-11-13T20:09:08.577197+00:00", "outcome": "scored"}
