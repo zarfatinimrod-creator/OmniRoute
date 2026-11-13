@@ -245,16 +245,17 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     - Not measured: whether Yahoo's close of bar D is final at 00:12 UTC. The R6 audit
       (`market.revised_close_alert_bps` 5) checks every decision; read `close_audit` in `state/crypto/pending.json`
       and `revised_close` rows in `state/crypto/decisions.jsonl` after the first week.
-70. [crypto][defect-timing] Yahoo's daily row for the day that just closed has close null at 00:12 UTC, two nights
-    running (2026-11-12 for bar 11-11, backlog 68; 2026-11-13 for bar 11-12: the chart call at 00:14 UTC returned the
-    11-12 timestamp with close None, which `_bars_from_chart` drops). Since the backlog 68 fix the 00:12 decide slot
-    then makes no decision, and the decision waits for a later run. On 2026-11-13 this delayed a rule exit: with the
-    Coinbase close of 11-12 (71,369.90) BTC was -2.34% under its 200-day average (73,081.1), below the 2% hysteresis
-    band (71,619.5) -> risk_off -> flat under crypto_base (`logs/2026-11-13-crypto-night.md`). Options, each through
-    rule 4: (a) the cycle retries inside the slot until the row fills or a deadline before exec_ts; (b) take the
-    Coinbase daily close when Yahoo's row is null (a data-source change: log-only first, compare the two closes);
-    (c) move the decide slot later (the owner's schedule; measure first when Yahoo fills the row - the poll of
-    2026-11-13 is in the night log). Answers the "not measured" line of item 69.
+71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
+    2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
+    for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
+    hourly_rebuild is replaced before its close_audit exists); (b) a declined rebuild gives no reason (fetch error /
+    23 hours / null / misaligned stamp): add a reason tag or a skips.jsonl row, event text unchanged (Basic law 2:
+    nothing fails silently); (c) with a two-coin profile the R6 tag "yahoo_1h" is set for the whole decision close
+    even when only one coin was rebuilt - tag per symbol; (d) not measured: whether the 23:00 hourly bar is final at
+    00:12 UTC (evidence so far from 06:05-06:35) and the latency on a hanging Yahoo (up to about 66 s per symbol per
+    run; the retry count would be the tunable); (e) when two daily rows are missing (D and D-1) only D is rebuilt
+    and the decision runs on a history with a one-day hole; (f) expect a "סגירה מתוקנת" R6 alert after most rebuilt
+    days (1h close vs daily close measured 1.93-140.28 USD, about 0.3-19 bp; the alert is at 5 bp).
 66. [news][rule 4] An engine whose lock call fails (not a held lock) runs unlocked and checks the stops, as before;
     the quant-critic (gate of 2026-11-11) recommends that such an engine opens no new position ("no_lock" in
     `_buys_blocked`), which removes a double-buy risk. A new check: log mode first, then rule 4 and the owner.
@@ -263,6 +264,20 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
 
 
 ## Done
+- 2026-11-13: backlog 70 fixed (d2e0c77e, quant-critic PASS + live-path review PASS, 696 tests): on the UTC
+  daily calendar a daily row that Yahoo returns all-null is rebuilt from Yahoo's 24 complete 1h bars of the same
+  day (all coins or none, never overwriting a daily value, logged in decisions/pending, R6 tagged yahoo_1h); any
+  other case keeps the backlog 68 skip. Follow-ups: item 71. Original item:
+  70. [crypto][defect-timing] Yahoo's daily row for the day that just closed has close null at 00:12 UTC, two nights
+      running (2026-11-12 for bar 11-11, backlog 68; 2026-11-13 for bar 11-12: the chart call at 00:14 UTC returned the
+      11-12 timestamp with close None, which `_bars_from_chart` drops). Since the backlog 68 fix the 00:12 decide slot
+      then makes no decision, and the decision waits for a later run. On 2026-11-13 this delayed a rule exit: with the
+      Coinbase close of 11-12 (71,369.90) BTC was -2.34% under its 200-day average (73,081.1), below the 2% hysteresis
+      band (71,619.5) -> risk_off -> flat under crypto_base (`logs/2026-11-13-crypto-night.md`). Options, each through
+      rule 4: (a) the cycle retries inside the slot until the row fills or a deadline before exec_ts; (b) take the
+      Coinbase daily close when Yahoo's row is null (a data-source change: log-only first, compare the two closes);
+      (c) move the decide slot later (the owner's schedule; measure first when Yahoo fills the row - the poll of
+      2026-11-13 is in the night log). Answers the "not measured" line of item 69.
 - 2026-11-12: backlog 68 fixed (df8042e2, quant-critic PASS, 679 tests): on the UTC daily calendar a decision bar
   that is not yesterday's (a daily row missing from Yahoo's reply) is no decision; the pending fill still runs.
   Built on Opus with the owner's approval (Fable limit reached). Critic's non-blocking follow-ups: write the reason
