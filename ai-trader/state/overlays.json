@@ -1,6 +1,83 @@
 {
-  "date": "2026-11-12",
+  "date": "2026-11-13",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-11-12",
+      "ticker": "HPP",
+      "company": "Hudson Pacific Properties, Inc.",
+      "industry": "Real Estate",
+      "insiders": 3,
+      "price": 9.06,
+      "value": 905762.0,
+      "delta_own": "+57%"
+    },
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-08-18",
+      "ticker": "ABCL",
+      "company": "Abcellera Biologics Inc.",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 3,
+      "price": 10.78,
+      "value": 778180.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-11-11",
+      "ticker": "CSQR",
+      "company": "Csquare, Inc.",
+      "industry": "Computer Programming, Data Processing, Etc.",
+      "insiders": 2,
+      "price": 17.24,
+      "value": 207400.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-10",
+      "ticker": "ENOV",
+      "company": "Enovis Corp",
+      "industry": "Orthopedic, Prosthetic & Surgical Appliances & Supplies",
+      "insiders": 4,
+      "price": 20.92,
+      "value": 599541.0,
+      "delta_own": "+8%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-10-27",
+      "ticker": "FLG",
+      "company": "Flagstar Bank, National Association",
+      "industry": "Savings Institutions, Not Federally Chartered",
+      "insiders": 2,
+      "price": 10.43,
+      "value": 597829.0,
+      "delta_own": "+5%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-08-27",
+      "ticker": "CTEV",
+      "company": "Claritev Corp",
+      "industry": "Investment Advice",
+      "insiders": 2,
+      "price": 24.99,
+      "value": 9477134.0,
+      "delta_own": "+17%"
+    },
+    {
+      "filing_date": "2026-11-12",
+      "trade_date": "2026-11-09",
+      "ticker": "OBIO",
+      "company": "Orchestra Biomed Holdings, Inc.",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 4,
+      "price": 5.0,
+      "value": 6247900.0,
+      "delta_own": "+11%"
+    },
     {
       "filing_date": "2026-11-12",
       "trade_date": "2026-11-09",
@@ -124,17 +201,6 @@
     },
     {
       "filing_date": "2026-11-10",
-      "trade_date": "2026-11-06",
-      "ticker": "ENOV",
-      "company": "Enovis Corp",
-      "industry": "Orthopedic, Prosthetic & Surgical Appliances & Supplies",
-      "insiders": 3,
-      "price": 19.88,
-      "value": 499516.0,
-      "delta_own": "+8%"
-    },
-    {
-      "filing_date": "2026-11-10",
       "trade_date": "2026-10-30",
       "ticker": "ATEC",
       "company": "Alphatec Holdings, Inc.",
@@ -209,74 +275,8 @@
       "price": 19.43,
       "value": 682656.0,
       "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-10",
-      "trade_date": "2026-11-04",
-      "ticker": "LBTY",
-      "company": "Liberty Global Ltd.",
-      "industry": "Cable & Other Pay Television Services",
-      "insiders": 3,
-      "price": 9.52,
-      "value": 4486300.0,
-      "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "NXRT",
-      "company": "Nexpoint Residential Trust, Inc.",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 2,
-      "price": 17.31,
-      "value": 503368.0,
-      "delta_own": "+6%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-05",
-      "ticker": "MTDR",
-      "company": "Matador Resources Co",
-      "industry": "Crude Petroleum & Natural Gas",
-      "insiders": 6,
-      "price": 53.21,
-      "value": 442465.0,
-      "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-06",
-      "ticker": "WCC",
-      "company": "Wesco International Inc",
-      "industry": "Electrical Apparatus & Equipment, Wiring Supplies",
-      "insiders": 2,
-      "price": 292.08,
-      "value": 603431.0,
-      "delta_own": "+12%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-09",
-      "ticker": "OBIO",
-      "company": "Orchestra Biomed Holdings, Inc.",
-      "industry": "Surgical & Medical Instruments & Apparatus",
-      "insiders": 3,
-      "price": 4.96,
-      "value": 247900.0,
-      "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-09",
-      "trade_date": "2026-11-06",
-      "ticker": "LUMN",
-      "company": "Lumen Technologies, Inc.",
-      "industry": "Telephone Communications (No Radiotelephone)",
-      "insiders": 2,
-      "price": 3.96,
-      "value": 494605.0,
-      "delta_own": "+1%"
     }
   ],
   "congress_buy": null,
-  "logged": 48
+  "logged": 50
 }

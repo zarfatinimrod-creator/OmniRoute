@@ -1,20 +1,20 @@
 {
-  "cash": 23144.142210368886,
+  "cash": 23147.3019161631,
   "positions": {
     "PM": {
       "qty": 30,
       "avg_cost": 195.41765511474608,
       "entry_date": "2026-11-09",
-      "peak_close": 198.1999969482422,
-      "last_price": 196.66000366210935,
+      "peak_close": 198.9600067138672,
+      "last_price": 198.9600067138672,
       "ca_applied_through": "2026-11-13"
     },
     "CVX": {
       "qty": 30,
       "avg_cost": 211.88372603607178,
       "entry_date": "2026-11-09",
-      "peak_close": 216.3500061035156,
-      "last_price": 216.3500061035156,
+      "peak_close": 219.88999938964844,
+      "last_price": 219.88999938964844,
       "ca_applied_through": "2026-11-13"
     },
     "MRK": {
@@ -22,7 +22,7 @@
       "avg_cost": 148.44418011474608,
       "entry_date": "2026-11-09",
       "peak_close": 148.75999450683594,
-      "last_price": 146.9499969482422,
+      "last_price": 147.75999450683594,
       "ca_applied_through": "2026-11-13"
     },
     "UNP": {
@@ -30,7 +30,7 @@
       "avg_cost": 297.5920505218506,
       "entry_date": "2026-11-09",
       "peak_close": 304.20001220703125,
-      "last_price": 304.20001220703125,
+      "last_price": 302.44000244140625,
       "ca_applied_through": "2026-11-13"
     },
     "AMGN": {
@@ -38,31 +38,31 @@
       "avg_cost": 465.3675772705078,
       "entry_date": "2026-11-09",
       "peak_close": 468.1099853515625,
-      "last_price": 467.05999755859375,
+      "last_price": 465.6700134277344,
       "ca_applied_through": "2026-11-13"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.0777170410156,
       "entry_date": "2026-11-09",
-      "peak_close": 1437.2900390625,
-      "last_price": 1427.280029296875,
+      "peak_close": 1443.5,
+      "last_price": 1443.5,
       "ca_applied_through": "2026-11-13"
     },
     "KO": {
       "qty": 93,
       "avg_cost": 96.16257315727972,
       "entry_date": "2026-11-09",
-      "peak_close": 97.56999969482422,
-      "last_price": 97.44000244140624,
+      "peak_close": 99.25,
+      "last_price": 99.25,
       "ca_applied_through": "2026-11-13"
     },
     "TEVA": {
       "qty": 90,
       "avg_cost": 43.031503320693965,
       "entry_date": "2026-11-09",
-      "peak_close": 43.650001525878906,
-      "last_price": 43.650001525878906,
+      "peak_close": 44.5,
+      "last_price": 44.5,
       "ca_applied_through": "2026-11-13"
     },
     "DE": {
@@ -70,39 +70,39 @@
       "avg_cost": 686.1300378243583,
       "entry_date": "2026-11-09",
       "peak_close": 691.75,
-      "last_price": 678.7899780273438,
+      "last_price": 673.5399780273438,
       "ca_applied_through": "2026-11-13"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.139,
       "entry_date": "2026-11-09",
-      "peak_close": 283.5199890136719,
-      "last_price": 283.5199890136719,
+      "peak_close": 285.75,
+      "last_price": 285.75,
       "ca_applied_through": "2026-11-13"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.98691633605955,
       "entry_date": "2026-11-09",
-      "peak_close": 294.9800109863281,
-      "last_price": 294.45001220703125,
+      "peak_close": 295.0299987792969,
+      "last_price": 295.0299987792969,
       "ca_applied_through": "2026-11-13"
     },
     "XOM": {
       "qty": 27,
       "avg_cost": 163.89690994262693,
       "entry_date": "2026-11-09",
-      "peak_close": 169.77999877929688,
-      "last_price": 169.77999877929688,
+      "peak_close": 170.58999633789062,
+      "last_price": 170.58999633789062,
       "ca_applied_through": "2026-11-13"
     },
     "AAPL": {
       "qty": 20,
       "avg_cost": 346.2705447807312,
       "entry_date": "2026-11-09",
-      "peak_close": 355.6300048828125,
-      "last_price": 354.8800048828125,
+      "peak_close": 356.2699890136719,
+      "last_price": 356.2699890136719,
       "ca_applied_through": "2026-11-13"
     },
     "XLV": {
@@ -110,22 +110,22 @@
       "avg_cost": 186.78278767395017,
       "entry_date": "2026-11-09",
       "peak_close": 188.9499969482422,
-      "last_price": 187.8300018310547,
+      "last_price": 188.8500061035156,
       "ca_applied_through": "2026-11-13"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.49820767211912,
       "entry_date": "2026-11-11",
-      "peak_close": 140.05999755859375,
-      "last_price": 140.05999755859375,
+      "peak_close": 142.27999877929688,
+      "last_price": 142.27999877929688,
       "ca_applied_through": "2026-11-13"
     }
   },
-  "peak_equity": 101122.52313077904,
+  "peak_equity": 101696.69194607032,
   "blocked": {},
   "created": "2026-11-06",
-  "last_mark": "2026-11-12",
+  "last_mark": "2026-11-13",
   "start_prices": {
     "SPY": 735.2899780273438,
     "QQQ": 656.0999755859375,
