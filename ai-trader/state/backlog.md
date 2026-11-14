@@ -51,9 +51,6 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     whether a source's hit rate should gate its size (desk, news rule).
 22. [docs] lessons.md still lists superseded sweep numbers without a marker (v1/v2 Sharpe in the first lessons;
     the "learned weights beat priors" lesson is retracted by the placebo lesson below it).
-23. [measurement] No stock sweep or placebo run is registered after the crypto-build changes to strategy.py,
-    backtest.py and learn.py (the golden tests show the stock book byte-identical): re-run the paired sweep at the
-    weekly review so the evidence matches the code.
 24. [crypto] Parked and deferred minors from the crypto build (6 parked, 20 open minors, rulings R1-R19):
     research/2026-11-09-crypto-deferred-and-rulings.txt.
 25. [alerts] Engine alerts are written in English; the owner reads Hebrew. Translate the urgent ones.
@@ -266,6 +263,13 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
 
 
 ## Done
+- 2026-11-14: backlog 23 done (weekly review): the paired sweep re-run on code 3d5b1109 (run 2026-11-14-59a459da5016,
+  state/trial_runs/): base Sharpe median 0.418 (registered 2026-11-09: 0.402), CAGR 7.40% (7.23%), maxDD -11.52%
+  (-11.52%); the change is the five new trading days at the end of the history, the stock book is unchanged by the
+  crypto build (the golden tests agree). DSR 0.559 (N=74); P(Sharpe > SPY) 0.195. Placebo not re-run (first
+  Saturday of December). Original item: [measurement] No stock sweep or placebo run is registered after the crypto-build changes to strategy.py,
+      backtest.py and learn.py (the golden tests show the stock book byte-identical): re-run the paired sweep at the
+      weekly review so the evidence matches the code.
 - 2026-11-13: backlog 70 fixed (d2e0c77e, quant-critic PASS + live-path review PASS, 696 tests): on the UTC
   daily calendar a daily row that Yahoo returns all-null is rebuilt from Yahoo's 24 complete 1h bars of the same
   day (all coins or none, never overwriting a daily value, logged in decisions/pending, R6 tagged yahoo_1h); any
