@@ -1,0 +1,21 @@
+coin       from                      rule      fill  CAGR  sharpe  maxDD  sw_yr
+ BTC 2015-04-05                   no band   t close 0.581   1.140 -0.701   6.46
+ BTC 2015-04-05                   no band t+1 close 0.624   1.187 -0.643   6.46
+ BTC 2015-04-05 hysteresis 2% (risk lens)   t close 0.611   1.175 -0.671   3.53
+ BTC 2015-04-05 hysteresis 2% (risk lens) t+1 close 0.621   1.185 -0.643   3.53
+ BTC 2015-04-05   offset 2% (strategy.py)   t close 0.588   1.143 -0.671   7.67
+ BTC 2015-04-05   offset 2% (strategy.py) t+1 close 0.639   1.200 -0.643   7.67
+ BTC 2018-01-01                   no band   t close 0.184   0.601 -0.668   7.67
+ BTC 2018-01-01                   no band t+1 close 0.217   0.659 -0.603   7.67
+ BTC 2018-01-01 hysteresis 2% (risk lens)   t close 0.216   0.658 -0.634   4.29
+ BTC 2018-01-01 hysteresis 2% (risk lens) t+1 close 0.215   0.655 -0.603   4.29
+ BTC 2018-01-01   offset 2% (strategy.py)   t close 0.183   0.597 -0.634   9.71
+ BTC 2018-01-01   offset 2% (strategy.py) t+1 close 0.220   0.662 -0.603   9.71
+ ETH 2018-06-01                   no band   t close 0.416   0.904 -0.628   7.22
+ ETH 2018-06-01                   no band t+1 close 0.388   0.866 -0.694   7.22
+ ETH 2018-06-01 hysteresis 2% (risk lens)   t close 0.439   0.932 -0.610   3.91
+ ETH 2018-06-01 hysteresis 2% (risk lens) t+1 close 0.382   0.859 -0.717   3.91
+ ETH 2018-06-01   offset 2% (strategy.py)   t close 0.373   0.844 -0.633   9.59
+ ETH 2018-06-01   offset 2% (strategy.py) t+1 close 0.413   0.894 -0.645   9.59
+
+NOW 2026-11-08 BTC 74584.65 SMA200 73169.69 ratio 0.0193 hyst state 1.0 offset state 1.0

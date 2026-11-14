@@ -1,0 +1,63 @@
+{
+  "date": "2026-11-14",
+  "as_of_utc": "2026-11-14T06:04:40+00:00",
+  "market": {
+    "is_open": true,
+    "regular_start_utc": "2026-11-14T00:00:00+00:00",
+    "regular_end_utc": "2026-11-14T23:59:00+00:00",
+    "last_trade_utc": "2026-11-14T06:04:35+00:00",
+    "price": 67156.37
+  },
+  "equity": 93819.73,
+  "cash": 93819.73,
+  "gross": 0.0,
+  "return_since_start": -0.0618,
+  "shadow_return_since_start": -0.0618,
+  "baselines": {
+    "bench_since_start": -0.089,
+    "equal_weight_since_start": -0.089
+  },
+  "started": "2026-11-10",
+  "regime": "risk_off",
+  "dd_state": "normal",
+  "drawdown": -0.0618,
+  "decided_now": false,
+  "weights": {
+    "tsmom": 0.0,
+    "xsmom": 0.0,
+    "trend": 1.0,
+    "breakout": 0.0,
+    "high52": 0.0,
+    "reversal": 0.0,
+    "rsi2": 0.0,
+    "lowvol": 0.0
+  },
+  "pending": {
+    "decision_date": "2026-11-13",
+    "status": "executed",
+    "rebalance": false,
+    "targets": {},
+    "overrides": [],
+    "earnings_blackout": {},
+    "preview_at_close": []
+  },
+  "executed": [],
+  "top_scores": null,
+  "bottom_scores": null,
+  "stopped": [],
+  "scorecard": {
+    "open": 9,
+    "evaluated": 0
+  },
+  "overlays": {
+    "insider_cluster": null,
+    "congress_buy": null,
+    "logged": null
+  },
+  "positions": {},
+  "day_moves": {},
+  "alert_channels": [],
+  "events": [
+    "השורה היומית של 2026-11-13 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 68,223.01)"
+  ]
+}

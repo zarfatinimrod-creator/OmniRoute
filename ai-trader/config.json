@@ -1,0 +1,462 @@
+{
+  "_note": "Every assumption lives here (ASSUME). Change numbers here, never inside the logic. Run the time machine before and after any change.",
+  "account": {
+    "starting_cash": 100000,
+    "cash_yield_annual": 0.035,
+    "paper_only": true,
+    "dividend_withholding": 0.25
+  },
+  "calendar": {
+    "_note": "NYSE full-day holidays and 13:00 ET early closes (source: vendor/jake-trader-skill-v2/trader-alerts/alerts.py). Years not listed in 'years' count as closed (the news engine will not trade). Extend before 2028; a test fails from October of the last listed year.",
+    "years": [2026, 2027],
+    "holidays": ["2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25", "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+                 "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24"],
+    "early_close": ["2026-11-27", "2026-12-24", "2027-11-26"]
+  },
+  "_note_market": "Per-book behaviour flags (crypto plan, planning decision 6). The 'market' values below are the stock book's and reproduce today's code; a book under 'books' overrides them key by key.",
+  "market": {
+    "calendar": "nyse",
+    "periods_per_year": 252,
+    "history": "10y",
+    "vix": true,
+    "earnings_blackout": true,
+    "overlays": true,
+    "corporate_actions": true,
+    "news_engine": true,
+    "fill_regime_on_no_picks": false,
+    "equity_mark_per_bar": false,
+    "delete_proposal_on_decision": false,
+    "grading": "excess",
+    "stale_skips_run": false,
+    "close_source": "yahoo",
+    "coinbase_guard_pct": 0,
+    "report_dir": "reports",
+    "intraday_alert_pct": 0.06,
+    "latest_max_age_hours": 30,
+    "state_subdir": "",
+    "etf_groups": ["Index", "SectorETF", "Bonds", "Gold"],
+    "quiet_hours": null,
+    "frozen_alert_runs": 2
+  },
+  "benchmark": "SPY",
+  "universe": {
+    "SPY": "Index",
+    "QQQ": "Index",
+    "IWM": "Index",
+    "DIA": "Index",
+    "XLK": "SectorETF",
+    "XLF": "SectorETF",
+    "XLE": "SectorETF",
+    "XLV": "SectorETF",
+    "XLY": "SectorETF",
+    "XLP": "SectorETF",
+    "XLI": "SectorETF",
+    "XLB": "SectorETF",
+    "XLU": "SectorETF",
+    "XLRE": "SectorETF",
+    "XLC": "SectorETF",
+    "SMH": "SectorETF",
+    "TLT": "Bonds",
+    "IEF": "Bonds",
+    "GLD": "Gold",
+    "AAPL": "Tech",
+    "MSFT": "Tech",
+    "NVDA": "Tech",
+    "AVGO": "Tech",
+    "ORCL": "Tech",
+    "CRM": "Tech",
+    "ADBE": "Tech",
+    "AMD": "Tech",
+    "CSCO": "Tech",
+    "QCOM": "Tech",
+    "TXN": "Tech",
+    "IBM": "Tech",
+    "INTC": "Tech",
+    "MU": "Tech",
+    "PLTR": "Tech",
+    "NOW": "Tech",
+    "AMAT": "Tech",
+    "PANW": "Tech",
+    "GOOGL": "Comm",
+    "META": "Comm",
+    "NFLX": "Comm",
+    "DIS": "Comm",
+    "TMUS": "Comm",
+    "AMZN": "ConsDisc",
+    "TSLA": "ConsDisc",
+    "HD": "ConsDisc",
+    "MCD": "ConsDisc",
+    "NKE": "ConsDisc",
+    "BKNG": "ConsDisc",
+    "LOW": "ConsDisc",
+    "SBUX": "ConsDisc",
+    "WMT": "Staples",
+    "COST": "Staples",
+    "PG": "Staples",
+    "KO": "Staples",
+    "PEP": "Staples",
+    "PM": "Staples",
+    "BRK-B": "Financials",
+    "JPM": "Financials",
+    "V": "Financials",
+    "MA": "Financials",
+    "BAC": "Financials",
+    "GS": "Financials",
+    "MS": "Financials",
+    "AXP": "Financials",
+    "BLK": "Financials",
+    "LLY": "Health",
+    "UNH": "Health",
+    "JNJ": "Health",
+    "ABBV": "Health",
+    "MRK": "Health",
+    "TMO": "Health",
+    "ABT": "Health",
+    "ISRG": "Health",
+    "AMGN": "Health",
+    "TEVA": "Health",
+    "XOM": "Energy",
+    "CVX": "Energy",
+    "COP": "Energy",
+    "CAT": "Industrials",
+    "GE": "Industrials",
+    "RTX": "Industrials",
+    "HON": "Industrials",
+    "UBER": "Industrials",
+    "DE": "Industrials",
+    "LMT": "Industrials",
+    "UNP": "Industrials",
+    "LIN": "Materials",
+    "NEE": "Utilities",
+    "PLD": "RealEstate",
+    "CHKP": "Tech",
+    "NICE": "Tech",
+    "WIX": "Tech",
+    "MNDY": "Tech"
+  },
+  "costs": {
+    "slippage_bps": 5,
+    "commission_per_share": 0.0
+  },
+  "risk": {
+    "target_vol_annual": 0.12,
+    "max_gross": 1.0,
+    "max_position_pct": 0.1,
+    "max_etf_position_pct": 0.2,
+    "max_sector_pct": 0.3,
+    "max_positions": 15,
+    "min_score": 0.15,
+    "regime_sma_days": 200,
+    "risk_off_gross_mult": 0.5,
+    "dd_halve": -0.1,
+    "dd_flat": -0.2,
+    "atr_days": 14,
+    "atr_stop_mult": 3.0,
+    "rebalance_band_pct": 0.02,
+    "min_trade_value": 500,
+    "vol_lookback_days": 60,
+    "exit_score": 0.0,
+    "keep_rank_mult": 2.0,
+    "rebalance_every_days": 5,
+    "stop_cooldown_days": 10,
+    "defensive_vix_pct": 0.8,
+    "defensive_gross_mult": 0.75,
+    "earnings_blackout_days": 4,
+    "lowvol_exclude_top_pct": 0.2,
+    "lowvol_exclude_lookback": 252,
+    "earnings_max_position_pct": 0.05,
+    "regime_band_pct": 0.02,
+    "regime_band_mode": "offset",
+    "dd_reentry_days": 20,
+    "lowvol_exclude_min_names": 10
+  },
+  "signals": {
+    "tsmom": {
+      "lookback": 252,
+      "skip": 21
+    },
+    "xsmom": {
+      "lookback": 252,
+      "skip": 21
+    },
+    "trend": {
+      "fast": 50,
+      "slow": 200
+    },
+    "reversal": {
+      "lookback": 5
+    },
+    "lowvol": {
+      "lookback": 60
+    },
+    "high52": {
+      "lookback": 252
+    },
+    "breakout": {
+      "lookback": 55
+    },
+    "rsi2": {
+      "period": 2,
+      "trend_sma": 200
+    }
+  },
+  "prior_weights": {
+    "tsmom": 0.25,
+    "xsmom": 0.25,
+    "trend": 0.2,
+    "breakout": 0.2,
+    "high52": 0.03,
+    "reversal": 0.02,
+    "rsi2": 0.05,
+    "lowvol": 0.0
+  },
+  "learning": {
+    "horizons_days": [
+      5,
+      20,
+      60
+    ],
+    "primary_horizon_days": 20,
+    "default_horizon": 20,
+    "ic_half_life_days": 504,
+    "eta": 0.3,
+    "weight_floor": 0.02,
+    "weight_cap": 0.35,
+    "max_step": 0.02,
+    "update_every_days": 21,
+    "tau": 0.02,
+    "ic_sd_floor": 0.15,
+    "z_cap": 2.5,
+    "min_n_eff": 12,
+    "enabled": true,
+    "ic_min_names": 10
+  },
+  "alerts": {
+    "ntfy_topic_env": "AITRADER_NTFY_TOPIC",
+    "telegram_token_env": "AITRADER_TELEGRAM_TOKEN",
+    "telegram_chat_env": "AITRADER_TELEGRAM_CHAT"
+  },
+  "sec_user_agent": "ai-trader-research-bot contact@example.com",
+  "_note_priors": "2026-11-09: reversal/high52/rsi2 demoted (decayed after publication, strategy-science brief); lowvol used as an exclusion filter instead of a score.",
+  "news": {
+    "_note": "Owner's rules 2026-11-09: buy only if Claude's headline score > 8; max 5% of the account per trade; sell at -3% from entry, no exceptions. sell_on_score_at_most and max_hold_days are Claude's additions (set to 0 to disable). Owner's decision 2026-11-11: a scorer answer that is a fraction counts only for the bad-news exit of a held name, compared as it is (1.6 sells, 2.4 does not); it never buys. block_buys_until_loss_reviewed: Claude's reduce-only addition that keeps the owner's order of 2026-11-10 (Basic law, item 3: every loss is studied). While a realized news loss has no review in state/postmortems.jsonl the engine opens no new position; sales and stops are never held back; false switches it off. Exit lever: `python3 -m aitrader news-exit SYMBOL --reason TEXT` asks the engine to sell a held name at its next live quote and keeps it from buying that name that day (state/news_exits.json; `--cancel --said TEXT` takes a waiting request back, only on the owner's word, and writes it to state/news_exit_cancels.jsonl); it never buys and never weakens the stop. sleep_slice_seconds: the wait between two steps (poll_seconds) is slept in slices of this length, so that a planned stop (SIGTERM or SIGINT to the engine) is seen within one slice and not after the whole wait; it changes no trading rule.",
+    "poll_seconds": 20,
+    "sleep_slice_seconds": 0.5,
+    "fresh_minutes": 30,
+    "buy_min_score": 8,
+    "max_position_pct": 0.05,
+    "stop_loss_pct": 0.03,
+    "sell_on_score_at_most": 2,
+    "max_hold_days": 5,
+    "max_gross": 1.0,
+    "slippage_bps": 10,
+    "starting_cash": 100000,
+    "model": "claude-haiku-5-5",
+    "trade_outside_hours": false,
+    "batch_max": 12,
+    "max_quote_age_minutes": 3,
+    "chain_check_seconds": 300,
+    "alert_after_errors": 5,
+    "stop_blind_alert_seconds": 300,
+    "block_buys_until_loss_reviewed": true,
+    "_note_guards": "Added after the MU loss of 2026-11-10 (state/postmortems.jsonl). Each can only refuse a buy or bring a sale forward. guards: the no-chase limit (max_day_move_pct_to_buy), the second check (verify_*) and the stop cooldown (rebuy_cooldown_sessions) are new rules, not repairs, and they rest on one loss: with guards = log (the default) they only write to state/news_checks.jsonl what they would have refused and change no trade; with guards = enforce they refuse. Enforcing is a rule change: on evidence it may be proposed only after 30 or more graded above-the-line headlines in news_checks.jsonl with |t| > 2 for the guard (skills/trader/SKILL.md section 3, item 5), through rule 4 and with the owner's answer; before that it is only the owner's own choice to reduce risk, and is put to him as such (one case, no forward record). Do NOT set enforce yet: in that mode the second check runs inside the batch and can age the quote of a bad-news sale behind it (state/backlog.md, item 35); the batch must first be handled in two passes, sales before buys. require_known_move is a repair (Basic law, item 1: missing data, no trade) and is always enforced: no buy in session when today's move of the stock is not known. max_day_move_pct_to_buy: the stock is already up this many percent today (3 = the stop distance, not a measured number; 0 switches it off). rebuy_cooldown_sessions: a name sold at its stop, until this many sessions have opened since (1 = the day of the stop). verify_buys: with guards = enforce, before a buy or a place in the queue, verify_calls independent checks must each call the headline a new, confirmed event of one of verify_allow_kinds (verify_model null = news.model), and with verify_rescore the same scorer, asked again, must still score it above buy_min_score; a check that fails or does not answer within verify_timeout_seconds is a refusal. With guards = log the same questions are asked after the buy, in the background (verify_parallel at a time), and only written down; they hold up no buy, no sale and no look at a stop, and an answer that is still out when a run ends in market hours is dropped, not waited for. stop_catchup: when a held name's stop was not looked at for more than stop_catchup_gap_seconds (engine down, a stalled step, no live quote), today's 1-minute bars of that stretch are read once at least stop_catchup_min_seconds of it have passed; a bar that closed at or under the stop, or stop_catchup_min_lows bars with a low at or under it, means the stop was traded through unseen (bars are trusted only when, for a stretch of stop_catchup_min_minutes or more, at least stop_catchup_min_bar_share of its minutes are there). alert (default until the owner decides): he is told at once and the position stays on its normal stop. sell: it is also sold at its first live quote that day. off: no look.",
+    "require_known_move": true,
+    "max_day_move_pct_to_buy": 3.0,
+    "rebuy_cooldown_sessions": 1,
+    "verify_buys": true,
+    "verify_calls": 2,
+    "verify_rescore": true,
+    "verify_timeout_seconds": 60,
+    "verify_model": null,
+    "verify_allow_kinds": ["company_announcement", "regulator_or_counterparty"],
+    "guards": "log",
+    "stop_catchup": "alert",
+    "stop_catchup_gap_seconds": 90,
+    "stop_catchup_min_seconds": 120,
+    "stop_catchup_min_lows": 2,
+    "stop_catchup_min_minutes": 4,
+    "stop_catchup_min_bar_share": 0.5,
+    "verify_parallel": 1,
+    "health_log_seconds": 300,
+    "seen_keep_days": 3,
+    "exits_lock_wait_seconds": 1.0,
+    "exits_lock_retry_seconds": 0.05
+  },
+  "postmortem": {
+    "_note": "Basic law, item 3 (loss reviews, aitrader/postmortem.py). min_chars: the shortest text a review may have in each answer, so a one-word review cannot clear a loss (fix_ref: where the fix lives, a commit or a backlog item; not asked of a planned loss). min_key_chars: how many characters of a sale's hash a review must give to name it.",
+    "min_chars": {"what": 40, "lesson": 20, "fix": 10, "fix_ref": 7},
+    "min_key_chars": 8
+  },
+  "_note_bootstrap": "Time-machine ranges and the fill-drift report (measurement only: no decision, pass rule or live path reads them). bootstrap: stationary block bootstrap of daily returns - mean block length in days, number of resamples, seed (a whole number: null is refused), level of the range, and min_blocks: under min_blocks x block_days days of returns no range is computed. The crypto sweep keeps its own pre-registered block, draws and seed (aitrader/crypto_sweep.py) and takes level and min_blocks from here. Never change block_days after seeing a range. drift: seconds between Yahoo chart calls.",
+  "bootstrap": {
+    "block_days": 20,
+    "draws": 2000,
+    "seed": 0,
+    "level": 0.95,
+    "min_blocks": 40
+  },
+  "drift": {
+    "pause_seconds": 1.5
+  },
+  "supervisor": {
+    "_note": "Supervisor spec 2026-11-10, section 10. The first three keys, for the lines the news engine sends the owner (aitrader/ownerlines.py): max_line_bytes: no line is longer (ntfy takes 4,096 bytes). held_names_in_line: the held names a line lists before it says how many more. free_text_max_chars: a note, a file name or a list that comes from outside is cut to this.",
+    "max_line_bytes": 1200,
+    "held_names_in_line": 6,
+    "free_text_max_chars": 200
+  },
+  "books": {
+    "_note": "Book profiles (spec 2026-11-09-crypto-book-design, sections 3.1 and 5; plan planning decisions). load_config('crypto') = this file without 'books', then books.crypto merged over it, then books.<ship_profile> over that when it is not 'crypto'. universe, prior_weights, signals and benchmark are replaced whole; every other block merges key by key. crypto_base lists only what differs from the candidate. Zero-weight signals keep the stock parameters (the values the replays used); max_positions 2 = the whole two-coin universe (the replays' 15 behaves the same). The candidate leaves risk.dd_reentry_ref to its default (dd_halve + dd_flat) / 2 = -0.375 (planning decision 1). risk.max_position_pct_by_symbol XRP-USD is read only by the crypto sweep's BTC+XRP hindsight control (XRP is in no profile's universe).",
+    "crypto": {
+      "ship_profile": "crypto_base",
+      "benchmark": "BTC-USD",
+      "universe": {
+        "BTC-USD": "Crypto",
+        "ETH-USD": "Crypto"
+      },
+      "account": {
+        "starting_cash": 100000,
+        "cash_yield_annual": 0
+      },
+      "costs": {
+        "slippage_bps": 5,
+        "fee_bps": 50,
+        "exec_delay_bps": 10,
+        "qty_step": 1e-6
+      },
+      "risk": {
+        "target_vol_annual": 0.30,
+        "max_gross": 1.0,
+        "max_position_pct": 1.0,
+        "max_position_pct_by_symbol": {
+          "BTC-USD": 1.0,
+          "ETH-USD": 0.6,
+          "XRP-USD": 0.6
+        },
+        "max_sector_pct": 1.0,
+        "max_positions": 2,
+        "min_score": 0.15,
+        "exit_score": 0.0,
+        "keep_rank_mult": 2.0,
+        "regime_sma_days": 200,
+        "regime_band_pct": 0.02,
+        "regime_band_mode": "hysteresis",
+        "risk_off_gross_mult": 0.0,
+        "dd_halve": -0.25,
+        "dd_flat": -0.5,
+        "dd_reentry_days": 20,
+        "atr_days": 14,
+        "atr_stop_mult": 3.0,
+        "rebalance_band_pct": 0.05,
+        "min_trade_value": 100,
+        "vol_lookback_days": 60,
+        "rebalance_every_days": 7,
+        "stop_cooldown_days": 14,
+        "lowvol_exclude_top_pct": 0.0,
+        "defensive_vix_pct": 0
+      },
+      "signals": {
+        "tsmom": {
+          "lookback": 365,
+          "skip": 30
+        },
+        "xsmom": {
+          "lookback": 252,
+          "skip": 21
+        },
+        "trend": {
+          "fast": 50,
+          "slow": 200
+        },
+        "reversal": {
+          "lookback": 5
+        },
+        "lowvol": {
+          "lookback": 60
+        },
+        "high52": {
+          "lookback": 252
+        },
+        "breakout": {
+          "lookback": 80
+        },
+        "rsi2": {
+          "period": 2,
+          "trend_sma": 200
+        }
+      },
+      "prior_weights": {
+        "tsmom": 0.3846,
+        "xsmom": 0.0,
+        "trend": 0.3077,
+        "breakout": 0.3077,
+        "high52": 0.0,
+        "reversal": 0.0,
+        "rsi2": 0.0,
+        "lowvol": 0.0
+      },
+      "learning": {
+        "enabled": false,
+        "default_horizon": 30,
+        "horizons_days": [
+          7,
+          30,
+          90
+        ]
+      },
+      "market": {
+        "calendar": "utc_daily",
+        "periods_per_year": 365,
+        "history": "max",
+        "vix": false,
+        "earnings_blackout": false,
+        "overlays": false,
+        "corporate_actions": false,
+        "news_engine": false,
+        "fill_regime_on_no_picks": true,
+        "equity_mark_per_bar": true,
+        "delete_proposal_on_decision": true,
+        "grading": "absolute",
+        "stale_skips_run": true,
+        "close_source": "yahoo",
+        "close_source_note": "Revised-close check 2026-11-11 16:09 UTC (research/2026-11-11-crypto-revised-close.md): the open moved, the close did not. BTC 11-08 close stayed 74,584.65 and the 11-09 open became 74,584.65 (was 74,719.82 on 11-09); ETH the same (2,120.98; the open was 2,124.33). So the decision close is Yahoo's close as fetched, and next_open is not used.",
+        "coinbase_guard_pct": 0.01,
+        "report_dir": "reports/crypto",
+        "intraday_alert_pct": 0.08,
+        "latest_max_age_hours": 26,
+        "state_subdir": "crypto",
+        "etf_groups": [],
+        "quiet_hours": {
+          "tz": "Asia/Jerusalem",
+          "from": "23:00",
+          "to": "08:00"
+        },
+        "revised_close_alert_bps": 5,
+        "fill_max_wait_hours": 24,
+        "fill_urgent_after_hours": 3
+      }
+    },
+    "crypto_base": {
+      "universe": {
+        "BTC-USD": "Crypto"
+      },
+      "prior_weights": {
+        "tsmom": 0.0,
+        "xsmom": 0.0,
+        "trend": 1.0,
+        "breakout": 0.0,
+        "high52": 0.0,
+        "reversal": 0.0,
+        "rsi2": 0.0,
+        "lowvol": 0.0
+      },
+      "risk": {
+        "min_score": -1.0,
+        "exit_score": -1.01,
+        "atr_stop_mult": 0.0,
+        "dd_halve": -1.0,
+        "dd_reentry_ref": -0.25,
+        "defensive_vix_pct": 0
+      }
+    }
+  }
+}

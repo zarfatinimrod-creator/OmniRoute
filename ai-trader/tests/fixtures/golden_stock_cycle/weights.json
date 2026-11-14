@@ -1,0 +1,14 @@
+{
+  "asof": "2021-07-13",
+  "weights": {
+    "tsmom": 0.25,
+    "xsmom": 0.25,
+    "trend": 0.2,
+    "breakout": 0.2,
+    "high52": 0.03,
+    "reversal": 0.02,
+    "rsi2": 0.05,
+    "lowvol": 0.0
+  },
+  "bootstrapped_from": "2021-02-24"
+}

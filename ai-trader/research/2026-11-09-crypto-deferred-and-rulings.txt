@@ -1,0 +1,45 @@
+Ruling: R1 — a panel/frame without attrs["fetched_at"] counts as fresh (stub and test panels); staleness tests set fetched_at explicitly; live fetch_daily always sets it — cost if wrong: a live code path that drops attrs would silently skip the freshness check (T5 test must cover that fetch_daily/fetch_panel preserve attrs).
+Ruling: R2 — T3 fractional-qty test computes its expected qty from the formula with the profile's slippage/fee (or with fee 0 and slip 0 for the literal 0.133484 case), never mixing — cost if wrong: a test that asserts a wrong number.
+Ruling: R3 — T10 harness: /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/harness/run.js (exists this session); if missing, the implementer recreates the mock-dash harness under scratch — cost if wrong: a skipped visual check.
+Ruling: R4 — no AI attribution trailers in commit messages (ai-trader convention this session; OmniRoute Hard Rule 16 spirit) — implementers are told; the controller strips trailers from unpushed commits — cost if wrong: none functional.
+Task 0: minor (deferred): test_golden_stock.py docstring regen command should be 'discover -s tests -p test_golden_stock.py'
+Task 0: minor (deferred): pickled panel fixture may break on pandas upgrade (switch to CSV/parquet if so)
+Task 0: minor (deferred): GOLDEN_WRITE regenerates each golden independently
+Ruling: R5 — maybe_reset_peak default reentry_ref = (dd_halve+dd_flat)/2 when dd_halve > dd_flat, else dd_flat/2 (no halving step) — carried into Task 3 — cost if wrong: an ablated no-halving variant would stay in cash forever after a -50% event.
+Task 1: minor (deferred): crypto risk inherits 6 stock keys (defensive_vix_pct truthy etc.) -> carried into Task 2 (set defensive_vix_pct 0 / test the leak set)
+Task 1: minor (deferred): ship_profile leaks into merged config -> carried into Task 9 (pop it, add cfg["profile"])
+Task 1: minor (deferred): isolation test does not snapshot report.ROOT -> carried into Task 6 (report_dir)
+Task 1: minor (deferred): data.py REGISTRY import before stock early return (nit)
+Task 2: minor (deferred): backtest.py:122 leftover ETF literal in stock-only _etf sweep variant
+Task 2: minor (deferred): backtest.py:84-86 periods_per_year(cfg) called 4x (hoist)
+Task 2: minor (deferred): test_symbol_cap_override uses 0.2 cap instead of 0.6
+Task 3: minor (deferred): whole-unit check differs (isinstance int at broker.py:87 vs qty_step != 1 at :187/:195) — decide once in __init__
+Task 3: minor (deferred): adding to a position floors the new total (broker.py:187) — use round(qty_old+qty, 8)
+Task 3: minor (deferred): cash guard expression differs in float order from _fill deduction (knife-edge -1e-11)
+Task 3: minor (deferred): stock SELL fill not asserted fee-free in test_broker_crypto.py:61
+Task 4: minor (deferred): research replay scripts fake hysteresis via aux["bench_sma"] — now inert; reruns must set regime_band_mode
+Task 4: minor (deferred): research replay scripts silently offset-mode now; codemap note 'keep working' is wrong
+Task 4: minor (deferred): regime_series mixes positional/label alignment (add index-equality assert)
+Ruling: R6 — the revised-close audit (compare a logged decision close with later history; event + queued alert above market.revised_close_alert_bps) goes into Task 6 (crypto cycle path), with the config key — cost if wrong: a silent live/replay divergence.
+Ruling: R7 — a crypto skip and a frozen held stock symbol must surface in alerts: Task 8's summary lists skips and frozen held symbols as urgent when repeated (>=2 runs) — cost if wrong: unnoticed stale data with unchecked stops.
+Ruling: R8 — no NotImplementedError placeholder for Task 6; existing crypto tests exercise the path — cost if wrong: none (Task 6 replaces the path).
+Task 5: minor (deferred): strategy.py:177 negative slice when frozen held > max_positions (use max(0, ...))
+Task 5: minor (deferred): frozen symbol's partial close still feeds mark/learning/predictions (cycle.py:302)
+Task 5: minor (deferred): no test for frozen name below ATR stop / on exits_only day
+Ruling: R9 — carried into Task 6: (a) persist pending["coinbase_breach"] and fill the main book exits_only on breach (cycle.py:328); (b) a benchmark stale on the decision bar (prev) means no decision this run + event (cycle.py:393-395); (c) the fill path must handle a dropped-D panel (next_open) — cost if wrong: a fill re-buying at a suspect weight / deciding on a partial benchmark close.
+Ruling: R10 — a missing exec_ts bar fills at the first later hourly open where every coin has a bar (spec 6.1 "next available hourly open"); exec_ts/override cutoff unchanged — cost if wrong: a later fill price than intended on outage days.
+Ruling: R11 — R9b's stock effect (benchmark stale on the decision bar -> no decision, pending fill still runs) is an intended robustness change consistent with spec 4 "a stale benchmark skips the run"; listed with the bar-final rule as the stock changes — cost if wrong: a skipped stock decision after a >1-day data outage.
+Task 6: minor (deferred): cycle.py:309 probe-count comment wrong; cap the hour walk or stop on transport error
+Task 6: minor (deferred): data.py:417-432 intraday_open docstring vs live behaviour; add dataGranularity assert
+Task 6: minor (deferred): cycle.py:267-270 _fill_books docstring wording on breach (shadow gets clamped targets)
+Task 6: minor (deferred): optional test for a fill exactly at exec_ts
+Task 7: minor (deferred): utc branch ignores price_at (no crypto writer records it today)
+Ruling: R12 — R7's "frozen held stock symbols" alert is out of v1 scope (summary is crypto-only; crypto never freezes); deferred to the final review list — cost if wrong: a persistently stale stock symbol stays frozen without an alert.
+Ruling: R13 — rule 5: XRP cap into config risk.max_position_pct_by_symbol; assert FEES_BP[0] == costs.fee_bps; drop unused START — pre-registration gate constants (6/7, 0.95, 2 pts, bootstrap params) stay as named constants citing spec 7, like backtest._variants — cost if wrong: a reviewer citing rule 5 again.
+Ruling: R14 — dsr.json/result carry config_change_needed + overrides when ablation drops components (load-bearing for Task 11 ship) — cost if wrong: shipping a config that never passed the gate.
+Ruling: R15 — DSR uses phase 0, not the phase average (conservative; matches the stock sweep and the live single phase) — cost if wrong: a slightly pessimistic DSR.
+Task 9: minor (deferred): lag-2 on-cycle decision could buy back a symbol a queued exits-only just sold (missed-night run only, informational)
+Task 9: minor (deferred): N counts all crypto looks incl. earlier sweeps (conservative; document in spec)
+Task 10: minor (deferred): #ck-claude tile lacks the no-proven-edge mark
+Task 10: minor (deferred): take sentence prints 'DSR —' when dsr.json missing
+Task 10: minor (deferred): crypto night runs not listed in the schedule table (add with Task 11 triggers)

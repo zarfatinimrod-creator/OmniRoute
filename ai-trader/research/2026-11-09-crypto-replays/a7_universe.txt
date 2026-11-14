@@ -1,0 +1,6 @@
+n=74 stocks from config.json universe, Yahoo range=2y daily (raw OHLC; splits not adjusted -> a split day can count as a touch)
+vol: median 30.9%  p25 25.6%  p75 41.4%  max 74.3% (INTC)
+P(touch -3% within 1 trading days): median 5.8%  p25 3.9%  p75 10.8%
+P(touch -3% within 3 trading days): median 27.4%  p25 19.6%  p75 37.1%
+P(touch -3% within 5 trading days): median 40.3%  p25 29.9%  p75 49.3%
+stocks with vol >= BTC 2y vol 44.1%: 14 (NVDA, QCOM, NICE, AVGO, NOW, AMAT, TSLA, ORCL, PLTR, WIX, AMD, MNDY, MU, INTC)

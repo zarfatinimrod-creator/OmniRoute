@@ -1,0 +1,801 @@
+<meta name="dash-one-writer">
+<style>
+  .at { font-family: var(--font-anthropic-sans); color: var(--color-fg); display: grid; gap: var(--cds-gap-lg); }
+  .at .ttl-row { display: flex; align-items: center; gap: var(--cds-gap-md); flex-wrap: wrap; }
+  .at h1.ttl { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; }
+  .at .paper { font-size: var(--cds-font-size-caption); border: 1px solid var(--color-warn); color: var(--color-warn); border-radius: 999px; padding: 2px 10px; }
+  .at .meta { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: var(--cds-gap-xs) 0 0; line-height: 1.6; }
+  .at .take { font-size: var(--cds-font-size-heading); margin: var(--cds-gap-sm) 0 0; line-height: 1.6; }
+  .at .card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+  .at h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+  .at .cap { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 0 0 var(--cds-gap-md); line-height: 1.55; }
+  .at .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: var(--cds-gap-md); }
+  .at .tile .lbl { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+  .at .tile .big { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: var(--cds-gap-xs) 0; }
+  .at .tile .sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.5; }
+  .at .num { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; display: inline-block; }
+  .at .pos { color: var(--color-ok); }
+  .at .neg { color: var(--color-bad); }
+  .at .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: var(--cds-gap-lg); }
+  .at .tw { overflow-x: auto; }
+  .at .tw.dash-skeleton { min-height: 96px; }
+  .at table.tbl { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+  .at .tbl th { text-align: start; color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); padding: 6px 8px; border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+  .at .tbl td { padding: 6px 8px; border-bottom: 1px solid var(--color-border-line); vertical-align: top; white-space: nowrap; }
+  .at .tbl tbody tr:last-child td { border-bottom: 0; }
+  .at .tbl td.n { direction: ltr; unicode-bidi: isolate; text-align: right; }
+  .at .tbl th.n { text-align: right; }
+  .at .tbl td.long { white-space: normal; min-width: 240px; line-height: 1.5; }
+  .at .tbl.is-empty thead { display: none; }
+  .at .empty { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: var(--cds-gap-sm) 0 0; line-height: 1.6; }
+  .at .pill { display: inline-block; min-width: 1.9em; text-align: center; border-radius: 999px; padding: 1px 8px; font-weight: var(--cds-font-weight-medium); }
+  .at .sc-hi { background: color-mix(in srgb, var(--color-ok) 18%, transparent); color: var(--color-ok); }
+  .at .sc-lo { background: color-mix(in srgb, var(--color-bad) 18%, transparent); color: var(--color-bad); }
+  .at .sc-mid { background: color-mix(in srgb, var(--color-fg-muted) 14%, transparent); color: var(--color-fg); }
+  .at .who-owner { background: color-mix(in srgb, var(--color-warn) 18%, transparent); color: var(--color-warn); }
+  .at .who-other { background: color-mix(in srgb, var(--color-fg-muted) 12%, transparent); color: var(--color-fg-muted); }
+  .at .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 6px; background: var(--color-fg-muted); }
+  .at .st-ok .dot { background: var(--color-ok); }
+  .at .st-warn .dot { background: var(--color-warn); }
+  .at .st-bad .dot { background: var(--color-bad); }
+  .at .legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-bottom: var(--cds-gap-sm); }
+  .at .legend i, .at .tip i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-inline-end: 6px; background: var(--color-fg-muted); }
+  .at .chart { position: relative; direction: ltr; min-height: 260px; touch-action: pan-y; }
+  .at .chart .ax text, .at .gauge .ax text { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); font-family: var(--font-anthropic-sans); }
+  .at .chart .fail { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); padding: var(--cds-pad-md); direction: rtl; }
+  .at .tip { position: absolute; top: 8px; pointer-events: none; direction: rtl; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: 6px 10px; font-size: var(--cds-font-size-caption); white-space: nowrap; opacity: 0; }
+  .at .tip .tt { color: var(--cds-text-secondary); margin-bottom: 2px; }
+  .at .dsr { font-size: var(--cds-font-size-body); margin: var(--cds-gap-md) 0 0; }
+  .at .part { display: grid; gap: var(--cds-gap-lg); padding-top: var(--cds-gap-lg); border-top: 1px solid var(--color-border-line); }
+  .at h2.ttl2 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; }
+  .at .noedge { color: var(--color-warn); }
+  .at .gauge { position: relative; direction: ltr; min-height: 64px; }
+  .at .gauge .trk { stroke: var(--cds-chart-grid); stroke-width: 6; stroke-linecap: round; }
+  .at .gauge .band { fill: color-mix(in srgb, var(--color-warn) 16%, transparent); }
+  .at .gauge .l-cash, .at .legend i.sw-cash { stroke: var(--color-bad); background: var(--color-bad); }
+  .at .gauge .l-sma, .at .legend i.sw-sma { stroke: var(--cds-chart-reference); background: var(--cds-chart-reference); }
+  .at .gauge .l-back, .at .legend i.sw-back { stroke: var(--color-ok); background: var(--color-ok); }
+  .at [data-dash-source-state=refreshing] { opacity: .5; }
+  .at .foot { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); line-height: 1.7; }
+  .at .foot details { margin-top: var(--cds-gap-sm); }
+  .at .foot dt { font-weight: var(--cds-font-weight-medium); color: var(--color-fg); margin-top: var(--cds-gap-sm); }
+  .at .foot dd { margin: 0; }
+</style>
+
+<div class="at" dir="rtl" lang="he">
+  <header id="top">
+    <div class="ttl-row">
+      <h1 class="ttl">AI Trader · חדר מסחר</h1>
+      <span class="paper">כסף נייר</span>
+    </div>
+    <p class="meta">
+      עודכן <span class="num" data-draw="kv" data-source="kpi" data-field="as_of_il" data-row="0">—</span> (שעון ישראל)
+      · שוק <span data-draw="kv" data-source="kpi" data-field="market" data-row="0" data-fmt="market">—</span>
+      · מנוע חדשות <span data-draw="kv" data-source="kpi" data-field="news_engine" data-row="0" data-fmt="engine">—</span>
+      · החלטה אחרונה <span class="num" data-draw="kv" data-source="kpi" data-field="decision_date" data-row="0" data-fmt="date">—</span>:
+      <span data-draw="kv" data-source="kpi" data-field="pending_status" data-row="0">—</span>
+    </p>
+    <p class="take" id="takeaway">
+      התיק הכמותי <b class="num" data-draw="kv" data-source="kpi" data-field="quant_ret" data-row="0" data-fmt="spct" data-tone="sign">—</b>
+      מאז <span class="num" data-draw="kv" data-source="kpi" data-field="started" data-row="0" data-fmt="date">—</span>,
+      ו-SPY <b class="num" data-draw="kv" data-source="kpi" data-field="spy_ret" data-row="0" data-fmt="spct" data-tone="sign">—</b> באותה תקופה.
+      תיק החדשות <b class="num" data-draw="kv" data-source="kpi" data-field="news_ret" data-row="0" data-fmt="spct" data-tone="sign">—</b>.
+    </p>
+  </header>
+
+  <section class="kpis" id="kpis">
+    <div class="card tile" id="k-quant">
+      <div class="lbl">תיק כמותי (נייר)</div>
+      <div class="big num" data-draw="kv" data-source="kpi" data-field="quant_equity" data-row="0" data-fmt="usd">—</div>
+      <div class="sub"><span class="num" data-draw="kv" data-source="kpi" data-field="quant_ret" data-row="0" data-fmt="spct" data-tone="sign">—</span> מאז ההתחלה</div>
+    </div>
+    <div class="card tile" id="k-alpha">
+      <div class="lbl">פער מול SPY</div>
+      <div class="big num" data-draw="kv" data-source="kpi" data-field="alpha_vs_spy" data-row="0" data-fmt="spct" data-tone="sign">—</div>
+      <div class="sub">SPY <span class="num" data-draw="kv" data-source="kpi" data-field="spy_ret" data-row="0" data-fmt="spct">—</span> באותה תקופה</div>
+    </div>
+    <div class="card tile" id="k-news">
+      <div class="lbl">תיק חדשות (נייר)</div>
+      <div class="big num" data-draw="kv" data-source="kpi" data-field="news_equity" data-row="0" data-fmt="usd">—</div>
+      <div class="sub"><span class="num" data-draw="kv" data-source="kpi" data-field="news_ret" data-row="0" data-fmt="spct" data-tone="sign">—</span> · <span class="num" data-draw="kv" data-source="kpi" data-field="n_news_positions" data-row="0" data-fmt="int">—</span> פוזיציות</div>
+    </div>
+    <div class="card tile" id="k-claude">
+      <div class="lbl">השפעת Claude</div>
+      <div class="big num" data-draw="kv" data-source="kpi" data-field="claude_effect" data-row="0" data-fmt="spct" data-tone="sign">—</div>
+      <div class="sub">תיק צל בלי Claude: <span class="num" data-draw="kv" data-source="kpi" data-field="shadow_ret" data-row="0" data-fmt="spct">—</span></div>
+    </div>
+    <div class="card tile" id="k-exposure">
+      <div class="lbl">חשיפה למניות</div>
+      <div class="big num" data-draw="kv" data-source="kpi" data-field="gross_pct" data-row="0" data-fmt="pct0">—</div>
+      <div class="sub">מזומן <span class="num" data-draw="kv" data-source="kpi" data-field="cash_pct" data-row="0" data-fmt="pct0">—</span> · <span class="num" data-draw="kv" data-source="kpi" data-field="n_positions" data-row="0" data-fmt="int">—</span> מניות</div>
+    </div>
+    <div class="card tile" id="k-dd">
+      <div class="lbl">ירידה מהשיא</div>
+      <div class="big num" data-draw="kv" data-source="kpi" data-field="drawdown" data-row="0" data-fmt="pct2" data-tone="sign">—</div>
+      <div class="sub">מפסק ירידה: <span data-draw="kv" data-source="kpi" data-field="dd_state" data-row="0">—</span></div>
+    </div>
+    <div class="card tile" id="k-vix">
+      <div class="lbl">VIX (מדד הפחד)</div>
+      <div class="big num" data-draw="kv" data-source="kpi" data-field="vix" data-row="0" data-fmt="num2">—</div>
+      <div class="sub">משטר: <span data-draw="kv" data-source="kpi" data-field="regime" data-row="0">—</span></div>
+    </div>
+    <div class="card tile" id="k-headlines">
+      <div class="lbl">כותרות שקיבלו ציון היום</div>
+      <div class="big num" data-draw="kv" data-source="kpi" data-field="headlines_today" data-row="0" data-fmt="int">—</div>
+      <div class="sub"><span class="num" data-draw="kv" data-source="kpi" data-field="news_trades_total" data-row="0" data-fmt="int">—</span> עסקאות חדשות עד היום</div>
+    </div>
+  </section>
+
+  <section class="card" id="equity-card">
+    <h2>תשואה מצטברת מאז ההתחלה</h2>
+    <p class="cap">כמותי, צל ו-SPY: נקודה לכל מחזור מסחר. חדשות: נקודה כל 5 דקות בשעות המסחר. צל = אותו בוט בדיוק, בלי ההתערבויות של Claude.</p>
+    <div class="legend" data-source="equity">
+      <span><i data-swatch="0"></i><span data-legend="quant">כמותי</span></span>
+      <span><i data-swatch="1"></i><span data-legend="shadow">צל (בלי Claude)</span></span>
+      <span><i data-swatch="2"></i><span data-legend="spy">SPY</span></span>
+      <span><i data-swatch="3"></i><span data-legend="news">חדשות</span></span>
+    </div>
+    <div class="chart" data-draw="equity" data-source="equity" data-series="quant,shadow,spy,news" data-label="תשואה מצטברת של התיק הכמותי, תיק הצל, תיק החדשות ו-SPY לאורך זמן"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="positions">
+      <h2>פוזיציות - תיק כמותי</h2>
+      <p class="cap">מחיר אחרון מ-Yahoo ברגע העדכון. רווח/הפסד מול מחיר הקנייה.</p>
+      <div class="tw"><table class="tbl" data-source="positions" data-row-key="symbol">
+        <thead><tr>
+          <th data-field="symbol">מניה</th><th data-field="sector">סקטור</th>
+          <th class="n" data-field="qty" data-fmt="int">כמות</th>
+          <th class="n" data-field="avg_cost" data-fmt="usd2">קנייה</th>
+          <th class="n" data-field="last" data-fmt="usd2">אחרון</th>
+          <th class="n" data-field="value" data-fmt="usd">שווי</th>
+          <th class="n" data-field="weight" data-fmt="pct1">משקל</th>
+          <th class="n" data-field="pnl_pct" data-fmt="spct" data-tone="sign">רווח/הפסד</th>
+          <th class="n" data-field="since" data-fmt="date">מאז</th>
+        </tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+      <p class="empty" data-empty-for="positions" hidden>אין פוזיציות פתוחות בתיק הכמותי.</p>
+    </section>
+
+    <section class="card" id="orders">
+      <h2>פקודות - ההחלטה האחרונה</h2>
+      <p class="cap">ההחלטה מתקבלת בסגירה ומבוצעת במחיר הפתיחה של יום המסחר הבא. החלטה מ-<span class="num" data-draw="kv" data-source="kpi" data-field="decision_date" data-row="0" data-fmt="date">—</span>.</p>
+      <div class="tw"><table class="tbl" data-source="orders" data-row-key="symbol">
+        <thead><tr>
+          <th data-field="symbol">מניה</th><th data-field="side" data-fmt="side">פעולה</th>
+          <th class="n" data-field="qty" data-fmt="int">כמות</th>
+          <th class="n" data-field="price" data-fmt="usd2">מחיר</th>
+          <th class="n" data-field="value" data-fmt="usd">שווי</th>
+          <th data-field="desk">דסק</th><th data-field="status">סטטוס</th>
+        </tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+      <p class="empty" data-empty-for="orders" hidden>אין פקודות בהחלטה האחרונה.</p>
+    </section>
+  </div>
+
+  <section class="card" id="desk">
+    <h2>דסק המסחר - קריאות אחרונות</h2>
+    <p class="cap">שור מול דוב, צוות סיכון ומנהל תיק על כל כניסה חדשה. הדסק יכול רק להקטין או להטיל וטו. הסתברות = הסיכוי לנצח את SPY.</p>
+    <div class="tw"><table class="tbl" data-source="desk" data-row-key="symbol">
+      <thead><tr>
+        <th data-field="symbol">מניה</th><th data-field="rating">דירוג</th>
+        <th class="n" data-field="prob" data-fmt="pct0">הסתברות</th>
+        <th class="long" data-field="thesis">תזה</th>
+        <th class="long" data-field="invalidation">מה יוכיח שטעינו</th>
+      </tr></thead>
+      <tbody data-draw="rows"></tbody>
+    </table></div>
+    <p class="empty" data-empty-for="desk" hidden>הדסק עוד לא דן במניות.</p>
+  </section>
+
+  <section class="card" id="news">
+    <h2>חדשות חיות - ציון Claude לכל כותרת</h2>
+    <p class="cap">1 = המניה כנראה תרד, 10 = כנראה תעלה. ירוק = ציון קנייה, אדום = ציון מכירה. השעות בשעון ישראל.</p>
+    <div class="tw"><table class="tbl" data-source="news" data-row-key="id">
+      <thead><tr>
+        <th class="n" data-field="time">נקלט</th><th data-field="symbol">מניה</th>
+        <th data-field="score" data-fmt="score">ציון</th>
+        <th class="long" data-field="headline">כותרת</th>
+        <th class="long" data-field="why">נימוק</th>
+        <th data-field="action">פעולה</th>
+      </tr></thead>
+      <tbody data-draw="rows"></tbody>
+    </table></div>
+    <p class="empty" data-empty-for="news" hidden>עוד לא נקלטו כותרות.</p>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="news-positions">
+      <h2>פוזיציות - תיק חדשות</h2>
+      <p class="cap">נקנו על כותרת עם ציון גבוה. יוצאות אוטומטית בסטופ, בכותרת רעה או לפי זמן - המספרים בטבלת החוקים.</p>
+      <div class="tw"><table class="tbl" data-source="news_positions" data-row-key="symbol">
+        <thead><tr>
+          <th data-field="symbol">מניה</th>
+          <th class="n" data-field="qty" data-fmt="int">כמות</th>
+          <th class="n" data-field="avg_cost" data-fmt="usd2">קנייה</th>
+          <th class="n" data-field="last" data-fmt="usd2">אחרון</th>
+          <th class="n" data-field="pnl_pct" data-fmt="spct" data-tone="sign">רווח/הפסד</th>
+          <th class="n" data-field="stop_price" data-fmt="usd2">סטופ</th>
+          <th data-field="score" data-fmt="score">ציון</th>
+          <th class="long" data-field="why">למה</th>
+        </tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+      <p class="empty" data-empty-for="news_positions" hidden>אין פוזיציות פתוחות בתיק החדשות. הוא קונה רק כשכותרת מקבלת ציון גבוה בשעות המסחר.</p>
+    </section>
+
+    <section class="card" id="scorecard">
+      <h2>כרטיס ציונים - האם התחזיות צודקות</h2>
+      <p class="cap">אחוז פגיעה = כמה פעמים הכיוון מול SPY היה נכון (50% = מטבע). Brier: 0.25 = מטבע, נמוך יותר = טוב יותר. נבדק רק קדימה, אף פעם לא על העבר.</p>
+      <div class="tw"><table class="tbl" data-source="scorecard" data-row-key="key">
+        <thead><tr>
+          <th data-field="source">מקור</th><th data-field="book">תיק</th>
+          <th class="n" data-field="horizon" data-fmt="days">אופק</th>
+          <th class="n" data-field="n" data-fmt="int">נבדקו</th>
+          <th class="n" data-field="hit_rate" data-fmt="pct1">אחוז פגיעה</th>
+          <th class="n" data-field="brier" data-fmt="num3">Brier</th>
+        </tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+      <p class="empty" data-empty-for="scorecard" hidden>אין עדיין תחזיות שהבשילו. פתוחות כרגע:
+        <b class="num" data-draw="kv" data-source="score_open" data-field="open_quant" data-row="0" data-fmt="int">—</b> תחזיות של התיק הכמותי ו-<b class="num" data-draw="kv" data-source="score_open" data-field="open_news" data-row="0" data-fmt="int">—</b> ציוני חדשות.</p>
+    </section>
+  </div>
+
+  <section class="card" id="trades">
+    <h2>יומן עסקאות - שני התיקים</h2>
+    <p class="cap">40 העסקאות האחרונות, החדשה למעלה. מחיר כולל החלקה (slippage).</p>
+    <div class="tw"><table class="tbl" data-source="trades" data-row-key="id">
+      <thead><tr>
+        <th class="n" data-field="time">זמן</th><th data-field="book">תיק</th>
+        <th data-field="side" data-fmt="side">פעולה</th><th data-field="symbol">מניה</th>
+        <th class="n" data-field="qty" data-fmt="int">כמות</th>
+        <th class="n" data-field="price" data-fmt="usd2">מחיר</th>
+        <th class="n" data-field="value" data-fmt="usd">שווי</th>
+        <th class="n" data-field="pnl" data-fmt="susd" data-tone="sign">רווח ממומש</th>
+        <th class="long" data-field="reason">סיבה</th>
+      </tr></thead>
+      <tbody data-draw="rows"></tbody>
+    </table></div>
+    <p class="empty" data-empty-for="trades" hidden>עוד אין עסקאות.</p>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="learning">
+      <h2>למידה - משקלות האותות</h2>
+      <p class="cap">אות משנה משקל רק אם הכוח שלו (z) עובר את סף הפלצבו - מה שיוצא כשמערבבים את האותות בין המניות באקראי. מתחת לסף = רעש, והמשקל נשאר.</p>
+      <div class="tw"><table class="tbl" data-source="weights" data-row-key="signal">
+        <thead><tr>
+          <th data-field="label">אות</th>
+          <th class="n" data-field="weight" data-fmt="pct0">משקל</th>
+          <th class="n" data-field="z" data-fmt="num2">כוח (z)</th>
+          <th class="n" data-field="gate" data-fmt="num2">סף פלצבו</th>
+          <th data-field="passes">עובר?</th>
+        </tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+    </section>
+
+    <section class="card" id="timemachine">
+      <h2>מכונת הזמן - הבוט על היסטוריה אמיתית</h2>
+      <p class="cap">כל גרסה רצה על 5 ימי ריבלנס שונים, אחרי עלויות; מוצג החציון. "ניצחונות" = בכמה מתוך 5 הגרסה ניצחה את הבסיס. שארפ מעל ריבית מזומן.</p>
+      <div class="tw"><table class="tbl" data-source="backtest" data-row-key="variant">
+        <thead><tr>
+          <th data-field="variant">גרסה</th>
+          <th class="n" data-field="sharpe" data-fmt="num2">שארפ</th>
+          <th class="n" data-field="cagr" data-fmt="spct" data-tone="sign">תשואה שנתית</th>
+          <th class="n" data-field="maxdd" data-fmt="pct1">ירידה מקסימלית</th>
+          <th class="n" data-field="calmar" data-fmt="num2">קלמר</th>
+          <th class="n" data-field="wins">ניצחונות</th>
+        </tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+      <p class="dsr"><span class="num" data-draw="kv" data-source="dsr" data-field="label" data-row="0">—</span>:
+        <b class="num" data-draw="kv" data-source="dsr" data-field="dsr" data-row="0" data-fmt="num2">—</b>
+        <span class="cap">(הסתברות שהשארפ אמיתי ולא מזל, אחרי כל הניסיונות; 0.95 ומעלה = יתרון מוכח)</span></p>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="card" id="rules">
+      <h2>החוקים - מה הבוט חייב לקיים</h2>
+      <p class="cap">הקוד אוכף את כולם. החוקים שלך מסומנים בכתום. Claude לא יכול לשנות אותם.</p>
+      <div class="tw"><table class="tbl" data-source="rules" data-row-key="name">
+        <thead><tr><th data-field="who" data-fmt="who">של מי</th><th data-field="name">חוק</th><th data-field="value">ערך</th></tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+    </section>
+
+    <section class="card" id="health">
+      <h2>בריאות המערכת</h2>
+      <p class="cap">מצב כל רכיב ברגע העדכון.</p>
+      <div class="tw"><table class="tbl" data-source="health" data-row-key="component">
+        <thead><tr><th data-field="component">רכיב</th><th data-field="status" data-fmt="status">מצב</th><th class="long" data-field="detail">פרט</th></tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="card" id="schedule">
+      <h2>לוח זמנים</h2>
+      <p class="cap">מניות: ימי מסחר (ב'-ו'), חוץ מהסקירה השבועית בשבת. קריפטו: כל לילה, גם בסוף שבוע.</p>
+      <div class="tw"><table class="tbl" data-source="schedule" data-row-key="name">
+        <thead><tr><th data-field="name">מה</th><th class="n" data-field="time_il">ישראל</th><th class="n" data-field="time_ny">ניו יורק</th><th class="long" data-field="what">מה קורה</th></tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+    </section>
+
+    <section class="card" id="blackout">
+      <h2>חסימת דוחות</h2>
+      <p class="cap">מניות שהבוט לא נכנס אליהן עכשיו, כי דוח רבעוני קרוב.</p>
+      <div class="tw"><table class="tbl" data-source="blackout" data-row-key="symbol">
+        <thead><tr><th data-field="symbol">מניה</th><th data-field="when">מתי הדוח</th></tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+      <p class="empty" data-empty-for="blackout" hidden>אין מניות בחסימה כרגע.</p>
+    </section>
+  </div>
+
+  <section class="card" id="lessons">
+    <h2>לקחים אחרונים</h2>
+    <p class="cap">מה הבוט למד, עם רמת ביטחון. לקח משנה התנהגות רק אחרי שהנתונים מאשרים אותו.</p>
+    <div class="tw"><table class="tbl" data-source="lessons" data-row-key="id">
+      <thead><tr><th class="n" data-field="date" data-fmt="date">תאריך</th><th class="long" data-field="text">לקח</th><th data-field="confidence">ביטחון</th></tr></thead>
+      <tbody data-draw="rows"></tbody>
+    </table></div>
+    <p class="empty" data-empty-for="lessons" hidden>עוד אין לקחים.</p>
+  </section>
+
+  <div class="part" id="crypto">
+    <header id="crypto-top">
+      <div class="ttl-row">
+        <h2 class="ttl2">ספר קריפטו · BTC ו-ETH</h2>
+        <span class="paper">כסף נייר</span>
+        <span class="pick"><span class="paper" data-when="false">אין יתרון מוכח</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span>
+      </div>
+      <p class="meta">
+        ספר נפרד מהמניות, מסחר 24/7. ההחלטה הבאה: כל לילה ב-02:12 שעון ישראל (00:12 UTC), על סגירת היום ב-UTC
+        · ריצה אחרונה <span class="num" data-draw="kv" data-source="ckpi" data-field="last_run_il" data-row="0">—</span>
+        · BTC עכשיו <span class="num" data-draw="kv" data-source="ckpi" data-field="btc" data-row="0" data-fmt="usd">—</span>
+        · החלטה אחרונה <span class="num" data-draw="kv" data-source="ckpi" data-field="decision_date" data-row="0" data-fmt="date">—</span>: <span data-draw="kv" data-source="ckpi" data-field="pending_status" data-row="0">—</span>
+      </p>
+      <p class="take" id="crypto-take">
+        <span data-when="true">ספר הקריפטו <b class="num" data-draw="kv" data-source="ckpi" data-field="ret" data-row="0" data-fmt="spct" data-tone="sign">—</b> מאז <span class="num" data-draw="kv" data-source="ckpi" data-field="started" data-row="0" data-fmt="date">—</span>,
+          תיק הצל בלי Claude <b class="num" data-draw="kv" data-source="ckpi" data-field="shadow_ret" data-row="0" data-fmt="spct" data-tone="sign">—</b>, ו-BTC בקנה-והחזק <b class="num" data-draw="kv" data-source="ckpi" data-field="bench_since_start" data-row="0" data-fmt="spct" data-tone="sign">—</b> באותה תקופה.</span>
+        <span data-when="false" hidden>ספר הקריפטו עוד לא התחיל לסחור. כשיתחיל, ההחלטות יתקבלו כל לילה ב-02:12 שעון ישראל.</span>
+        <span data-draw="pick" data-source="ckpi" data-field="live" data-row="0"></span>
+        <span class="pick">
+          <span class="noedge" data-when="false">אין יתרון מוכח: DSR <b class="num" data-draw="kv" data-source="ckpi" data-field="dsr" data-row="0" data-fmt="num2">—</b>, והסף הוא <span class="num" data-draw="kv" data-source="ckpi" data-field="dsr_gate" data-row="0" data-fmt="num2">—</span>. רווח או הפסד כאן עלולים להיות מזל.</span>
+          <span data-when="true" hidden>DSR <b class="num" data-draw="kv" data-source="ckpi" data-field="dsr" data-row="0" data-fmt="num2">—</b>, מעל הסף <span class="num" data-draw="kv" data-source="ckpi" data-field="dsr_gate" data-row="0" data-fmt="num2">—</span>: יתרון מוכח במכונת הזמן. עדיין כסף נייר.</span>
+          <span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span>
+        </span>
+      </p>
+    </header>
+
+    <section class="kpis" id="crypto-kpis">
+      <div class="card tile" id="ck-equity">
+        <div class="lbl">ספר קריפטו (נייר)</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="equity" data-row="0" data-fmt="usd">—</div>
+        <div class="sub"><span class="num" data-draw="kv" data-source="ckpi" data-field="ret" data-row="0" data-fmt="spct" data-tone="sign">—</span> מאז ההתחלה<span class="pick"><span class="noedge" data-when="false"> · אין יתרון מוכח</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></div>
+      </div>
+      <div class="card tile" id="ck-bench">
+        <div class="lbl">פער מול BTC (קנה והחזק)</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="vs_bench" data-row="0" data-fmt="spct" data-tone="sign">—</div>
+        <div class="sub">BTC <span class="num" data-draw="kv" data-source="ckpi" data-field="bench_since_start" data-row="0" data-fmt="spct">—</span> באותה תקופה<span class="pick"><span class="noedge" data-when="false"> · אין יתרון מוכח</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></div>
+      </div>
+      <div class="card tile" id="ck-claude">
+        <div class="lbl">השפעת Claude</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="claude_effect" data-row="0" data-fmt="spct" data-tone="sign">—</div>
+        <div class="sub">תיק צל בלי Claude: <span class="num" data-draw="kv" data-source="ckpi" data-field="shadow_ret" data-row="0" data-fmt="spct">—</span><span class="pick"><span class="noedge" data-when="false"> · אין יתרון מוכח</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></div>
+      </div>
+      <div class="card tile" id="ck-exposure">
+        <div class="lbl">חשיפה לקריפטו</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="gross_pct" data-row="0" data-fmt="pct0">—</div>
+        <div class="sub">מזומן <span class="num" data-draw="kv" data-source="ckpi" data-field="cash_pct" data-row="0" data-fmt="pct0">—</span> · <span class="num" data-draw="kv" data-source="ckpi" data-field="n_positions" data-row="0" data-fmt="int">—</span> מטבעות</div>
+      </div>
+      <div class="card tile" id="ck-dd">
+        <div class="lbl">ירידה מהשיא</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="drawdown" data-row="0" data-fmt="pct2" data-tone="sign">—</div>
+        <div class="sub">מפסק ירידה: <span data-draw="kv" data-source="ckpi" data-field="dd_state" data-row="0">—</span> · מגמה: <span data-draw="kv" data-source="ckpi" data-field="regime" data-row="0">—</span></div>
+      </div>
+      <div class="card tile" id="ck-fees">
+        <div class="lbl">עמלות ששולמו</div>
+        <div class="big num" data-draw="kv" data-source="ckpi" data-field="fees_paid" data-row="0" data-fmt="usd2">—</div>
+        <div class="sub">עמלה של <span class="num" data-draw="kv" data-source="ckpi" data-field="fee_pct" data-row="0" data-fmt="pct2">—</span> על כל קנייה ומכירה</div>
+      </div>
+    </section>
+
+    <section class="card" id="crypto-equity">
+      <h2>תשואה מצטברת - ספר קריפטו</h2>
+      <p class="cap">נקודה לכל החלטה לילית, בשווי של סגירת היום, ועוד נקודה במחיר הנוכחי. צל = אותו בוט בלי ההתערבויות של Claude. BTC = קנייה ביום הראשון והחזקה.<span class="pick"><span class="noedge" data-when="false"> אין יתרון מוכח: הפער בין הקווים עלול להיות מזל.</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></p>
+      <div class="legend" data-source="cequity">
+        <span><i data-swatch="0"></i><span data-legend="crypto">קריפטו</span></span>
+        <span><i data-swatch="1"></i><span data-legend="shadow">צל (בלי Claude)</span></span>
+        <span><i data-swatch="2"></i><span data-legend="btc">BTC קנה והחזק</span></span>
+      </div>
+      <div class="chart" data-draw="equity" data-source="cequity" data-series="crypto,shadow,btc" data-label="תשואה מצטברת של ספר הקריפטו, תיק הצל שלו ו-BTC בקנה-והחזק לאורך זמן"></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card" id="crypto-positions">
+        <h2>אחזקות - ספר קריפטו</h2>
+        <p class="cap">כמויות בשברי מטבע, עד 6 ספרות אחרי הנקודה. מחיר אחרון מ-Yahoo ברגע העדכון. רווח/הפסד מול מחיר הקנייה, לפני עמלת המכירה.<span class="pick"><span class="noedge" data-when="false"> אין יתרון מוכח.</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></p>
+        <div class="tw"><table class="tbl" data-source="cpositions" data-row-key="symbol">
+          <thead><tr>
+            <th data-field="symbol">מטבע</th>
+            <th class="n" data-field="qty" data-fmt="qty6">כמות</th>
+            <th class="n" data-field="avg_cost" data-fmt="usd2">קנייה</th>
+            <th class="n" data-field="last" data-fmt="usd2">אחרון</th>
+            <th class="n" data-field="value" data-fmt="usd">שווי</th>
+            <th class="n" data-field="weight" data-fmt="pct1">משקל</th>
+            <th class="n" data-field="pnl_pct" data-fmt="spct" data-tone="sign">רווח/הפסד</th>
+            <th class="n" data-field="since" data-fmt="date">מאז</th>
+          </tr></thead>
+          <tbody data-draw="rows"></tbody>
+        </table></div>
+        <p class="empty" data-empty-for="cpositions" hidden>אין אחזקות. ספר הקריפטו כולו במזומן.</p>
+      </section>
+
+      <section class="card" id="crypto-regime">
+        <h2>מסנן המגמה - כמה רחוק BTC מהמעבר למזומן</h2>
+        <p class="cap">BTC מתחת לממוצע <span class="num" data-draw="kv" data-source="cregime" data-field="sma_days" data-row="0" data-fmt="int">—</span> יום פחות <span class="num" data-draw="kv" data-source="cregime" data-field="band" data-row="0" data-fmt="pct0">—</span>: כל הספר עובר למזומן. חוזרים להשקיע רק מעל הממוצע ועוד <span class="num" data-draw="kv" data-source="cregime" data-field="band" data-row="0" data-fmt="pct0">—</span>. לפי סגירת <span class="num" data-draw="kv" data-source="cregime" data-field="date" data-row="0" data-fmt="date">—</span> (UTC).</p>
+        <p class="take">מצב: <b data-draw="kv" data-source="cregime" data-field="state_he" data-row="0">—</b> · מרחק מקו המזומן <b class="num" data-draw="kv" data-source="cregime" data-field="dist_cash" data-row="0" data-fmt="spct" data-tone="sign">—</b></p>
+        <div class="legend">
+          <span><i data-swatch="0"></i>BTC <span class="num" data-draw="kv" data-source="cregime" data-field="px" data-row="0" data-fmt="usd">—</span></span>
+          <span><i class="sw-cash"></i>קו מזומן <span class="num" data-draw="kv" data-source="cregime" data-field="cash_line" data-row="0" data-fmt="usd">—</span></span>
+          <span><i class="sw-sma"></i>ממוצע <span class="num" data-draw="kv" data-source="cregime" data-field="sma" data-row="0" data-fmt="usd">—</span></span>
+          <span><i class="sw-back"></i>קו חזרה <span class="num" data-draw="kv" data-source="cregime" data-field="back_line" data-row="0" data-fmt="usd">—</span> (<span class="num" data-draw="kv" data-source="cregime" data-field="dist_back" data-row="0" data-fmt="spct">—</span>)</span>
+        </div>
+        <div class="gauge" data-draw="gauge" data-source="cregime" data-field="px" data-row="0" data-label="מחיר BTC מול קו המעבר למזומן, הממוצע וקו החזרה להשקעה"></div>
+        <p class="empty" data-empty-for="cregime" hidden>עוד אין החלטת קריפטו. המסנן יופיע אחרי ההחלטה הראשונה.</p>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="card" id="crypto-orders">
+        <h2>פקודות קריפטו - ההחלטה האחרונה</h2>
+        <p class="cap">החלטה מ-<span class="num" data-draw="kv" data-source="ckpi" data-field="decision_date" data-row="0" data-fmt="date">—</span>, ביצוע ב-<span class="num" data-draw="kv" data-source="ckpi" data-field="exec_il" data-row="0">—</span> שעון ישראל: מחיר הפתיחה של השעה העגולה הראשונה אחרי ההחלטה, לכל המטבעות או לאף אחד. Claude יכול רק לבטל או להקטין.</p>
+        <div class="tw"><table class="tbl" data-source="corders" data-row-key="symbol">
+          <thead><tr>
+            <th data-field="symbol">מטבע</th><th data-field="side" data-fmt="side">פעולה</th>
+            <th class="n" data-field="qty" data-fmt="qty6">כמות</th>
+            <th class="n" data-field="price" data-fmt="usd2">מחיר</th>
+            <th class="n" data-field="value" data-fmt="usd">שווי</th>
+            <th data-field="desk">Claude</th><th data-field="status">סטטוס</th>
+            <th class="n" data-field="when">מתי</th>
+          </tr></thead>
+          <tbody data-draw="rows"></tbody>
+        </table></div>
+        <p class="empty" data-empty-for="corders" hidden>אין פקודות בהחלטה האחרונה.</p>
+      </section>
+
+      <section class="card" id="crypto-lessons">
+        <h2>לקחי קריפטו</h2>
+        <p class="cap">שורות ביומן הלקחים המשותף שהתצפית שלהן מתחילה ב-crypto:. שאר השורות שייכות למניות.</p>
+        <div class="tw"><table class="tbl" data-source="clessons" data-row-key="id">
+          <thead><tr><th class="n" data-field="date" data-fmt="date">תאריך</th><th class="long" data-field="text">לקח</th><th data-field="confidence">ביטחון</th></tr></thead>
+          <tbody data-draw="rows"></tbody>
+        </table></div>
+        <p class="empty" data-empty-for="clessons" hidden>עוד אין לקחי קריפטו.</p>
+      </section>
+    </div>
+
+    <section class="card" id="crypto-trades">
+      <h2>יומן עסקאות - ספר קריפטו</h2>
+      <p class="cap">40 העסקאות האחרונות, החדשה למעלה. המחיר כולל החלקה, והעמלה בנפרד; בקנייה הרווח הממומש הוא מינוס העמלה. מקור המחיר: 1h = פתיחת הנר השעתי, 1m = הדקה הראשונה.<span class="pick"><span class="noedge" data-when="false"> אין יתרון מוכח.</span><span data-draw="pick" data-source="ckpi" data-field="proven_edge" data-row="0"></span></span></p>
+      <div class="tw"><table class="tbl" data-source="ctrades" data-row-key="id">
+        <thead><tr>
+          <th class="n" data-field="time">זמן</th>
+          <th data-field="side" data-fmt="side">פעולה</th><th data-field="symbol">מטבע</th>
+          <th class="n" data-field="qty" data-fmt="qty6">כמות</th>
+          <th class="n" data-field="price" data-fmt="usd2">מחיר</th>
+          <th class="n" data-field="value" data-fmt="usd">שווי</th>
+          <th class="n" data-field="fee" data-fmt="usd2">עמלה</th>
+          <th class="n" data-field="pnl" data-fmt="susd" data-tone="sign">רווח ממומש</th>
+          <th data-field="source">מקור מחיר</th><th data-field="reason">סיבה</th>
+        </tr></thead>
+        <tbody data-draw="rows"></tbody>
+      </table></div>
+      <p class="empty" data-empty-for="ctrades" hidden>עוד אין עסקאות קריפטו.</p>
+    </section>
+  </div>
+
+  <footer class="foot" id="foot">
+    <p>כסף נייר בלבד. אין כאן כסף אמיתי ואין המלצת השקעה. הבוט מעריך יתרונות קטנים עם שגיאה ידועה, ולא "צופה" את השוק. מקורות: Yahoo Finance, SEC EDGAR, Nasdaq, OpenInsider.</p>
+    <details>
+      <summary>מילון מונחים</summary>
+      <dl>
+        <dt>תיק כמותי</dt><dd>הבוט הראשי: אותות מומנטום ומגמה, ניהול סיכון, החלטה בסגירה וביצוע בפתיחה.</dd>
+        <dt>תיק צל</dt><dd>אותו בוט בדיוק בלי ההתערבויות של Claude. ההפרש ביניהם = השפעת Claude.</dd>
+        <dt>תיק חדשות</dt><dd>תיק נפרד שקונה רק על כותרת עם ציון גבוה, לפי החוקים שלך.</dd>
+        <dt>משטר שוק</dt><dd>SPY מעל הממוצע של 200 יום = מגמה חיובית. מתחתיו = חצי חשיפה. VIX גבוה = 75% חשיפה.</dd>
+        <dt>ירידה מהשיא</dt><dd>כמה התיק ירד מהשווי הגבוה ביותר שלו. מפסק הירידה חוצה חשיפה ואז עובר למזומן.</dd>
+        <dt>שארפ</dt><dd>תשואה מעל ריבית מזומן, ביחס לתנודתיות. מעל 1 = טוב מאוד.</dd>
+        <dt>ספר קריפטו</dt><dd>ספר נייר נפרד על BTC ו-ETH: החלטה כל לילה על סגירת היום ב-UTC, ביצוע בשעה העגולה הבאה, עמלה על כל קנייה ומכירה. מתחת לקו המזומן של מסנן המגמה כל הספר במזומן.</dd>
+        <dt>DSR</dt><dd>הסתברות שהשארפ אמיתי ולא מזל, אחרי שמתקנים על כל הגרסאות שנוסו.</dd>
+        <dt>Brier</dt><dd>מדד לדיוק הסתברויות. 0 = מושלם, 0.25 = מטבע.</dd>
+        <dt>פלצבו</dt><dd>מבחן: מערבבים את האותות בין המניות. אות שלא חזק יותר מהערבוב הוא רעש.</dd>
+      </dl>
+    </details>
+  </footer>
+</div>
+
+<script>
+  dash.loader('snapshot', {
+    description: 'הקובץ הוא רשימה אחת של שורות מכמה טבלאות (העמודה t אומרת לאיזו טבלה שייכת כל שורה); כאן הוא נקרא כשורות כמו שהוא, עם כל העמודות',
+    fn: ({ answer }) => {
+      const rows = Array.isArray(answer) ? answer : [];
+      const columns = [];
+      rows.forEach((row) => Object.keys(row).forEach((k) => { if (!columns.includes(k)) columns.push(k); }));
+      return { columns, rows };
+    },
+  });
+  dash.calc('kpi', { inputs: ['snapshot'], title: 'מדדי חשבון', description: 'השורה המסכמת: שווי, תשואות, חשיפה, משטר שוק, מצב המנועים', fn: (snapshot) => snapshot.filter((row) => row.t === 'kpi') });
+  dash.calc('positions', { inputs: ['snapshot'], title: 'פוזיציות - כמותי', description: 'המניות שהתיק הכמותי מחזיק', fn: (snapshot) => snapshot.filter((row) => row.t === 'pos') });
+  dash.calc('news_positions', { inputs: ['snapshot'], title: 'פוזיציות - חדשות', description: 'המניות שתיק החדשות מחזיק', fn: (snapshot) => snapshot.filter((row) => row.t === 'npos') });
+  dash.calc('orders', { inputs: ['snapshot'], title: 'פקודות', description: 'הפקודות של ההחלטה האחרונה', fn: (snapshot) => snapshot.filter((row) => row.t === 'order') });
+  dash.calc('desk', { inputs: ['snapshot'], title: 'קריאות הדסק', description: 'הקריאה האחרונה של דסק המסחר לכל מניה', fn: (snapshot) => snapshot.filter((row) => row.t === 'desk') });
+  dash.calc('equity', { inputs: ['snapshot'], title: 'עקומת תשואה', description: 'תשואה מצטברת של כל תיק ושל SPY לאורך זמן', fn: (snapshot) => snapshot.filter((row) => row.t === 'eq') });
+  dash.calc('trades', { inputs: ['snapshot'], title: 'עסקאות', description: '40 העסקאות האחרונות בשני התיקים', fn: (snapshot) => snapshot.filter((row) => row.t === 'trade') });
+  dash.calc('news', { inputs: ['snapshot'], title: 'חדשות חיות', description: 'הכותרות האחרונות עם ציון Claude', fn: (snapshot) => snapshot.filter((row) => row.t === 'news') });
+  dash.calc('scorecard', { inputs: ['snapshot'], title: 'כרטיס ציונים', description: 'אחוז פגיעה ו-Brier לכל מקור תחזיות ואופק', fn: (snapshot) => snapshot.filter((row) => row.t === 'score') });
+  dash.calc('score_open', { inputs: ['snapshot'], title: 'תחזיות פתוחות', description: 'כמה תחזיות עוד לא הבשילו', fn: (snapshot) => snapshot.filter((row) => row.t === 'score_open') });
+  dash.calc('weights', { inputs: ['snapshot'], title: 'משקלות האותות', description: 'משקל כל אות, הכוח שלו וסף הפלצבו', fn: (snapshot) => snapshot.filter((row) => row.t === 'weight') });
+  dash.calc('backtest', { inputs: ['snapshot'], title: 'מכונת הזמן', description: 'הסריקה האחרונה של מכונת הזמן', fn: (snapshot) => snapshot.filter((row) => row.t === 'bt') });
+  dash.calc('dsr', { inputs: ['snapshot'], title: 'DSR', description: 'הסתברות שהשארפ של הבסיס אמיתי', fn: (snapshot) => snapshot.filter((row) => row.t === 'bt_dsr') });
+  dash.calc('blackout', { inputs: ['snapshot'], title: 'חסימת דוחות', description: 'מניות שלא נכנסים אליהן בגלל דוח קרוב', fn: (snapshot) => snapshot.filter((row) => row.t === 'block') });
+  dash.calc('rules', { inputs: ['snapshot'], title: 'חוקים', description: 'החוקים שהקוד אוכף', fn: (snapshot) => snapshot.filter((row) => row.t === 'rule') });
+  dash.calc('schedule', { inputs: ['snapshot'], title: 'לוח זמנים', description: 'מתי כל חלק בבוט רץ', fn: (snapshot) => snapshot.filter((row) => row.t === 'slot') });
+  dash.calc('health', { inputs: ['snapshot'], title: 'בריאות המערכת', description: 'מצב כל רכיב', fn: (snapshot) => snapshot.filter((row) => row.t === 'health') });
+  dash.calc('lessons', { inputs: ['snapshot'], title: 'לקחים', description: 'הלקחים האחרונים', fn: (snapshot) => snapshot.filter((row) => row.t === 'lesson') });
+  dash.calc('ckpi', { inputs: ['snapshot'], title: 'מדדי קריפטו', description: 'השורה המסכמת של ספר הקריפטו: שווי, תשואה מול הצל ומול BTC, עמלות, DSR', fn: (snapshot) => snapshot.filter((row) => row.t === 'ckpi') });
+  dash.calc('cpositions', { inputs: ['snapshot'], title: 'אחזקות - קריפטו', description: 'המטבעות שספר הקריפטו מחזיק, בכמויות שבר', fn: (snapshot) => snapshot.filter((row) => row.t === 'cpos') });
+  dash.calc('corders', { inputs: ['snapshot'], title: 'פקודות - קריפטו', description: 'הפקודות של ההחלטה הלילית האחרונה', fn: (snapshot) => snapshot.filter((row) => row.t === 'corder') });
+  dash.calc('ctrades', { inputs: ['snapshot'], title: 'עסקאות - קריפטו', description: '40 העסקאות האחרונות של ספר הקריפטו', fn: (snapshot) => snapshot.filter((row) => row.t === 'ctrade') });
+  dash.calc('cequity', { inputs: ['snapshot'], title: 'עקומת תשואה - קריפטו', description: 'תשואה מצטברת של ספר הקריפטו, הצל ו-BTC', fn: (snapshot) => snapshot.filter((row) => row.t === 'ceq') });
+  dash.calc('cregime', { inputs: ['snapshot'], title: 'מסנן המגמה - קריפטו', description: 'BTC מול הממוצע, קו המזומן וקו החזרה בהחלטה האחרונה', fn: (snapshot) => snapshot.filter((row) => row.t === 'cregime') });
+  dash.calc('clessons', { inputs: ['snapshot'], title: 'לקחי קריפטו', description: 'לקחים שסומנו crypto', fn: (snapshot) => snapshot.filter((row) => row.t === 'clesson') });
+</script>
+
+<script>
+  (function () {
+    const F = {
+      usd: d3.format('$,.0f'), usd2: d3.format('$,.2f'), susd: d3.format('+$,.0f'),
+      pct0: d3.format('.0%'), pct1: d3.format('.1%'), pct2: d3.format('.2%'), spct: d3.format('+.2%'),
+      int: d3.format(',d'), qty6: d3.format(',.6~f'), num2: d3.format('.2f'), num3: d3.format('.3f'),
+    };
+    const OWNER = 'נמרוד';
+    const STATUS = { ok: 'תקין', warn: 'שים לב', bad: 'תקלה' };
+
+    function blank(v) { return v === null || v === undefined || v === '' || (typeof v === 'number' && isNaN(v)); }
+    function fmt(kind, v) {
+      if (blank(v)) return '—';
+      if (F[kind]) return typeof v === 'number' ? F[kind](v) : String(v);
+      if (kind === 'date') { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v)); return m ? m[3] + '.' + m[2] + '.' + m[1] : String(v); }
+      if (kind === 'days') return v + ' ימים';
+      if (kind === 'status') return STATUS[v] || String(v);
+      return String(v);
+    }
+    function tone(el, kind, toneKind, v) {
+      let pos = false, neg = false;
+      if (toneKind === 'sign' && typeof v === 'number') { pos = v > 0.00005; neg = v < -0.00005; }
+      if (kind === 'market') pos = v === 'פתוח';
+      if (kind === 'engine') { pos = v === 'פעיל'; neg = v === 'לא פעיל'; }
+      el.classList.toggle('pos', pos);
+      el.classList.toggle('neg', neg);
+    }
+    function cell(td, kind, v, toneKind) {
+      td.replaceChildren();
+      if (kind === 'score' && !blank(v)) {
+        const s = document.createElement('span');
+        s.className = 'pill num ' + (v > 8 ? 'sc-hi' : v <= 2 ? 'sc-lo' : 'sc-mid');
+        s.textContent = String(v);
+        td.append(s);
+        return;
+      }
+      if (kind === 'who' && !blank(v)) {
+        const s = document.createElement('span');
+        s.className = 'pill ' + (v === OWNER ? 'who-owner' : 'who-other');
+        s.textContent = String(v);
+        td.append(s);
+        return;
+      }
+      if (kind === 'status') {
+        td.className += ' st-' + v;
+        const d = document.createElement('i');
+        d.className = 'dot';
+        td.append(d, document.createTextNode(fmt(kind, v)));
+        return;
+      }
+      // an empty text cell (no desk action, no news action) stays blank instead of showing a dash
+      td.textContent = kind === 'text' && blank(v) ? '' : fmt(kind, v);
+      if (kind === 'side') td.classList.add(v === 'קנייה' ? 'buy' : 'sell');
+      tone(td, kind, toneKind, v);
+    }
+    function enc(s) { return String(s).replace(/[%,&=]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase()); }
+
+    dash.onData(() => {
+      document.querySelectorAll('.at [data-swatch]').forEach((s) => { s.style.background = dash.colors[+s.dataset.swatch % dash.colors.length]; });
+    });
+
+    dash.draw('kv', (el) => {
+      const d = dash.data(el.dataset.source);
+      el.classList.toggle('dash-skeleton', d.status === 'loading');
+      const row = d.status === 'ok' && Array.isArray(d.data) ? d.data[+(el.dataset.row || 0)] : null;
+      const v = row ? row[el.dataset.field] : null;
+      el.textContent = fmt(el.dataset.fmt, v);
+      tone(el, el.dataset.fmt, el.dataset.tone, v);
+    });
+
+    dash.draw('rows', (tb) => {
+      const table = tb.closest('table');
+      if (!table) return;
+      const src = table.dataset.source, key = table.dataset.rowKey;
+      const d = dash.data(src);
+      const wrap = table.closest('.tw');
+      if (wrap) wrap.classList.toggle('dash-skeleton', d.status === 'loading');
+      const ths = Array.from(table.querySelectorAll('thead th'));
+      if (d.status !== 'ok') {
+        tb.replaceChildren();
+        if (d.status === 'error') {
+          const tr = document.createElement('tr'), td = document.createElement('td');
+          td.colSpan = ths.length; td.textContent = 'הטעינה נכשלה';
+          tr.append(td); tb.append(tr);
+        }
+        return;
+      }
+      const rows = Array.isArray(d.data) ? d.data : [];
+      const sec = table.closest('section');
+      if (sec) sec.querySelectorAll('[data-empty-for="' + src + '"]').forEach((p) => { p.hidden = rows.length > 0; });
+      table.classList.toggle('is-empty', rows.length === 0);
+      tb.replaceChildren(...rows.map((r) => {
+        const tr = document.createElement('tr');
+        if (key) tr.dataset.key = key.split(',').map((k) => enc(r[k])).join(',');
+        ths.forEach((th) => {
+          const td = document.createElement('td');
+          td.className = th.className;
+          if (td.classList.contains('long')) td.dir = 'auto';
+          cell(td, th.dataset.fmt || 'text', r[th.dataset.field], th.dataset.tone);
+          tr.append(td);
+        });
+        return tr;
+      }));
+    });
+
+    dash.draw('equity', (el) => {
+      const d = dash.data(el.dataset.source || 'equity');
+      el.classList.toggle('dash-skeleton', d.status === 'loading');
+      if (d.status !== 'ok') {
+        el.replaceChildren();
+        if (d.status === 'error') { const f = document.createElement('div'); f.className = 'fail'; f.textContent = 'הטעינה נכשלה'; el.append(f); }
+        return;
+      }
+      const box = el.closest('section') || document;
+      const label = (b) => { const n = box.querySelector('[data-legend="' + b + '"]'); return n ? n.textContent : b; };
+      const series = (el.dataset.series || 'quant,shadow,spy,news').split(',').map((b, i) => ({
+        label: label(b), color: dash.colors[i % dash.colors.length],
+        pts: (d.data || []).filter((r) => r.book === b && !blank(r.ret) && r.ts)
+          .map((r) => ({ x: new Date(r.ts), y: +r.ret })).filter((p) => !isNaN(p.x)).sort((a, b2) => a.x - b2.x),
+      })).filter((s) => s.pts.length);
+      const all = series.flatMap((s) => s.pts);
+      el.replaceChildren();
+      if (!all.length) { el.textContent = '—'; return; }
+
+      const W = Math.max(280, el.clientWidth), H = 260, mt = 12, mb = 28, mr = 14;
+      const x = d3.scaleTime().domain(d3.extent(all, (p) => p.x));
+      if (+x.domain()[0] === +x.domain()[1]) x.domain([new Date(+x.domain()[0] - 3600e3), new Date(+x.domain()[1] + 3600e3)]);
+      const ext = d3.extent(all.map((p) => p.y).concat([0]));
+      const pad = Math.max((ext[1] - ext[0]) * 0.12, 0.002);
+      const y = d3.scaleLinear().domain([ext[0] - pad, ext[1] + pad]).range([H - mb, mt]).nice();
+      const fy = d3.format('+.1%'), fp = d3.format('+.2%'), ft = d3.timeFormat('%d.%m %H:%M');
+
+      const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', '0 0 ' + W + ' ' + H)
+        .attr('role', 'img').attr('aria-label', el.dataset.label || '');
+      const grid = svg.append('g');
+      const gy = svg.append('g').attr('class', 'ax')
+        .call(d3.axisLeft(y).ticks(5).tickFormat((v) => (Math.abs(v) < 1e-9 ? '0%' : fy(v))).tickSize(0).tickPadding(6));
+      let ml = 0;
+      gy.selectAll('text').each(function () { ml = Math.max(ml, this.getComputedTextLength()); });
+      ml = Math.ceil(ml) + 12;
+      gy.attr('transform', 'translate(' + ml + ',0)');
+      gy.select('.domain').remove();
+      x.range([ml, W - mr]);
+      grid.selectAll('line').data(y.ticks(5)).join('line')
+        .attr('x1', ml).attr('x2', W - mr).attr('y1', (v) => y(v)).attr('y2', (v) => y(v))
+        .style('stroke', (v) => (Math.abs(v) < 1e-9 ? 'var(--cds-chart-reference)' : 'var(--cds-chart-grid)'));
+      const gx = svg.append('g').attr('class', 'ax').attr('transform', 'translate(0,' + (H - mb) + ')')
+        .call(d3.axisBottom(x).ticks(Math.max(2, Math.floor((W - ml - mr) / 120))).tickFormat(ft).tickSize(0).tickPadding(8));
+      gx.select('.domain').style('stroke', 'var(--cds-chart-axis)');
+      gx.selectAll('.tick').each(function (t) {
+        const tx = d3.select(this).select('text'), half = tx.node().getComputedTextLength() / 2, px = x(t);
+        if (px + half > W) tx.attr('text-anchor', 'end');
+        else if (px - half < ml) tx.attr('text-anchor', 'start');
+      });
+
+      const line = d3.line().x((p) => x(p.x)).y((p) => y(p.y));
+      series.forEach((s) => {
+        svg.append('path').attr('d', line(s.pts)).attr('fill', 'none').style('stroke', s.color).style('stroke-width', 2);
+        const last = s.pts[s.pts.length - 1];
+        svg.append('circle').attr('cx', x(last.x)).attr('cy', y(last.y)).attr('r', 3).style('fill', s.color);
+      });
+
+      const tip = d3.select(el).append('div').attr('class', 'tip');
+      const rule = svg.append('line').attr('y1', mt).attr('y2', H - mb).style('stroke', 'var(--cds-chart-reference)').style('opacity', 0);
+      const near = (pts, t) => {
+        const i = d3.bisector((p) => p.x).left(pts, t);
+        return [pts[i - 1], pts[i]].filter(Boolean).sort((a, b) => Math.abs(a.x - t) - Math.abs(b.x - t))[0];
+      };
+      svg.append('rect').attr('x', ml).attr('y', mt).attr('width', Math.max(0, W - ml - mr)).attr('height', H - mt - mb)
+        .style('fill', 'transparent')
+        .on('pointermove', (ev) => {
+          const px = d3.pointer(ev)[0], t = x.invert(px);
+          rule.attr('x1', px).attr('x2', px).style('opacity', 1);
+          tip.selectAll('*').remove();
+          tip.append('div').attr('class', 'tt').text(ft(t));
+          series.forEach((s) => {
+            const p = near(s.pts, t);
+            if (!p) return;
+            const r = tip.append('div');
+            r.append('i').style('background', s.color);
+            r.append('span').text(s.label + ' ');
+            r.append('b').attr('class', 'num').text(fp(p.y));
+          });
+          const k = el.clientWidth / W, tw = tip.node().offsetWidth;
+          const left = px * k + 14 + tw > el.clientWidth ? px * k - 14 - tw : px * k + 14;
+          tip.style('left', Math.max(0, left) + 'px').style('opacity', 1);
+        })
+        .on('pointerleave', () => { tip.style('opacity', 0); rule.style('opacity', 0); });
+    });
+
+    // Whole sentences chosen by a true/false field: each sentence is in the HTML with data-when="true|false", and this
+    // empty drawing sets hidden on its siblings. A failed load counts as false, the cautious sentence.
+    dash.draw('pick', (el) => {
+      const d = dash.data(el.dataset.source);
+      if (d.status === 'loading') return;
+      const row = d.status === 'ok' && Array.isArray(d.data) ? d.data[+(el.dataset.row || 0)] : null;
+      const v = String(!!row && row[el.dataset.field] === true);
+      const box = el.parentElement;
+      if (box) box.querySelectorAll(':scope > [data-when]').forEach((s) => { s.hidden = s.dataset.when !== v; });
+    });
+
+    // Regime gauge: BTC (dot) against the go-to-cash line, the moving average and the back-in line.
+    dash.draw('gauge', (el) => {
+      const d = dash.data(el.dataset.source);
+      el.classList.toggle('dash-skeleton', d.status === 'loading');
+      const row = d.status === 'ok' && Array.isArray(d.data) ? d.data[+(el.dataset.row || 0)] : null;
+      const sec = el.closest('section');
+      if (sec && d.status === 'ok') sec.querySelectorAll('[data-empty-for="' + el.dataset.source + '"]').forEach((p) => { p.hidden = !!row; });
+      el.replaceChildren();
+      const v = row ? [row.cash_line, row.sma, row.back_line, row[el.dataset.field]] : [];
+      if (!row || v.some(blank)) {
+        if (d.status === 'error') { const f = document.createElement('div'); f.className = 'fail'; f.textContent = 'הטעינה נכשלה'; el.append(f); }
+        else el.textContent = '—';
+        return;
+      }
+      const [lo, mid, hi, px] = v.map(Number);
+      const W = Math.max(280, el.clientWidth), H = 64, m = 14, ty = 18;
+      const a = Math.min(lo, px), b = Math.max(hi, px), pad = Math.max((b - a) * 0.15, mid * 0.01);
+      const x = d3.scaleLinear().domain([a - pad, b + pad]).range([m, W - m]);
+      const svg = d3.select(el).append('svg').attr('width', '100%').attr('height', H).attr('viewBox', '0 0 ' + W + ' ' + H)
+        .attr('role', 'img').attr('aria-label', el.dataset.label || '');
+      svg.append('line').attr('class', 'trk').attr('x1', m).attr('x2', W - m).attr('y1', ty).attr('y2', ty);
+      svg.append('rect').attr('class', 'band').attr('x', x(lo)).attr('width', Math.max(0, x(hi) - x(lo))).attr('y', ty - 8).attr('height', 16);
+      [[lo, 'l-cash'], [mid, 'l-sma'], [hi, 'l-back']].forEach(([val, cls]) => {
+        svg.append('line').attr('class', cls).attr('x1', x(val)).attr('x2', x(val)).attr('y1', ty - 12).attr('y2', ty + 12).style('stroke-width', 2);
+      });
+      svg.append('circle').attr('cx', x(px)).attr('cy', ty).attr('r', 6).style('fill', dash.colors[0])
+        .style('stroke', 'var(--color-panel)').style('stroke-width', 2);
+      const gx = svg.append('g').attr('class', 'ax').attr('transform', 'translate(0,' + (ty + 16) + ')')
+        .call(d3.axisBottom(x).ticks(Math.max(2, Math.floor((W - 2 * m) / 110))).tickFormat(d3.format('$,.0f')).tickSize(0).tickPadding(6));
+      gx.select('.domain').remove();
+      gx.selectAll('.tick').each(function (t) {
+        const tx = d3.select(this).select('text'), half = tx.node().getComputedTextLength() / 2, p = x(t);
+        if (p + half > W) tx.attr('text-anchor', 'end');
+        else if (p - half < 0) tx.attr('text-anchor', 'start');
+      });
+    });
+  })();
+</script>

@@ -1,0 +1,6 @@
+BTC-USD N=3d: equal-noise stop -3.9% = 1.27 x median ATR14 (3.05%); P(touch -3%) here 38.6% vs universe median 27.4%
+BTC-USD N=5d: equal-noise stop -3.8% = 1.24 x median ATR14 (3.05%); P(touch -3%) here 48.8% vs universe median 40.3%
+ETH-USD N=3d: equal-noise stop -5.8% = 1.19 x median ATR14 (4.88%); P(touch -3%) here 53.0% vs universe median 27.4%
+ETH-USD N=5d: equal-noise stop -5.3% = 1.09 x median ATR14 (4.88%); P(touch -3%) here 62.3% vs universe median 40.3%
+SOL-USD N=3d: equal-noise stop -6.6% = 1.21 x median ATR14 (5.44%); P(touch -3%) here 60.2% vs universe median 27.4%
+SOL-USD N=5d: equal-noise stop -6.4% = 1.17 x median ATR14 (5.44%); P(touch -3%) here 68.6% vs universe median 40.3%

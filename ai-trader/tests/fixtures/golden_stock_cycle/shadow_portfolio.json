@@ -1,0 +1,99 @@
+{
+  "cash": 9440.124013563816,
+  "positions": {
+    "S18": {
+      "qty": 17,
+      "avg_cost": 149.0328413785279,
+      "entry_date": "2021-07-14",
+      "peak_close": 149.76570513708458,
+      "last_price": 149.76570513708458,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S13": {
+      "qty": 29,
+      "avg_cost": 126.52786981532402,
+      "entry_date": "2021-07-14",
+      "peak_close": 132.11689077851867,
+      "last_price": 129.3222691832582,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S15": {
+      "qty": 69,
+      "avg_cost": 84.77595495721286,
+      "entry_date": "2021-07-14",
+      "peak_close": 88.61005105900917,
+      "last_price": 88.61005105900917,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S05": {
+      "qty": 92,
+      "avg_cost": 99.32710302459311,
+      "entry_date": "2021-07-14",
+      "peak_close": 102.15402399693045,
+      "last_price": 100.72211704236176,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S01": {
+      "qty": 53,
+      "avg_cost": 177.87910098124053,
+      "entry_date": "2021-07-14",
+      "peak_close": 177.79020587830138,
+      "last_price": 173.38025793281642,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S27": {
+      "qty": 71,
+      "avg_cost": 138.2953066531456,
+      "entry_date": "2021-07-14",
+      "peak_close": 142.3197420536249,
+      "last_price": 139.1755137958618,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S00": {
+      "qty": 66,
+      "avg_cost": 150.99603149042883,
+      "entry_date": "2021-07-14",
+      "peak_close": 152.7759476892126,
+      "last_price": 151.435466863105,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S04": {
+      "qty": 54,
+      "avg_cost": 183.6566359974409,
+      "entry_date": "2021-07-14",
+      "peak_close": 186.60402114100071,
+      "last_price": 181.43882897025964,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S09": {
+      "qty": 74,
+      "avg_cost": 134.22385989991784,
+      "entry_date": "2021-07-14",
+      "peak_close": 139.90083243454546,
+      "last_price": 138.75435652305697,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S20": {
+      "qty": 62,
+      "avg_cost": 158.76317020614627,
+      "entry_date": "2021-07-14",
+      "peak_close": 163.3066873375883,
+      "last_price": 163.3066873375883,
+      "ca_applied_through": "2021-07-20"
+    },
+    "S23": {
+      "qty": 61,
+      "avg_cost": 162.21633269262625,
+      "entry_date": "2021-07-14",
+      "peak_close": 162.1352650600962,
+      "last_price": 158.5272673142802,
+      "ca_applied_through": "2021-07-20"
+    }
+  },
+  "peak_equity": 100112.47448539393,
+  "blocked": {
+    "S12": "2021-08-03"
+  },
+  "last_mark": "2021-07-20",
+  "last_rebalance": "2021-07-13"
+}
