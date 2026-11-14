@@ -10,6 +10,8 @@ hourly_day_bars returned all 24 bars at 00:13:47 and a rerun at 00:14:14 rebuilt
 * (b) a declined rebuild has a reason tag (fetch_error:<Type>, hours:<n>, null_value, misaligned_stamp, ...); a run that
   ends in the backlog 68 skip writes one plain row to skips.jsonl (bar, symbols, reason, tries, seconds) and prints a
   "[cycle] backlog 71: ..." line; the backlog 68 event text is unchanged.
+(d) ships switched off: config.json sets neither key, because the wait judges no finality and the 23:00 bar of 11-13 was
+complete but stale from 00:13:47 to at least 01:08:44 (test_the_live_config_keeps_the_wait_off).
 The wait runs on cycle._monotonic and cycle._sleep; every test here puts both on one fake clock, so nothing sleeps.
 Network stubbed everywhere (data._get_json).
 """
@@ -235,6 +237,27 @@ class Wait(CryptoBook):
                 self.assertFalse(out["decided_now"])
                 self.assertIn(self.backlog68(), out["events"])
                 self.assertEqual([(r["reason"], r["tries"], r["waited_s"]) for r in self.skips()], [("hours:23", 1, 0.0)])
+
+    # ---- (d) ships switched off: the live config sets no key, so the live run tries once ---------------------------
+    def test_the_live_config_keeps_the_wait_off(self):
+        """config.json has no rebuild_* key, so the live crypto run tries the rebuild once, as before 71 (d). Keep it off
+        until the rebuild judges finality (backlog 70's acceptance rule, not this wait): on 2026-11-14 Yahoo's 23:00 1h bar
+        of 11-13 was out but not final - BTC close 67,881.85 at 00:13:47, at 00:14:14 (the rerun that decided) and still
+        at 01:08:44 (the fill run's rebuild, state/crypto/alert_queue.json); the settled 1h close is 68,223.01 and Yahoo's
+        daily close 68,249.27 (-53.8 bp). A 30 s poll would have decided on 67,881.85, and so would two tries that agree
+        or a floor at 00:30 UTC. Switching it on also needs tests/test_books.py (CRYPTO_MARKET pins the block)."""
+        why = ("backlog 71 (d) is switched on: first give the hourly rebuild a finality check (the 2026-11-14 23:00 bar was "
+               "complete but stale until at least 01:08:44), then change this test")
+        for profile in (None, "crypto_base", "crypto"):
+            with self.subTest(profile=profile):
+                self.cfg = data.load_config("crypto") if profile is None else data.load_config("crypto", profile)
+                self.coins = sorted(self.cfg["universe"])
+                self.assertEqual([k for k in self.cfg["market"] if k.startswith("rebuild_")], [], why)
+                self.state, self.clock = self.mkdtemp(), FakeClock()
+                out, calls, stdout = self.run_seq({s: [self.short(s), self.full(s)] for s in self.coins})
+                self.assertEqual((self.clock.sleeps, calls), ([], [("BTC-USD", 1000.0)]), why)
+                self.assertIn(self.backlog68(), out["events"])
+                self.assertIn("(1 tries, 0 s)", self.b71(stdout)[0])
 
     # ---- (5) the stock calendar never waits and never calls the helper -------------------------------------------
     def test_stock_calendar_never_waits(self):

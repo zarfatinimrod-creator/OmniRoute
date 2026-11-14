@@ -469,13 +469,18 @@ def _rebuild_from_hourly(panel: dict, day, symbols, events: list) -> tuple[dict,
 
 def _rebuild_waiting(panel: dict, day, symbols, events: list, mk: dict, may_wait: bool) -> tuple[dict, dict | None]:
     """Backlog 71 (d): _rebuild_from_hourly, tried again every market.rebuild_poll_seconds while hourly_day_bars declines,
-    until it rebuilds or market.rebuild_wait_seconds have passed since the first try (on 2026-11-14 Yahoo's 23:00 1h
-    bar was not out for the 00:13 run and was at 00:13:47; logs/2026-11-14-crypto-night.md). Either key absent or 0, or
+    until it rebuilds or market.rebuild_wait_seconds have passed since the first try (on 2026-11-14 the 00:13 run
+    declined and the 24 hours were out at 00:13:47; logs/2026-11-14-crypto-night.md). Either key absent or 0, or
     may_wait False: one try, as before. Not tried again: a decline the daily reply decided (retry False) and a helper
     that raises (printed as before). The budget is _monotonic since the first try, never less than the sleeps asked
     for, so no try starts later than rebuild_wait_seconds after the first; a try already running is not cut short
     (data._get_json's own timeouts bound it). Returns (panel, None), or (the panel as fetched, the decline with tries
-    and waited_s)."""
+    and waited_s).
+    Switched off: config.json sets neither key (tests/test_books.py pins the block). The wait judges no finality - it
+    takes the first complete reply, as backlog 70 does - and on 2026-11-14 the 23:00 bar was out but not final: BTC
+    close 67,881.85 at 00:13:47, 00:14:14 and still at 01:08:44 (the fill run's rebuild); settled 68,223.01, Yahoo's
+    daily close 68,249.27 (-53.8 bp). Two agreeing tries or a 00:30 floor would have taken 67,881.85 too. So it stays
+    off until the rebuild has a finality check (backlog 70's acceptance rule, a build of its own)."""
     wait = float(mk.get("rebuild_wait_seconds") or 0) if may_wait else 0.0
     poll = float(mk.get("rebuild_poll_seconds") or 0)
     start, slept, tries = _monotonic(), 0.0, 0
@@ -701,7 +706,8 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
         declined = deciding = None
         if want:  # backlog 70: a final day missing from Yahoo's daily reply is built from its 24 hourly bars, if complete
             # backlog 71 (d): only a run that would decide `want` waits for the hours (not a proposal, a dry run or a run
-            # after the decision of `want` was recorded: none of them can decide it)
+            # after the decision of `want` was recorded: none of them can decide it). Off while config.json has no rebuild_*
+            # key: the wait judges no finality (_rebuild_waiting)
             deciding = execute and not propose and (journal.load_json("pending.json") or {}).get("decision_date") != str(want)
             panel, declined = _rebuild_waiting(panel, want, set(cfg["universe"]) | {bench}, events, mk, deciding)
             if declined:  # backlog 71 (b): a declined rebuild says why
