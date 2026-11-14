@@ -5,6 +5,15 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
+- **2026-11-14 15:25 - trader session (weekly review improvement)** - files: `aitrader/cycle.py`, new file
+  `tests/test_crypto_rebuild_wait.py`, `tests/test_crypto_hourly_rebuild.py` (only where a declined-rebuild reason
+  changes a helper's return), `config.json` - ONLY two new keys in the `books.crypto.market` block. The main
+  session's claim on `config.json` (refreshed 2026-11-11 21:10) is older than 24 hours and nothing of it was pushed
+  since 2026-11-12; this claim touches no other block and no line of the main session's work. Purpose: backlog 71
+  (b) and (d): the crypto decide run waits briefly for Yahoo's last hourly bar of the day (it was not final at 00:13
+  UTC on 2026-11-14) and logs why a rebuild was declined. Rule 4 (owner's third ruling: no time-machine file):
+  failing test first, quant-critic, suite.
+
 - **2026-11-11 10:09 (refreshed 21:10; rollout step 1 landed at 21:08 UTC, ab7b27f9) - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
