@@ -15,8 +15,13 @@
 ### מילוי (01:08 UTC)
 - `verify --book crypto`: ALL CHAINS OK. `cycle --book crypto` (rc=0): לא היה מה למלא. להחלטה של 11-13 אין פקודות, הספר במזומן, risk_off. equity 93,819.73 (‎-6.18%). עוד התראה עם אותה הודעה על הבנייה נכנסה לתור הלילה.
 
+### סיכום בוקר (06:04 UTC, 08:04 שעון ישראל)
+- `cycle --book crypto` (rc=0): אין שינוי. משטר risk_off, במזומן, equity 93,819.73 (‎-6.18%; ‏BTC עצמו ‎-7.49% מאז 11-10).
+- `summary --book crypto --send`: exit 0, נמסר דרך ntfy. זו הפעם הראשונה ש-ntfy עובד; ב-12/11 וב-13/11 התוצאה הייתה exit 3. אין פריטים דחופים, ולכן לא נשלח PushNotification. בתור היו שלוש הודעות לילה, שתיים מהן עם אותו נוסח של הבנייה (backlog 71: התראה אחת לכל ריצה).
+- `postmortem`: pending ריק. הדשבורד רוענן (גרסה 44, 06:04 UTC).
+
 ## קבצים ששונו
-`state/crypto/*` (latest, pending, decisions, alert_queue, equity), `state/backlog.md` (פריט 71d), `reports/crypto/2026-11-14.md`, הלוג הזה.
+`state/crypto/*` (latest, pending, decisions, alert_queue, equity), `state/backlog.md` (פריט 71d), `reports/crypto/2026-11-14.md`, הלוג הזה. הדשבורד: גרסה 44.
 
 ## החלטות
 אין התערבות של Claude. אין push בלילה; הכול נכנס לסיכום הבוקר.
