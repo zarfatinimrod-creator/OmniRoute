@@ -4,7 +4,7 @@ Every item: implement behind a config switch -> paired sweep before/after (strat
 PASS -> only then merge. Sources: research/2026-11-09-repo-sweep-take-list.md, research/*.md, critic notes.
 
 ## Open (priority order)
-First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 44, 34, 35, 39, 40 - then the list below.
+First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (crypto data defect, found 2026-11-14), 33, 44, 34, 35, 39, 40 - then the list below.
 1. [defect] Learning label credits the overnight gap: learn.forward_excess uses close(d)->close(d+h) but fills are
    at open(d+1). Use open(d+1)->open(d+1+h); mature at asof-h-1; rerun placebo; add a test that the label equals
    the return the backtest earns (qlib leak-gap 2; FinRL-Trading label assertion).
@@ -242,16 +242,26 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     - Not measured: whether Yahoo's close of bar D is final at 00:12 UTC. The R6 audit
       (`market.revised_close_alert_bps` 5) checks every decision; read `close_audit` in `state/crypto/pending.json`
       and `revised_close` rows in `state/crypto/decisions.jsonl` after the first week.
+72. [crypto][defect] The backlog 70 rebuild accepts a complete but not final 23:00 1h bar: a wrong close reached a
+    decision. On 2026-11-14 Yahoo's 1h bars of 11-13 were complete at 00:13:47, 00:14:14 (the rerun that decided) and
+    01:08:44, all with BTC close 67,881.85; the settled 23:00 1h close is 68,223.01 and Yahoo's daily close 68,249.27,
+    so the decision close was -53.8 bp off (regime_sma 73,033.55: risk_off either way, no trade changed). Two agreeing
+    tries 30 s apart or a 00:30 UTC floor would both have accepted the stale bar (backlog 71 gate, commit 99d51558).
+    Candidate checks, log-only first: the 1h 23:00 close equals the close of the 23:55 5m bar (matched exactly on
+    settled data 11-09..11-13; not yet measured live at 00:13); or a Coinbase cross-check tighter than the 1% guard
+    (backlog 70 option b). Measure at the next 00:13 runs, then rule 4. Until fixed, 71 (d) stays off. The R6 audit
+    should flag the 11-13 close (about -54 bp, over the 5 bp line) at the next decision.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
-    hourly_rebuild is replaced before its close_audit exists); (b) a declined rebuild gives no reason (fetch error /
-    23 hours / null / misaligned stamp): add a reason tag or a skips.jsonl row, event text unchanged (Basic law 2:
-    nothing fails silently); (c) with a two-coin profile the R6 tag "yahoo_1h" is set for the whole decision close
-    even when only one coin was rebuilt - tag per symbol; (d) whether the 23:00 hourly bar is final at 00:12 UTC: on
-    2026-11-14 it was not - the 00:13 run declined the rebuild (no reason logged, see b), the helper had all 24 bars
-    at 00:13:47 and a rerun at 00:14:14 rebuilt and decided; the decide slot can be 1-2 minutes too early, so a short
-    retry inside the run (or a decide slot a few minutes later) would close it and the latency on a hanging Yahoo (up to about 66 s per symbol per
+    hourly_rebuild is replaced before its close_audit exists); (b) DONE 2026-11-14 (7bbb1957): a declined rebuild prints a reason tag and a deciding run that ends in
+    the skip writes a rebuild_declined row to skips.jsonl (note: the morning summary counts these rows as skipped
+    runs; a live bar is tagged misaligned_stamp - a separate live_bar tag would read better); (c) with a two-coin profile the R6 tag "yahoo_1h" is set for the whole decision close
+    even when only one coin was rebuilt - tag per symbol; (d) the in-run wait is BUILT but OFF (7bbb1957 + 99d51558): it
+    needs market.rebuild_wait_seconds/rebuild_poll_seconds in books.crypto.market plus tests/test_books.py CRYPTO_MARKET
+    and the pin test in test_crypto_rebuild_wait.py; do not switch it on before item 72 (on 2026-11-14 the bars the
+    rerun accepted were complete but not final); a try in progress can overrun the budget by up to one try (about
+    66 s per symbol on a hanging Yahoo) and the latency on a hanging Yahoo (up to about 66 s per symbol per
     run; the retry count would be the tunable); (e) when two daily rows are missing (D and D-1) only D is rebuilt
     and the decision runs on a history with a one-day hole; (f) expect a "סגירה מתוקנת" R6 alert after most rebuilt
     days (1h close vs daily close measured 1.93-140.28 USD, about 0.3-19 bp; the alert is at 5 bp).
