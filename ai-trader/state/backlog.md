@@ -251,8 +251,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     hourly_rebuild is replaced before its close_audit exists); (b) a declined rebuild gives no reason (fetch error /
     23 hours / null / misaligned stamp): add a reason tag or a skips.jsonl row, event text unchanged (Basic law 2:
     nothing fails silently); (c) with a two-coin profile the R6 tag "yahoo_1h" is set for the whole decision close
-    even when only one coin was rebuilt - tag per symbol; (d) not measured: whether the 23:00 hourly bar is final at
-    00:12 UTC (evidence so far from 06:05-06:35) and the latency on a hanging Yahoo (up to about 66 s per symbol per
+    even when only one coin was rebuilt - tag per symbol; (d) whether the 23:00 hourly bar is final at 00:12 UTC: on
+    2026-11-14 it was not - the 00:13 run declined the rebuild (no reason logged, see b), the helper had all 24 bars
+    at 00:13:47 and a rerun at 00:14:14 rebuilt and decided; the decide slot can be 1-2 minutes too early, so a short
+    retry inside the run (or a decide slot a few minutes later) would close it and the latency on a hanging Yahoo (up to about 66 s per symbol per
     run; the retry count would be the tunable); (e) when two daily rows are missing (D and D-1) only D is rebuilt
     and the decision runs on a history with a one-day hole; (f) expect a "סגירה מתוקנת" R6 alert after most rebuilt
     days (1h close vs daily close measured 1.93-140.28 USD, about 0.3-19 bp; the alert is at 5 bp).
