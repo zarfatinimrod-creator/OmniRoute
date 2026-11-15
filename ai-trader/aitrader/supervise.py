@@ -384,11 +384,25 @@ def _looks(hb: dict) -> dict:
     return {sym: _when(v.get("checked_at") if isinstance(v, dict) else None) or kept for sym, v in _held(hb).items()}
 
 
+# The precision of a beat's `at`, in seconds: the engine writes it floored to the whole second (journal.now_utc) and a
+# held name's checked_at with its microseconds, so a look that ended inside the second of its beat is stamped up to
+# this much later than `at`. A format's precision, not a threshold: no config key.
+AT_FLOOR_S = 1.0
+
+
 def _stamp_ages(hb: dict, age_s: float | None) -> dict:
     """Each held name's stop-look age now (ruling P16): the beat's `at` less its stamp, plus the beat's own age, so that
-    it keeps growing through a long call that writes no beat. None when a time or the age is not known."""
+    it keeps growing through a long call that writes no beat. None when a time or the age is not known. An age below 0
+    by less than AT_FLOOR_S is the floor of `at` and no stamp in the future: a look of this moment, 0. One further
+    below stays as it is, and open_age calls it unknown."""
     at = _when(hb.get("at"))
-    return {sym: None if None in (at, t, age_s) else (at - t).total_seconds() + age_s for sym, t in _looks(hb).items()}
+
+    def age(t) -> float | None:
+        if None in (at, t, age_s):
+            return None
+        a = (at - t).total_seconds() + age_s
+        return 0.0 if -AT_FLOOR_S < a < 0 else a
+    return {sym: age(t) for sym, t in _looks(hb).items()}
 
 
 def beat_view(hb: dict | None, mtime: float | None, child_pid: int | None, now: float) -> dict:

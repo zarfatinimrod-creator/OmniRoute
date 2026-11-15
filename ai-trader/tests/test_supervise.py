@@ -788,6 +788,13 @@ YEAR_ONE_CHILD = STAMPLESS_CHILD.replace(
     '"held": {"BBB": {"stop": 48.5, "checked_at": "0001-01-01T00:00:00+00:00"}}')
 assert YEAR_ONE_CHILD != STAMPLESS_CHILD
 
+# STAMPLESS_CHILD with the stamps the real engine writes: `at` floored to the whole second (journal.now_utc) and, on its
+# held name, a look of this very moment with its microseconds (news_live.check_stops), so the stamp is later than `at`.
+FLOORED_AT_CHILD = STAMPLESS_CHILD.replace(
+    '"held": {"BBB": {"stop": 48.5}}',
+    '"held": {"BBB": {"stop": 48.5, "checked_at": datetime.now(timezone.utc).isoformat()}}')
+assert FLOORED_AT_CHILD != STAMPLESS_CHILD
+
 # STAMPLESS_CHILD with a stop stamp on its held name and the same one in stops_checked_at: fresh at every beat until the
 # child gets a SIGCONT, and from then on the stamp of its last beat before it, which never moves again (Ruling 53: the
 # engine's first beats after a machine pause still carry the stamps from before it). argv as STAMPLESS_CHILD's.
@@ -939,6 +946,7 @@ class Parents(Procs):
         try:
             argv = set(Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0"))
             if argv & {PARENT_WRAPPER.encode(), GROUP_CHILD.encode(), SLOW_GROUP_CHILD.encode(), STAMPLESS_CHILD.encode(), YEAR_ONE_CHILD.encode(),
+                       FLOORED_AT_CHILD.encode(),
                        PAUSED_STAMP_CHILD.encode(), str(DUMMY_CHILD).encode(), str(ENGINE_CHILD).encode()}:
                 os.kill(pid, signal.SIGKILL)
         except OSError:
@@ -1522,6 +1530,34 @@ class Watching(Parents):
         self.assertGreaterEqual(r6["t"], "2026-11-12T14:30:03+00:00")
         self.assertLessEqual(int(re.search(r"כבר (\d+) שניות", r6["text"])[1]), 4)   # the session's seconds, as unknown
         self.assertEqual({m["stop"] for m in self.urows("mark")}, {None})            # no mark carries an age it made up
+
+    # Tests added by Task 14h's fix round 1: a look later than the beat's floored `at`, inside its second, is a fresh one.
+    def test_a_look_inside_the_second_of_the_beats_floored_at_is_fresh_and_not_unknown(self):
+        cal, now = supervise.load_cfg()["calendar"], datetime(2026, 11, 12, 15, 0, 5, 900000, tzinfo=timezone.utc)
+        look = lambda stamp: {"at": "2026-11-12T15:00:05+00:00", "pid": 1, "market_open": True,
+                              "held": {"BBB": {"stop": 48.5, "checked_at": stamp}}}
+        hb = look("2026-11-12T15:00:05.700000+00:00")                    # the look ended 0.7 s into the beat's second
+        ages = supervise._stamp_ages(hb, 0.1)                            # read 0.1 s after the write: -0.7 + 0.1
+        self.assertEqual(({s: supervise.open_age(a, now, cal) for s, a in ages.items()},
+                          supervise.open_age(supervise.beat_view(hb, 100.0, 1, 100.1)["stop_age_s"], now, cal)),
+                         ({"BBB": 0.0}, 0.0))
+        self.assertEqual(supervise._stamp_ages(look("2026-11-12T15:00:05.999999+00:00"), 0.0), {"BBB": 0.0})
+        self.assertEqual(supervise._stamp_ages(look("2026-11-12T15:00:03+00:00"), 0.5), {"BBB": 2.5})   # a past one as it is
+        future, = supervise._stamp_ages(look("2026-11-12T15:00:06.200000+00:00"), 0.1).values()   # past the floor: the future
+        self.assertIsNone(supervise.open_age(future, now, cal))
+
+    def test_fresh_looks_under_a_floored_at_raise_no_stale_stops(self):
+        """The engine's real beats (FLOORED_AT_CHILD), with the child past stops_stale_seconds: were the fresh looks
+        unknown stamps, Ruling 48's `born` would call them stale from then on."""
+        self.offset = datetime(2026, 11, 12, 10, 0, 5, tzinfo=NY) - datetime.now(timezone.utc)
+        child = [sys.executable, "-c", FLOORED_AT_CHILD, str(self.state / "news_heartbeat.json")]
+        p = self.spawn_parent(None, child_cmd=child, stops_stale_seconds=3)
+        self.wait_beat()
+        self.assertEqual(self.stop_parent(p, settle=5), 143)             # about 100 ticks, 40 of them past the 3 s
+        self.assertEqual((self.urows("stale_stops"), [r["kind"] for r in self.urows("alert") if r["kind"] in ("R6", "R6b")]),
+                         ([], []))
+        held = [m["stop"] for m in self.urows("mark") if m["n"]]
+        self.assertTrue(all(s is not None and s <= 1 for s in held), held)   # a mark of a held name carries its age
 
     def at_the_open(self, stamp: datetime, start: datetime) -> subprocess.Popen:
         """A parent whose clock starts at `start`, with a child that holds BBB, says the market is open and carries
