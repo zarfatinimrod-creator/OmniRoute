@@ -186,8 +186,11 @@ verbatim). One question per message, with options (א / ב / ג) and a recommend
 7. **No look-ahead.** Values on date t use data up to the close of t. Claude's own judgement is graded only
    forward (live), never in historical replay (the model may remember the past).
 8. `git stash` is banned (it is shared across worktrees). Commit state with clear messages and push. In the trader
-   session's checkout nothing is ever rebased: `git fetch`, then `git merge --no-edit`. A turn never ends with a merge
-   in progress. A conflict is reported, never resolved by discarding.
+   session's checkout nothing is ever rebased: `git fetch`, then the check
+   `git merge-tree --write-tree --name-only HEAD origin/<branch>` (it touches neither the index nor the tree; exit 1
+   with conflicted files printed is a conflict: do not merge), and only when it exits 0 `git merge --no-edit`. A turn
+   never ends with a merge in progress (`git merge --abort` if one is). A conflict is reported, never resolved by
+   discarding.
 
 ## Memory (four layers)
 - working: `state/portfolio.json`, `state/weights.json`, `state/latest.json`

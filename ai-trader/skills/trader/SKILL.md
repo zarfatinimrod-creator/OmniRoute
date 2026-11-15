@@ -32,9 +32,16 @@ Claude מוסיף שיקול דעת - חדשות, אירועים, סיכונים
 
 ```bash
 cd ai-trader && pip install -q -r requirements.txt
-git fetch origin ccr-120121ba-vsvwlj && git merge --no-edit origin/ccr-120121ba-vsvwlj   # state/ הוא הזיכרון - תמיד מהגרסה האחרונה; אף פעם לא rebase
+git fetch origin ccr-120121ba-vsvwlj && git merge-tree --write-tree --name-only HEAD origin/ccr-120121ba-vsvwlj && git merge --no-edit origin/ccr-120121ba-vsvwlj   # state/ הוא הזיכרון - תמיד מהגרסה האחרונה; אף פעם לא rebase
 python3 -m aitrader verify   # שרשרת ההאש של היומן תקינה? אם לא - עצור ודווח
 ```
+הבדיקה שבאמצע (`git merge-tree`) לא נוגעת באינדקס ובעץ: על התנגשות היא יוצאת עם 1, מדפיסה את הקבצים בהתנגשות אחרי
+מזהה העץ שבשורה הראשונה, והמיזוג לא רץ. על התנגשות: לא ממזגים, וממשיכים בעבודת הסשן על המצב המקומי (`verify` והלאה);
+הסנכרון שבסוף הסשן פוגש את ההתנגשות שוב ומדווח עליה (S2). יציאה שאינה 0 בלי קובץ בהתנגשות שהודפס (למשל fetch
+שנכשל) היא לא התנגשות: ממשיכים על המצב המקומי. מיזוג שסורב בגלל קבצים שלא נכנסו ל-commit: commit של ה-state
+ומריצים את השורה שוב; אף פעם לא stash, ולא מוחקים קבצים. לא משאירים מיזוג באמצע: אם יש, `git merge --abort` (הוא לא
+מוחק כלום); אם גם הוא נכשל - S2 לנמרוד ב-PushNotification עם הקובץ שה-abort ציין במקום {file} (`משיכה מ-git נעצרה על התנגשות בקובץ {file}. לא מחקתי כלום, והמנוע ממשיך לרוץ על מה שיש. כסף נייר`), לא
+נוגעים בשום דבר אחר, וממשיכים.
 אם `verify` מדפיס `LOSSES AWAITING REVIEW` - יש הפסד ממומש בלי תחקיר. קודם עושים את העבודה הקבועה של הסשן
 (בדיקת המנוע, `cycle`), ומיד אחריה נוהל הפסד (סעיף 3א). `REPEATED CAUSES` - אותה סיבה נרשמה בשתי מכירות
 בהפסד. אם זה באמת אירוע שני, והיא עוד לא בראש `state/backlog.md` כפגם: מעלים אותה לשם ומודיעים לנמרוד פעם אחת.
@@ -157,8 +164,15 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
      שוב תוך שניות.
    - אחר כך, באותה הרצה של הסשן (מתוך `ai-trader/`):
      `git add state/postmortems.jsonl state/lessons.md state/backlog.md && git commit -m "trader: loss review <keys>"`,
-     ואז `git fetch origin ccr-120121ba-vsvwlj`, `git merge --no-edit origin/ccr-120121ba-vsvwlj` ו-`git push` (אף פעם לא
+     ואז `git fetch origin ccr-120121ba-vsvwlj` והבדיקה `git merge-tree --write-tree --name-only HEAD origin/ccr-120121ba-vsvwlj` (היא לא נוגעת
+     באינדקס ובעץ); רק כשהיא יוצאת עם 0, `git merge --no-edit origin/ccr-120121ba-vsvwlj`; ואז `git push` (אף פעם לא
      rebase). תחקיר שלא נדחף הולך לאיבוד עם המכונה, וההפסד חוזר לרשימה.
+     על התנגשות (הבדיקה יוצאת עם 1 ומדפיסה את הקבצים בהתנגשות אחרי מזהה העץ שבשורה הראשונה): לא ממזגים, לא
+     דוחפים, ושולחים לנמרוד את S2 ב-PushNotification, עם שם הקובץ הראשון בהתנגשות במקום {file} -
+     `משיכה מ-git נעצרה על התנגשות בקובץ {file}. לא מחקתי כלום, והמנוע ממשיך לרוץ על מה שיש. כסף נייר` -
+     (בליל קריפטו S2 נכתב ללוג הלילה, סעיף 4א) וממשיכים לשלבים הבאים; לא מוחקים כלום. ה-commit של התחקיר נשאר
+     מקומי, והסנכרון הבא דוחף אותו. תור לא נגמר עם מיזוג באמצע: אם יש, `git merge --abort`; אם גם הוא נכשל - לא
+     דוחפים, S2 עם הקובץ שה-abort ציין, לא נוגעים בשום דבר אחר, וממשיכים.
    - הודעה לנמרוד (כמה הפסדנו, למה, ומה שינינו; כסף נייר) יוצאת כשהתחקיר מצא פגם, חוק שהופר, חוק שנראה שגוי או
      טעות שחוזרת (כל מסקנה חוץ מ-`planned_loss`). הפסד מתוכנן נכנס לסיכום היומי בלי התראה נפרדת. אם התיקון
      דורש החלטה של נמרוד: שאלה אחת בהודעה, עם א/ב/ג והמלצה (סעיף 5).
@@ -203,7 +217,8 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
 
 - כשמשימת הרקע מסתיימת הסשן מתעורר לבד, ועושה לפי הסדר: (א) קורא את השורה האחרונה של המפקח ואת קוד היציאה שלו,
   ועושה מה שכתוב בשורה שלה בטבלה שלמטה; (ב) מריץ `cd /home/user/OmniRoute/ai-trader && python3 -m aitrader.supervise --status`
-  ועושה מה ש-`action` אומר, חוץ מ-`launch` כשהטבלה אמרה לא להפעיל בתור הזה; (ג) שולח את `unsent` כמו בדיקת
+  ועושה מה ש-`action` אומר. כשהטבלה אמרה לא להפעיל בתור הזה: `launch` לא מריצים, וב-`replace_parent` וב-`kill_stray`
+  עושים רק את העצירה, בלי ה"ואז מפעילים" שבסופם; (ג) שולח את `unsent` כמו בדיקת
   המנוע (כל `text` ב-PushNotification, ואז `--relayed` עם המזהים).
   השורה האחרונה של המפקח נראית כך:
   `supervise: 76 handover. Run python3 -m aitrader.supervise --status and do what action says.` הטבלה היא הכלל:
@@ -212,12 +227,13 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
   |------------------------|------------|-------------------------------|
   | `0 end_of_day`, `0 closed_today` | היום נגמר; אין מסחר היום | כלום; `--status` אומר `after_hours` או `closed_today` |
   | `76 handover` | החלפה מתוכננת לפני מגבלת השעתיים | כלום; `--status` אומר `launch`, ומפעילים מיד |
-  | `75 tripped` | המנוע נפל שוב ושוב (crash loop) | קודם קוראים את 20 השורות האחרונות של `.cache/news_live.log`; אם יש מיזוג באמצע (`git rev-parse -q --verify MERGE_HEAD` מדפיס hash): `git merge --abort` (אם גם הוא נכשל: לא דוחפים, S2 עם הקובץ שה-abort ציין, ולא נוגעים בשום דבר אחר). אחר כך `--status`: trip ראשון (`today.trips` הוא 1) - `launch`; trip שני - `wait_for_watchdog` |
+  | `75 tripped` | המנוע נפל שוב ושוב (crash loop) | קודם קוראים את 20 השורות האחרונות של `.cache/news_live.log`; אם יש מיזוג באמצע (`git rev-parse -q --verify MERGE_HEAD` מדפיס hash): `git merge --abort` (אם גם הוא נכשל: לא דוחפים, S2 עם הקובץ שה-abort ציין, לא נוגעים בשום דבר אחר, וממשיכים ל-(ב)). אחר כך `--status`: trip ראשון (`today.trips` הוא 1) - `launch`; trip שני - `wait_for_watchdog` |
   | `4 halt`, `5 halt`, `6 halt` | עצירה: יומן פגום, לוח חגים, קובץ התיק | כלום; `--status` אומר `halted` |
   | `3 lock_held pid <n>` | מנוע מחוץ לפיקוח מחזיק את התיק (או: מפקח אחר מחזיק את הנעילה של המפקח, והחדש לא התחיל) | כלום; `--status` אומר `kill_stray` (כשזה מפקח אחר: `none` או `replace_parent`) |
   | `143 signal`, `143 orphaned` | המפקח קיבל הוראה לעצור (אות עצירה, או שתהליך האב שלו נעלם) | כלום; `--status` אומר `launch` אם השעות מאפשרות |
   | נעצר במגבלה, בלי קוד ("was stopped after reaching its background time limit") | מגבלת השעתיים הגיעה לפני ההחלפה | `launch`. אם הוא רץ עם ה-timeout הארוך (בלי `--handover`): חוזרים ל-`--handover` עם timeout 7200000 (והדגל `supervisor.long_timeout_proven` חוזר ל-false, דרך השער), ו-R8 לנמרוד ב-PushNotification: `המפקח נעצר אחרי שעתיים למרות ההגדרה של 9 שעות. חוזרים להחלפה מתוכננת 4 פעמים ביום. כסף נייר` |
-  | `1`, `2` (`a bad argument or config`, או שגיאה של argparse), או כל קוד או שורה שאינם בטבלה | באג במפקח, או הגדרה שהוא לא מקבל | קוראים את 20 השורות האחרונות של `.cache/supervise.log`. הפעלה מחדש אחרי סוף כזה: לכל היותר פעם אחת ביום ניו יורק. הסימן הוא הקובץ `.cache/parent_relaunched`, ובו התאריך של ניו יורק (`TZ=America/New_York date +%F`). אם הוא כבר מחזיק את התאריך של היום: לא מפעילים בתור הזה (גם כש-`--status` אומר `launch`), ו-R12 לנמרוד ב-PushNotification: `המפקח עצמו קרס (תקלה בקוד שלו). הפעלתי אותו מחדש פעם אחת. כסף נייר`. אחרת: כותבים לתוכו את התאריך של היום, ו-`--status` מפעיל |
+  | `137` בלי שורה אחרונה, אחרי שהסשן עצמו שלח `kill -9` למפקח ב-`replace_parent` | החלפה מתוכננת, לא קריסה | כלום: את הסימן `.cache/parent_relaunched` לא קוראים ולא כותבים, ו-R12 לא נשלח; `--status` אומר `launch` |
+  | `1`, `2` (`a bad argument or config`, או שגיאה של argparse), או כל קוד או שורה שאינם בטבלה | באג במפקח, או הגדרה שהוא לא מקבל | קוראים את 20 השורות האחרונות של היומן של המפקח: `cd /home/user/OmniRoute/ai-trader && tail -n 20 .cache/supervise.log`. הפעלה מחדש אחרי סוף כזה: לכל היותר פעם אחת ביום ניו יורק, וגם R12 לכל היותר פעם אחת ביום ניו יורק. הסימן הוא הקובץ `.cache/parent_relaunched` (ב-ai-trader/): שורה אחת, התאריך של ניו יורק (`TZ=America/New_York date +%F`), ואחריו ` R12` מרגע ש-R12 נשלח באותו יום. קוראים אותו: `cd /home/user/OmniRoute/ai-trader && cat .cache/parent_relaunched` (אין קובץ: אין תאריך). השורה לא מתחילה בתאריך של היום: כותבים לתוכו את התאריך של היום (`cd /home/user/OmniRoute/ai-trader && TZ=America/New_York date +%F > .cache/parent_relaunched`), לא שולחים כלום, ו-`--status` מפעיל. השורה מתחילה בתאריך של היום: לא מפעילים בתור הזה (גם כש-`--status` אומר `launch`; וב-`replace_parent` וב-`kill_stray` רק עוצרים, בלי ה"ואז מפעילים" שבסופם). ואז: אם השורה לא נגמרת ב-` R12` - R12 לנמרוד ב-PushNotification: `המפקח עצמו קרס (תקלה בקוד שלו). הפעלתי אותו מחדש פעם אחת. כסף נייר`, ומוסיפים ` R12` לשורה (`cd /home/user/OmniRoute/ai-trader && echo "$(TZ=America/New_York date +%F) R12" > .cache/parent_relaunched`); אם היא כבר נגמרת ב-` R12` - לא שולחים כלום |
 - אם עבודה אחרת רצה בסשן, ההתעוררות מחכה לה, ובזמן הזה אין מנוע ואין בדיקת סטופים. לפני עבודה ארוכה בסשן הסוחר
   בודקים מתי המנוע עלה (`code.started` ב-heartbeat) ומפעילים אותו מחדש קודם.
 - מנוע שני על אותו תיק לא עולה (`state/news_engine.lock`): הפקודה מסתיימת מיד עם קוד יציאה 3, ושום מנוע חדש לא

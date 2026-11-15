@@ -2,7 +2,9 @@
 watchdog asks the supervisor parent, the close slot reports the day, and the public repository names no session, task,
 topic or address (supervisor spec 4.4, 4.5, 4.7, 8; plan Task 19). Task 19b (Ruling 57): every sync checks for a
 conflict before it merges, a conflict never skips the slot's work, the woken turn acts on the parent's last line, and
-the crypto push loop's exit code says whether it pushed (run with real git in throwaway repositories)."""
+the crypto push loop's exit code says whether it pushed (run with real git in throwaway repositories). Task 19c
+(Ruling 59): SKILL sections 0 and 3א and CLAUDE.md hard rule 8 name the same check, R12 goes out at most once a New
+York day, and step 6 of the watchdog names its directory."""
 
 from helpers import no_phone  # noqa: F401  (first: a test run must never reach the owner's phone)
 
@@ -105,6 +107,40 @@ class SlotFiles(unittest.TestCase):
     def test_claude_md_syncs_without_git_pull(self):   # (e)
         self.assertNotIn("`git pull`", (ROOT / "CLAUDE.md").read_text(encoding="utf-8"))
 
+    # Task 19c (Ruling 59), item 5
+    @staticmethod
+    def section(heading: str) -> str:
+        """One section of SKILL.md, from its `## ` heading to the next one."""
+        skill = (SLOTS.parent / "SKILL.md").read_text(encoding="utf-8")
+        start = skill.index("\n## " + heading)
+        return skill[start:skill.index("\n## ", start + 1)]
+
+    def test_skill_sections_0_and_3a_check_for_a_conflict_before_they_merge(self):   # (a)
+        for heading in ("0. ", "3א. "):
+            t = self.section(heading)
+            self.assertEqual([w in t for w in (CHECK + BRANCH, "git merge --no-edit origin/" + BRANCH, "git merge --abort")],
+                             [True, True, True], heading)
+            self.assertLess(t.index(CHECK), t.index("git merge --no-edit"), heading)   # the check comes first
+        self.assertIn(ownerlines.LINES["S2"][1], self.section("3א. "))   # the closing sync reports the conflict
+
+    def test_claude_md_hard_rule_8_names_the_check(self):   # (b)
+        text = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        rule = re.search(r"^8\. .*?(?=^\S)", text, re.S | re.M)[0]   # rule 8 and its indented lines
+        self.assertEqual([w in rule for w in ("git fetch", CHECK, "git merge --no-edit", "git merge --abort")],
+                         [True, True, True, True])
+
+    def test_r12_goes_out_at_most_once_a_new_york_day_by_the_marker_line(self):   # (c)
+        watch = (SLOTS / "news-watch.md").read_text(encoding="utf-8")
+        self.assertEqual([w in watch for w in ("send R12 at most once per New York day", "` R12`")], [True, True])
+        skill = self.section("3ב. ")
+        self.assertEqual([w in skill for w in ("R12 לכל היותר פעם אחת ביום ניו יורק", "` R12`")], [True, True])
+
+    def test_every_git_command_of_the_watchdogs_closing_sync_starts_from_the_repository_root(self):   # (d)
+        step = next(line for line in (SLOTS / "news-watch.md").read_text(encoding="utf-8").splitlines() if line.startswith("6."))
+        commands = [c for c in re.findall(r"`([^`]*)`", step) if re.search(r"git [a-z]", c)]   # S2's own "git" is no command
+        self.assertGreaterEqual(len(commands), 5)   # add, fetch, the check, merge, merge --abort
+        self.assertEqual([c for c in commands if not c.startswith("cd /home/user/OmniRoute && git ")], [])
+
 
 class CryptoPushLoop(unittest.TestCase):
     """(f) The crypto push loop exactly as crypto-fill.md writes it, run with bash in one of two clones of a local bare
@@ -185,7 +221,9 @@ class CryptoPushLoop(unittest.TestCase):
     def test_the_crypto_slots_and_the_skill_carry_the_same_loop(self):   # the line run above is the one they all run
         texts = [(SLOTS / f).read_text(encoding="utf-8") for f in ("crypto-decide.md", "crypto-fill.md", "crypto-summary.md")]
         texts.append((SLOTS.parent / "SKILL.md").read_text(encoding="utf-8"))
-        self.assertEqual({m[0] for t in texts for m in LOOP.finditer(t)}, {LOOP.search(texts[1])[0]})
+        one = LOOP.findall(texts[1])
+        self.assertEqual(len(one), 1)
+        self.assertEqual([LOOP.findall(t) for t in texts], [one] * 4)   # exactly one loop in each text: a file that loses its loop fails
 
 
 if __name__ == "__main__":
