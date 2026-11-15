@@ -288,6 +288,37 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     idea b. Gate: rule 4 (time machine sweep before and after, quant-critic, unit suite; every variant counted for
     the Deflated Sharpe). Owner's answer א of 2026-11-15: after the supervisor build.
 
+75. [supervisor][spec 13] An alert on dead headline feeds. A failed fetch returns an empty list, so a dead feed looks like
+    "no news" (news_live.py). Basic law 2 says nothing fails silently. Not designed in the supervisor spec (section 13).
+76. [supervisor][spec 13] An alert on repeated scorer failures. Today they are only written down.
+77. [supervisor][spec 13] A standby parent that takes over with no model turn (extends item 39). It is the next step if
+    the long-timeout proof of spec section 9 fails and the four daily handovers stay.
+78. [supervisor][spec 13] A short lock inside `journal.append` for chained files, so two writers can never interleave a
+    row.
+79. [supervisor][spec 13] `slot-done` and `postmortem` lines in the three crypto prompts (item 39).
+80. [supervisor][step 2 review minors, landed 2026-11-15] Known small gaps of the parent, none of which can lose money or
+    skip a stop check:
+    (a) An R2 sent at the parent's end says "killed and restarted" even when no restart followed (the kill tripped the
+        parent, or a planned stop came first). Give R2 an end-of-parent form.
+    (b) A handover whose mark pair spans more than mark_gap_max_seconds is booked from the earlier mark. Book it from
+        the handover's sup_stop.
+    (c) A machine pause of 160-180 s is not detected as a pause (the threshold is hang_seconds). With hang kill on, it
+        gives one needless restart and an R2. Detect a pause from a smaller tick gap.
+    (d) A kill between a SELL's journal row and the book's save can leave the book holding the name; the next engine
+        sells again, so the journal gets two SELL rows for one position (the book's cash is right; realized P&L read
+        from the journal is doubled). At start, on a SELL mismatch, let the book follow the journal, or tag the second
+        sale.
+    (e) A pause whose R4 was skipped for a pending first up gets no line if that up never comes (a trip, a halt or a
+        planned stop first); R11 counts it at the close.
+    (f) S2 has no once-per-conflict rule: a lasting git conflict repeats S2 from each slot in market hours.
+    (g) R4c names the positions of the day's last up, not the book.
+    (h) No "back" line after an urgent R3, R3c or R5c when the relaunch comes back within outage_report_seconds.
+    (i) Drill e never produces a book mismatch, so its PASS is not coverage of check 4 and E1 (unit tests pin them).
+    (j) `--status` prints engine.stop_age_s in wall-clock seconds (about 63,000 at 09:30 with a name held overnight); no
+        prompt reads it.
+    (k) supervise.MAX_AGE_S (30 days) is a literal: move it to a supervisor key with Task 22, the next change to
+        config.json.
+
 
 ## Done
 - 2026-11-14: backlog 23 done (weekly review): the paired sweep re-run on code 3d5b1109 (run 2026-11-14-59a459da5016,
