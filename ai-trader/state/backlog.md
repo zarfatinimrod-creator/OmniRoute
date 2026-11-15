@@ -274,6 +274,19 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     `_buys_blocked`), which removes a double-buy risk. A new check: log mode first, then rule 4 and the owner.
 67. [news][owner] The R5d line says "ויש עסקאות ביומן" also for a book file that parses but is no book while the
     journal is empty (critic N8, review Ruling 18). Reword the line through the owner, or narrow the case.
+73. [news][measurement][owner 2026-11-15] Score each headline a second time with the company name and ticker hidden,
+    beside the normal score, and journal both (log only: the normal score alone still decides; no trade changes).
+    After enough graded headlines, compare the two scores' forward returns. Why: an LLM recalls what it knows about a
+    named company (arXiv 2504.14765, memorization) and attention to famous names drives LLM picks (NBER w35153).
+    Source: research/2026-11-14-claude-portfolio.md, idea d. Gate: rule 4 (quant-critic, unit suite, a forward
+    measurement written down with it). Cost: one more scorer call per headline. Owner's answer א of 2026-11-15:
+    after the supervisor build.
+74. [stocks][time-machine][owner 2026-11-15] A control book with no LLM: rank by news count, 12-1 momentum and size
+    on point-in-time data, rebalance on the quant book's schedule, and compare it with the quant book and the news
+    book. If the Claude layers cannot beat this control, they add nothing. Why: NBER w35153 finds LLM picks load on
+    attention, momentum and size, with no significant abnormal return. Source: research/2026-11-14-claude-portfolio.md,
+    idea b. Gate: rule 4 (time machine sweep before and after, quant-critic, unit suite; every variant counted for
+    the Deflated Sharpe). Owner's answer א of 2026-11-15: after the supervisor build.
 
 
 ## Done
