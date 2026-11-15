@@ -4,7 +4,7 @@ Every item: implement behind a config switch -> paired sweep before/after (strat
 PASS -> only then merge. Sources: research/2026-11-09-repo-sweep-take-list.md, research/*.md, critic notes.
 
 ## Open (priority order)
-First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 44, 34, 35, 39, 40 - then the list below.
+First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (crypto data defect, found 2026-11-14), 33, 44, 34, 35, 39, 40 - then the list below.
 1. [defect] Learning label credits the overnight gap: learn.forward_excess uses close(d)->close(d+h) but fills are
    at open(d+1). Use open(d+1)->open(d+1+h); mature at asof-h-1; rerun placebo; add a test that the label equals
    the return the backtest earns (qlib leak-gap 2; FinRL-Trading label assertion).
@@ -51,9 +51,6 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     whether a source's hit rate should gate its size (desk, news rule).
 22. [docs] lessons.md still lists superseded sweep numbers without a marker (v1/v2 Sharpe in the first lessons;
     the "learned weights beat priors" lesson is retracted by the placebo lesson below it).
-23. [measurement] No stock sweep or placebo run is registered after the crypto-build changes to strategy.py,
-    backtest.py and learn.py (the golden tests show the stock book byte-identical): re-run the paired sweep at the
-    weekly review so the evidence matches the code.
 24. [crypto] Parked and deferred minors from the crypto build (6 parked, 20 open minors, rulings R1-R19):
     research/2026-11-09-crypto-deferred-and-rulings.txt.
 25. [alerts] Engine alerts are written in English; the owner reads Hebrew. Translate the urgent ones.
@@ -245,14 +242,75 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 33, 
     - Not measured: whether Yahoo's close of bar D is final at 00:12 UTC. The R6 audit
       (`market.revised_close_alert_bps` 5) checks every decision; read `close_audit` in `state/crypto/pending.json`
       and `revised_close` rows in `state/crypto/decisions.jsonl` after the first week.
+72. [crypto][defect] The backlog 70 rebuild accepts a complete but not final 23:00 1h bar: a wrong close reached a
+    decision. On 2026-11-14 Yahoo's 1h bars of 11-13 were complete at 00:13:47, 00:14:14 (the rerun that decided) and
+    01:08:44, all with BTC close 67,881.85; the settled 23:00 1h close is 68,223.01 and Yahoo's daily close 68,249.27,
+    so the decision close was -53.8 bp off (regime_sma 73,033.55: risk_off either way, no trade changed). Two agreeing
+    tries 30 s apart or a 00:30 UTC floor would both have accepted the stale bar (backlog 71 gate, commit 99d51558).
+    Candidate checks, log-only first: the 1h 23:00 close equals the close of the 23:55 5m bar (matched exactly on
+    settled data 11-09..11-13; not yet measured live at 00:13); or a Coinbase cross-check tighter than the 1% guard
+    (backlog 70 option b). Measure at the next 00:13 runs, then rule 4. Until fixed, 71 (d) stays off. The R6 audit
+    should flag the 11-13 close (about -54 bp, over the 5 bp line) at the next decision.
+    2026-11-15 measurement (logs/2026-11-15-crypto-night.md): the 23:00 1h bar of 11-14 first appeared at 00:45:40
+    (64,113.45) and then alternated null/value between successive fetches until at least 01:12 (Yahoo replicas
+    disagree); the 5m 23:55 close equalled the 1h close in every non-null reply (same reply, so not an independent
+    finality check). Compare 64,113.45 with the settled daily close when it arrives.
+71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
+    2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
+    for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
+    hourly_rebuild is replaced before its close_audit exists); (b) DONE 2026-11-14 (7bbb1957): a declined rebuild prints a reason tag and a deciding run that ends in
+    the skip writes a rebuild_declined row to skips.jsonl (note: the morning summary counts these rows as skipped
+    runs; a live bar is tagged misaligned_stamp - a separate live_bar tag would read better); (c) with a two-coin profile the R6 tag "yahoo_1h" is set for the whole decision close
+    even when only one coin was rebuilt - tag per symbol; (d) the in-run wait is BUILT but OFF (7bbb1957 + 99d51558): it
+    needs market.rebuild_wait_seconds/rebuild_poll_seconds in books.crypto.market plus tests/test_books.py CRYPTO_MARKET
+    and the pin test in test_crypto_rebuild_wait.py; do not switch it on before item 72 (on 2026-11-14 the bars the
+    rerun accepted were complete but not final); a try in progress can overrun the budget by up to one try (about
+    66 s per symbol on a hanging Yahoo) and the latency on a hanging Yahoo (up to about 66 s per symbol per
+    run; the retry count would be the tunable); (e) when two daily rows are missing (D and D-1) only D is rebuilt
+    and the decision runs on a history with a one-day hole; (f) expect a "סגירה מתוקנת" R6 alert after most rebuilt
+    days (1h close vs daily close measured 1.93-140.28 USD, about 0.3-19 bp; the alert is at 5 bp).
 66. [news][rule 4] An engine whose lock call fails (not a held lock) runs unlocked and checks the stops, as before;
     the quant-critic (gate of 2026-11-11) recommends that such an engine opens no new position ("no_lock" in
     `_buys_blocked`), which removes a double-buy risk. A new check: log mode first, then rule 4 and the owner.
 67. [news][owner] The R5d line says "ויש עסקאות ביומן" also for a book file that parses but is no book while the
     journal is empty (critic N8, review Ruling 18). Reword the line through the owner, or narrow the case.
+73. [news][measurement][owner 2026-11-15] Score each headline a second time with the company name and ticker hidden,
+    beside the normal score, and journal both (log only: the normal score alone still decides; no trade changes).
+    After enough graded headlines, compare the two scores' forward returns. Why: an LLM recalls what it knows about a
+    named company (arXiv 2504.14765, memorization) and attention to famous names drives LLM picks (NBER w35153).
+    Source: research/2026-11-14-claude-portfolio.md, idea d. Gate: rule 4 (quant-critic, unit suite, a forward
+    measurement written down with it). Cost: one more scorer call per headline. Owner's answer א of 2026-11-15:
+    after the supervisor build.
+74. [stocks][time-machine][owner 2026-11-15] A control book with no LLM: rank by news count, 12-1 momentum and size
+    on point-in-time data, rebalance on the quant book's schedule, and compare it with the quant book and the news
+    book. If the Claude layers cannot beat this control, they add nothing. Why: NBER w35153 finds LLM picks load on
+    attention, momentum and size, with no significant abnormal return. Source: research/2026-11-14-claude-portfolio.md,
+    idea b. Gate: rule 4 (time machine sweep before and after, quant-critic, unit suite; every variant counted for
+    the Deflated Sharpe). Owner's answer א of 2026-11-15: after the supervisor build.
 
 
 ## Done
+- 2026-11-14: backlog 23 done (weekly review): the paired sweep re-run on code 3d5b1109 (run 2026-11-14-59a459da5016,
+  state/trial_runs/): base Sharpe median 0.418 (registered 2026-11-09: 0.402), CAGR 7.40% (7.23%), maxDD -11.52%
+  (-11.52%); the change is the five new trading days at the end of the history, the stock book is unchanged by the
+  crypto build (the golden tests agree). DSR 0.559 (N=74); P(Sharpe > SPY) 0.195. Placebo not re-run (first
+  Saturday of December). Original item: [measurement] No stock sweep or placebo run is registered after the crypto-build changes to strategy.py,
+      backtest.py and learn.py (the golden tests show the stock book byte-identical): re-run the paired sweep at the
+      weekly review so the evidence matches the code.
+- 2026-11-13: backlog 70 fixed (d2e0c77e, quant-critic PASS + live-path review PASS, 696 tests): on the UTC
+  daily calendar a daily row that Yahoo returns all-null is rebuilt from Yahoo's 24 complete 1h bars of the same
+  day (all coins or none, never overwriting a daily value, logged in decisions/pending, R6 tagged yahoo_1h); any
+  other case keeps the backlog 68 skip. Follow-ups: item 71. Original item:
+  70. [crypto][defect-timing] Yahoo's daily row for the day that just closed has close null at 00:12 UTC, two nights
+      running (2026-11-12 for bar 11-11, backlog 68; 2026-11-13 for bar 11-12: the chart call at 00:14 UTC returned the
+      11-12 timestamp with close None, which `_bars_from_chart` drops). Since the backlog 68 fix the 00:12 decide slot
+      then makes no decision, and the decision waits for a later run. On 2026-11-13 this delayed a rule exit: with the
+      Coinbase close of 11-12 (71,369.90) BTC was -2.34% under its 200-day average (73,081.1), below the 2% hysteresis
+      band (71,619.5) -> risk_off -> flat under crypto_base (`logs/2026-11-13-crypto-night.md`). Options, each through
+      rule 4: (a) the cycle retries inside the slot until the row fills or a deadline before exec_ts; (b) take the
+      Coinbase daily close when Yahoo's row is null (a data-source change: log-only first, compare the two closes);
+      (c) move the decide slot later (the owner's schedule; measure first when Yahoo fills the row - the poll of
+      2026-11-13 is in the night log). Answers the "not measured" line of item 69.
 - 2026-11-12: backlog 68 fixed (df8042e2, quant-critic PASS, 679 tests): on the UTC daily calendar a decision bar
   that is not yesterday's (a daily row missing from Yahoo's reply) is no decision; the pending fill still runs.
   Built on Opus with the owner's approval (Fable limit reached). Critic's non-blocking follow-ups: write the reason

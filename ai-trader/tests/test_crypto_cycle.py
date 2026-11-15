@@ -111,7 +111,8 @@ class CryptoBook(unittest.TestCase):
             panel: dict | None = None, patches: dict | None = None) -> dict:
         """One run_cycle with rows 0..upto visible at `clock` (UTC, journal.now_utc format)."""
         pn = panel if panel is not None else self.panel(upto)
-        with frozen_env(self.state, None):
+        # backlog 70: Yahoo's 1h bars of a missing daily row are "no data" unless a test patches hourly_day_bars
+        with frozen_env(self.state, None), mock.patch.object(cycle, "hourly_day_bars", lambda sym, day: None):
             journal.now_utc = lambda: clock
             rep.ROOT = self.reports
             cycle.load_config = lambda: self.cfg
