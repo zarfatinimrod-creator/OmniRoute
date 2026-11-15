@@ -781,6 +781,13 @@ while os.getppid() == parent:
     os.replace(path + ".tmp", path)
     time.sleep(0.1)"""
 
+# STAMPLESS_CHILD whose held name and stops_checked_at carry a stamp that parses and cannot be measured (Ruling 61).
+YEAR_ONE_CHILD = STAMPLESS_CHILD.replace(
+    '"held": {"BBB": {"stop": 48.5}}',
+    '"stops_checked_at": "0001-01-01T00:00:00+00:00", '
+    '"held": {"BBB": {"stop": 48.5, "checked_at": "0001-01-01T00:00:00+00:00"}}')
+assert YEAR_ONE_CHILD != STAMPLESS_CHILD
+
 # STAMPLESS_CHILD with a stop stamp on its held name and the same one in stops_checked_at: fresh at every beat until the
 # child gets a SIGCONT, and from then on the stamp of its last beat before it, which never moves again (Ruling 53: the
 # engine's first beats after a machine pause still carry the stamps from before it). argv as STAMPLESS_CHILD's.
@@ -931,7 +938,7 @@ class Parents(Procs):
         """SIGKILL to a parent or a child this test started that outlived it, and never to a pid that was reused."""
         try:
             argv = set(Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0"))
-            if argv & {PARENT_WRAPPER.encode(), GROUP_CHILD.encode(), SLOW_GROUP_CHILD.encode(), STAMPLESS_CHILD.encode(),
+            if argv & {PARENT_WRAPPER.encode(), GROUP_CHILD.encode(), SLOW_GROUP_CHILD.encode(), STAMPLESS_CHILD.encode(), YEAR_ONE_CHILD.encode(),
                        PAUSED_STAMP_CHILD.encode(), str(DUMMY_CHILD).encode(), str(ENGINE_CHILD).encode()}:
                 os.kill(pid, signal.SIGKILL)
         except OSError:
@@ -1491,6 +1498,31 @@ class Watching(Parents):
         self.assertEqual(age(ny(11, 15, 59), ny(12, 9, 32, 5)), 185)     # yesterday's last minute is market time
         self.assertIsNone(supervise.open_age(None, ny(12, 10, 0), cal))  # an age that is not known stays unknown
 
+    # Tests added by Ruling 61 (Task 14h): a stop stamp that cannot be measured is an unknown stamp, never a crash.
+    def test_an_age_that_cannot_be_measured_is_unknown_and_open_age_never_raises(self):
+        cal, now = supervise.load_cfg()["calendar"], datetime(2026, 11, 12, 10, 0, tzinfo=NY)
+        year_one = (now - datetime(1, 1, 1, tzinfo=timezone.utc)).total_seconds()
+        for age in (year_one, now.timestamp() + 1, 1e300, float("inf"), float("nan"), -5.0,
+                    supervise.MAX_AGE_S + 1):                            # year 1, before the epoch, the future, too old
+            self.assertIsNone(supervise.open_age(age, now, cal), age)
+        self.assertEqual(supervise.open_age(120.0, now, cal), 120)
+        self.assertIsNotNone(supervise.open_age(supervise.MAX_AGE_S, now, cal))
+        self.assertIsNone(supervise._when("0001-01-01T00:00:00+00:00"))  # before the epoch: no time to measure from
+        self.assertIsNone(supervise._when("9999-12-31T23:59:59+00:00"))
+        self.assertIsNotNone(supervise._when("2026-11-12T15:00:00+00:00"))
+
+    def test_a_stop_stamp_of_the_year_one_is_an_unknown_stamp_and_the_parent_lives(self):
+        """A corrupt but parseable stamp (Review Focus 4): judged as Ruling 48's unknown stamp, from the child's start,
+        the way test_an_unknown_stamps_age_counts_from_the_open_when_the_child_started_before_it has it."""
+        self.offset = datetime(2026, 11, 12, 9, 29, 57, tzinfo=NY) - datetime.now(timezone.utc)
+        child = [sys.executable, "-c", YEAR_ONE_CHILD, str(self.state / "news_heartbeat.json")]
+        p = self.spawn_parent(None, child_cmd=child, stops_stale_seconds=3)
+        r6, = self.wait_for(lambda: self.alerts("R6"), timeout=15)
+        self.assertEqual(self.stop_parent(p), 143)                       # it ran to its SIGTERM: no exception ended it
+        self.assertGreaterEqual(r6["t"], "2026-11-12T14:30:03+00:00")
+        self.assertLessEqual(int(re.search(r"כבר (\d+) שניות", r6["text"])[1]), 4)   # the session's seconds, as unknown
+        self.assertEqual({m["stop"] for m in self.urows("mark")}, {None})            # no mark carries an age it made up
+
     def at_the_open(self, stamp: datetime, start: datetime) -> subprocess.Popen:
         """A parent whose clock starts at `start`, with a child that holds BBB, says the market is open and carries
         the stop look of `stamp` on that clock: the last look of the session before, which the day's first engine
@@ -1649,8 +1681,17 @@ class ParentLines(Parents):
         fell = row(ny(12, 15, 50), "exit", why="exit", rc=1)
         self.assertIsNone(gap(fell, ny(13, 8, 10)))
         self.assertEqual(told(gap(fell, ny(13, 9, 45))), ("R4", 900, 15, opened, ownerlines.hhmm(ny(13, 9, 45), tz)))
-        handed = row(ny(12, 15, 50), "sup_stop", why="handover", rc=76)  # R4b counts from today's open as well
-        self.assertEqual(told(gap(handed, ny(13, 9, 45)))[:4], ("R4b", 900, 15, opened))
+        # Ruling 61 (Task 14h): across days R4, whatever the last row was. R4b says "the supervisor stopped at {time}
+        # ({why})", and no stop happened at today's open; inside one New York day R4b keeps its meaning.
+        for why, word in ownerlines.WORDS["R4b.why"].items():
+            stop = row(ny(12, 15, 50), "sup_stop", why=why)
+            line = gap(stop, ny(13, 9, 45))                              # Thursday 15:50, Friday's first up at 09:45
+            self.assertEqual((told(line)[:4], "why" in line[1]), (("R4", 900, 15, opened), False), why)
+            line = gap(stop, ny(12, 15, 55))                             # the same stop, up five minutes later
+            self.assertEqual((told(line)[:3], line[1]["why"], line[1]["time"]),
+                             (("R4b", 300, 5), word, ownerlines.hhmm(ny(12, 15, 50), tz)), why)
+        for why in ("halt", "lock_held"):                                # Friday's own 15 minutes are in no R5 line
+            self.assertEqual(told(gap(row(ny(12, 15, 50), "sup_stop", why=why), ny(13, 9, 45)))[:3], ("R4", 900, 15), why)
         # with a restore from git, the state's own time is still the last row's
         self.assertEqual(gap(fell, ny(13, 9, 45), cold=True)[1]["cold_time"], ownerlines.hhmm(ny(12, 15, 50), tz))
         # a closed day: nothing on the day itself, and at the next session only that session's seconds

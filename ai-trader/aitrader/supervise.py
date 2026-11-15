@@ -340,20 +340,36 @@ def open_seconds(a: datetime, b: datetime, cal: dict) -> float:
     return total
 
 
+# ponytail: the oldest age open_age measures, in seconds (30 days). A held name's stop look is at most a long weekend
+# old (the 5-day exit sells it), so an older stamp is a corrupt one. open_seconds walks one day at a time, and the
+# bound is also what keeps that walk short. The ceiling: a market closed for a month. The upgrade: a config key.
+MAX_AGE_S = 30 * 86400.0
+
+
 def open_age(age_s: float | None, now: datetime, cal: dict) -> float | None:
     """The market-open seconds of an age that ends at `now` (Ruling 58): open_seconds over its last age_s seconds, so
     the closed night or weekend behind a stop look of the session before adds nothing, and an age from inside today's
-    session is the age itself. None stays None."""
-    return None if age_s is None else open_seconds(now - timedelta(seconds=age_s), now, cal)
+    session is the age itself. None stays None, and an age that cannot be measured is None too (Ruling 61): one from
+    a stamp in the future (below 0), one above MAX_AGE_S, one that is no number. It never raises."""
+    if age_s is None or not 0 <= age_s <= MAX_AGE_S:
+        return None
+    return open_seconds(now - timedelta(seconds=age_s), now, cal)
+
+
+def _own_age(age_s: float, now: datetime, cal: dict) -> float:
+    """open_age of an age the parent measured itself (since a start of its own, never a stamp it read): held inside
+    what open_age measures, so it is always a number."""
+    return open_age(min(max(age_s, 0.0), MAX_AGE_S), now, cal)
 
 
 def _when(text) -> datetime | None:
-    """An ISO-8601 time with its zone; None for anything else."""
+    """An ISO-8601 time with its zone; None for anything else, and for a time before the epoch or in the year 9999
+    (Ruling 61): no file here has a true one, and moving one to another zone can raise."""
     try:
         t = datetime.fromisoformat(text)
     except (TypeError, ValueError):
         return None
-    return t if t.utcoffset() is not None else None
+    return t if t.utcoffset() is not None and 1970 <= t.year < 9999 else None
 
 
 def _held(hb: dict) -> dict:
@@ -446,18 +462,21 @@ def gap_line(prev: dict | None, up_at: datetime, cold: bool, cal: dict, sup: dic
     Only when the outage holds outage_report_seconds or more inside a session. It runs from prev.t to up_at; when
     prev is from an earlier New York day than up_at, from today's session open (Ruling 58): the earlier day's part was
     told by that day's R4c or counted by its R11, and is not told again, and a normal night or a closed day adds
-    nothing. R4 when prev is no sup_stop, or a sup_stop for the end of the day or a closed day (no line said anything
-    then, so the day's first parent coming up late is told; with cold, `cold_time` is prev.t on the owner's clock: the
-    parent never runs git, and the last row it can read is what git restored); R4b when it is a sup_stop whose `why`
-    has a word in ownerlines.WORDS["R4b.why"]. After a sup_stop for a halt or a held lock it is None: R5a-R5e said
-    that the stops are not checked, and the minutes reach R11. The fields carry `time`, where the outage is counted
+    nothing. Across days it is R4 whatever prev was (Ruling 61): nothing stopped at today's open, so R4b's "stopped
+    at {time} ({why})" would be false, and no R5 line spoke of today. Within one New York day: R4 when prev is no
+    sup_stop, or a sup_stop for the end of the day or a closed day (no line said anything then, so a parent coming up
+    late is told); R4b when it is a sup_stop whose `why` has a word in ownerlines.WORDS["R4b.why"]; None after a
+    sup_stop for a halt or a held lock: R5a-R5e said that the stops are not checked, and the minutes reach R11. With
+    cold, R4's `cold_time` is prev.t on the owner's clock: the parent never runs git, and the last row it can read is
+    what git restored. The fields carry `time`, where the outage is counted
     from, `m`, the line's minutes, and `s`, its exact market-open seconds, for its alert row (ruling P6; R11 counts
     `s`, ruling 50); no template names `s`, so it stays out of the owner's text."""
     t = _when(prev.get("t")) if isinstance(prev, dict) else None
     if t is None:
         return None
     start, day = t, up_at.astimezone(NY).date()
-    if t.astimezone(NY).date() < day:
+    across = t.astimezone(NY).date() < day
+    if across:
         (oh, om), _ = session_hours(day, cal) or ((0, 0), None)  # no session today: open_seconds gives 0 anyway
         start = datetime(day.year, day.month, day.day, oh, om, tzinfo=NY)
     s = open_seconds(start, up_at, cal)
@@ -465,7 +484,7 @@ def gap_line(prev: dict | None, up_at: datetime, cold: bool, cal: dict, sup: dic
         return None
     tz = sup["owner_tz"]
     fields = {"time": ownerlines.hhmm(start, tz), "time2": ownerlines.hhmm(up_at, tz), "m": round(s / 60), "s": s}
-    if prev.get("ev") != "sup_stop" or prev.get("why") in ("end_of_day", "closed_today"):
+    if across or prev.get("ev") != "sup_stop" or prev.get("why") in ("end_of_day", "closed_today"):
         return "R4", {**fields, **({"cold_time": ownerlines.hhmm(t, tz)} if cold else {})}
     why = ownerlines.WORDS["R4b.why"].get(str(prev.get("why")))
     return ("R4b", {**fields, "why": why}) if why else None
@@ -759,10 +778,11 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     4, 5, 6 (halt), 75 (tripped), 76 (handover), 143 (signal, orphaned), 2 for a bad argument or config.
     clock() -> an aware UTC time (default now) answers the calendar questions only: the day, the session, --until, the
     handover times and the `t` of a row. Ages never read it (how many of a stop-look age's seconds were market-open
-    is a calendar question: open_age), so a test or a drill can run the parent on a session morning on any day. SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the
-    child; with --handover, so does handover_due, and the state file keeps {"at", "last_look"} for the next parent's
-    first `up` (its handover_s). An episode a planned end cuts short gets its R1 then (ruling 37), and a hang kill that
-    no `up` followed gets its R2 at whatever end comes (Ruling 58). Two lines go
+    is a calendar question: open_age), so a test or a drill can run the parent on a session morning on any day.
+    SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the child; with
+    --handover, so does handover_due, and the state file keeps {"at", "last_look"} for the next parent's first `up`
+    (its handover_s). An episode a planned end cuts short gets its R1 then (ruling 37), and a hang kill that no `up`
+    followed gets its R2 at whatever end comes (Ruling 58). Two lines go
     to stdout, the first and the last; the rest goes to .cache/supervise.log. The owner's lines (spec 8) go to
     alerts.ntfy_base_url with the topic of env (default os.environ), through a worker thread that the loop never waits
     for. --net-check asks ntfy's health once, prints what came back and returns 0 only on 200 (spec 6, "Not verified":
@@ -1050,7 +1070,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 mine = view["mine"]
                 # Ruling 58: wherever a stop-look age is judged or written here it counts market-open seconds only
                 # (open_age), so the last look of the session before is not "unchecked" through the closed night.
-                stop_s = None if view["stop_age_s"] is None else round(open_age(view["stop_age_s"], now, cal), 1)
+                # Ruling 61: an age open_age cannot measure is an unknown stamp's, here and below (ruling 48's born).
+                stop_s = open_age(view["stop_age_s"], now, cal)
+                stop_s = None if stop_s is None else round(stop_s, 1)
                 last, seen["tick"] = seen["tick"], (wall, now)
                 # ponytail: any wait inside this loop longer than hang_seconds reads as a pause of the machine. Today
                 # only a hang stop() waits and ticks again (a planned stop ends the loop): at most
@@ -1087,7 +1109,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     ages = _stamp_ages(hb, view["age_s"]) if view["open"] else {}
                     ages = {sym: open_age(a, now, cal) for sym, a in ages.items()}
                     # ruling 48: an unknown stamp's age counts from this child's start
-                    born = open_age(wall - kid["started"], now, cal)
+                    born = _own_age(wall - kid["started"], now, cal)
                     # Ruling 53: after a machine pause no age counts from before its resume tick, so the stamps a beat
                     # still carries from before the pause raise no R6 until stops_stale_seconds after it ({s} stays the
                     # true age). An episode already open is judged on the true ages: capped, they would end it with an
@@ -1266,9 +1288,11 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             # counts it), an age on the real clock like every other (open_age).
             if ep["r2"] is not None:
                 r2, ep["r2"], end = ep["r2"], None, clock()
-                age = time.time() - (r2["look"].timestamp() if r2["look"] else began)
+                blind = open_age(time.time() - r2["look"].timestamp(), end, cal) if r2["look"] else None
+                if blind is None:  # no look on record, or one that cannot be measured (Ruling 61)
+                    blind = _own_age(time.time() - began, end, cal)
                 say("R2", end, s=r2["s"], time=ownerlines.hhmm(r2["t"], tz, seconds=True),
-                    blind_s=round(open_age(age, end, cal), 1), held=_held_now(paths, seen["last_child"]))
+                    blind_s=round(blind, 1), held=_held_now(paths, seen["last_child"]))
             # Ruling 37: a planned end cuts an open episode short of its healthy run. Its R1 goes out now when a child
             # came up after the episode's last fall; else nothing more is said here (the handover gap measures it).
             if word in PLANNED and ep["ups"] and ep["ups"][-1]["t"] > ep["falls"][-1]["t"]:

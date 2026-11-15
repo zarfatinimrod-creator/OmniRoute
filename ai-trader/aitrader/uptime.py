@@ -36,7 +36,9 @@ def _stretches(timed: list[tuple[datetime, dict]], sup: dict) -> dict[str, list]
       is as old as the pause);
     - two marks closer than that when the later one shows `hb` above up_hb_max_seconds: "hang". A null `hb` (no beat
       of this child: spec 4.6) goes on with what the mark before it showed: "hang" after a stale beat (the hang row is
-      written after the kill, so a hang's start comes from the marks), else "gap";
+      written after the kill, so a hang's start comes from the marks), else "gap", and that gap only from the last
+      `exit` or `sup_stop` row between the two marks (Ruling 61): the parent writes no mark while a planned stop waits, so
+      until that row the engine ran, and the exit-to-up stretch above books the rest under its own cause;
     - two marks when the later one shows `n` above 0 and `stop` above stops_stale_seconds, or no stop it can read:
       "stale_stops"."""
     out: dict[str, list] = {c: [] for c in CAUSES}
@@ -56,14 +58,15 @@ def _stretches(timed: list[tuple[datetime, dict]], sup: dict) -> dict[str, list]
     def beat_stale(m: dict) -> bool:
         return _num(m.get("hb")) and m["hb"] > sup["up_hb_max_seconds"]
 
-    marks = [(t, r) for t, r in timed if r.get("ev") == "mark"]
-    for (ta, a), (tb, b) in zip(marks, marks[1:]):
+    marks = [(i, t, r) for i, (t, r) in enumerate(timed) if r.get("ev") == "mark"]
+    for (ia, ta, a), (ib, tb, b) in zip(marks, marks[1:]):
         if (tb - ta).total_seconds() > sup["mark_gap_max_seconds"]:
             out["gap"].append((ta, tb))
         elif beat_stale(b) or (not _num(b.get("hb")) and beat_stale(a)):
             out["hang"].append((ta, tb))
         elif not _num(b.get("hb")):
-            out["gap"].append((ta, tb))
+            ends = [t for t, r in timed[ia + 1:ib] if r.get("ev") in ("exit", "sup_stop")]  # in the log's order
+            out["gap"].append((ends[-1] if ends else ta, tb))
         if _num(b.get("n")) and b["n"] > 0 and not (_num(b.get("stop")) and b["stop"] <= sup["stops_stale_seconds"]):
             out["stale_stops"].append((ta, tb))
     return out

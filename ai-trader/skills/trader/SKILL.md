@@ -166,7 +166,8 @@ python3 -m aitrader predict SYMBOL up --horizon 20 --prob 0.58 --note "thesis; i
      `git add state/postmortems.jsonl state/lessons.md state/backlog.md && git commit -m "trader: loss review <keys>"`,
      ואז `git fetch origin ccr-120121ba-vsvwlj` והבדיקה `git merge-tree --write-tree --name-only HEAD origin/ccr-120121ba-vsvwlj` (היא לא נוגעת
      באינדקס ובעץ); רק כשהיא יוצאת עם 0, `git merge --no-edit origin/ccr-120121ba-vsvwlj`; ואז `git push` (אף פעם לא
-     rebase). תחקיר שלא נדחף הולך לאיבוד עם המכונה, וההפסד חוזר לרשימה.
+     rebase). מיזוג שסורב בגלל קבצים שלא נכנסו ל-commit: commit של ה-state ומריצים את השורה שוב; אף פעם לא stash,
+     ולא מוחקים קבצים. תחקיר שלא נדחף הולך לאיבוד עם המכונה, וההפסד חוזר לרשימה.
      על התנגשות (הבדיקה יוצאת עם 1 ומדפיסה את הקבצים בהתנגשות אחרי מזהה העץ שבשורה הראשונה): לא ממזגים, לא
      דוחפים, ושולחים לנמרוד את S2 ב-PushNotification, עם שם הקובץ הראשון בהתנגשות במקום {file} -
      `משיכה מ-git נעצרה על התנגשות בקובץ {file}. לא מחקתי כלום, והמנוע ממשיך לרוץ על מה שיש. כסף נייר` -

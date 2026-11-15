@@ -123,6 +123,12 @@ class SlotFiles(unittest.TestCase):
             self.assertLess(t.index(CHECK), t.index("git merge --no-edit"), heading)   # the check comes first
         self.assertIn(ownerlines.LINES["S2"][1], self.section("3א. "))   # the closing sync reports the conflict
 
+    def test_skill_sections_0_and_3a_say_what_to_do_when_a_merge_is_refused(self):   # Ruling 61 (Task 14h), item 4
+        clause = ("מיזוג שסורב בגלל קבצים שלא נכנסו ל-commit: commit של ה-state ומריצים את השורה שוב; "
+                  "אף פעם לא stash, ולא מוחקים קבצים.")
+        for heading in ("0. ", "3א. "):
+            self.assertIn(clause, " ".join(self.section(heading).split()), heading)   # the same words, however wrapped
+
     def test_claude_md_hard_rule_8_names_the_check(self):   # (b)
         text = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
         rule = re.search(r"^8\. .*?(?=^\S)", text, re.S | re.M)[0]   # rule 8 and its indented lines

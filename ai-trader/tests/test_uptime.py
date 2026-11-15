@@ -304,12 +304,13 @@ class Report(unittest.TestCase):
 
     # Tests of Ruling 58 (Task 14g): a planned handover is booked at its true length, and a short one is no untold outage.
     @staticmethod
-    def handover(at: str, took: int) -> list[dict]:
+    def handover(at: str, took: int, stop_s: int = 0) -> list[dict]:
         """The rows of one planned handover on 2026-11-12 as the two parents write them. At `at` (UTC, a whole minute:
-        the old parent writes that minute's mark first, and marks() has it) the child's planned exit and the sup_stop.
-        The next parent starts 2 s before `at` + took: sup_start, its first mark (no child yet: hb null), start; its
-        child is up `took` seconds after the exit."""
-        t0 = datetime.fromisoformat(f"2026-11-12T{at}+00:00")
+        the old parent writes that minute's mark first, and marks() has it) plus stop_s (a planned stop that took that
+        long, or a handover that came due that far into the minute) the child's planned exit and the sup_stop.
+        The next parent starts 2 s before the exit + took: sup_start, its first mark (no child yet: hb null), start;
+        its child is up `took` seconds after the exit."""
+        t0 = datetime.fromisoformat(f"2026-11-12T{at}+00:00") + timedelta(seconds=stop_s)
         new, up = ((t0 + timedelta(seconds=s)).isoformat() for s in (took - 2, took))
         return [row(t0.isoformat(), "exit", child=7, rc=143, signal=None, ran_s=4000.0, why="planned"),
                 row(t0.isoformat(), "sup_stop", why="handover", rc=76),
@@ -318,24 +319,26 @@ class Report(unittest.TestCase):
                 row(new, "start", child=8, n=1, backoff_s=0),
                 row(up, "up", child=8, down_s=None, blind_s=took, handover_s=float(took), held={})]
 
-    def handover_day(self, *took: int, skip: tuple = ()) -> list[dict]:
+    def handover_day(self, *took: int, skip: tuple = (), stop_s: int = 0) -> list[dict]:
         """A whole day of marks from the 08:07 New York start, with the day's four handovers (09:18, 10:48, 12:28 and
-        14:17 New York), each as long as `took` says; skip: the minutes no parent lived in."""
+        14:17 New York), each as long as `took` says and each exit stop_s into its minute; skip: the minutes no parent
+        lived in."""
         rows = marks("2026-11-12", "13:07:00", "21:05:00", skip=skip)
         for at, s in zip(("14:18:00", "15:48:00", "17:28:00", "19:17:00"), took):
-            rows += self.handover(at, s)
+            rows += self.handover(at, s, stop_s)
         return sorted(rows, key=lambda x: x["t"])
 
     def test_one_46_s_handover_is_booked_as_46_s(self):
         """The old parent's mark of the handover minute shows a live beat, so the pair that ends at the next parent's
         first mark (hb null) starts there and lies inside the exit-to-up stretch. Without that mark the pair starts a
-        minute earlier, while the engine still ran: 106 s for a 46 s handover."""
+        minute earlier, while the engine still ran: that booked 106 s for a 46 s handover until Ruling 61 (Task 14h)
+        counted such a pair's gap from the exit inside it."""
         rows = sorted(marks("2026-11-12", "14:30:00", "21:00:00") + self.handover("15:48:00", 46), key=lambda x: x["t"])
         r = uptime.day_report(rows, date(2026, 11, 12), CFG)
         self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"], r["handovers"]),
                          (46, 46, 0, [46.0]))
         old = [x for x in rows if not (x["ev"] == "mark" and x["t"] == "2026-11-12T15:48:00+00:00")]
-        self.assertEqual(uptime.day_report(old, date(2026, 11, 12), CFG)["unprotected_s"], 106)
+        self.assertEqual(uptime.day_report(old, date(2026, 11, 12), CFG)["unprotected_s"], 46)
 
     def test_a_clean_day_of_four_short_handovers_sends_no_r11(self):   # spec 11.2: the first day ends with a quiet phone
         rows = self.handover_day(46, 46, 46, 46)
@@ -346,6 +349,45 @@ class Report(unittest.TestCase):
                          key=lambda x: x["t"])                        # a trip still sends R11
         r = uptime.day_report(tripped, date(2026, 11, 12), CFG)
         self.assertEqual([l["id"] for l in uptime.close_lines(r, tripped, CFG)], ["R11"])
+
+    # Tests of Ruling 61 (Task 14h): the parent writes no mark while stop() waits, so the seconds from the minute's mark
+    # to the old engine's exit are the engine still running, not an untold gap.
+    def test_a_25_s_planned_stop_books_only_its_exit_to_up_seconds(self):
+        # no parent lives at 15:49:00: the old one ended at 15:48:25 and the next writes its first mark at 15:49:09
+        rows = sorted(marks("2026-11-12", "14:30:00", "21:00:00", skip=("15:49",))
+                      + self.handover("15:48:00", 46, stop_s=25), key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"], r["handovers"]),
+                         (46, 46, 0, [46.0]))
+        rows = self.handover_day(46, 46, 46, 46, stop_s=25, skip=("14:19", "15:49", "17:29", "19:18"))
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)         # three in market hours: 75 s were booked as gap
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"]), (138, 138, 0))
+        self.assertEqual(uptime.close_lines(r, rows, CFG), [])
+
+    def test_a_handover_due_at_second_40_of_its_minute_books_the_same(self):   # the max_leg_minutes backstop
+        rows = sorted(marks("2026-11-12", "14:30:00", "21:00:00", skip=("15:49",))   # the next parent's mark: 15:49:24
+                      + self.handover("15:48:00", 46, stop_s=40), key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"]), (46, 46, 0))
+        self.assertEqual(uptime.close_lines(r, rows, CFG), [])
+
+    def test_a_fall_inside_a_pair_that_ends_at_a_null_hb_mark_is_still_booked_and_counted(self):
+        """The engine falls at 15:48:25 and the mark of 15:49 finds the next child with no beat yet (hb null): the
+        fall's 45 s to the next up are a restart, counted, and R11 is due; only the 25 s before it are not a gap."""
+        rows = marks("2026-11-12", "14:30:00", "21:00:00")
+        edit(rows, "2026-11-12T15:49:00+00:00", hb=None, n=None, open=None)
+        rows += [row("2026-11-12T14:30:00+00:00", "start", child=7, n=1, backoff_s=0),
+                 row("2026-11-12T15:48:25+00:00", "exit", child=7, rc=1, signal=None, ran_s=4705.0, why="exit"),
+                 row("2026-11-12T15:48:27+00:00", "start", child=8, n=2, backoff_s=2),
+                 row("2026-11-12T15:49:10+00:00", "up", child=8, down_s=45, blind_s=45, handover_s=None, held={})]
+        rows.sort(key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["restart"], r["by_cause"]["gap"], r["restarts"]),
+                         (45, 45, 0, 1))
+        self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R11"])
+        # with no exit and no sup_stop inside it, such a pair is a gap from its first mark, as before
+        bare = [x for x in rows if x["ev"] == "mark"]
+        self.assertEqual(uptime.day_report(bare, date(2026, 11, 12), CFG)["by_cause"]["gap"], 60)
 
     def test_a_handover_as_long_as_r4b_reports_stays_untold_until_a_line_tells_it(self):
         """200 s from the exit to the next up at 10:48 New York (outage_report_seconds is 180): R11, unless an R4b that
