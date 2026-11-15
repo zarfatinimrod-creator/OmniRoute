@@ -1,12 +1,12 @@
 {
   "date": "2026-11-15",
-  "as_of_utc": "2026-11-15T01:12:19+00:00",
+  "as_of_utc": "2026-11-15T06:04:23+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-15T00:00:00+00:00",
     "regular_end_utc": "2026-11-15T23:59:00+00:00",
-    "last_trade_utc": "2026-11-15T01:12:17+00:00",
-    "price": 62871.14
+    "last_trade_utc": "2026-11-15T06:04:18+00:00",
+    "price": 64270.73
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,14 +14,14 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.1472,
-    "equal_weight_since_start": -0.1472
+    "bench_since_start": -0.1282,
+    "equal_weight_since_start": -0.1282
   },
   "started": "2026-11-10",
   "regime": "risk_off",
   "dd_state": "normal",
   "drawdown": -0.0618,
-  "decided_now": false,
+  "decided_now": true,
   "weights": {
     "tsmom": 0.0,
     "xsmom": 0.0,
@@ -33,8 +33,8 @@
     "lowvol": 0.0
   },
   "pending": {
-    "decision_date": "2026-11-13",
-    "status": "executed",
+    "decision_date": "2026-11-14",
+    "status": "pending",
     "rebalance": false,
     "targets": {},
     "overrides": [],
@@ -42,11 +42,15 @@
     "preview_at_close": []
   },
   "executed": [],
-  "top_scores": null,
-  "bottom_scores": null,
+  "top_scores": {
+    "BTC-USD": -0.103
+  },
+  "bottom_scores": {
+    "BTC-USD": -0.103
+  },
   "stopped": [],
   "scorecard": {
-    "open": 9,
+    "open": 12,
     "evaluated": 0
   },
   "overlays": {
@@ -57,9 +61,10 @@
   "positions": {},
   "day_moves": {},
   "alert_channels": [
-    "queued"
+    "ntfy"
   ],
   "events": [
-    "אין שורה יומית של 2026-11-14 בנתונים (הנר האחרון הסופי הוא 2026-11-13) - אין החלטה בריצה הזו, הזמנה ממתינה עדיין מתמלאת, ריצה מאוחרת תנסה שוב"
+    "השורה היומית של 2026-11-14 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 64,113.45)",
+    "סגירה מתוקנת: ההחלטה של 2026-11-13 השתמשה בסגירה שההיסטוריה שינתה - BTC-USD +54.1bp (סף 5bp). לבדוק את market.close_source (סגירת ההחלטה נבנתה מנרות שעתיים, backlog 70)"
   ]
 }
