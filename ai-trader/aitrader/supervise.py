@@ -655,8 +655,10 @@ def status(paths: Paths, cfg: dict, now: datetime, *, watchdog: bool = False, en
             if r.get("kind") == "R6b" and r.get("sent") is True:
                 checked_again = max(checked_again, _alert_n(r))
 
-    def late(i: str, text):
-        return ownerlines.late(text, first[i], sup["owner_tz"], sup["max_line_bytes"]) if isinstance(text, str) else text
+    def late(i: str, text):  # a row with no text stays as it is: --status never raises on a row
+        if not isinstance(text, str):
+            return text
+        return ownerlines.late(text, first[i], sup["owner_tz"], sup["max_line_bytes"])
     unsent = [{"id": i, "kind": r.get("kind"), "text": late(i, r.get("text"))} for i, r in latest.items()
               if r.get("sent") is False and i not in relayed
               and not (r.get("kind") == "R6" and _alert_n(r) < checked_again)
