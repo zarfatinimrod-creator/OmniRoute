@@ -1505,6 +1505,16 @@ class Watching(Parents):
         self.assertTrue(125 <= s <= 135 and 125 <= stale["stop"] <= 135, (r6, stale))    # 09:30 to 09:32:05 and the start
         self.assertEqual((stale["what"], [r["kind"] for r in self.urows("alert")]), ("start", ["R6"]))
 
+    def test_an_unknown_stamps_age_counts_from_the_open_when_the_child_started_before_it(self):   # Ruling 48's `born`
+        self.offset = datetime(2026, 11, 12, 9, 29, 57, tzinfo=NY) - datetime.now(timezone.utc)
+        child = [sys.executable, "-c", STAMPLESS_CHILD, str(self.state / "news_heartbeat.json")]
+        p = self.spawn_parent(None, child_cmd=child, stops_stale_seconds=3)
+        r6, = self.wait_for(lambda: self.alerts("R6"), timeout=15)
+        self.assertEqual(self.stop_parent(p), 143)
+        # the child is 3 s old at about 09:30:00; 3 s of the session have gone by only after 09:30:03 (14:30:03 UTC)
+        self.assertGreaterEqual(r6["t"], "2026-11-12T14:30:03+00:00")
+        self.assertLessEqual(int(re.search(r"כבר (\d+) שניות", r6["text"])[1]), 4)   # {s}: the session's seconds
+
     def test_the_mark_of_the_opens_first_minute_books_no_stale_seconds_from_the_night(self):
         p = self.at_the_open(datetime(2026, 11, 11, 16, 0, tzinfo=NY), datetime(2026, 11, 12, 9, 30, 55, tzinfo=NY))
         self.wait_for(lambda: [m for m in self.urows("mark") if m["t"][11:16] == "14:31"], timeout=15)   # 09:31 New York
