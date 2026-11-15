@@ -1,1 +1,2 @@
 {"logged_at": "2026-11-15T00:13:39+00:00", "event": "rebuild_declined", "bar": "2026-11-14", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-15T01:12:19+00:00", "event": "rebuild_declined", "bar": "2026-11-14", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.3}

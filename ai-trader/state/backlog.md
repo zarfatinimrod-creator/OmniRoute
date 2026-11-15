@@ -251,6 +251,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     settled data 11-09..11-13; not yet measured live at 00:13); or a Coinbase cross-check tighter than the 1% guard
     (backlog 70 option b). Measure at the next 00:13 runs, then rule 4. Until fixed, 71 (d) stays off. The R6 audit
     should flag the 11-13 close (about -54 bp, over the 5 bp line) at the next decision.
+    2026-11-15 measurement (logs/2026-11-15-crypto-night.md): the 23:00 1h bar of 11-14 first appeared at 00:45:40
+    (64,113.45) and then alternated null/value between successive fetches until at least 01:12 (Yahoo replicas
+    disagree); the 5m 23:55 close equalled the 1h close in every non-null reply (same reply, so not an independent
+    finality check). Compare 64,113.45 with the settled daily close when it arrives.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
