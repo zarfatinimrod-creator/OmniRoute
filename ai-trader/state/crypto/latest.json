@@ -1,12 +1,12 @@
 {
-  "date": "2026-11-14",
-  "as_of_utc": "2026-11-14T06:04:40+00:00",
+  "date": "2026-11-15",
+  "as_of_utc": "2026-11-15T00:13:39+00:00",
   "market": {
     "is_open": true,
-    "regular_start_utc": "2026-11-14T00:00:00+00:00",
-    "regular_end_utc": "2026-11-14T23:59:00+00:00",
-    "last_trade_utc": "2026-11-14T06:04:35+00:00",
-    "price": 67156.37
+    "regular_start_utc": "2026-11-15T00:00:00+00:00",
+    "regular_end_utc": "2026-11-15T23:59:00+00:00",
+    "last_trade_utc": "2026-11-15T00:13:37+00:00",
+    "price": 64277.27
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,8 +14,8 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.089,
-    "equal_weight_since_start": -0.089
+    "bench_since_start": -0.1281,
+    "equal_weight_since_start": -0.1281
   },
   "started": "2026-11-10",
   "regime": "risk_off",
@@ -56,8 +56,10 @@
   },
   "positions": {},
   "day_moves": {},
-  "alert_channels": [],
+  "alert_channels": [
+    "queued"
+  ],
   "events": [
-    "השורה היומית של 2026-11-13 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 68,223.01)"
+    "אין שורה יומית של 2026-11-14 בנתונים (הנר האחרון הסופי הוא 2026-11-13) - אין החלטה בריצה הזו, הזמנה ממתינה עדיין מתמלאת, ריצה מאוחרת תנסה שוב"
   ]
 }
