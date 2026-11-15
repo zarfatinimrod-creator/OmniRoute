@@ -1111,6 +1111,11 @@ class Watching(Parents):
         p.send_signal(signal.SIGTERM)
         return p.wait(timeout=10)
 
+    def raw_ages(self):
+        """open_age stood in by the age as it is (Ruling 58: a stop-look age asks open_seconds too), for a test that
+        stands in open_seconds to see what `up` asks it for blind_s."""
+        return mock.patch.object(supervise, "open_age", lambda age_s, now, cal: age_s)
+
     def test_open_seconds_is_cut_to_the_session(self):          # Review Focus 3: 2026-11-27 closes at 13:00 New York, 18:00 UTC
         cal, utc = supervise.load_cfg()["calendar"], lambda h, m: datetime(2026, 11, 27, h, m, tzinfo=timezone.utc)
         self.assertEqual(supervise.open_seconds(utc(17, 50), utc(18, 30), cal), 600)
@@ -1229,7 +1234,7 @@ class Watching(Parents):
              "held": {"BBB": {"stop": 48.5, "checked_at": last.isoformat()}}, "blind": []}))
         asked, began = [], int(time.time())
         script = [{"beats": 10, "held": {"BBB": 48.5}, "blind": ["BBB"], "stop_age_s": 3000, "then": "exit", "code": 0}]
-        with mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0):
+        with self.raw_ages(), mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0):
             self.assertEqual(self.run_parent(script, "--until", "10:00"), 0)   # open_seconds reads the real calendar: not the hour here
         (a, b), = asked
         # to: BBB is blind, so the `at` of the beat that wrote `up` (a whole second of this run), not its stamp of 3000 s ago
@@ -1250,7 +1255,7 @@ class Watching(Parents):
             return done
 
         script = [{"beats": 10, "then": "exit", "code": 0}]              # this run holds nothing: its first look sold BBB
-        with mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0), \
+        with self.raw_ages(), mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0), \
                 mock.patch.object(supervise, "first_look_done", first_look_done):
             self.assertEqual(self.run_parent(script, "--until", "10:00"), 0)
         ((a, b),), (beat,) = asked, beats
@@ -1320,7 +1325,7 @@ class Watching(Parents):
             hb.pop("stops_checked_at", None)
             return real(hb, child_pid, started)
         script = [{"beats": 10, "held": {"BBB": 48.5}, "blind": ["BBB"], "stop_age_s": 3000, "then": "exit", "code": 0}]
-        with mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0), \
+        with self.raw_ages(), mock.patch.object(supervise, "open_seconds", lambda a, b, cal: asked.append((a, b)) or 42.0), \
                 mock.patch.object(supervise, "first_look_done", first_look_done):
             self.assertEqual(self.run_parent(script, "--until", "10:00"), 0)
         ((a, b),) = asked
@@ -1421,7 +1426,7 @@ class Watching(Parents):
         self.assertGreater(line["s"], pause["s"])                                            # the pause is inside it
 
     def test_a_pause_before_a_first_up_that_tells_no_outage_has_its_own_r4(self):   # else the pause would go untold
-        self.pause_before_the_first_up("sup_stop", why="end_of_day", rc=0)   # after a day's end the up tells nothing
+        self.pause_before_the_first_up("sup_stop", why="halt", rc=4)   # after a halt the up tells nothing (R5a did)
         (pause,) = self.urows("pause")
         self.assertEqual([(r["kind"], r["t"]) for r in self.told()], [("R4", pause["t"])])
         (line,), tz = self.told(), supervise.load_cfg()["supervisor"]["owner_tz"]
@@ -1433,11 +1438,11 @@ class Watching(Parents):
         p = self.spawn_parent(None, child_cmd=child, hang_seconds=2, stops_stale_seconds=2, outage_report_seconds=2)
         self.wait_for(lambda: self.urows("up"))
         self.addCleanup(self.kill_ours, self.urows("start")[0]["child"])
-        time.sleep(3)                                              # Ruling 55: the child is 3 s older than its stamp
+        time.sleep(3)                                              # Ruling 55: the child is at least 3 s older than its stamp
         self.pause(p, 4, argv=PAUSED_STAMP_CHILD)                  # longer than stops_stale_seconds
         r6, = self.wait_for(lambda: self.alerts("R6"), timeout=10)  # the stamp is still old after that: R6 then
         seen, beat = time.time(), json.loads((self.state / "news_heartbeat.json").read_text())
-        frozen = datetime.fromisoformat(beat["stops_checked_at"])  # its stamps from before the pause, frozen since
+        frozen = datetime.fromisoformat(beat["held"]["BBB"]["checked_at"])   # the stamp R6 reads, frozen since the pause
         self.assertEqual(self.stop_parent(p), 143)
         (pause,), (stale,) = self.urows("pause"), self.urows("stale_stops")
         self.assertEqual((stale["what"], stale["t"]), ("start", r6["t"]))                  # the only stale_stops row
@@ -1445,7 +1450,9 @@ class Watching(Parents):
         self.assertGreaterEqual(waited, timedelta(seconds=2))                              # stops_stale_seconds
         s = int(re.search(r"כבר (\d+) שניות", r6["text"])[1])
         self.assertGreaterEqual(s, 4 + 2)                                                  # {s}: pause + 2 at least
-        self.assertLessEqual(abs(s - (seen - frozen.timestamp())), 1)   # {s}: the frozen stamp's age, never the child's
+        # {s}: the frozen stamp's age, never the child's (at least 3 s more). One-sided: a row read late only makes
+        # `seen` later (Ruling 58).
+        self.assertLessEqual(s, seen - frozen.timestamp() + 1)
         self.assertEqual([r["kind"] for r in self.urows("alert")], ["R4", "R6"])           # no R6b: the stamp stays old
 
     def test_a_stale_stops_episode_open_before_a_pause_is_still_open_after_it(self):   # no R6b while the stamps are old
@@ -1457,6 +1464,57 @@ class Watching(Parents):
         self.assertEqual(len(self.urows("pause")), 1)              # Ruling 55: else this test guards nothing
         r6 = [r["kind"] for r in self.urows("alert") if r["kind"] in ("R6", "R6b")]
         self.assertEqual(([r["what"] for r in self.urows("stale_stops")], r6), (["start"], ["R6"]))
+
+    # Tests added by Ruling 58 (Task 14f): a stop stamp's age counts market-open seconds only.
+    def test_open_age_counts_only_the_market_open_seconds_of_an_age(self):
+        cal, ny = supervise.load_cfg()["calendar"], lambda d, h, m, s=0: datetime(2026, 11, d, h, m, s, tzinfo=NY)
+        age = lambda then, now: supervise.open_age((now - then).total_seconds(), now, cal)
+        self.assertEqual(age(ny(11, 16, 0), ny(12, 9, 30, 5)), 5)        # the night adds nothing
+        self.assertEqual(age(ny(13, 16, 0), ny(16, 9, 30, 5)), 5)        # nor a weekend: Friday's close to Monday's open
+        self.assertEqual(age(ny(12, 8, 7), ny(12, 9, 30, 10)), 10)       # Ruling 48's `born`: a child started at 08:07
+        self.assertEqual(age(ny(12, 9, 58), ny(12, 10, 0)), 120)         # inside today's session: the age as it is
+        self.assertEqual(age(ny(11, 15, 59), ny(12, 9, 32, 5)), 185)     # yesterday's last minute is market time
+        self.assertIsNone(supervise.open_age(None, ny(12, 10, 0), cal))  # an age that is not known stays unknown
+
+    def at_the_open(self, stamp: datetime, start: datetime) -> subprocess.Popen:
+        """A parent whose clock starts at `start`, with a child that holds BBB, says the market is open and carries
+        the stop look of `stamp` on that clock: the last look of the session before, which the day's first engine
+        repeats until its own first look. (The dummy's stamp moves on with its beats; it stays after that session's
+        close, which adds nothing.) stops_stale_seconds is config.json's, 120. Returns the parent, its child beating."""
+        self.offset = start - datetime.now(timezone.utc)
+        p = self.spawn_parent([{"held": {"BBB": 48.5}, "stop_age_s": (start - stamp).total_seconds()}])
+        self.wait_beat()
+        return p
+
+    def test_at_the_open_yesterdays_last_stop_look_is_not_stale(self):   # no false "Yahoo is slow" after a normal night
+        p = self.at_the_open(datetime(2026, 11, 11, 16, 0, tzinfo=NY), datetime(2026, 11, 12, 9, 30, 5, tzinfo=NY))
+        self.assertEqual(self.stop_parent(p, settle=1.5), 143)
+        self.assertEqual((self.urows("stale_stops"), self.alerts("R6")), ([], []))
+
+    def test_on_a_monday_open_fridays_last_stop_look_is_not_stale(self):
+        p = self.at_the_open(datetime(2026, 11, 13, 16, 0, tzinfo=NY), datetime(2026, 11, 16, 9, 30, 5, tzinfo=NY))
+        self.assertEqual(self.stop_parent(p, settle=1.5), 143)
+        self.assertEqual((self.urows("stale_stops"), self.alerts("R6")), ([], []))
+
+    def test_two_minutes_into_the_session_r6_says_the_seconds_since_the_open(self):   # never the night's tens of thousands
+        p = self.at_the_open(datetime(2026, 11, 11, 16, 0, tzinfo=NY), datetime(2026, 11, 12, 9, 32, 5, tzinfo=NY))
+        self.wait_for(lambda: self.alerts("R6"), timeout=10)
+        self.assertEqual(self.stop_parent(p, settle=1), 143)
+        (r6,), (stale,) = self.alerts("R6"), self.urows("stale_stops")
+        s = int(re.search(r"כבר (\d+) שניות", r6["text"])[1])
+        self.assertTrue(125 <= s <= 135 and 125 <= stale["stop"] <= 135, (r6, stale))    # 09:30 to 09:32:05 and the start
+        self.assertEqual((stale["what"], [r["kind"] for r in self.urows("alert")]), ("start", ["R6"]))
+
+    def test_the_mark_of_the_opens_first_minute_books_no_stale_seconds_from_the_night(self):
+        p = self.at_the_open(datetime(2026, 11, 11, 16, 0, tzinfo=NY), datetime(2026, 11, 12, 9, 30, 55, tzinfo=NY))
+        self.wait_for(lambda: [m for m in self.urows("mark") if m["t"][11:16] == "14:31"], timeout=15)   # 09:31 New York
+        self.assertEqual(self.stop_parent(p), 143)
+        mark = [m for m in self.urows("mark") if m["t"][11:16] == "14:31"][0]
+        self.assertEqual((mark["n"], mark["open"]), (1, True))
+        self.assertTrue(60 <= mark["stop"] <= 75, mark)                       # the session's first minute, and a late tick
+        # uptime counts a minute as stale stops when its mark shows a stop above stops_stale_seconds (120)
+        stale = supervise.load_cfg()["supervisor"]["stops_stale_seconds"]
+        self.assertEqual([m["stop"] for m in self.urows("mark") if m["stop"] is not None and m["stop"] > stale], [])
 
 
 TOPIC = "t0p1c-under-test"
@@ -1548,6 +1606,36 @@ class ParentLines(Parents):
         self.assertIsNone(supervise.gap_line(row("mark"), at(179), False, cal, sup))
         self.assertEqual(supervise.gap_line(row("sup_stop", why="handover"), at(200), False, cal, sup)[0], "R4b")
         self.assertIsNone(supervise.gap_line(row("sup_stop", why="halt"), at(200), False, cal, sup))
+
+    # Test added by Ruling 58 (Task 14f): a late first start of the day is told, an earlier day's outage never twice.
+    def test_gap_line_after_a_days_end_and_across_days(self):            # 2026-11-12 is a Thursday, 11-14 a Saturday
+        cfg, ny = supervise.load_cfg(), lambda d, h, m, s=0: datetime(2026, 11, d, h, m, s, tzinfo=NY)
+        cal, sup, tz = cfg["calendar"], cfg["supervisor"], cfg["supervisor"]["owner_tz"]
+        row = lambda t, ev, **f: {"t": t.astimezone(timezone.utc).isoformat(), "ev": ev, **f}
+        gap = lambda prev, up, cold=False: supervise.gap_line(prev, up, cold, cal, sup)
+        told = lambda line: (line[0], line[1]["s"], line[1]["m"], line[1]["time"], line[1]["time2"])
+        opened = ownerlines.hhmm(ny(13, 9, 30), tz)                      # Friday's open on the owner's clock
+        # the day's first parent comes up late after a normal close: R4, from today's open
+        ended = row(ny(12, 16, 5, 1), "sup_stop", why="end_of_day", rc=0)
+        self.assertEqual(told(gap(ended, ny(13, 12, 40))), ("R4", 11400, 190, opened, ownerlines.hhmm(ny(13, 12, 40), tz)))
+        self.assertEqual(opened, "16:30")
+        self.assertIsNone(gap(ended, ny(13, 8, 5)))                      # a normal morning: no market time went by
+        # an outage that was open at Thursday's close: Thursday's part is that day's R4c or R11, never Friday's line
+        fell = row(ny(12, 15, 50), "exit", why="exit", rc=1)
+        self.assertIsNone(gap(fell, ny(13, 8, 10)))
+        self.assertEqual(told(gap(fell, ny(13, 9, 45))), ("R4", 900, 15, opened, ownerlines.hhmm(ny(13, 9, 45), tz)))
+        handed = row(ny(12, 15, 50), "sup_stop", why="handover", rc=76)  # R4b counts from today's open as well
+        self.assertEqual(told(gap(handed, ny(13, 9, 45)))[:4], ("R4b", 900, 15, opened))
+        # with a restore from git, the state's own time is still the last row's
+        self.assertEqual(gap(fell, ny(13, 9, 45), cold=True)[1]["cold_time"], ownerlines.hhmm(ny(12, 15, 50), tz))
+        # a closed day: nothing on the day itself, and at the next session only that session's seconds
+        closed = row(ny(14, 10, 0), "sup_stop", why="closed_today", rc=0)
+        self.assertIsNone(gap(closed, ny(14, 12, 0)))
+        self.assertIsNone(gap(closed, ny(16, 9, 31)))                    # 60 s, under outage_report_seconds
+        self.assertEqual(told(gap(closed, ny(16, 9, 40)))[:3], ("R4", 600, 10))
+        # the same day is as before: a halt and a held lock said their own lines
+        for why in ("halt", "lock_held"):
+            self.assertIsNone(gap(row(ny(12, 10, 0), "sup_stop", why=why), ny(12, 11, 0)), why)
 
     def test_the_topic_reaches_no_file_and_no_output_and_net_check_says_the_status(self):   # Review Focus 5: answers 500, a hang, then the
         self.answers([{"status": 500}, {"hang": True}])                                     # stub stopped (refused)
@@ -2111,6 +2199,15 @@ class Drills(unittest.TestCase):
         cp = self.drill("a", "c", "f", "--fast")
         self.assertEqual((cp.returncode, [l.split()[:2] for l in cp.stdout.splitlines() if l[:4] in ("PASS", "FAIL")]),
                          (0, [["PASS", "a"], ["PASS", "c"], ["PASS", "f"]]), cp.stdout + cp.stderr[-2000:])
+
+    def test_drill_a_counts_every_r1_id_whatever_its_row_says_of_sent(self):   # Ruling 58: a held-back duplicate is a duplicate
+        drill, now = load_script("scripts/drill_supervisor.py"), datetime(2026, 11, 12, 15, 0, tzinfo=timezone.utc)
+        drill.supervise = supervise                                # what main() imports after its guard
+        with tempfile.TemporaryDirectory() as tmp:
+            for line, sent in (("R1-1", True), ("R1-2", "capped"), ("R1-3", False), ("R1-3", True), ("R6-4", True)):
+                supervise.append_row(Path(tmp) / "uptime.jsonl", 1, "alert", now, id=line, kind=line.split("-")[0], sent=sent)
+            self.assertEqual(drill.r1_ids(Path(tmp)), {"R1-1": True, "R1-2": False, "R1-3": True})
+            self.assertEqual(drill.said(Path(tmp), "R1"), 2)       # what the drill counted before: R1-2 was not seen
 
     def test_only_the_phone_drill_with_the_owner_keeps_the_topic_or_an_outside_address(self):
         drill = load_script("scripts/drill_supervisor.py")          # importlib; importing it runs no drill

@@ -17,7 +17,8 @@ runs on any day; every child is started with --until 24:00, which never comes (r
   a  6 kill -9 of the dummy child, each more than healthy_seconds after the last and spread over more than
      restart_window_seconds; then one of the engine child holding 3 names, under a parent and a state directory of its
      own (ruling P3). Pass: every replacement beats within 1 s of its kill, the engine's first look stamps each held
-     name within 3 s, no trip, one R1 per kill.
+     name within 3 s, no trip, one R1 per kill: exactly one, each of them sent (the dummy's parent has an hourly cap
+     above the kills, so the cap cannot hold a doubled line back out of sight).
   b  kill -STOP of the child, the kill switch on. Pass: replaced within hang_seconds + 10 s, one hang row, one R2 and
      no R1 (ruling P5).
   c  a child that always exits 1. Pass: max_restarts restarts, one tripped row, one R3, the parent returns 75.
@@ -84,6 +85,8 @@ ENGINE_UP_S = 5  # d: an engine beat within this of the parent's kill
 CLOUD_BEAT_S = 30  # cloud-check: a new parent's child beats within this
 TRIPPED_RC = 75  # what a parent that tripped returns
 KILLS = 6  # a: the kills of the dummy child
+CAP_OVER = 2  # a: the dummy part's hourly alert cap is KILLS + this, so the cap cannot hide a doubled R1
+TICKS = 5  # a: the parent's loop ticks left for a second R1 to show before the R1 lines are counted
 HELD = {"AAA": 100.0, "BBB": 100.0, "CCC": 100.0}  # a, f: three names, each bought at 100 with its stop at 97
 SCORER_S = 30  # d: the scorer stub the engine sits in
 QUOTE_S = {False: 60, True: 2}  # f: each quote stub; under --fast shorter than hang_seconds 4 (controller's P2)
@@ -178,6 +181,17 @@ def rows(state: Path, ev: str | None = None) -> list[dict]:
 def said(state: Path, kind: str) -> int:
     """How many lines of this kind reached the NtfyStub: alert ids with a row `sent` true."""
     return len({r.get("id") for r in rows(state, "alert") if r.get("kind") == kind and r.get("sent") is True})
+
+
+def r1_ids(state: Path) -> dict[str, bool]:
+    """Every R1 line of the log by its alert id, whatever its rows say of `sent` (a line held back as "capped" or not
+    delivered is a line the parent said: a second R1 for one episode must not hide there), with whether a row of it
+    says `sent` true."""
+    out: dict[str, bool] = {}
+    for r in rows(state, "alert"):
+        if r.get("kind") == "R1":
+            out[r.get("id")] = out.get(r.get("id"), False) or r.get("sent") is True
+    return out
 
 
 def replaced(state: Path, old: int, t0: float, timeout: float) -> float:
@@ -335,20 +349,32 @@ class Drill:
 def drill_a(d: Drill) -> str:
     sup = d.sup
     gap = max(sup["healthy_seconds"], sup["restart_window_seconds"] / (KILLS - 1)) + 1
+    ticks = TICKS * sup["loop_seconds"]  # a line that should come once has its chance to come twice
+
+    def one_r1_each(state: Path, kills: int) -> None:
+        r1 = r1_ids(state)
+        if len(r1) != kills or not all(r1.values()):
+            raise Failed(f"want exactly one R1 per kill, each sent: after {kills} kills {len(r1)} R1 lines,"
+                         f" {sum(r1.values())} of them sent")
+
     st = d.state()
-    p = d.parent(st, d.dummy(st, [{"beats": -1}]))
+    # the hourly cap above the kills: at KILLS (config.json's 6) a seventh R1 would be held back and never requested
+    p = d.parent(st, d.dummy(st, [{"beats": -1}]), max_alerts_per_hour=KILLS + CAP_OVER)
     wait(lambda: rows(st, "up"), WAIT_S, "the first child's up")
     last, beats = time.time(), []  # a kill comes `gap` after the last one (the first: after the child came up)
     for k in range(KILLS):
         if k:  # the episode of the kill before has ended with its R1: this kill is a new one
-            wait(lambda: said(st, "R1") >= k, sup["healthy_seconds"] + WAIT_S, f"R1 of kill {k}")
-        time.sleep(max(0.0, last + gap - time.time()))
+            wait(lambda: len(r1_ids(st)) >= k, sup["healthy_seconds"] + WAIT_S, f"R1 of kill {k}")
+        time.sleep(max(ticks if k else 0.0, last + gap - time.time()))
+        one_r1_each(st, k)
         old, last = beat(st)[0]["pid"], time.time()
         signal_child(old, signal.SIGKILL)
         beats.append(replaced(st, old, last, BEAT_S + WAIT_S))
-    wait(lambda: said(st, "R1") >= KILLS, sup["healthy_seconds"] + WAIT_S, f"R1 of kill {KILLS}")
+    wait(lambda: len(r1_ids(st)) >= KILLS, sup["healthy_seconds"] + WAIT_S, f"R1 of kill {KILLS}")
+    time.sleep(ticks)
     d.stop(p)
-    trips, r1 = len(rows(st, "tripped")), said(st, "R1")
+    one_r1_each(st, KILLS)
+    trips, r1 = len(rows(st, "tripped")), len(r1_ids(st))
 
     st2 = d.state()  # ruling P3: the engine's kill under a parent of its own, with an alert count of its own
     write_book(st2, HELD)
@@ -368,9 +394,11 @@ def drill_a(d: Drill) -> str:
     if min(looked) < t0:  # a stamp from before the kill is no look of the replacement, not a negative time
         raise Failed(f"a stamp of the replacement's first look is {t0 - min(looked):.2f} s older than the kill")
     look = max(looked) - t0
-    wait(lambda: said(st2, "R1") >= 1, sup["healthy_seconds"] + WAIT_S, "R1 of the engine's kill")
+    wait(lambda: len(r1_ids(st2)) >= 1, sup["healthy_seconds"] + WAIT_S, "R1 of the engine's kill")
+    time.sleep(ticks)
     d.stop(p2)
-    trips, r1_engine = trips + len(rows(st2, "tripped")), said(st2, "R1")
+    one_r1_each(st2, 1)
+    trips, r1_engine = trips + len(rows(st2, "tripped")), len(r1_ids(st2))
     numbers = (f"kills={KILLS}+1 next_beat_max_s={max(beats):.2f} engine_beat_s={beats[-1]:.2f}"
                f" engine_look_s={look:.2f} r1={r1}+{r1_engine} tripped={trips}")
     if max(beats) >= BEAT_S:

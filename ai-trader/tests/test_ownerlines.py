@@ -57,6 +57,11 @@ class Lines(unittest.TestCase):
         self.assertEqual(ownerlines.held_text({"MU": float("nan"), "NVDA": float("inf"), "AMD": 12.0}, 3),
                          "MU (סטופ לא ידוע), NVDA (סטופ לא ידוע), AMD (סטופ 12.00)")
 
+    # Test added by Ruling 58 (Task 14f): an int too large for a float is no stop the owner can read either.
+    def test_an_int_stop_too_large_for_a_float_is_unknown(self):
+        self.assertEqual(ownerlines.held_text({"MU": 10**400}, 3), "MU (סטופ לא ידוע)")
+        self.assertEqual(ownerlines.held_text({"MU": 10**400, "NVDA": 120}, 3), "MU (סטופ לא ידוע), NVDA (סטופ 120.00)")
+
     def test_r1_and_the_two_forms_read_as_the_spec_writes_them(self):
         self.assertEqual(
             ownerlines.render("R1", **LIM, time="17:02:11", cause="קרס", down_s=1, falls="", blind_s=0,

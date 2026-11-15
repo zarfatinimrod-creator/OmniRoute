@@ -103,15 +103,18 @@ def held_text(held: dict | None, max_names: int) -> str:
     None: what is held cannot be told (Ruling 39), never the same word as an empty book. A stop that is no int or
     float (None from a book position without stop_price or a beat entry that is no mapping, a string, a bool) cannot
     be told either: "MU (סטופ לא ידוע)", and the line still goes out (Ruling 53); nor can a float that is no finite
-    number, NaN or an infinity (Ruling 55)."""
+    number, NaN or an infinity (Ruling 55), or an int too large for a float (Ruling 58)."""
     if held is None:
         return WORDS["held"]["unknown"]
     if not held:
         return WORDS["held"]["none"]
 
     def stop_text(stop) -> str:
-        number = isinstance(stop, (int, float)) and not isinstance(stop, bool) and math.isfinite(stop)
-        return f"{stop:.2f}" if number else WORDS["held"]["unknown"]
+        try:
+            number = isinstance(stop, (int, float)) and not isinstance(stop, bool) and math.isfinite(stop)
+            return f"{stop:.2f}" if number else WORDS["held"]["unknown"]
+        except OverflowError:  # an int too large for a float
+            return WORDS["held"]["unknown"]
     more = len(held) - max_names
     names = ", ".join(f"{sym} (סטופ {stop_text(stop)})" for sym, stop in list(held.items())[:max_names])
     return names + (f" ועוד {more}" if more > 0 else "")

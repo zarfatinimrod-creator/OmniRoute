@@ -340,6 +340,13 @@ def open_seconds(a: datetime, b: datetime, cal: dict) -> float:
     return total
 
 
+def open_age(age_s: float | None, now: datetime, cal: dict) -> float | None:
+    """The market-open seconds of an age that ends at `now` (Ruling 58): open_seconds over its last age_s seconds, so
+    the closed night or weekend behind a stop look of the session before adds nothing, and an age from inside today's
+    session is the age itself. None stays None."""
+    return None if age_s is None else open_seconds(now - timedelta(seconds=age_s), now, cal)
+
+
 def _when(text) -> datetime | None:
     """An ISO-8601 time with its zone; None for anything else."""
     try:
@@ -436,23 +443,30 @@ def may_send(st: dict, line_id: str, now: datetime, cap: int) -> bool:
 def gap_line(prev: dict | None, up_at: datetime, cold: bool, cal: dict, sup: dict) -> tuple[str, dict] | None:
     """The line for the outage before a parent's first `up` (spec 8, R4 and R4b), or None. prev: the last readable row
     before this sup_start (or a machine pause's start as {"t", "ev": "pause"}: R4, ruling 49; up_at is then its end).
-    Only when [prev.t, up_at] holds outage_report_seconds or more inside sessions (today's or earlier ones): R4 when
-    prev is no sup_stop (with cold, `cold_time` is prev.t on the owner's clock: the parent never runs git, and the last
-    row it can read is what git restored); R4b when it is a sup_stop whose `why` has a word in
-    ownerlines.WORDS["R4b.why"]. After a sup_stop for a halt, a held lock, the end of the day or a closed day it is
-    None: R5a-R5e said that the stops are not checked, and the minutes reach R11. The fields carry `m`, the line's
-    minutes, and `s`, its exact market-open seconds, for its alert row (ruling P6; R11 counts `s`, ruling 50); no
-    template names `s`, so it stays out of the owner's text."""
+    Only when the outage holds outage_report_seconds or more inside a session. It runs from prev.t to up_at; when
+    prev is from an earlier New York day than up_at, from today's session open (Ruling 58): the earlier day's part was
+    told by that day's R4c or counted by its R11, and is not told again, and a normal night or a closed day adds
+    nothing. R4 when prev is no sup_stop, or a sup_stop for the end of the day or a closed day (no line said anything
+    then, so the day's first parent coming up late is told; with cold, `cold_time` is prev.t on the owner's clock: the
+    parent never runs git, and the last row it can read is what git restored); R4b when it is a sup_stop whose `why`
+    has a word in ownerlines.WORDS["R4b.why"]. After a sup_stop for a halt or a held lock it is None: R5a-R5e said
+    that the stops are not checked, and the minutes reach R11. The fields carry `time`, where the outage is counted
+    from, `m`, the line's minutes, and `s`, its exact market-open seconds, for its alert row (ruling P6; R11 counts
+    `s`, ruling 50); no template names `s`, so it stays out of the owner's text."""
     t = _when(prev.get("t")) if isinstance(prev, dict) else None
     if t is None:
         return None
-    s = open_seconds(t, up_at, cal)
+    start, day = t, up_at.astimezone(NY).date()
+    if t.astimezone(NY).date() < day:
+        (oh, om), _ = session_hours(day, cal) or ((0, 0), None)  # no session today: open_seconds gives 0 anyway
+        start = datetime(day.year, day.month, day.day, oh, om, tzinfo=NY)
+    s = open_seconds(start, up_at, cal)
     if s < sup["outage_report_seconds"]:
         return None
     tz = sup["owner_tz"]
-    fields = {"time": ownerlines.hhmm(t, tz), "time2": ownerlines.hhmm(up_at, tz), "m": round(s / 60), "s": s}
-    if prev.get("ev") != "sup_stop":
-        return "R4", {**fields, **({"cold_time": fields["time"]} if cold else {})}
+    fields = {"time": ownerlines.hhmm(start, tz), "time2": ownerlines.hhmm(up_at, tz), "m": round(s / 60), "s": s}
+    if prev.get("ev") != "sup_stop" or prev.get("why") in ("end_of_day", "closed_today"):
+        return "R4", {**fields, **({"cold_time": ownerlines.hhmm(t, tz)} if cold else {})}
     why = ownerlines.WORDS["R4b.why"].get(str(prev.get("why")))
     return ("R4b", {**fields, "why": why}) if why else None
 
@@ -733,8 +747,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     an answer. Returns 0 (end_of_day, closed_today), 3 (lock_held, or another parent holds the lock: it writes nothing),
     4, 5, 6 (halt), 75 (tripped), 76 (handover), 143 (signal, orphaned), 2 for a bad argument or config.
     clock() -> an aware UTC time (default now) answers the calendar questions only: the day, the session, --until, the
-    handover times and the `t` of a row. Ages never read it, so a test or a drill can run the parent on a session
-    morning on any day. SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the
+    handover times and the `t` of a row. Ages never read it (how many of a stop-look age's seconds were market-open
+    is a calendar question: open_age), so a test or a drill can run the parent on a session morning on any day. SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the
     child; with --handover, so does handover_due, and the state file keeps {"at", "last_look"} for the next parent's
     first `up` (its handover_s). An episode a planned end cuts short gets its R1 then (ruling 37). Two lines go
     to stdout, the first and the last; the rest goes to .cache/supervise.log. The owner's lines (spec 8) go to
@@ -997,8 +1011,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 seconds in it, R4 for it, from its start to now, built by gap_line. Ruling 53: not while this parent's
                 first `up` is still to come with a line of its own (gap_line from the row before this parent's start,
                 so that line spans the pause): one outage, one line (spec 8), counted once by R11. A first `up` that
-                tells no outage (the row before is a sup_stop for a halt, a held lock, the end of a day or a closed
-                day, or there is no row with a time) leaves the pause its own R4."""
+                tells no outage (the row before is a sup_stop for a halt or a held lock, there is no row with a time,
+                or no market time went by since it) leaves the pause its own R4."""
                 start = _utc(last[1])
                 emit("pause", now, start=start, s=round(wall - last[0], 1), child=child.pid if child else None)
                 seen["resumed"] = wall
@@ -1018,6 +1032,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 wall = time.time()  # the beat's age and the gap between ticks are read on it, never on clock()
                 view, now = beat_view(hb, mtime, child.pid if child else None, wall), clock()
                 mine = view["mine"]
+                # Ruling 58: wherever a stop-look age is judged or written here it counts market-open seconds only
+                # (open_age), so the last look of the session before is not "unchecked" through the closed night.
+                stop_s = None if view["stop_age_s"] is None else round(open_age(view["stop_age_s"], now, cal), 1)
                 last, seen["tick"] = seen["tick"], (wall, now)
                 # ponytail: any wait inside this loop longer than hang_seconds reads as a pause of the machine. Today
                 # only a hang stop() waits and ticks again (a planned stop ends the loop): at most
@@ -1031,8 +1048,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     say("R7", now, n=hour["capped"], cap=sup["max_alerts_per_hour"], r=counts["restarts_today"])
                 if mark_due(seen["mark"], now):
                     seen["mark"] = now
-                    emit("mark", now, hb=round(view["age_s"], 1) if mine else None,
-                         stop=None if view["stop_age_s"] is None else round(view["stop_age_s"], 1),
+                    emit("mark", now, hb=round(view["age_s"], 1) if mine else None, stop=stop_s,
                          n=len(view["held"]) if mine else None, open=view["open"], blind=view["blind"], dm=None,
                          left=seen["left"])
                 if child is None:
@@ -1053,7 +1069,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                         ep["codes"].append(code_row)
                 if mine and view["age_s"] <= sup["hang_seconds"]:  # a fresh beat: what it says about the stops
                     ages = _stamp_ages(hb, view["age_s"]) if view["open"] else {}
-                    born = wall - kid["started"]  # ruling 48: an unknown stamp's age counts from this child's start
+                    ages = {sym: open_age(a, now, cal) for sym, a in ages.items()}
+                    # ruling 48: an unknown stamp's age counts from this child's start
+                    born = open_age(wall - kid["started"], now, cal)
                     # Ruling 53: after a machine pause no age counts from before its resume tick, so the stamps a beat
                     # still carries from before the pause raise no R6 until stops_stale_seconds after it ({s} stays the
                     # true age). An episode already open is judged on the true ages: capped, they would end it with an
@@ -1061,12 +1079,11 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     cap = wall - seen["resumed"] if seen["resumed"] is not None and not seen["stale"] else float("inf")
                     names = sorted(s for s, a in ages.items()
                                    if min(born if a is None else a, cap) > sup["stops_stale_seconds"])
-                    stop_s = None if view["stop_age_s"] is None else round(view["stop_age_s"], 1)
                     if names and not seen["stale"]:
                         seen["stale"] = names
                         emit("stale_stops", now, what="start", names=names, stop=stop_s)
                         if not set(names) <= set(view["blind"]):  # else the engine's blind-quote alert owns it
-                            s = round(stop_s if stop_s is not None else time.time() - kid["started"])
+                            s = round(stop_s if stop_s is not None else born)
                             seen["r6"] = (now, s)
                             say("R6", now, s=s, names=", ".join(names), held=view["held"])
                     elif not names and seen["stale"]:
