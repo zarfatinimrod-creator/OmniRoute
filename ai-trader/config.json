@@ -312,7 +312,7 @@
     "hang_seconds": 180,
     "start_grace_seconds": 60,
     "hang_term_grace_seconds": 5,
-    "hang_kill_enabled": false,
+    "hang_kill_enabled": true,
     "planned_stop_grace_seconds": 120,
     "lock_wait_seconds": 150,
     "stops_stale_seconds": 120,

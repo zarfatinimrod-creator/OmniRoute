@@ -505,7 +505,7 @@ WATCHER = {"lookback_hours": 24, "ntfy_since": "35m", "stale_minutes": 90,
            "engine_window_ny": ["08:07", "16:01"], "quiet_hours": {"tz": "Asia/Jerusalem", "from": "23:00", "to": "08:00"},
            "max_cost_share": 0.2}
 SWITCHES = [("hang_kill_enabled",), ("long_timeout_proven",), ("deadman", "enabled"), ("watcher", "fire_enabled"), ("watcher", "notify_enabled")]
-SWITCHES_ON: list = []      # a rollout step that turns a switch on adds its path here, in the same commit as config.json
+SWITCHES_ON: list = [("hang_kill_enabled",)]    # a rollout step that turns a switch on adds its path here, in the same commit as config.json
 
 
 class Foundations(unittest.TestCase):
