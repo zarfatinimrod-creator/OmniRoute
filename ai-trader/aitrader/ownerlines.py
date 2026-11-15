@@ -85,7 +85,8 @@ PARTS: dict[str, str] = {
 }
 
 # The owner's word for an internal code. The spec gives no words for E1's {side}; these two were decided with the table.
-# held: {held} when nothing is held, and when it cannot be told what is (Ruling 39).
+# held: {held} when nothing is held, and when it cannot be told what is (Ruling 39). late: what goes in front of a line
+# that the watchdog relays after the parent could not send it, and the words every line ends with (Ruling 58).
 WORDS: dict[str, dict] = {
     "cause": {"crash": "קרס", "killed": "נהרג", "stopped": "נעצר"},
     "held": {"none": "אין פוזיציות", "unknown": "לא ידוע"},
@@ -93,6 +94,7 @@ WORDS: dict[str, dict] = {
     "R5e.why": {4: "יומן פגום", 5: "לוח חגים", 6: "קובץ התיק"},
     "W0.what": {"sync": "אין גישה לקוד", "crash": "הפקודה קרסה", "ntfy": "אין קריאה מ-ntfy", "fire": "אי אפשר להפעיל משימה"},
     "E1.side": {"BUY": "קנייה", "SELL": "מכירה"},
+    "late": {"prefix": "נשלח באיחור, מ-{time}: ", "end": " כסף נייר"},
 }
 
 FREE = ("note", "what", "file", "names")  # fields whose text comes from outside this table: render cuts them
@@ -132,6 +134,17 @@ def sold_text(sales: list[dict], max_names: int) -> str:
 def hhmm(t: datetime, tz: str, seconds: bool = False) -> str:
     """t on the owner's clock (supervisor.owner_tz), as HH:MM or HH:MM:SS."""
     return t.astimezone(ZoneInfo(tz)).strftime("%H:%M:%S" if seconds else "%H:%M")
+
+
+def late(text: str, t: datetime, tz: str, max_bytes: int) -> str:
+    """A line that reaches the owner late, through the watchdog's relay (Ruling 58): it says so first, with the time of
+    its first try on the owner's clock, so that "not checked now" is never read as news of this minute. Still at most
+    max_bytes: the line's own text is cut, never the prefix and never its closing words."""
+    head, end = WORDS["late"]["prefix"].format(time=hhmm(t, tz)), WORDS["late"]["end"]
+    body, end = (text[:-len(end)], end) if text.endswith(end) else (text, "")
+    while body and len((head + body + end).encode()) > max_bytes:
+        body = body[:-1]
+    return head + body + end
 
 
 def priority(line_id: str, held: bool = False) -> str:

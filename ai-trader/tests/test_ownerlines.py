@@ -62,6 +62,17 @@ class Lines(unittest.TestCase):
         self.assertEqual(ownerlines.held_text({"MU": 10**400}, 3), "MU (סטופ לא ידוע)")
         self.assertEqual(ownerlines.held_text({"MU": 10**400, "NVDA": 120}, 3), "MU (סטופ לא ידוע), NVDA (סטופ 120.00)")
 
+    # Test added by Ruling 58 (Task 14g): a line the watchdog relays says that it is late and from when.
+    def test_a_late_line_says_so_with_its_time_and_still_fits_and_ends_with_paper_money(self):
+        t = datetime(2026, 11, 12, 14, 47, 30, tzinfo=timezone.utc)                     # 16:47 on the owner's clock
+        line = ownerlines.render("R3", **LIM, k=6, m=10, held="אין פוזיציות")
+        self.assertEqual(ownerlines.late(line, t, "Asia/Jerusalem", 1200), "נשלח באיחור, מ-16:47: " + line)
+        self.assertNotIn("!", ownerlines.WORDS["late"]["prefix"])
+        long = "א" * 590 + " כסף נייר"                                                  # 1,196 bytes: no room for the prefix
+        cut = ownerlines.late(long, t, "Asia/Jerusalem", 1200)
+        self.assertTrue(cut.startswith("נשלח באיחור, מ-16:47: א") and cut.endswith("א כסף נייר"), cut[:40])
+        self.assertTrue(1190 < len(cut.encode()) <= 1200, len(cut.encode()))
+
     def test_r1_and_the_two_forms_read_as_the_spec_writes_them(self):
         self.assertEqual(
             ownerlines.render("R1", **LIM, time="17:02:11", cause="קרס", down_s=1, falls="", blind_s=0,

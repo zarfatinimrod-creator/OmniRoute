@@ -747,6 +747,17 @@ open(sys.argv[1] + ".tmp", "w").write(str(g.pid))
 os.replace(sys.argv[1] + ".tmp", sys.argv[1])
 signal.pause()"""
 
+# GROUP_CHILD that takes a second to end after its SIGTERM, as an engine that finishes its step does.
+SLOW_GROUP_CHILD = """import os, signal, subprocess, sys, time
+def end(*_):
+    time.sleep(1)
+    sys.exit(143)
+signal.signal(signal.SIGTERM, end)
+g = subprocess.Popen(["sleep", "60"])
+open(sys.argv[1] + ".tmp", "w").write(str(g.pid))
+os.replace(sys.argv[1] + ".tmp", sys.argv[1])
+signal.pause()"""
+
 # GROUP_CHILD whose `sleep 60` ignores SIGTERM (SIG_IGN outlives the exec): only a SIGKILL to the group ends it.
 DEAF_GROUP_CHILD = """import os, signal, subprocess, sys
 signal.signal(signal.SIGTERM, signal.SIG_IGN)
@@ -920,7 +931,7 @@ class Parents(Procs):
         """SIGKILL to a parent or a child this test started that outlived it, and never to a pid that was reused."""
         try:
             argv = set(Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0"))
-            if argv & {PARENT_WRAPPER.encode(), GROUP_CHILD.encode(), STAMPLESS_CHILD.encode(),
+            if argv & {PARENT_WRAPPER.encode(), GROUP_CHILD.encode(), SLOW_GROUP_CHILD.encode(), STAMPLESS_CHILD.encode(),
                        PAUSED_STAMP_CHILD.encode(), str(DUMMY_CHILD).encode(), str(ENGINE_CHILD).encode()}:
                 os.kill(pid, signal.SIGKILL)
         except OSError:
@@ -1028,15 +1039,19 @@ class ParentLoop(Parents):
         self.assertEqual(p.wait(timeout=5), 143)
         self.assertEqual(([r["rc"] for r in self.urows("exit")][:1], len(self.urows("start")) >= 2), ([0], True))
 
-    def test_a_planned_stop_signals_the_child_alone_and_not_its_group(self):   # spec 5.3: a scorer call in flight can finish
+    # Restated by Ruling 58 (Task 14g): the SIGTERM still goes to the child alone, and once the child has ended nothing
+    # of its group is left (a scorer call the engine started and did not wait for).
+    def test_a_planned_stop_signals_the_child_alone_and_then_leaves_no_grandchild(self):   # spec 5.3; Ruling 36 (f)
         pid_file = self.tmp / "grandchild.pid"
-        p = self.spawn_parent(None, child_cmd=[sys.executable, "-c", GROUP_CHILD, str(pid_file)])
+        p = self.spawn_parent(None, child_cmd=[sys.executable, "-c", SLOW_GROUP_CHILD, str(pid_file)])
         grandchild = int(self.wait_for(lambda: pid_file.exists() and pid_file.read_text()))
         self.addCleanup(self.kill_sleep, grandchild)
         self.addCleanup(self.kill_ours, self.urows("start")[0]["child"])     # it does not die with its parent
         p.send_signal(signal.SIGTERM)
+        time.sleep(0.5)                              # the child takes 1 s to end: its group has not been signalled
+        self.assertEqual((p.poll(), self.dead(grandchild)), (None, False))
         self.assertEqual((p.wait(timeout=5), [(r["rc"], r["why"]) for r in self.urows("exit")]), (143, [(143, "planned")]))
-        self.assertFalse(self.dead(grandchild))                                 # in the child's group, and not signalled
+        self.assertTrue(self.dead(grandchild))       # gone by the time the parent has ended: no wait for it
 
     # Tests added by ruling.
     def test_a_state_file_that_does_not_parse_is_named_in_the_log_and_saved_whole(self):     # ruling P18(c)
@@ -1682,6 +1697,46 @@ class ParentLines(Parents):
         r1 = self.urows("alert")[-1]["text"]
         self.assertEqual(("(נהרג)" in r1, "(2 נפילות ברצף)" in r1), (True, True))   # the hang is the first fall
 
+    # Tests of Ruling 58 (Task 14g).
+    def r2_rows(self) -> list[dict]:
+        return [r for r in self.urows("alert") if r["kind"] == "R2"]
+
+    def test_a_hang_kill_whose_replacement_never_came_up_is_told_by_r2_at_a_planned_end(self):
+        # the first child beats 5 times and hangs; its replacement never beats (start_grace_seconds is 60); SIGTERM at 5 s
+        self.fresh({})
+        rc = self.run_parent([{"beats": 5, "then": "hang"}, {"beats": 0, "then": "hang"}], hang_seconds=2,
+                             hang_kill_enabled=True, stop_after=5)
+        (r2,), (kill,) = self.r2_rows(), [r for r in self.urows("exit") if r["why"] == "hang"]
+        self.assertEqual((rc, len(self.urows("start")), len(self.urows("up")), r2["id"], r2["sent"], self.ids()),
+                         (143, 2, 1, "R2-1", True, ["R2"]))
+        killed_at = ownerlines.hhmm(datetime.fromisoformat(kill["t"]), "Asia/Jerusalem", seconds=True)
+        self.assertIn(f"נהרג והופעל מחדש ב-{killed_at}.", r2["text"])            # the kill row's time
+        blind_s = float(re.search(r"סטופים לא נבדקו ([\d.]+) שניות", r2["text"])[1])
+        self.assertTrue(4 <= blind_s <= 6, r2["text"])       # from the dead engine's last look (0.4 s in) to the end (5 s)
+        self.assertEqual([r["ev"] for r in self.urows()][-2:], ["alert", "sup_stop"])
+
+    def test_a_hang_kill_that_trips_the_parent_is_told_by_r2_beside_r3(self):   # max_restarts 0: no replacement at all
+        self.fresh({})
+        rc = self.run_parent([{"first_after_s": 2, "beats": 5, "then": "hang"}], hang_seconds=2, hang_kill_enabled=True,
+                             max_restarts=0)
+        r2, = self.r2_rows()
+        self.assertEqual((rc, sorted(self.ids()), len(self.urows("start"))), (75, ["R2", "R3"], 1))
+        blind_s = float(re.search(r"סטופים לא נבדקו ([\d.]+) שניות", r2["text"])[1])
+        # from the hung child's own last look, 2.4 s into its life (a stamp of whole seconds: up to 1 s earlier), to the
+        # trip 2 s later; from the parent's start it would be 4.4 s or more
+        self.assertTrue(2 <= blind_s <= 3.5, r2["text"])
+
+    def test_an_r6_episode_open_at_the_bell_ends_with_its_row_and_no_r6b(self):
+        # BBB's stop look is 300 s old at every beat. The first child falls after 10 beats; its replacement's beats say
+        # the market is closed: the episode ends, and nothing is "checked again"
+        stale = {"held": {"BBB": 48.5}, "stop_age_s": 300}
+        self.fresh({})
+        self.run_parent([{**stale, "beats": 10, "then": "exit", "code": 1}, {**stale, "open": False}], stops_stale_seconds=1,
+                        stop_after=5)
+        kinds = [r["kind"] for r in self.urows("alert")]
+        self.assertEqual((kinds.count("R6"), "R6b" in kinds, [r["what"] for r in self.urows("stale_stops")]),
+                         (1, False, ["start", "end"]))
+
     def test_the_rows_of_r4_and_r4b_carry_their_minutes(self):           # ruling P6: the last row 10 minutes before the start
         for prev, kind in (({"ev": "mark"}, "R4"), ({"ev": "sup_stop", "why": "handover"}, "R4b")):
             self.fresh({})
@@ -1974,6 +2029,35 @@ class Status(Parents):
         parent.kill(); parent.wait()                                           # no parent is left to retry R1-3: at once
         self.assertEqual([u["id"] for u in self.status()["unsent"]], ["R4-2", "R1-3", "R10-4"])
 
+    # Tests of Ruling 58 (Task 14g): a relayed line says that it is late, and an R6 that is over is not relayed at all.
+    def alert(self, line: str, ago_min: float, sent, text: str | None = None) -> None:
+        """An alert row of line id `line`, written ago_min minutes before NOW."""
+        supervise.append_row(self.paths.uptime, 4242, "alert", self.NOW - timedelta(minutes=ago_min), id=line,
+                             kind=line.split("-")[0], sent=sent, text=text or f"line {line}. כסף נייר")
+
+    def test_a_relayed_line_says_it_is_late_and_gives_the_time_of_its_first_row(self):
+        r3 = ownerlines.render("R3", max_bytes=1200, free_chars=200, k=6, m=10, held="אין פוזיציות")
+        self.alert("R3-1", 20, False, r3)                    # 09:47 New York, 16:47 on the owner's clock
+        self.alert("R3-1", 5, False, r3)                     # a later row of the same line: the first row's time is said
+        (u,) = self.status()["unsent"]
+        self.assertEqual((u["id"], u["kind"], u["text"]), ("R3-1", "R3", "נשלח באיחור, מ-16:47: " + r3))
+
+    def test_a_long_relayed_line_stays_under_max_line_bytes_and_keeps_its_last_words(self):
+        self.alert("R1-1", 20, False, "א" * 590 + " כסף נייר")              # 1,196 bytes before the prefix
+        text = self.status()["unsent"][0]["text"]
+        self.assertTrue(text.startswith("נשלח באיחור, מ-16:47: א") and text.endswith("א כסף נייר"), text[:40])
+        self.assertLessEqual(len(text.encode()), supervise.load_cfg()["supervisor"]["max_line_bytes"])
+
+    def test_an_r6_whose_r6b_went_out_is_not_relayed(self):
+        self.alert("R6-1", 20, False)                        # "the stops are not checked", never delivered
+        self.alert("R6b-2", 10, True)                        # "checked again" reached the phone
+        self.alert("R6-3", 3, False)                         # a later episode, still open: no parent lives, so at once
+        self.assertEqual([u["id"] for u in self.status()["unsent"]], ["R6-3"])
+        self.fresh({})                                       # an R6b that reached nobody ends nothing for the owner
+        self.alert("R6-1", 20, False)
+        self.alert("R6b-2", 10, False)
+        self.assertEqual([u["id"] for u in self.status()["unsent"]], ["R6-1", "R6b-2"])
+
     def test_clear_halt_clears_only_when_the_check_passes_and_status_writes_nothing(self):
         self.assertEqual((self.clear_halt(check_rc=4), self.state_file()["halt"]["code"]), (1, 4))
         self.assertIn("stand-in check: --check", self.out)                    # the check's own output is printed
@@ -2130,6 +2214,17 @@ class Handover(Parents):
         self.assertTrue(0 <= self.urows("up")[-1]["handover_s"] < 60)
         self.assertIsNone(self.state_file()["handover"])
 
+    # Test of Ruling 58 (Task 14g): else the next parent's first mark (no beat yet) books the whole minute before the
+    # handover, while the engine still ran, as a gap (uptime._stretches).
+    def test_the_old_parents_last_mark_is_written_in_the_minute_it_hands_over(self):   # 10:48 comes 3 s after the start
+        rc = self.run_parent([{"beats": -1}], "--handover", clock=self.clock_from(10, 47, 57), min_leg_minutes=0,
+                             stop_after=10)
+        rows = self.urows()
+        mark, = [r for r in rows if r["ev"] == "mark" and r["t"][11:16] == "15:48"]    # 10:48 New York
+        self.assertEqual((rc, rows[-1]["ev"], rows[-1]["why"], rows[-1]["t"][11:16]), (76, "sup_stop", "handover", "15:48"))
+        self.assertTrue(mark["hb"] is not None and mark["hb"] < 1, mark)                # the child's live beat
+        self.assertLess(rows.index(mark), rows.index(self.urows("exit")[0]))            # before the planned stop
+
     def test_without_the_flag_no_handover_happens(self):   # max_leg_minutes 0: with the flag, due at every tick
         script = [{"beats": 3, "then": "exit", "code": 0}]                     # 0 at --until: the end of the day
         self.assertEqual(self.run_parent(script, "--until", "10:00", max_leg_minutes=0), 0)
@@ -2267,6 +2362,59 @@ class Drills(unittest.TestCase):
         log.write_text("")                                              # no mark, no sup_stop
         self.assertEqual(self.drill("cloud-check", "--alive", str(d), timeout=60).stdout.split(),
                          ["FAIL", "cloud-check", "--alive", "no", "mark", "row"])
+
+    # Tests of Ruling 58 (Task 14g): --alive reads a live mark, and the cloud parent's last line names its directory.
+    def test_cloud_check_alive_wants_its_last_mark_fresh_and_with_a_beat(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        now, log = datetime.now(timezone.utc), d / "uptime.jsonl"
+        stale = supervise.load_cfg()["supervisor"]["parent_stale_seconds"]
+        lock = open(d / "news_supervisor.lock", "a+")                   # this process plays the parent that holds it
+        self.addCleanup(lock.close)
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        def check(*marks: tuple) -> list[str]:
+            """The first word of --alive for a log of one sup_start and these marks, (seconds ago, hb) each."""
+            log.write_text("")
+            supervise.append_row(log, os.getpid(), "sup_start", now - timedelta(seconds=600), until="24:00", handover=False)
+            for ago, hb in marks:
+                supervise.append_row(log, os.getpid(), "mark", now - timedelta(seconds=ago), hb=hb)
+            cp = self.drill("cloud-check", "--alive", str(d), timeout=60)
+            self.assertEqual(cp.returncode, 0 if cp.stdout.startswith("PASS") else 1, cp.stdout + cp.stderr)
+            return cp.stdout.split()[:1]
+
+        self.assertEqual(check((0, None)), ["FAIL"])                    # a parent whose child never beat
+        self.assertEqual(check((stale + 20, 0.1)), ["FAIL"])            # a parent that ticked once and then stalled
+        self.assertEqual(check((stale + 20, 0.1), (0, 0.1)), ["PASS"])
+        self.assertEqual(check((60, 0.1), (0, None)), ["FAIL"])         # the last mark decides
+        # the cloud parent's clock is a moved one, and `cloud` writes down by how much: a mark is aged on that clock
+        (d / "drill-clock.json").write_text(json.dumps({"offset_s": 3600.0}))
+        self.assertEqual((check((-3600, 0.1)), check((0, 0.1))), (["PASS"], ["FAIL"]))
+
+    def test_the_cloud_parents_last_line_names_its_drill_directory_and_alive_fails_before_a_beat_is_marked(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+        p = subprocess.Popen([sys.executable, "-u", "scripts/drill_supervisor.py", "cloud", str(d), "--fast"],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                             env=no_phone.clean_env(), cwd=TESTS.parent)
+
+        def end() -> None:
+            if p.poll() is None:
+                p.kill()
+            p.communicate()
+        self.addCleanup(end)
+        end_by = time.monotonic() + 30
+        while not (d / "news_heartbeat.json").exists() and time.monotonic() < end_by:
+            time.sleep(0.05)
+        self.assertTrue((d / "news_heartbeat.json").exists(), "the cloud parent's child did not beat")
+        # its clock started at a whole minute: for a minute the log's one mark is the parent's first, with no child yet
+        cp = self.drill("cloud-check", "--alive", str(d), timeout=60)
+        self.assertEqual((cp.returncode, cp.stdout.split()[:1]), (1, ["FAIL"]), cp.stdout + cp.stderr)
+        p.send_signal(signal.SIGTERM)
+        out, err = p.communicate(timeout=30)
+        self.assertEqual(p.returncode, 143, out + err[-2000:])
+        last = out.splitlines()[-1]
+        self.assertTrue(str(d.resolve()) in last and "--status" not in last, out)
 
     # Tests of Ruling 50 (Task 14c): the drills kill what they start and print no exception text.
     @staticmethod

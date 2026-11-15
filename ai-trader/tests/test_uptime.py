@@ -302,6 +302,64 @@ class Report(unittest.TestCase):
         old = {k: v for k, v in r4.items() if k != "s"}         # a row written before `s`: its m counts as m * 60
         self.assertEqual((ids(gap + [old]), ids(gap)), ([], ["R11"]))
 
+    # Tests of Ruling 58 (Task 14g): a planned handover is booked at its true length, and a short one is no untold outage.
+    @staticmethod
+    def handover(at: str, took: int) -> list[dict]:
+        """The rows of one planned handover on 2026-11-12 as the two parents write them. At `at` (UTC, a whole minute:
+        the old parent writes that minute's mark first, and marks() has it) the child's planned exit and the sup_stop.
+        The next parent starts 2 s before `at` + took: sup_start, its first mark (no child yet: hb null), start; its
+        child is up `took` seconds after the exit."""
+        t0 = datetime.fromisoformat(f"2026-11-12T{at}+00:00")
+        new, up = ((t0 + timedelta(seconds=s)).isoformat() for s in (took - 2, took))
+        return [row(t0.isoformat(), "exit", child=7, rc=143, signal=None, ran_s=4000.0, why="planned"),
+                row(t0.isoformat(), "sup_stop", why="handover", rc=76),
+                row(new, "sup_start", until="16:05", handover=True),
+                row(new, "mark", hb=None, stop=None, n=None, open=None, blind=[], dm=None, left=None),
+                row(new, "start", child=8, n=1, backoff_s=0),
+                row(up, "up", child=8, down_s=None, blind_s=took, handover_s=float(took), held={})]
+
+    def handover_day(self, *took: int, skip: tuple = ()) -> list[dict]:
+        """A whole day of marks from the 08:07 New York start, with the day's four handovers (09:18, 10:48, 12:28 and
+        14:17 New York), each as long as `took` says; skip: the minutes no parent lived in."""
+        rows = marks("2026-11-12", "13:07:00", "21:05:00", skip=skip)
+        for at, s in zip(("14:18:00", "15:48:00", "17:28:00", "19:17:00"), took):
+            rows += self.handover(at, s)
+        return sorted(rows, key=lambda x: x["t"])
+
+    def test_one_46_s_handover_is_booked_as_46_s(self):
+        """The old parent's mark of the handover minute shows a live beat, so the pair that ends at the next parent's
+        first mark (hb null) starts there and lies inside the exit-to-up stretch. Without that mark the pair starts a
+        minute earlier, while the engine still ran: 106 s for a 46 s handover."""
+        rows = sorted(marks("2026-11-12", "14:30:00", "21:00:00") + self.handover("15:48:00", 46), key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"], r["handovers"]),
+                         (46, 46, 0, [46.0]))
+        old = [x for x in rows if not (x["ev"] == "mark" and x["t"] == "2026-11-12T15:48:00+00:00")]
+        self.assertEqual(uptime.day_report(old, date(2026, 11, 12), CFG)["unprotected_s"], 106)
+
+    def test_a_clean_day_of_four_short_handovers_sends_no_r11(self):   # spec 11.2: the first day ends with a quiet phone
+        rows = self.handover_day(46, 46, 46, 46)
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["restarts"], r["trips"]), (138, 138, 0, 0))
+        self.assertEqual(uptime.close_lines(r, rows, CFG), [])       # 09:18 is before the open; three of 46 s each
+        tripped = sorted(rows + [row("2026-11-12T20:50:00+00:00", "tripped", restarts=5, window_s=600, trips_today=1)],
+                         key=lambda x: x["t"])                        # a trip still sends R11
+        r = uptime.day_report(tripped, date(2026, 11, 12), CFG)
+        self.assertEqual([l["id"] for l in uptime.close_lines(r, tripped, CFG)], ["R11"])
+
+    def test_a_handover_as_long_as_r4b_reports_stays_untold_until_a_line_tells_it(self):
+        """200 s from the exit to the next up at 10:48 New York (outage_report_seconds is 180): R11, unless an R4b that
+        reached a channel told it. The day's other handovers, 46 s each, are no part of what is untold."""
+        rows = self.handover_day(46, 200, 46, 46, skip=("15:49", "15:50", "15:51"))
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"]), (292, 292))
+        lines = uptime.close_lines(r, rows, CFG)
+        self.assertEqual([l["id"] for l in lines], ["R11"])
+        self.assertIn(" 5 דקות ", lines[0]["text"])                  # {m} stays the day's unprotected minutes
+        told = row("2026-11-12T15:51:21+00:00", "alert", id="R4b-1", kind="R4b", text="...", m=3, s=198.0, sent=True)
+        rows = sorted(rows + [told], key=lambda x: x["t"])
+        self.assertEqual(uptime.close_lines(uptime.day_report(rows, date(2026, 11, 12), CFG), rows, CFG), [])
+
     def test_days_below_one_are_refused(self):
         self.state([])
         for days in ("0", "-1"):

@@ -606,7 +606,10 @@ def status(paths: Paths, cfg: dict, now: datetime, *, watchdog: bool = False, en
       alert_retry_minutes, or no parent lives to retry them; R10 at once: the parent never retries it) and not in
       news_relayed.json. With watchdog and a halt of an earlier New York day, R5e as well, id "R5e-<today>", until it
       is relayed; its {held} from the book (ruling P11), "unknown" when no book can be read (ruling 39). On the day of
-      the halt R5a-R5d have spoken.
+      the halt R5a-R5d have spoken. Ruling 58: a row's `text` gets ownerlines.late in front, with the time of the
+      line's first row, since the watchdog relays it up to half an hour later, as it is; and an R6 is left out once
+      an R6b said after it reached a channel (the ids count the day's lines in the order they were said): "not
+      checked now" is over.
     - launch: the command and timeout of the tracked background command: --handover and TWO_HOURS_MS until
       long_timeout_proven is true and environ's BASH_MAX_TIMEOUT_MS is at least long_timeout_ms (section 9)."""
     sup, cal = cfg["supervisor"], cfg["calendar"]
@@ -643,14 +646,20 @@ def status(paths: Paths, cfg: dict, now: datetime, *, watchdog: bool = False, en
     else:
         action, why = "launch", "no live parent"
 
-    relayed, first, latest = _relayed(paths.relayed, today), {}, {}
+    relayed, first, latest, checked_again = _relayed(paths.relayed, today), {}, {}, 0
     for r in rows:
         t = _when(r.get("t"))
         if r.get("ev") == "alert" and isinstance(r.get("id"), str) and t is not None and t.astimezone(NY).date() == day:
             first.setdefault(r["id"], t)
             latest[r["id"]] = r
-    unsent = [{"id": i, "kind": r.get("kind"), "text": r.get("text")} for i, r in latest.items()
+            if r.get("kind") == "R6b" and r.get("sent") is True:
+                checked_again = max(checked_again, _alert_n(r))
+
+    def late(i: str, text):
+        return ownerlines.late(text, first[i], sup["owner_tz"], sup["max_line_bytes"]) if isinstance(text, str) else text
+    unsent = [{"id": i, "kind": r.get("kind"), "text": late(i, r.get("text"))} for i, r in latest.items()
               if r.get("sent") is False and i not in relayed
+              and not (r.get("kind") == "R6" and _alert_n(r) < checked_again)
               and (r.get("kind") == "R10" or parent is None
                    or (now - first[i]).total_seconds() > sup["alert_retry_minutes"] * 60)]
     halted_at, r5e = _when(at), f"R5e-{today}"
@@ -750,7 +759,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
     handover times and the `t` of a row. Ages never read it (how many of a stop-look age's seconds were market-open
     is a calendar question: open_age), so a test or a drill can run the parent on a session morning on any day. SIGTERM, SIGINT and SIGHUP, or a change of its own parent pid, end it with a planned stop of the
     child; with --handover, so does handover_due, and the state file keeps {"at", "last_look"} for the next parent's
-    first `up` (its handover_s). An episode a planned end cuts short gets its R1 then (ruling 37). Two lines go
+    first `up` (its handover_s). An episode a planned end cuts short gets its R1 then (ruling 37), and a hang kill that
+    no `up` followed gets its R2 at whatever end comes (Ruling 58). Two lines go
     to stdout, the first and the last; the rest goes to .cache/supervise.log. The owner's lines (spec 8) go to
     alerts.ntfy_base_url with the topic of env (default os.environ), through a worker thread that the loop never waits
     for. --net-check asks ntfy's health once, prints what came back and returns 0 only on 200 (spec 6, "Not verified":
@@ -889,7 +899,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 "left": None, "last_child": None, "codes": [], "refused": None, "tripped": {}, "tick": None,
                 "resumed": None}
         # The restart episode (spec 8, R1): its falls, the `up` and `code` rows of its children, and the hang kill
-        # that waits for the next `up` to be told by R2 (ruling P5).
+        # that waits for the next `up` to be told by R2 (ruling P5), or for this parent's end (Ruling 58): {"s": the
+        # seconds without a beat, "t": the kill's time, "look": the hung engine's last stop look, None when unknown}.
         ep: dict = {"falls": [], "ups": [], "codes": [], "r2": None}
         pending: dict = {}  # alert id -> a line on its way: {row, payload, first, next (None: in flight), failed}
         counts = {"restarts_today": st["restarts_today"], "stamps": []}
@@ -998,10 +1009,13 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                     return "signal"
                 if os.getppid() != ppid:
                     return "orphaned"
-                if a.handover and handover_due(started_ny, clock().astimezone(NY), sup["handover_times_ny"],
-                                               sup["min_leg_minutes"], sup["max_leg_minutes"]):
-                    return "handover"
-                return look(child, ran_s)
+                due = a.handover and handover_due(started_ny, clock().astimezone(NY), sup["handover_times_ny"],
+                                                  sup["min_leg_minutes"], sup["max_leg_minutes"])
+                # Ruling 58: the tick that hands over is read like any other first, so its minute has a mark with the
+                # child's live beat. Else the next parent's first mark (no beat yet) would book the minute before the
+                # handover, in which the engine ran, as a gap (uptime._stretches).
+                order = look(child, ran_s)
+                return "handover" if due else order
 
             def paused(child, last: tuple, wall: float, now: datetime) -> None:
                 """Ruling 49: more than hang_seconds between two of this parent's own ticks (wall: time.time()), so the
@@ -1091,7 +1105,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                         seen["stale"] = None
                         if seen["r6"]:
                             (t, s), seen["r6"] = seen["r6"], None
-                            say("R6b", now, s=round(s + (now - t).total_seconds()))
+                            if view["open"]:  # Ruling 58: at the bell the episode ends; nothing is "checked again"
+                                say("R6b", now, s=round(s + (now - t).total_seconds()))
                 if ep["falls"] and kid["up"] and ran_s >= sup["healthy_seconds"]:  # the episode is over: R1
                     episode_end(now)
                 # A hang: this child's beat is older than hang_seconds, or it has none after start_grace_seconds. After
@@ -1171,7 +1186,7 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 if ep["falls"]:
                     ep["ups"].append({**up_row, "t": now})
                 if ep["r2"] is not None:  # ruling P5: a hang kill is told at the restart, with its time and blind_s
-                    say("R2", now, s=ep["r2"], time=ownerlines.hhmm(now, tz, seconds=True), blind_s=blind_s,
+                    say("R2", now, s=ep["r2"]["s"], time=ownerlines.hhmm(now, tz, seconds=True), blind_s=blind_s,
                         held=view["held"])
                     ep["r2"] = None
                 if seen["gap"] is not None:  # this parent's first `up`: the outage before it, if any (R4, R4b)
@@ -1185,7 +1200,9 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 child to end, then SIGKILL to the group whether or not it has (what it started may ignore SIGTERM;
                 ruling 36 f), then the row `hang`: killed_with "TERM" when the child ended within the grace, else
                 "KILL". A planned stop (spec 5.3): SIGTERM to the child's pid alone, so that a scorer call in flight can
-                finish, planned_stop_grace_seconds, then SIGKILL to its process group."""
+                finish, up to planned_stop_grace_seconds for the child to end, then SIGKILL to its process group whether
+                or not it has: a scorer call the engine did not wait for must not outlive it (Ruling 58; why the group's
+                number is still the child's: ruling 36 f)."""
                 if how == "hang":
                     _signal_group(child.pid, signal.SIGTERM)
                     try:
@@ -1204,8 +1221,8 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
                 except subprocess.TimeoutExpired:
                     log(f"child {child.pid} did not end within {sup['planned_stop_grace_seconds']} s of SIGTERM:"
                         " SIGKILL to its process group")
-                    _signal_group(child.pid, signal.SIGKILL)
-                    child.wait()
+                _signal_group(child.pid, signal.SIGKILL)
+                child.wait()
 
             def core_emit(ev: str, **fields) -> None:
                 now = clock()
@@ -1226,19 +1243,30 @@ def main(argv: list[str] | None = None, *, child_cmd: list[str] | None = None, e
             def fall(now: datetime, fields: dict) -> None:
                 """A fall of the child, for R1: its time and its cause (a code, or no child at all: "crash"; a signal or
                 a hang kill: "killed"; 0 or 143: "stopped"). A hang kill waits for the next `up` to be told by R2
-                (ruling P5)."""
+                (ruling P5); the heartbeat file still holds the hung engine's last stop look (as spawn reads it)."""
                 hang = fields["why"] == "hang"
                 cause = ("killed" if hang or fields["signal"] is not None else "stopped" if fields["rc"] in (0, 143)
                          else "crash")
                 ep["falls"].append({"t": now, "cause": cause, "hang": hang})
                 if hang:
-                    ep["r2"] = kid["hang"]["hb"]
+                    hb = _read_beat(paths.heartbeat)[0] or {}
+                    looks = list(_looks(hb).values()) or [_when(hb.get("stops_checked_at"))]
+                    ep["r2"] = {"s": kid["hang"]["hb"], "t": now, "look": None if None in looks else min(looks)}
 
             def at_until() -> bool:
                 return near_until(clock().astimezone(NY), a.until, sup["end_of_day_slack_seconds"])
 
             rc, word = restart_core(spawn, watch, stop, at_until, core_emit, sup, counts, sleep=sleep or time.sleep)
             st["restarts_today"] = counts["restarts_today"]
+            # Ruling 58: a hang kill that no `up` followed (a planned end, a halt, a held lock or a trip came first) is
+            # told now, or R2 would be in no row and --status could not relay it: the kill's time, and the blind time
+            # from the hung engine's last look until now (with no look on record, from this parent's start, as `up`
+            # counts it), an age on the real clock like every other (open_age).
+            if ep["r2"] is not None:
+                r2, ep["r2"], end = ep["r2"], None, clock()
+                age = time.time() - (r2["look"].timestamp() if r2["look"] else began)
+                say("R2", end, s=r2["s"], time=ownerlines.hhmm(r2["t"], tz, seconds=True),
+                    blind_s=round(open_age(age, end, cal), 1), held=_held_now(paths, seen["last_child"]))
             # Ruling 37: a planned end cuts an open episode short of its healthy run. Its R1 goes out now when a child
             # came up after the episode's last fall; else nothing more is said here (the handover gap measures it).
             if word in PLANNED and ep["ups"] and ep["ups"][-1]["t"] > ep["falls"][-1]["t"]:

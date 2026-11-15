@@ -33,9 +33,11 @@ runs on any day; every child is started with --until 24:00, which never comes (r
   g  Task 5's loop: 50 engine starts beside 20 fetch-and-merge rounds, on a temporary repository with a temporary bare
      remote. Pass: book and chains as they were, every start returned 0 or 7.
   cloud DIR                 not part of all: this process becomes a parent with the dummy child on state directory DIR,
-                            in the foreground, for a session to launch as a tracked background command.
+                            in the foreground, for a session to launch as a tracked background command. Its last line
+                            names DIR as a drill's directory.
   cloud-check --alive DIR   while that parent runs (90 s after its launch): a live process holds DIR's parent lock, the
-                            log has a mark row and no sup_stop.
+                            log has no sup_stop, and its last mark row is at most parent_stale_seconds old and shows
+                            a beat of the child.
   cloud-check DIR           after it was stopped from outside: no process of DIR left, both locks free, a new parent's
                             child beats within 30 s.
 It is also run by hand, in a session whose environment may hold the owner's topic: guard() drops the phone variables
@@ -56,7 +58,7 @@ import sys
 import tempfile
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
@@ -83,6 +85,7 @@ LOOK_S = 3  # and its first stop look
 HANG_EXTRA_S = 10  # the frozen child replaced within hang_seconds + this
 ENGINE_UP_S = 5  # d: an engine beat within this of the parent's kill
 CLOUD_BEAT_S = 30  # cloud-check: a new parent's child beats within this
+CLOUD_CLOCK = "drill-clock.json"  # cloud: {"offset_s"}, how far the parent's clock is moved, for cloud-check --alive
 TRIPPED_RC = 75  # what a parent that tripped returns
 KILLS = 6  # a: the kills of the dummy child
 CAP_OVER = 2  # a: the dummy part's hourly alert cap is KILLS + this, so the cap cannot hide a doubled R1
@@ -722,7 +725,9 @@ def run(name: str, fast: bool, rounds: int, seed: int | None = None) -> bool:
 def cloud(directory: Path, fast: bool) -> int:
     """This process becomes a parent with the dummy child on state directory `directory`, in the foreground (a
     tracked background command of the session that launches it), until it is stopped from outside. Its config copy and
-    the dummy's script are written into the directory; it has no topic, so it sends nothing."""
+    the dummy's script are written into the directory, and so is how far its clock is moved (CLOUD_CLOCK: its rows
+    carry that clock's times); it has no topic, so it sends nothing. The parent's own last line tells a session to
+    run --status, which reads the live state: one more line here says that this was a drill's directory."""
     state = directory.resolve()
     state.mkdir(parents=True, exist_ok=True)
     script = state / "drill-script.json"
@@ -730,8 +735,12 @@ def cloud(directory: Path, fast: bool) -> int:
     config = config_copy(state / "drill-config.json", fast, DEAD)
     child = [sys.executable, str(DUMMY), "--heartbeat", str(state / "news_heartbeat.json"), "--script", str(script)]
     offset = MORNING - datetime.now(timezone.utc)
-    return supervise.main(["--state-dir", str(state), "--config", str(config), "--until", UNTIL], child_cmd=child,
-                          env=no_phone.clean_env(), clock=lambda: datetime.now(timezone.utc) + offset)
+    (state / CLOUD_CLOCK).write_text(json.dumps({"offset_s": offset.total_seconds()}))
+    rc = supervise.main(["--state-dir", str(state), "--config", str(config), "--until", UNTIL], child_cmd=child,
+                        env=no_phone.clean_env(), clock=lambda: datetime.now(timezone.utc) + offset)
+    print(f"drill: that parent ran on the drill directory {state}, not on the live state: nothing to do for it.",
+          flush=True)
+    return rc
 
 
 def lock_holder(lock: Path) -> int | None:
@@ -763,9 +772,20 @@ def cloud_check(given: str, alive: bool) -> int:
     last = log[next((i for i in range(len(log) - 1, -1, -1) if log[i].get("ev") == "sup_start"), 0):]
     stops = [str(r.get("why")) for r in last if r.get("ev") == "sup_stop"]
     if alive:
-        holder, marks = lock_holder(paths.lock), sum(r.get("ev") == "mark" for r in last)
+        mark_rows = [r for r in last if r.get("ev") == "mark"]
+        holder, marks = lock_holder(paths.lock), len(mark_rows)
         why = ((["no live process holds the parent lock"] if holder is None else [])
                + ([] if marks else ["no mark row"]) + ([f"a sup_stop row ({', '.join(stops)})"] if stops else []))
+        if marks:  # Ruling 58: one tick long ago, or a child that never beat, is no live parent
+            try:  # the cloud parent's rows carry its moved clock; a log written on the real one has no such file
+                offset = float(json.loads((state / CLOUD_CLOCK).read_text())["offset_s"])
+            except (OSError, ValueError, KeyError, TypeError):
+                offset = 0.0
+            t, hb = supervise._when(mark_rows[-1].get("t")), mark_rows[-1].get("hb")
+            limit = supervise.load_cfg()["supervisor"]["parent_stale_seconds"]
+            age = None if t is None else (datetime.now(timezone.utc) + timedelta(seconds=offset) - t).total_seconds()
+            why += [] if age is not None and age <= limit else [f"the last mark is not within {limit} s"]
+            why += [] if isinstance(hb, (int, float)) and not isinstance(hb, bool) else ["the last mark shows no beat"]
         print(f"FAIL cloud-check --alive {'; '.join(why)}" if why
               else f"PASS cloud-check --alive parent={holder} marks={marks}", flush=True)
         return 1 if why else 0

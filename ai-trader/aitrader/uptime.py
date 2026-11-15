@@ -214,7 +214,10 @@ def close_lines(report: dict, rows: list[dict], cfg: dict) -> list[dict]:
       more (R11 says minutes; the rest is rounded once, not each line on its own). Reported: the `s` of each R4 and
       R4b alert row whose line reached a channel (a row of its id with `sent` true, counted once; a row written
       before `s` counts m * 60), plus this call's R4c (rulings P6 and 50). A line that never got `sent` true
-      reported nothing. Its {m} is the day's unprotected minutes; its {r} ("the engine fell r times") is the day's
+      reported nothing. A planned handover (an `exit` to the next `up` after a sup_stop "handover") with fewer
+      market-open seconds than outage_report_seconds is reported too: it is the day's routine, four times a day, and
+      no line is due for it; a longer one stays untold unless its R4b reached a channel (Ruling 58). Its {m} is the
+      day's unprotected minutes; its {r} ("the engine fell r times") is the day's
       falls: restarts + trips, since each trip follows one fall the parent did not restart (R3's {k} is the trip's
       restarts + 1)."""
     sup, day, timed = cfg["supervisor"], date.fromisoformat(report["day"]), _timed(rows)
@@ -223,6 +226,8 @@ def close_lines(report: dict, rows: list[dict], cfg: dict) -> list[dict]:
             and r.get("sent") is True]
     reported = {r.get("id"): r["s"] if _num(r.get("s")) else r["m"] * 60 for _, r in told
                 if _num(r.get("s")) or _num(r.get("m"))}
+    routine = sum(s for a, b in _stretches(timed, sup)["handover"] if b is not None and a.astimezone(NY).date() == day
+                  and (s := supervise.open_seconds(a, b, cfg["calendar"])) < sup["outage_report_seconds"])
     lines = []
     sec = _by_second(timed, day, cfg)
     if sec:
@@ -235,7 +240,7 @@ def close_lines(report: dict, rows: list[dict], cfg: dict) -> list[dict]:
                                held=ownerlines.held_text(report["open_at_close"], sup["held_names_in_line"])))
     if any(r.get("ev") == "deadman" and r.get("what") == "cancel_failed" and r.get("dm3") is False for _, r in today):
         lines.append(_line("R9", sup))
-    if report["trips"] or round((report["unprotected_s"] - sum(reported.values())) / 60) >= 1:  # R11 says minutes
+    if report["trips"] or round((report["unprotected_s"] - sum(reported.values()) - routine) / 60) >= 1:  # minutes
         lines.append(_line("R11", sup, r=report["restarts"] + report["trips"], t=report["trips"],
                            m=round(report["unprotected_s"] / 60)))
     return lines
