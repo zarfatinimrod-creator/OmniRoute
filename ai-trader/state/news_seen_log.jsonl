@@ -4886,3 +4886,14 @@
 {"key": "5be32b6c65d95912", "symbol": "NKE", "published": "2026-11-16T14:53:03+00:00", "first_seen": "2026-11-16T14:56:14.485025+00:00", "outcome": "scored"}
 {"key": "49166360023cf4eb", "symbol": "ABT", "published": "2026-11-16T14:53:03+00:00", "first_seen": "2026-11-16T14:56:54.521542+00:00", "outcome": "scored"}
 {"key": "86d68035f8cbddd8", "symbol": "CRM", "published": "2026-11-16T14:54:00+00:00", "first_seen": "2026-11-16T14:57:34.411789+00:00", "outcome": "scored"}
+{"key": "f65f9e2a447904ec", "symbol": "AVGO", "published": "2026-11-16T14:41:14+00:00", "first_seen": "2026-11-16T14:59:34.549148+00:00", "outcome": "scored"}
+{"key": "3f2ed10e2389888a", "symbol": "AMZN", "published": "2026-11-16T14:56:00+00:00", "first_seen": "2026-11-16T15:00:14.614706+00:00", "outcome": "scored"}
+{"key": "54b1043cb85eb8e9", "symbol": "NVDA", "published": "2026-11-16T14:58:10+00:00", "first_seen": "2026-11-16T15:00:34.661351+00:00", "outcome": "scored"}
+{"key": "9c4bffeed2e8c8a7", "symbol": "AMD", "published": "2026-11-16T15:00:19+00:00", "first_seen": "2026-11-16T15:00:54.610860+00:00", "outcome": "scored"}
+{"key": "6917122f8693a131", "symbol": "BRK-B", "published": "2026-11-16T14:54:14+00:00", "first_seen": "2026-11-16T15:00:54.611272+00:00", "outcome": "scored"}
+{"key": "62d7284adb92d46a", "symbol": "INTC", "published": "2026-11-16T14:45:23+00:00", "first_seen": "2026-11-16T15:01:14.649011+00:00", "outcome": "scored"}
+{"key": "0f2e92970312a4f1", "symbol": "INTC", "published": "2026-11-16T15:00:19+00:00", "first_seen": "2026-11-16T15:01:14.649039+00:00", "outcome": "scored"}
+{"key": "bb2ebd630cecfcc3", "symbol": "BAC", "published": "2026-11-16T14:54:14+00:00", "first_seen": "2026-11-16T15:01:14.649292+00:00", "outcome": "scored"}
+{"key": "bc9c17669f4d7a30", "symbol": "AVGO", "published": "2026-11-16T15:00:19+00:00", "first_seen": "2026-11-16T15:01:54.594283+00:00", "outcome": "scored"}
+{"key": "44d4c26b6fcc8a09", "symbol": "AMZN", "published": "2026-11-16T14:52:43+00:00", "first_seen": "2026-11-16T15:03:34.697183+00:00", "outcome": "scored"}
+{"key": "124740e5d8ee0acb", "symbol": "BLK", "published": "2026-11-16T14:02:54+00:00", "first_seen": "2026-11-16T15:05:24.305986+00:00", "outcome": "stale"}
