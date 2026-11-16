@@ -5143,3 +5143,16 @@
 {"key": "dd658f8450d24ec3", "symbol": "MRK", "published": "2026-11-16T16:47:58+00:00", "first_seen": "2026-11-16T16:53:02.150589+00:00", "outcome": "scored"}
 {"key": "b745a2cce4722cf0", "symbol": "AMZN", "published": "2026-11-16T16:31:16+00:00", "first_seen": "2026-11-16T16:56:08.184991+00:00", "outcome": "scored"}
 {"key": "cbaa8c1e4c67dc73", "symbol": "JNJ", "published": "2026-11-16T16:50:31+00:00", "first_seen": "2026-11-16T16:56:08.185082+00:00", "outcome": "scored"}
+{"key": "f7b1097ccb0f6532", "symbol": "INTC", "published": "2026-11-16T16:53:26+00:00", "first_seen": "2026-11-16T16:56:31.310461+00:00", "outcome": "scored"}
+{"key": "a79e3c84737b774d", "symbol": "WMT", "published": "2026-11-16T16:46:43+00:00", "first_seen": "2026-11-16T16:56:31.310673+00:00", "outcome": "scored"}
+{"key": "1ea40b7492ca1fe1", "symbol": "NVDA", "published": "2026-11-16T16:50:32+00:00", "first_seen": "2026-11-16T16:56:51.310492+00:00", "outcome": "scored"}
+{"key": "31ea298b0e456215", "symbol": "NVDA", "published": "2026-11-16T16:46:43+00:00", "first_seen": "2026-11-16T16:56:51.310546+00:00", "outcome": "scored"}
+{"key": "439e4d7f5ca78162", "symbol": "GOOGL", "published": "2026-11-16T15:48:00+00:00", "first_seen": "2026-11-16T16:57:31.367021+00:00", "outcome": "stale"}
+{"key": "af5f76beb48dc9ac", "symbol": "AMD", "published": "2026-11-16T16:51:48+00:00", "first_seen": "2026-11-16T16:57:31.366899+00:00", "outcome": "scored"}
+{"key": "2d0896fe97ac56af", "symbol": "AMZN", "published": "2026-11-16T15:48:00+00:00", "first_seen": "2026-11-16T16:57:51.353716+00:00", "outcome": "stale"}
+{"key": "06f3c88182afa2c7", "symbol": "NVDA", "published": "2026-11-16T16:51:48+00:00", "first_seen": "2026-11-16T16:57:51.353466+00:00", "outcome": "scored"}
+{"key": "cf17521d5f326ee7", "symbol": "NVDA", "published": "2026-11-16T16:50:56+00:00", "first_seen": "2026-11-16T16:57:51.353482+00:00", "outcome": "scored"}
+{"key": "0fbeafd52c117ca4", "symbol": "NVDA", "published": "2026-11-16T16:50:02+00:00", "first_seen": "2026-11-16T16:57:51.353493+00:00", "outcome": "scored"}
+{"key": "cd92d9e990b93eb8", "symbol": "GOOGL", "published": "2026-11-16T16:50:56+00:00", "first_seen": "2026-11-16T16:57:51.353659+00:00", "outcome": "scored"}
+{"key": "bd1b0514f22fea73", "symbol": "CAT", "published": "2026-11-16T16:50:56+00:00", "first_seen": "2026-11-16T16:57:51.354313+00:00", "outcome": "scored"}
+{"key": "4224aca9e3c992f9", "symbol": "BRK-B", "published": "2026-11-16T16:30:32+00:00", "first_seen": "2026-11-16T16:58:31.261654+00:00", "outcome": "scored"}
