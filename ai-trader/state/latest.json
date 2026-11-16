@@ -1,27 +1,27 @@
 {
   "date": "2026-11-16",
-  "as_of_utc": "2026-11-16T17:53:14+00:00",
+  "as_of_utc": "2026-11-16T21:23:14+00:00",
   "market": {
-    "is_open": true,
+    "is_open": false,
     "regular_start_utc": "2026-11-16T14:30:00+00:00",
     "regular_end_utc": "2026-11-16T21:00:00+00:00",
-    "last_trade_utc": "2026-11-16T17:53:13+00:00",
-    "price": 743.35
+    "last_trade_utc": "2026-11-16T21:00:00+00:00",
+    "price": 739.96
   },
-  "equity": 101303.28,
-  "cash": 23147.3,
-  "gross": 0.7715,
-  "return_since_start": 0.013,
-  "shadow_return_since_start": 0.0138,
+  "equity": 100863.46,
+  "cash": 23150.46,
+  "gross": 0.7705,
+  "return_since_start": 0.0086,
+  "shadow_return_since_start": 0.0094,
   "baselines": {
-    "spy_since_start": 0.0109,
-    "equal_weight_since_start": 0.0146
+    "spy_since_start": 0.0064,
+    "equal_weight_since_start": 0.0091
   },
   "started": "2026-11-06",
-  "regime": "risk_on",
+  "regime": "risk_on+defensive",
   "dd_state": "normal",
-  "drawdown": -0.0039,
-  "decided_now": false,
+  "drawdown": -0.0082,
+  "decided_now": true,
   "weights": {
     "tsmom": 0.25,
     "xsmom": 0.25,
@@ -33,45 +33,205 @@
     "lowvol": 0.0
   },
   "pending": {
-    "decision_date": "2026-11-13",
-    "status": "executed",
-    "rebalance": false,
+    "decision_date": "2026-11-16",
+    "status": "pending",
+    "rebalance": true,
     "targets": {
-      "PM": 0.058692176581134674,
-      "CVX": 0.0648664165515598,
-      "MRK": 0.024700114217562553,
-      "UNP": 0.07137459360470604,
-      "AMGN": 0.022895042332088777,
-      "LLY": 0.028388337366283004,
-      "KO": 0.09076253930555377,
-      "TEVA": 0.039381811968120344,
-      "DE": 0.046361191853631294,
-      "JNJ": 0.03933756274118987,
-      "ABBV": 0.04061508692043311,
-      "XOM": 0.04529085276014256,
-      "AAPL": 0.07006520707725707,
-      "XLV": 0.10027760131074648,
-      "COP": 0.029380306450378
+      "PM": 0.044164993517135626,
+      "CVX": 0.04958347002774338,
+      "MRK": 0.03157061182993458,
+      "UNP": 0.05911091299365958,
+      "AMGN": 0.029085380980619354,
+      "LLY": 0.027567436748925138,
+      "KO": 0.07010173051079573,
+      "TEVA": 0.036903848709425605,
+      "DE": 0.03981198010893815,
+      "JNJ": 0.03987912126590821,
+      "ABBV": 0.04529879199757428,
+      "XOM": 0.04387226728409697,
+      "AAPL": 0.05649719345477499,
+      "XLV": 0.08138430740687051,
+      "COP": 0.0461852582715551
     },
     "overrides": [],
     "earnings_blackout": {},
-    "preview_at_close": []
+    "preview_at_close": [
+      {
+        "date": "2026-11-16",
+        "symbol": "KO",
+        "side": "SELL",
+        "qty": 21,
+        "price": 99.4303,
+        "value": 2088.04,
+        "realized_pnl": 68.62,
+        "reason": "trim"
+      }
+    ]
   },
   "executed": [],
-  "top_scores": null,
-  "bottom_scores": null,
+  "top_scores": {
+    "TEVA": 0.745,
+    "TXN": 0.703,
+    "JNJ": 0.641,
+    "KO": 0.639,
+    "AMGN": 0.639,
+    "AMD": 0.631,
+    "COP": 0.617,
+    "UNP": 0.596,
+    "AAPL": 0.596,
+    "ABBV": 0.594
+  },
+  "bottom_scores": {
+    "NFLX": -0.784,
+    "ORCL": -0.693,
+    "ADBE": -0.538,
+    "BKNG": -0.534,
+    "NKE": -0.524
+  },
   "stopped": [],
   "scorecard": {
-    "open": 653,
-    "evaluated": 15,
+    "open": 747,
+    "evaluated": 37,
     "quant_h5": {
-      "n": 15,
-      "hit_rate": 0.667,
-      "avg_excess_up_calls": 0.01
+      "n": 37,
+      "hit_rate": 0.73,
+      "avg_excess_up_calls": 0.0172
     }
   },
   "overlays": {
     "insider_cluster": [
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-16",
+        "ticker": "BW",
+        "company": "Babcock & Wilcox Enterprises, Inc.",
+        "industry": "Heating Equipment, Except Electric & Warm Air Furnaces",
+        "insiders": 3,
+        "price": 4.61,
+        "value": 138292.0,
+        "delta_own": "+1%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-13",
+        "ticker": "GOOD",
+        "company": "Gladstone Commercial Corp",
+        "industry": "Lessors of Real Property",
+        "insiders": 2,
+        "price": 10.05,
+        "value": 286263.0,
+        "delta_own": "+46%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-13",
+        "ticker": "DX",
+        "company": "Dynex Capital Inc",
+        "industry": "Real Estate Investment Trusts",
+        "insiders": 3,
+        "price": 11.68,
+        "value": 334478.0,
+        "delta_own": "+2%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-13",
+        "ticker": "CSQR",
+        "company": "Csquare, Inc.",
+        "industry": "Computer Programming, Data Processing, Etc.",
+        "insiders": 3,
+        "price": 17.22,
+        "value": 413720.0,
+        "delta_own": "+6%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-12",
+        "ticker": "TH",
+        "company": "Target Hospitality Corp.",
+        "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
+        "insiders": 2,
+        "price": 13.75,
+        "value": 937839.0,
+        "delta_own": "+3%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-10-05",
+        "ticker": "AGMB",
+        "company": "Agomab Therapeutics Nv",
+        "industry": "Biological Products, (No Diagnostic Substances)",
+        "insiders": 3,
+        "price": 7.79,
+        "value": 592149.0,
+        "delta_own": "+168%"
+      },
+      {
+        "filing_date": "2026-11-13",
+        "trade_date": "2026-11-10",
+        "ticker": "NXGL",
+        "company": "Nexgel, Inc.",
+        "industry": "Surgical & Medical Instruments & Apparatus",
+        "insiders": 2,
+        "price": 5.5,
+        "value": 757691.0,
+        "delta_own": ">999%"
+      },
+      {
+        "filing_date": "2026-11-13",
+        "trade_date": "2026-11-11",
+        "ticker": "STWD",
+        "company": "Starwood Property Trust, Inc.",
+        "industry": "Real Estate Investment Trusts",
+        "insiders": 2,
+        "price": 11.81,
+        "value": 16711132.0,
+        "delta_own": "+8%"
+      },
+      {
+        "filing_date": "2026-11-13",
+        "trade_date": "2026-11-11",
+        "ticker": "CTEV",
+        "company": "Claritev Corp",
+        "industry": "Business Services",
+        "insiders": 2,
+        "price": 25.05,
+        "value": 9627061.0,
+        "delta_own": "+17%"
+      },
+      {
+        "filing_date": "2026-11-13",
+        "trade_date": "2026-11-11",
+        "ticker": "FUN",
+        "company": "Six Flags Entertainment Corporation/New",
+        "industry": "Amusement & Recreation Services",
+        "insiders": 3,
+        "price": 10.62,
+        "value": 24312320.0,
+        "delta_own": "+44%"
+      },
+      {
+        "filing_date": "2026-11-13",
+        "trade_date": "2026-11-10",
+        "ticker": "NXRT",
+        "company": "Nexpoint Residential Trust, Inc.",
+        "industry": "Real Estate Investment Trusts",
+        "insiders": 2,
+        "price": 17.02,
+        "value": 603299.0,
+        "delta_own": "+7%"
+      },
+      {
+        "filing_date": "2026-11-13",
+        "trade_date": "2026-11-13",
+        "ticker": "GAM",
+        "company": "General American Investors Co Inc",
+        "industry": "Closed-End Funds",
+        "insiders": 5,
+        "price": 23.04,
+        "value": 760290.0,
+        "delta_own": "+2%"
+      },
       {
         "filing_date": "2026-11-13",
         "trade_date": "2026-11-12",
@@ -85,24 +245,13 @@
       },
       {
         "filing_date": "2026-11-13",
-        "trade_date": "2026-08-18",
+        "trade_date": "2026-11-13",
         "ticker": "ABCL",
         "company": "Abcellera Biologics Inc.",
         "industry": "Pharmaceutical Preparations",
-        "insiders": 3,
-        "price": 10.78,
-        "value": 778180.0,
-        "delta_own": "+3%"
-      },
-      {
-        "filing_date": "2026-11-13",
-        "trade_date": "2026-11-11",
-        "ticker": "CSQR",
-        "company": "Csquare, Inc.",
-        "industry": "Computer Programming, Data Processing, Etc.",
         "insiders": 2,
-        "price": 17.24,
-        "value": 207400.0,
+        "price": 10.74,
+        "value": 667880.0,
         "delta_own": "+3%"
       },
       {
@@ -126,17 +275,6 @@
         "price": 10.43,
         "value": 597829.0,
         "delta_own": "+5%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-08-27",
-        "ticker": "CTEV",
-        "company": "Claritev Corp",
-        "industry": "Investment Advice",
-        "insiders": 2,
-        "price": 24.99,
-        "value": 9477134.0,
-        "delta_own": "+17%"
       },
       {
         "filing_date": "2026-11-12",
@@ -177,10 +315,10 @@
         "ticker": "RWAY",
         "company": "Runway Growth Finance Corp.",
         "industry": "Closed-End Funds",
-        "insiders": 3,
-        "price": 6.74,
-        "value": 218908.0,
-        "delta_own": "+671%"
+        "insiders": 2,
+        "price": 6.66,
+        "value": 163165.0,
+        "delta_own": "%"
       },
       {
         "filing_date": "2026-11-12",
@@ -236,116 +374,6 @@
         "price": 36.26,
         "value": 3353606.0,
         "delta_own": "+5%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-11",
-        "ticker": "TH",
-        "company": "Target Hospitality Corp.",
-        "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
-        "insiders": 2,
-        "price": 14.7,
-        "value": 687833.0,
-        "delta_own": "+2%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-10",
-        "ticker": "NTHI",
-        "company": "Neonc Technologies Holdings, Inc.",
-        "industry": "Pharmaceutical Preparations",
-        "insiders": 2,
-        "price": 3.71,
-        "value": 839805.0,
-        "delta_own": "+1%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-09",
-        "ticker": "COHR",
-        "company": "Coherent Corp.",
-        "industry": "Optical Instruments & Lenses",
-        "insiders": 2,
-        "price": 203.38,
-        "value": 1220285.0,
-        "delta_own": "+3%"
-      },
-      {
-        "filing_date": "2026-11-10",
-        "trade_date": "2026-10-30",
-        "ticker": "ATEC",
-        "company": "Alphatec Holdings, Inc.",
-        "industry": "Surgical & Medical Instruments & Apparatus",
-        "insiders": 3,
-        "price": 7.93,
-        "value": 1664300.0,
-        "delta_own": "+3%"
-      },
-      {
-        "filing_date": "2026-11-10",
-        "trade_date": "2026-11-10",
-        "ticker": "WW",
-        "company": "Ww International, Inc.",
-        "industry": "Personal Services",
-        "insiders": 3,
-        "price": 11.84,
-        "value": 292882.0,
-        "delta_own": "+200%"
-      },
-      {
-        "filing_date": "2026-11-10",
-        "trade_date": "2026-11-06",
-        "ticker": "FUN",
-        "company": "Six Flags Entertainment Corporation/New",
-        "industry": "Amusement & Recreation Services",
-        "insiders": 3,
-        "price": 10.29,
-        "value": 15066320.0,
-        "delta_own": "+28%"
-      },
-      {
-        "filing_date": "2026-11-10",
-        "trade_date": "2026-11-05",
-        "ticker": "GLXY",
-        "company": "Galaxy Digital Inc.",
-        "industry": "Security Brokers, Dealers & Flotation Companies",
-        "insiders": 2,
-        "price": 12.99,
-        "value": 9934246.0,
-        "delta_own": "+141%"
-      },
-      {
-        "filing_date": "2026-11-10",
-        "trade_date": "2026-11-09",
-        "ticker": "UPBD",
-        "company": "Upbound Group, Inc.",
-        "industry": "Equipment Rental & Leasing",
-        "insiders": 8,
-        "price": 22.98,
-        "value": 1840818.0,
-        "delta_own": "+16%"
-      },
-      {
-        "filing_date": "2026-11-10",
-        "trade_date": "2026-11-06",
-        "ticker": "GOOD",
-        "company": "Gladstone Commercial Corp",
-        "industry": "Lessors of Real Property",
-        "insiders": 2,
-        "price": 10.12,
-        "value": 186263.0,
-        "delta_own": "+30%"
-      },
-      {
-        "filing_date": "2026-11-10",
-        "trade_date": "2026-11-05",
-        "ticker": "FLOC",
-        "company": "Flowco Holdings Inc.",
-        "industry": "Oil & Gas Field Machinery & Equipment",
-        "insiders": 2,
-        "price": 19.43,
-        "value": 682656.0,
-        "delta_own": "+3%"
       }
     ],
     "congress_buy": null,
@@ -355,125 +383,114 @@
     "PM": {
       "qty": 30,
       "avg_cost": 195.42,
-      "last": 196.39,
-      "pnl_pct": 0.005,
+      "last": 196.04,
+      "pnl_pct": 0.0032,
       "since": "2026-11-09"
     },
     "CVX": {
       "qty": 30,
       "avg_cost": 211.88,
-      "last": 217.49,
-      "pnl_pct": 0.0264,
+      "last": 217.14,
+      "pnl_pct": 0.0248,
       "since": "2026-11-09"
     },
     "MRK": {
       "qty": 17,
       "avg_cost": 148.44,
-      "last": 146.55,
-      "pnl_pct": -0.0128,
+      "last": 144.46,
+      "pnl_pct": -0.0268,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 24,
       "avg_cost": 297.59,
-      "last": 304.07,
-      "pnl_pct": 0.0218,
+      "last": 303.71,
+      "pnl_pct": 0.0206,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 468.48,
-      "pnl_pct": 0.0067,
+      "last": 462.32,
+      "pnl_pct": -0.0065,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1446.14,
-      "pnl_pct": 0.0586,
+      "last": 1431.67,
+      "pnl_pct": 0.048,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 93,
       "avg_cost": 96.16,
-      "last": 99.4,
-      "pnl_pct": 0.0337,
+      "last": 99.48,
+      "pnl_pct": 0.0345,
       "since": "2026-11-09"
     },
     "TEVA": {
       "qty": 90,
       "avg_cost": 43.03,
-      "last": 43.57,
-      "pnl_pct": 0.0125,
+      "last": 42.57,
+      "pnl_pct": -0.0107,
       "since": "2026-11-09"
     },
     "DE": {
       "qty": 7,
       "avg_cost": 686.13,
-      "last": 663.03,
-      "pnl_pct": -0.0337,
+      "last": 653.99,
+      "pnl_pct": -0.0468,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 285.2,
-      "pnl_pct": 0.0254,
+      "last": 282.55,
+      "pnl_pct": 0.0159,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 296.83,
-      "pnl_pct": 0.0097,
+      "last": 294.55,
+      "pnl_pct": 0.0019,
       "since": "2026-11-09"
     },
     "XOM": {
       "qty": 27,
       "avg_cost": 163.9,
-      "last": 167.53,
-      "pnl_pct": 0.0222,
+      "last": 166.87,
+      "pnl_pct": 0.0181,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 20,
       "avg_cost": 346.27,
-      "last": 353.5,
-      "pnl_pct": 0.0209,
+      "last": 352.78,
+      "pnl_pct": 0.0188,
       "since": "2026-11-09"
     },
     "XLV": {
       "qty": 54,
       "avg_cost": 186.78,
-      "last": 189.14,
-      "pnl_pct": 0.0126,
+      "last": 187.88,
+      "pnl_pct": 0.0059,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 140.66,
-      "pnl_pct": 0.0305,
+      "last": 140.52,
+      "pnl_pct": 0.0295,
       "since": "2026-11-11"
     }
   },
-  "day_moves": {
-    "PM": -0.0129,
-    "CVX": -0.0109,
-    "MRK": -0.0082,
-    "UNP": 0.0054,
-    "AMGN": 0.006,
-    "LLY": 0.0018,
-    "KO": 0.0015,
-    "TEVA": -0.0209,
-    "DE": -0.0156,
-    "JNJ": -0.0019,
-    "ABBV": 0.0061,
-    "XOM": -0.0179,
-    "AAPL": -0.0078,
-    "XLV": 0.0015,
-    "COP": -0.0114
-  },
-  "events": []
+  "alert_channels": [
+    "ntfy"
+  ],
+  "events": [
+    "מתוכנן לפתיחה הבאה: SELL 21 KO",
+    "שינוי משטר שוק: risk_on -> risk_on+defensive"
+  ]
 }

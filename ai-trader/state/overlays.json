@@ -1,6 +1,138 @@
 {
-  "date": "2026-11-13",
+  "date": "2026-11-16",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-16",
+      "trade_date": "2026-11-16",
+      "ticker": "BW",
+      "company": "Babcock & Wilcox Enterprises, Inc.",
+      "industry": "Heating Equipment, Except Electric & Warm Air Furnaces",
+      "insiders": 3,
+      "price": 4.61,
+      "value": 138292.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-16",
+      "trade_date": "2026-11-13",
+      "ticker": "GOOD",
+      "company": "Gladstone Commercial Corp",
+      "industry": "Lessors of Real Property",
+      "insiders": 2,
+      "price": 10.05,
+      "value": 286263.0,
+      "delta_own": "+46%"
+    },
+    {
+      "filing_date": "2026-11-16",
+      "trade_date": "2026-11-13",
+      "ticker": "DX",
+      "company": "Dynex Capital Inc",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 3,
+      "price": 11.68,
+      "value": 334478.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-16",
+      "trade_date": "2026-11-13",
+      "ticker": "CSQR",
+      "company": "Csquare, Inc.",
+      "industry": "Computer Programming, Data Processing, Etc.",
+      "insiders": 3,
+      "price": 17.22,
+      "value": 413720.0,
+      "delta_own": "+6%"
+    },
+    {
+      "filing_date": "2026-11-16",
+      "trade_date": "2026-11-12",
+      "ticker": "TH",
+      "company": "Target Hospitality Corp.",
+      "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
+      "insiders": 2,
+      "price": 13.75,
+      "value": 937839.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-16",
+      "trade_date": "2026-10-05",
+      "ticker": "AGMB",
+      "company": "Agomab Therapeutics Nv",
+      "industry": "Biological Products, (No Diagnostic Substances)",
+      "insiders": 3,
+      "price": 7.79,
+      "value": 592149.0,
+      "delta_own": "+168%"
+    },
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-11-10",
+      "ticker": "NXGL",
+      "company": "Nexgel, Inc.",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 2,
+      "price": 5.5,
+      "value": 757691.0,
+      "delta_own": ">999%"
+    },
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-11-11",
+      "ticker": "STWD",
+      "company": "Starwood Property Trust, Inc.",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 2,
+      "price": 11.81,
+      "value": 16711132.0,
+      "delta_own": "+8%"
+    },
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-11-11",
+      "ticker": "CTEV",
+      "company": "Claritev Corp",
+      "industry": "Business Services",
+      "insiders": 2,
+      "price": 25.05,
+      "value": 9627061.0,
+      "delta_own": "+17%"
+    },
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-11-11",
+      "ticker": "FUN",
+      "company": "Six Flags Entertainment Corporation/New",
+      "industry": "Amusement & Recreation Services",
+      "insiders": 3,
+      "price": 10.62,
+      "value": 24312320.0,
+      "delta_own": "+44%"
+    },
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-11-10",
+      "ticker": "NXRT",
+      "company": "Nexpoint Residential Trust, Inc.",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 2,
+      "price": 17.02,
+      "value": 603299.0,
+      "delta_own": "+7%"
+    },
+    {
+      "filing_date": "2026-11-13",
+      "trade_date": "2026-11-13",
+      "ticker": "GAM",
+      "company": "General American Investors Co Inc",
+      "industry": "Closed-End Funds",
+      "insiders": 5,
+      "price": 23.04,
+      "value": 760290.0,
+      "delta_own": "+2%"
+    },
     {
       "filing_date": "2026-11-13",
       "trade_date": "2026-11-12",
@@ -14,24 +146,13 @@
     },
     {
       "filing_date": "2026-11-13",
-      "trade_date": "2026-08-18",
+      "trade_date": "2026-11-13",
       "ticker": "ABCL",
       "company": "Abcellera Biologics Inc.",
       "industry": "Pharmaceutical Preparations",
-      "insiders": 3,
-      "price": 10.78,
-      "value": 778180.0,
-      "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-13",
-      "trade_date": "2026-11-11",
-      "ticker": "CSQR",
-      "company": "Csquare, Inc.",
-      "industry": "Computer Programming, Data Processing, Etc.",
       "insiders": 2,
-      "price": 17.24,
-      "value": 207400.0,
+      "price": 10.74,
+      "value": 667880.0,
       "delta_own": "+3%"
     },
     {
@@ -55,17 +176,6 @@
       "price": 10.43,
       "value": 597829.0,
       "delta_own": "+5%"
-    },
-    {
-      "filing_date": "2026-11-12",
-      "trade_date": "2026-08-27",
-      "ticker": "CTEV",
-      "company": "Claritev Corp",
-      "industry": "Investment Advice",
-      "insiders": 2,
-      "price": 24.99,
-      "value": 9477134.0,
-      "delta_own": "+17%"
     },
     {
       "filing_date": "2026-11-12",
@@ -106,10 +216,10 @@
       "ticker": "RWAY",
       "company": "Runway Growth Finance Corp.",
       "industry": "Closed-End Funds",
-      "insiders": 3,
-      "price": 6.74,
-      "value": 218908.0,
-      "delta_own": "+671%"
+      "insiders": 2,
+      "price": 6.66,
+      "value": 163165.0,
+      "delta_own": "%"
     },
     {
       "filing_date": "2026-11-12",
@@ -165,116 +275,6 @@
       "price": 36.26,
       "value": 3353606.0,
       "delta_own": "+5%"
-    },
-    {
-      "filing_date": "2026-11-12",
-      "trade_date": "2026-11-11",
-      "ticker": "TH",
-      "company": "Target Hospitality Corp.",
-      "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
-      "insiders": 2,
-      "price": 14.7,
-      "value": 687833.0,
-      "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-12",
-      "trade_date": "2026-11-10",
-      "ticker": "NTHI",
-      "company": "Neonc Technologies Holdings, Inc.",
-      "industry": "Pharmaceutical Preparations",
-      "insiders": 2,
-      "price": 3.71,
-      "value": 839805.0,
-      "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-12",
-      "trade_date": "2026-11-09",
-      "ticker": "COHR",
-      "company": "Coherent Corp.",
-      "industry": "Optical Instruments & Lenses",
-      "insiders": 2,
-      "price": 203.38,
-      "value": 1220285.0,
-      "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-10",
-      "trade_date": "2026-10-30",
-      "ticker": "ATEC",
-      "company": "Alphatec Holdings, Inc.",
-      "industry": "Surgical & Medical Instruments & Apparatus",
-      "insiders": 3,
-      "price": 7.93,
-      "value": 1664300.0,
-      "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-10",
-      "trade_date": "2026-11-10",
-      "ticker": "WW",
-      "company": "Ww International, Inc.",
-      "industry": "Personal Services",
-      "insiders": 3,
-      "price": 11.84,
-      "value": 292882.0,
-      "delta_own": "+200%"
-    },
-    {
-      "filing_date": "2026-11-10",
-      "trade_date": "2026-11-06",
-      "ticker": "FUN",
-      "company": "Six Flags Entertainment Corporation/New",
-      "industry": "Amusement & Recreation Services",
-      "insiders": 3,
-      "price": 10.29,
-      "value": 15066320.0,
-      "delta_own": "+28%"
-    },
-    {
-      "filing_date": "2026-11-10",
-      "trade_date": "2026-11-05",
-      "ticker": "GLXY",
-      "company": "Galaxy Digital Inc.",
-      "industry": "Security Brokers, Dealers & Flotation Companies",
-      "insiders": 2,
-      "price": 12.99,
-      "value": 9934246.0,
-      "delta_own": "+141%"
-    },
-    {
-      "filing_date": "2026-11-10",
-      "trade_date": "2026-11-09",
-      "ticker": "UPBD",
-      "company": "Upbound Group, Inc.",
-      "industry": "Equipment Rental & Leasing",
-      "insiders": 8,
-      "price": 22.98,
-      "value": 1840818.0,
-      "delta_own": "+16%"
-    },
-    {
-      "filing_date": "2026-11-10",
-      "trade_date": "2026-11-06",
-      "ticker": "GOOD",
-      "company": "Gladstone Commercial Corp",
-      "industry": "Lessors of Real Property",
-      "insiders": 2,
-      "price": 10.12,
-      "value": 186263.0,
-      "delta_own": "+30%"
-    },
-    {
-      "filing_date": "2026-11-10",
-      "trade_date": "2026-11-05",
-      "ticker": "FLOC",
-      "company": "Flowco Holdings Inc.",
-      "industry": "Oil & Gas Field Machinery & Equipment",
-      "insiders": 2,
-      "price": 19.43,
-      "value": 682656.0,
-      "delta_own": "+3%"
     }
   ],
   "congress_buy": null,
