@@ -1,27 +1,27 @@
 {
-  "date": "2026-11-13",
-  "as_of_utc": "2026-11-13T21:24:17+00:00",
+  "date": "2026-11-16",
+  "as_of_utc": "2026-11-16T14:53:10+00:00",
   "market": {
-    "is_open": false,
-    "regular_start_utc": "2026-11-13T14:30:00+00:00",
-    "regular_end_utc": "2026-11-13T21:00:00+00:00",
-    "last_trade_utc": "2026-11-13T21:00:00+00:00",
-    "price": 754.21
+    "is_open": true,
+    "regular_start_utc": "2026-11-16T14:30:00+00:00",
+    "regular_end_utc": "2026-11-16T21:00:00+00:00",
+    "last_trade_utc": "2026-11-16T14:53:06+00:00",
+    "price": 748.25
   },
-  "equity": 101696.69,
+  "equity": 101647.06,
   "cash": 23147.3,
-  "gross": 0.7724,
-  "return_since_start": 0.017,
-  "shadow_return_since_start": 0.0177,
+  "gross": 0.7723,
+  "return_since_start": 0.0165,
+  "shadow_return_since_start": 0.017,
   "baselines": {
-    "spy_since_start": 0.0257,
-    "equal_weight_since_start": 0.0251
+    "spy_since_start": 0.0175,
+    "equal_weight_since_start": 0.0193
   },
   "started": "2026-11-06",
   "regime": "risk_on",
   "dd_state": "normal",
-  "drawdown": 0.0,
-  "decided_now": true,
+  "drawdown": -0.0005,
+  "decided_now": false,
   "weights": {
     "tsmom": 0.25,
     "xsmom": 0.25,
@@ -34,7 +34,7 @@
   },
   "pending": {
     "decision_date": "2026-11-13",
-    "status": "pending",
+    "status": "executed",
     "rebalance": false,
     "targets": {
       "PM": 0.058692176581134674,
@@ -58,25 +58,8 @@
     "preview_at_close": []
   },
   "executed": [],
-  "top_scores": {
-    "TEVA": 0.75,
-    "TXN": 0.737,
-    "KO": 0.662,
-    "AMD": 0.656,
-    "JNJ": 0.639,
-    "AMGN": 0.638,
-    "MRK": 0.631,
-    "UNP": 0.599,
-    "COP": 0.599,
-    "AAPL": 0.572
-  },
-  "bottom_scores": {
-    "NFLX": -0.766,
-    "ORCL": -0.655,
-    "ADBE": -0.537,
-    "BKNG": -0.52,
-    "NKE": -0.518
-  },
+  "top_scores": null,
+  "bottom_scores": null,
   "stopped": [],
   "scorecard": {
     "open": 653,
@@ -372,108 +355,125 @@
     "PM": {
       "qty": 30,
       "avg_cost": 195.42,
-      "last": 198.96,
-      "pnl_pct": 0.0181,
+      "last": 195.56,
+      "pnl_pct": 0.0007,
       "since": "2026-11-09"
     },
     "CVX": {
       "qty": 30,
       "avg_cost": 211.88,
-      "last": 219.89,
-      "pnl_pct": 0.0378,
+      "last": 218.01,
+      "pnl_pct": 0.0289,
       "since": "2026-11-09"
     },
     "MRK": {
       "qty": 17,
       "avg_cost": 148.44,
-      "last": 147.76,
-      "pnl_pct": -0.0046,
+      "last": 148.05,
+      "pnl_pct": -0.0026,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 24,
       "avg_cost": 297.59,
-      "last": 302.44,
-      "pnl_pct": 0.0163,
+      "last": 305.63,
+      "pnl_pct": 0.027,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 465.67,
-      "pnl_pct": 0.0006,
+      "last": 469.63,
+      "pnl_pct": 0.0092,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1443.5,
-      "pnl_pct": 0.0567,
+      "last": 1464.33,
+      "pnl_pct": 0.0719,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 93,
       "avg_cost": 96.16,
-      "last": 99.25,
-      "pnl_pct": 0.0321,
+      "last": 99.87,
+      "pnl_pct": 0.0386,
       "since": "2026-11-09"
     },
     "TEVA": {
       "qty": 90,
       "avg_cost": 43.03,
-      "last": 44.5,
-      "pnl_pct": 0.0341,
+      "last": 44.04,
+      "pnl_pct": 0.0234,
       "since": "2026-11-09"
     },
     "DE": {
       "qty": 7,
       "avg_cost": 686.13,
-      "last": 673.54,
-      "pnl_pct": -0.0183,
+      "last": 667.28,
+      "pnl_pct": -0.0275,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 285.75,
-      "pnl_pct": 0.0274,
+      "last": 286.69,
+      "pnl_pct": 0.0307,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 295.03,
-      "pnl_pct": 0.0035,
+      "last": 298.74,
+      "pnl_pct": 0.0162,
       "since": "2026-11-09"
     },
     "XOM": {
       "qty": 27,
       "avg_cost": 163.9,
-      "last": 170.59,
-      "pnl_pct": 0.0408,
+      "last": 168.68,
+      "pnl_pct": 0.0292,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 20,
       "avg_cost": 346.27,
-      "last": 356.27,
-      "pnl_pct": 0.0289,
+      "last": 354.82,
+      "pnl_pct": 0.0247,
       "since": "2026-11-09"
     },
     "XLV": {
       "qty": 54,
       "avg_cost": 186.78,
-      "last": 188.85,
-      "pnl_pct": 0.0111,
+      "last": 189.93,
+      "pnl_pct": 0.0168,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 142.28,
-      "pnl_pct": 0.0424,
+      "last": 139.92,
+      "pnl_pct": 0.0251,
       "since": "2026-11-11"
     }
+  },
+  "day_moves": {
+    "PM": -0.0171,
+    "CVX": -0.0085,
+    "MRK": 0.002,
+    "UNP": 0.0105,
+    "AMGN": 0.0085,
+    "LLY": 0.0144,
+    "KO": 0.0062,
+    "TEVA": -0.0103,
+    "DE": -0.0093,
+    "JNJ": 0.0033,
+    "ABBV": 0.0126,
+    "XOM": -0.0112,
+    "AAPL": -0.0041,
+    "XLV": 0.0057,
+    "COP": -0.0166
   },
   "events": []
 }
