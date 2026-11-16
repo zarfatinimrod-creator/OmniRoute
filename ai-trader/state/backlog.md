@@ -254,7 +254,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     2026-11-15 measurement (logs/2026-11-15-crypto-night.md): the 23:00 1h bar of 11-14 first appeared at 00:45:40
     (64,113.45) and then alternated null/value between successive fetches until at least 01:12 (Yahoo replicas
     disagree); the 5m 23:55 close equalled the 1h close in every non-null reply (same reply, so not an independent
-    finality check). Compare 64,113.45 with the settled daily close when it arrives.
+    finality check). Settled 11-14 daily close 64,128.05: the 1h close decided on (64,113.45) was -2.3 bp off (under R6).
+    2026-11-16 00:13:42: the 11-15 1h 23:00 bar had a value (65,174.53, decided on) while the 5m 23:55 bar was still
+    null - a '1h 23:00 == 5m 23:55' check would have held that decision back; compare with the settled close.
+    Tally so far (rebuilt close vs settled daily): 11-12 -3.8 bp, 11-13 -53.8 bp, 11-14 -2.3 bp, 11-15 pending.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
