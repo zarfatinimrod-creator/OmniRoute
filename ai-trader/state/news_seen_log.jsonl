@@ -5323,3 +5323,12 @@
 {"key": "753a7efa52573c11", "symbol": "LMT", "published": "2026-11-16T18:07:00+00:00", "first_seen": "2026-11-16T18:18:13.720514+00:00", "outcome": "scored"}
 {"key": "1626b173f67d050c", "symbol": "MSFT", "published": "2026-11-16T18:09:31+00:00", "first_seen": "2026-11-16T18:23:13.587171+00:00", "outcome": "scored"}
 {"key": "2ae1936a47b77db8", "symbol": "MCD", "published": "2026-11-16T18:11:23+00:00", "first_seen": "2026-11-16T18:24:14.326939+00:00", "outcome": "scored"}
+{"key": "91fbcf5b865a349a", "symbol": "AVGO", "published": "2026-11-16T18:18:29+00:00", "first_seen": "2026-11-16T18:26:33.739934+00:00", "outcome": "scored"}
+{"key": "ffb8cfe86c59eb6a", "symbol": "TSLA", "published": "2026-11-16T18:17:21+00:00", "first_seen": "2026-11-16T18:26:33.740135+00:00", "outcome": "scored"}
+{"key": "3d623e4e310c45aa", "symbol": "AMD", "published": "2026-11-16T18:18:59+00:00", "first_seen": "2026-11-16T18:26:54.074819+00:00", "outcome": "scored"}
+{"key": "afc2a7ba6499e363", "symbol": "GOOGL", "published": "2026-11-16T18:18:59+00:00", "first_seen": "2026-11-16T18:26:54.074938+00:00", "outcome": "scored"}
+{"key": "f4b37d77f4e6f977", "symbol": "NVDA", "published": "2026-11-16T18:11:01+00:00", "first_seen": "2026-11-16T18:27:13.662592+00:00", "outcome": "scored"}
+{"key": "417c53e118d3baaf", "symbol": "NVDA", "published": "2026-11-16T18:19:25+00:00", "first_seen": "2026-11-16T18:27:13.662615+00:00", "outcome": "scored"}
+{"key": "e66695fe333f3211", "symbol": "NVDA", "published": "2026-11-16T18:18:59+00:00", "first_seen": "2026-11-16T18:27:13.662621+00:00", "outcome": "scored"}
+{"key": "749632214ef96346", "symbol": "MU", "published": "2026-11-16T18:20:12+00:00", "first_seen": "2026-11-16T18:27:13.662728+00:00", "outcome": "scored"}
+{"key": "3a1b4b7814769c7a", "symbol": "UBER", "published": "2026-11-16T18:17:49+00:00", "first_seen": "2026-11-16T18:27:13.663077+00:00", "outcome": "scored"}
