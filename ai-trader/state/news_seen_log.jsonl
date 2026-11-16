@@ -5118,3 +5118,5 @@
 {"key": "1e5bbfc526ecb4df", "symbol": "MU", "published": "2026-11-16T16:30:00+00:00", "first_seen": "2026-11-16T16:36:41.595130+00:00", "outcome": "scored"}
 {"key": "9d2d6989a19c82c3", "symbol": "NVDA", "published": "2026-11-16T16:30:00+00:00", "first_seen": "2026-11-16T16:37:01.642269+00:00", "outcome": "scored"}
 {"key": "ad3805c6959f5e4f", "symbol": "DIS", "published": "2026-11-16T16:33:00+00:00", "first_seen": "2026-11-16T16:37:21.625220+00:00", "outcome": "scored"}
+{"key": "0712537a1fea7603", "symbol": "LLY", "published": "2026-11-16T14:55:00+00:00", "first_seen": "2026-11-16T16:38:01.666080+00:00", "outcome": "stale"}
+{"key": "0e052e20eb78f988", "symbol": "NVDA", "published": "2026-11-16T16:36:39+00:00", "first_seen": "2026-11-16T16:38:01.665661+00:00", "outcome": "scored"}
