@@ -5321,3 +5321,5 @@
 {"key": "c66ad1fdddaa06c1", "symbol": "AMZN", "published": "2026-11-16T18:07:00+00:00", "first_seen": "2026-11-16T18:18:13.720148+00:00", "outcome": "scored"}
 {"key": "229d315c4abd97dc", "symbol": "V", "published": "2026-11-16T18:00:01+00:00", "first_seen": "2026-11-16T18:18:13.720336+00:00", "outcome": "scored"}
 {"key": "753a7efa52573c11", "symbol": "LMT", "published": "2026-11-16T18:07:00+00:00", "first_seen": "2026-11-16T18:18:13.720514+00:00", "outcome": "scored"}
+{"key": "1626b173f67d050c", "symbol": "MSFT", "published": "2026-11-16T18:09:31+00:00", "first_seen": "2026-11-16T18:23:13.587171+00:00", "outcome": "scored"}
+{"key": "2ae1936a47b77db8", "symbol": "MCD", "published": "2026-11-16T18:11:23+00:00", "first_seen": "2026-11-16T18:24:14.326939+00:00", "outcome": "scored"}
