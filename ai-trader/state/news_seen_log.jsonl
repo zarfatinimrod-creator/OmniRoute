@@ -5141,3 +5141,5 @@
 {"key": "1fd6967658957213", "symbol": "JPM", "published": "2026-11-16T16:36:00+00:00", "first_seen": "2026-11-16T16:52:22.084059+00:00", "outcome": "scored"}
 {"key": "6e8385a470794ea1", "symbol": "COST", "published": "2026-11-16T16:20:19+00:00", "first_seen": "2026-11-16T16:52:42.108974+00:00", "outcome": "stale"}
 {"key": "dd658f8450d24ec3", "symbol": "MRK", "published": "2026-11-16T16:47:58+00:00", "first_seen": "2026-11-16T16:53:02.150589+00:00", "outcome": "scored"}
+{"key": "b745a2cce4722cf0", "symbol": "AMZN", "published": "2026-11-16T16:31:16+00:00", "first_seen": "2026-11-16T16:56:08.184991+00:00", "outcome": "scored"}
+{"key": "cbaa8c1e4c67dc73", "symbol": "JNJ", "published": "2026-11-16T16:50:31+00:00", "first_seen": "2026-11-16T16:56:08.185082+00:00", "outcome": "scored"}
