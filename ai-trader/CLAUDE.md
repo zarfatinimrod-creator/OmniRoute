@@ -145,9 +145,20 @@ short plain Hebrew (terse, no fluff - the Age of Blood "caveman" style; technica
 verbatim). One question per message, with options (א / ב / ג) and a recommendation.
 
 ## Hard rules
-1. **Paper money only** until Nimrod explicitly says otherwise in chat, after at least 3 months of paper
-   results that beat SPY on a risk-adjusted basis. Never place a real-money order. Never create accounts,
-   type passwords, or handle payment details - he signs in himself.
+1. **Paper money only** until Nimrod explicitly says otherwise in chat, and only after the real-money gate below
+   is passed. Never place a real-money order. Never create accounts, type passwords, or handle payment details -
+   he signs in himself.
+   - **Real-money gate (Nimrod, 2026-11-16; replaces "3 months that beat SPY", which the backtest passes by luck in
+     about a third of quarters):** at least 6 months of forward paper results of the same frozen book, after
+     real costs (his broker's measured fees and the tax on realized gains). The book must beat both SPY and an
+     exposure-matched SPY/T-bill mix, with P(Sharpe > SPY) >= 0.8 on the forward record. Only then is real money
+     proposed to him, and it starts with a small slice that grows only with further results. Until then the
+     evidence-based place for real money is a low-cost broad index fund, which is his own choice to make outside
+     this bot (research/2026-11-16-real-money-review.md).
+   - **Freeze (same decision):** the stock and crypto strategy parameters are frozen from 2026-11-16. There are
+     no new looks at the 2018-2026 history to tune them. Defect and data fixes still go through rule 4. The
+     improvement effort moves to finding a measured edge: first opportunistic insider purchases (SEC Form 4,
+     backlog item 3), as a separate log-only book with a sealed holdout and a written kill criterion.
    The order skill `trader-broker` (`.claude/skills/`) is installed for that day only (his request,
    2026-11-11): until he says real money starts it runs only when he types `/trader-broker`, only with an Alpaca
    paper account, and no engine, slot or agent calls it.

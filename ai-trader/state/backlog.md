@@ -4,6 +4,9 @@ Every item: implement behind a config switch -> paired sweep before/after (strat
 PASS -> only then merge. Sources: research/2026-11-09-repo-sweep-take-list.md, research/*.md, critic notes.
 
 ## Open (priority order)
+Owner's decision 2026-11-16 (research/2026-11-16-real-money-review.md): stock and crypto strategy parameters FROZEN;
+the improvement effort goes to item 3 (opportunistic insider purchases, log-only book, sealed holdout, kill criterion
+written first) after defects; real-money gate = 6 months forward (CLAUDE.md hard rule 1).
 First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (crypto data defect, found 2026-11-14), 33, 44, 34, 35, 39, 40 - then the list below.
 1. [defect] Learning label credits the overnight gap: learn.forward_excess uses close(d)->close(d+h) but fills are
    at open(d+1). Use open(d+1)->open(d+1+h); mature at asof-h-1; rerun placebo; add a test that the label equals

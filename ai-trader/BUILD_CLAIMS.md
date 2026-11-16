@@ -5,14 +5,6 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-16 18:35 - trader session (owner decision)** - files: `CLAUDE.md` (hard rule 1 only, plus one new dated
-  owner-decision paragraph under it). The main session's claim on `CLAUDE.md` (refreshed 2026-11-11 21:10) is older
-  than 24 hours and nothing of it was pushed since 2026-11-12; no other line is touched. Purpose: record the owner's
-  answer of 2026-11-16 ("א, but not 12 months, whatever you think") to the real-money review
-  (research/2026-11-16-real-money-review.md): freeze the stock and crypto strategy parameters, move the improvement
-  effort to an insider-purchase experiment (log-only, sealed holdout), and replace the 3-month real-money gate with
-  a stricter 6-month forward gate.
-
 - **2026-11-11 10:09 (refreshed 21:10; rollout step 1 landed at 21:08 UTC, ab7b27f9) - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
@@ -54,6 +46,15 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
+
+- **2026-11-16 18:35 - trader session (owner decision)** - files: `CLAUDE.md` (hard rule 1 only, plus one new dated
+  owner-decision paragraph under it). The main session's claim on `CLAUDE.md` (refreshed 2026-11-11 21:10) is older
+  than 24 hours and nothing of it was pushed since 2026-11-12; no other line is touched. Purpose: record the owner's
+  answer of 2026-11-16 ("א, but not 12 months, whatever you think") to the real-money review
+  (research/2026-11-16-real-money-review.md): freeze the stock and crypto strategy parameters, move the improvement
+  effort to an insider-purchase experiment (log-only, sealed holdout), and replace the 3-month real-money gate with
+  a stricter 6-month forward gate.
+  **Done 2026-11-16 18:40**: hard rule 1 replaced (6-month forward gate, freeze, effort to the insider experiment).
 
 - **2026-11-14 15:25 - trader session (weekly review improvement)** - files: `aitrader/cycle.py`, new file
   `tests/test_crypto_rebuild_wait.py`, `tests/test_crypto_hourly_rebuild.py` (only where a declined-rebuild reason
