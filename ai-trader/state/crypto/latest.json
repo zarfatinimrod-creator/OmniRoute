@@ -1,12 +1,12 @@
 {
   "date": "2026-11-16",
-  "as_of_utc": "2026-11-16T00:13:39+00:00",
+  "as_of_utc": "2026-11-16T01:08:48+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-16T00:00:00+00:00",
     "regular_end_utc": "2026-11-16T23:59:00+00:00",
-    "last_trade_utc": "2026-11-16T00:13:33+00:00",
-    "price": 65081.3
+    "last_trade_utc": "2026-11-16T01:08:47+00:00",
+    "price": 64791.73
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,14 +14,14 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.1172,
-    "equal_weight_since_start": -0.1172
+    "bench_since_start": -0.1213,
+    "equal_weight_since_start": -0.1213
   },
   "started": "2026-11-10",
   "regime": "risk_off",
   "dd_state": "normal",
   "drawdown": -0.0618,
-  "decided_now": true,
+  "decided_now": false,
   "weights": {
     "tsmom": 0.0,
     "xsmom": 0.0,
@@ -34,7 +34,7 @@
   },
   "pending": {
     "decision_date": "2026-11-15",
-    "status": "pending",
+    "status": "executed",
     "rebalance": false,
     "targets": {},
     "overrides": [],
@@ -42,12 +42,8 @@
     "preview_at_close": []
   },
   "executed": [],
-  "top_scores": {
-    "BTC-USD": -0.072
-  },
-  "bottom_scores": {
-    "BTC-USD": -0.072
-  },
+  "top_scores": null,
+  "bottom_scores": null,
   "stopped": [],
   "scorecard": {
     "open": 15,
@@ -64,6 +60,6 @@
     "queued"
   ],
   "events": [
-    "השורה היומית של 2026-11-15 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 65,174.53)"
+    "אין שורה יומית של 2026-11-15 בנתונים (הנר האחרון הסופי הוא 2026-11-14) - אין החלטה בריצה הזו, הזמנה ממתינה עדיין מתמלאת, ריצה מאוחרת תנסה שוב"
   ]
 }
