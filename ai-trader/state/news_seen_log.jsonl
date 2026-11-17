@@ -6678,3 +6678,4 @@
 {"key": "4d24983f1adb6e2c", "symbol": "META", "published": "2026-11-17T14:54:21+00:00", "first_seen": "2026-11-17T15:10:42.526308+00:00", "outcome": "scored"}
 {"key": "bbbffa583dc10dad", "symbol": "WMT", "published": "2026-11-17T13:56:00+00:00", "first_seen": "2026-11-17T15:11:02.600338+00:00", "outcome": "stale"}
 {"key": "2887f925f0715634", "symbol": "JPM", "published": "2026-11-17T13:59:00+00:00", "first_seen": "2026-11-17T15:11:02.600669+00:00", "outcome": "stale"}
+{"key": "7204f8806b49f3cb", "symbol": "INTC", "published": "2026-11-17T14:57:54+00:00", "first_seen": "2026-11-17T15:11:02.600142+00:00", "outcome": "scored"}
