@@ -1,27 +1,27 @@
 {
   "date": "2026-11-17",
-  "as_of_utc": "2026-11-17T17:53:40+00:00",
+  "as_of_utc": "2026-11-17T21:23:25+00:00",
   "market": {
-    "is_open": true,
+    "is_open": false,
     "regular_start_utc": "2026-11-17T14:30:00+00:00",
     "regular_end_utc": "2026-11-17T21:00:00+00:00",
-    "last_trade_utc": "2026-11-17T17:53:36+00:00",
-    "price": 732.035
+    "last_trade_utc": "2026-11-17T21:00:00+00:00",
+    "price": 732.44
   },
-  "equity": 100442.72,
-  "cash": 25224.01,
-  "gross": 0.7489,
-  "return_since_start": 0.0044,
-  "shadow_return_since_start": 0.0053,
+  "equity": 100209.0,
+  "cash": 25227.46,
+  "gross": 0.7483,
+  "return_since_start": 0.0021,
+  "shadow_return_since_start": 0.0028,
   "baselines": {
-    "spy_since_start": -0.0045,
-    "equal_weight_since_start": -0.0032
+    "spy_since_start": -0.0039,
+    "equal_weight_since_start": -0.0046
   },
   "started": "2026-11-06",
   "regime": "risk_on+defensive",
   "dd_state": "normal",
-  "drawdown": -0.0123,
-  "decided_now": false,
+  "drawdown": -0.0146,
+  "decided_now": true,
   "weights": {
     "tsmom": 0.25,
     "xsmom": 0.25,
@@ -33,56 +33,216 @@
     "lowvol": 0.0
   },
   "pending": {
-    "decision_date": "2026-11-16",
-    "status": "executed",
-    "rebalance": true,
+    "decision_date": "2026-11-17",
+    "status": "pending",
+    "rebalance": false,
     "targets": {
-      "PM": 0.044164993517135626,
-      "CVX": 0.04958347002774338,
-      "MRK": 0.03157061182993458,
-      "UNP": 0.05911091299365958,
-      "AMGN": 0.029085380980619354,
-      "LLY": 0.027567436748925138,
-      "KO": 0.07010173051079573,
-      "TEVA": 0.036903848709425605,
-      "DE": 0.03981198010893815,
-      "JNJ": 0.03987912126590821,
-      "ABBV": 0.04529879199757428,
-      "XOM": 0.04387226728409697,
-      "AAPL": 0.05649719345477499,
-      "XLV": 0.08138430740687051,
-      "COP": 0.0461852582715551
+      "PM": 0.05819237983137261,
+      "CVX": 0.06470377107295329,
+      "MRK": 0.024322066235549153,
+      "UNP": 0.07113852073703844,
+      "AMGN": 0.022848745927710235,
+      "LLY": 0.02825195460523694,
+      "KO": 0.07098045205154337,
+      "TEVA": 0.038277998311896856,
+      "DE": 0.04535131472823093,
+      "JNJ": 0.038936624458522716,
+      "ABBV": 0.04090930089610284,
+      "XOM": 0.04505254234019258,
+      "AAPL": 0.07023520967571134,
+      "XLV": 0.09982097787794855,
+      "COP": 0.029229709231687613
     },
     "overrides": [],
     "earnings_blackout": {},
-    "preview_at_close": [
-      {
-        "date": "2026-11-16",
-        "symbol": "KO",
-        "side": "SELL",
-        "qty": 21,
-        "price": 99.4303,
-        "value": 2088.04,
-        "realized_pnl": 68.62,
-        "reason": "trim"
-      }
-    ]
+    "preview_at_close": []
   },
   "executed": [],
-  "top_scores": null,
-  "bottom_scores": null,
+  "top_scores": {
+    "TEVA": 0.735,
+    "TXN": 0.709,
+    "KO": 0.666,
+    "AMD": 0.638,
+    "JNJ": 0.614,
+    "COP": 0.614,
+    "AMGN": 0.61,
+    "ABBV": 0.604,
+    "AAPL": 0.59,
+    "UNP": 0.568
+  },
+  "bottom_scores": {
+    "NFLX": -0.777,
+    "ORCL": -0.722,
+    "NKE": -0.616,
+    "ADBE": -0.584,
+    "BKNG": -0.57
+  },
   "stopped": [],
   "scorecard": {
-    "open": 747,
-    "evaluated": 37,
+    "open": 842,
+    "evaluated": 58,
     "quant_h5": {
-      "n": 37,
-      "hit_rate": 0.73,
-      "avg_excess_up_calls": 0.0172
+      "n": 58,
+      "hit_rate": 0.776,
+      "avg_excess_up_calls": 0.0168
     }
   },
   "overlays": {
     "insider_cluster": [
+      {
+        "filing_date": "2026-11-17",
+        "trade_date": "2026-11-11",
+        "ticker": "DKNG",
+        "company": "Draftkings Inc.",
+        "industry": "Miscellaneous Amusement & Recreation",
+        "insiders": 3,
+        "price": 18.39,
+        "value": 1450887.0,
+        "delta_own": "+1%"
+      },
+      {
+        "filing_date": "2026-11-17",
+        "trade_date": "2026-11-16",
+        "ticker": "ETN",
+        "company": "Eaton Corp Plc",
+        "industry": "Misc Industrial & Commercial Machinery & Equipment",
+        "insiders": 2,
+        "price": 341.79,
+        "value": 170894.0,
+        "delta_own": "+6%"
+      },
+      {
+        "filing_date": "2026-11-17",
+        "trade_date": "2026-11-05",
+        "ticker": "GLXY",
+        "company": "Galaxy Digital Inc.",
+        "industry": "Security Brokers, Dealers & Flotation Companies",
+        "insiders": 2,
+        "price": 12.99,
+        "value": 10135096.0,
+        "delta_own": "+144%"
+      },
+      {
+        "filing_date": "2026-11-17",
+        "trade_date": "2026-11-13",
+        "ticker": "KRMD",
+        "company": "Koru Medical Systems, Inc.",
+        "industry": "Surgical & Medical Instruments & Apparatus",
+        "insiders": 2,
+        "price": 3.26,
+        "value": 132142.0,
+        "delta_own": "+11%"
+      },
+      {
+        "filing_date": "2026-11-17",
+        "trade_date": "2026-11-13",
+        "ticker": "PAM",
+        "company": "Pampa Energy Inc.",
+        "industry": "Electric Services",
+        "insiders": 3,
+        "price": 12.62,
+        "value": 58319010.0,
+        "delta_own": "+13%"
+      },
+      {
+        "filing_date": "2026-11-17",
+        "trade_date": "2026-11-17",
+        "ticker": "BLX",
+        "company": "Bladex, Inc.",
+        "industry": "Commercial Banks",
+        "insiders": 4,
+        "price": 52.08,
+        "value": 396891.0,
+        "delta_own": "+6%"
+      },
+      {
+        "filing_date": "2026-11-17",
+        "trade_date": "2026-11-16",
+        "ticker": "NGS",
+        "company": "Natural Gas Services Group Inc",
+        "industry": "Oil & Gas Field Services",
+        "insiders": 3,
+        "price": 28.8,
+        "value": 192962.0,
+        "delta_own": "+14%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-12",
+        "ticker": "ENOV",
+        "company": "Enovis Corp",
+        "industry": "Orthopedic, Prosthetic & Surgical Appliances & Supplies",
+        "insiders": 4,
+        "price": 21.34,
+        "value": 648927.0,
+        "delta_own": "+8%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-10",
+        "ticker": "MP",
+        "company": "Mp Materials Corp. / De",
+        "industry": "Metal Mining",
+        "insiders": 3,
+        "price": 36.28,
+        "value": 3482231.0,
+        "delta_own": "+6%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-11",
+        "ticker": "CTEV",
+        "company": "Claritev Corp",
+        "industry": "Investment Advice",
+        "insiders": 2,
+        "price": 25.29,
+        "value": 10407867.0,
+        "delta_own": "+19%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-13",
+        "ticker": "ADIG",
+        "company": "Adi Global Distribution Inc.",
+        "industry": "Hardware",
+        "insiders": 5,
+        "price": 9.83,
+        "value": 325603.0,
+        "delta_own": "+13%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-13",
+        "ticker": "CTVA",
+        "company": "Corteva, Inc.",
+        "industry": "Crops",
+        "insiders": 2,
+        "price": 9.29,
+        "value": 485712.0,
+        "delta_own": "+24%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-08-25",
+        "ticker": "SELF",
+        "company": "Global Self Storage, Inc.",
+        "industry": "Real Estate Investment Trusts",
+        "insiders": 2,
+        "price": 5.46,
+        "value": 276732.0,
+        "delta_own": "+9%"
+      },
+      {
+        "filing_date": "2026-11-16",
+        "trade_date": "2026-11-12",
+        "ticker": "NSLR",
+        "company": "Neostellar Capital Corp.",
+        "industry": "Closed-End Funds",
+        "insiders": 4,
+        "price": 6.88,
+        "value": 1650700.0,
+        "delta_own": "+12%"
+      },
       {
         "filing_date": "2026-11-16",
         "trade_date": "2026-11-16",
@@ -174,17 +334,6 @@
       {
         "filing_date": "2026-11-13",
         "trade_date": "2026-11-11",
-        "ticker": "CTEV",
-        "company": "Claritev Corp",
-        "industry": "Business Services",
-        "insiders": 2,
-        "price": 25.05,
-        "value": 9627061.0,
-        "delta_own": "+17%"
-      },
-      {
-        "filing_date": "2026-11-13",
-        "trade_date": "2026-11-11",
         "ticker": "FUN",
         "company": "Six Flags Entertainment Corporation/New",
         "industry": "Amusement & Recreation Services",
@@ -214,149 +363,6 @@
         "price": 23.04,
         "value": 760290.0,
         "delta_own": "+2%"
-      },
-      {
-        "filing_date": "2026-11-13",
-        "trade_date": "2026-11-12",
-        "ticker": "HPP",
-        "company": "Hudson Pacific Properties, Inc.",
-        "industry": "Real Estate",
-        "insiders": 3,
-        "price": 9.06,
-        "value": 905762.0,
-        "delta_own": "+57%"
-      },
-      {
-        "filing_date": "2026-11-13",
-        "trade_date": "2026-11-13",
-        "ticker": "ABCL",
-        "company": "Abcellera Biologics Inc.",
-        "industry": "Pharmaceutical Preparations",
-        "insiders": 2,
-        "price": 10.74,
-        "value": 667880.0,
-        "delta_own": "+3%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-10",
-        "ticker": "ENOV",
-        "company": "Enovis Corp",
-        "industry": "Orthopedic, Prosthetic & Surgical Appliances & Supplies",
-        "insiders": 4,
-        "price": 20.92,
-        "value": 599541.0,
-        "delta_own": "+8%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-10-27",
-        "ticker": "FLG",
-        "company": "Flagstar Bank, National Association",
-        "industry": "Savings Institutions, Not Federally Chartered",
-        "insiders": 2,
-        "price": 10.43,
-        "value": 597829.0,
-        "delta_own": "+5%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-09",
-        "ticker": "OBIO",
-        "company": "Orchestra Biomed Holdings, Inc.",
-        "industry": "Surgical & Medical Instruments & Apparatus",
-        "insiders": 4,
-        "price": 5.0,
-        "value": 6247900.0,
-        "delta_own": "+11%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-09",
-        "ticker": "NOMD",
-        "company": "Nomad Foods Ltd",
-        "industry": "Food & Kindred Products",
-        "insiders": 2,
-        "price": 12.17,
-        "value": 1054392.0,
-        "delta_own": "+9%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-10",
-        "ticker": "LUCK",
-        "company": "Lucky Strike Entertainment Corp",
-        "industry": "Amusement & Recreation Services",
-        "insiders": 3,
-        "price": 13.74,
-        "value": 965695.0,
-        "delta_own": "+1%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-11",
-        "ticker": "RWAY",
-        "company": "Runway Growth Finance Corp.",
-        "industry": "Closed-End Funds",
-        "insiders": 2,
-        "price": 6.66,
-        "value": 163165.0,
-        "delta_own": "%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-09",
-        "ticker": "ADTN",
-        "company": "Adtran Holdings, Inc.",
-        "industry": "Telephone & Telegraph Apparatus",
-        "insiders": 2,
-        "price": 4.08,
-        "value": 847008.0,
-        "delta_own": "+16%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-10",
-        "ticker": "EGBN",
-        "company": "Eagle Bancorp Inc",
-        "industry": "State Commercial Banks",
-        "insiders": 2,
-        "price": 34.02,
-        "value": 199430.0,
-        "delta_own": "+10%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-09-25",
-        "ticker": "PAM",
-        "company": "Pampa Energy Inc.",
-        "industry": "Electric Services",
-        "insiders": 3,
-        "price": 12.34,
-        "value": 56713058.0,
-        "delta_own": "+13%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-11",
-        "ticker": "DKNG",
-        "company": "Draftkings Inc.",
-        "industry": "Miscellaneous Amusement & Recreation",
-        "insiders": 2,
-        "price": 18.77,
-        "value": 448787.0,
-        "delta_own": "+11%"
-      },
-      {
-        "filing_date": "2026-11-12",
-        "trade_date": "2026-11-10",
-        "ticker": "MP",
-        "company": "Mp Materials Corp. / De",
-        "industry": "Metal Mining",
-        "insiders": 3,
-        "price": 36.26,
-        "value": 3353606.0,
-        "delta_own": "+5%"
       }
     ],
     "congress_buy": null,
@@ -366,125 +372,108 @@
     "PM": {
       "qty": 30,
       "avg_cost": 195.42,
-      "last": 197.24,
-      "pnl_pct": 0.0094,
+      "last": 194.38,
+      "pnl_pct": -0.0053,
       "since": "2026-11-09"
     },
     "CVX": {
       "qty": 30,
       "avg_cost": 211.88,
-      "last": 216.24,
-      "pnl_pct": 0.0206,
+      "last": 216.13,
+      "pnl_pct": 0.02,
       "since": "2026-11-09"
     },
     "MRK": {
       "qty": 17,
       "avg_cost": 148.44,
-      "last": 143.98,
-      "pnl_pct": -0.0301,
+      "last": 143.37,
+      "pnl_pct": -0.0342,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 24,
       "avg_cost": 297.59,
-      "last": 299.7,
-      "pnl_pct": 0.0071,
+      "last": 297.03,
+      "pnl_pct": -0.0019,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 458.87,
-      "pnl_pct": -0.014,
+      "last": 457.93,
+      "pnl_pct": -0.016,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1415.09,
-      "pnl_pct": 0.0359,
+      "last": 1415.55,
+      "pnl_pct": 0.0362,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 72,
       "avg_cost": 96.16,
-      "last": 99.21,
-      "pnl_pct": 0.0316,
+      "last": 98.79,
+      "pnl_pct": 0.0273,
       "since": "2026-11-09"
     },
     "TEVA": {
       "qty": 90,
       "avg_cost": 43.03,
-      "last": 42.08,
-      "pnl_pct": -0.0221,
+      "last": 42.62,
+      "pnl_pct": -0.0096,
       "since": "2026-11-09"
     },
     "DE": {
       "qty": 7,
       "avg_cost": 686.13,
-      "last": 651.52,
-      "pnl_pct": -0.0504,
+      "last": 649.23,
+      "pnl_pct": -0.0538,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 279.95,
-      "pnl_pct": 0.0065,
+      "last": 278.7,
+      "pnl_pct": 0.002,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 292.94,
-      "pnl_pct": -0.0036,
+      "last": 292.82,
+      "pnl_pct": -0.004,
       "since": "2026-11-09"
     },
     "XOM": {
       "qty": 27,
       "avg_cost": 163.9,
-      "last": 167.18,
-      "pnl_pct": 0.02,
+      "last": 167.21,
+      "pnl_pct": 0.0202,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 20,
       "avg_cost": 346.27,
-      "last": 350.87,
-      "pnl_pct": 0.0133,
+      "last": 351.91,
+      "pnl_pct": 0.0163,
       "since": "2026-11-09"
     },
     "XLV": {
       "qty": 54,
       "avg_cost": 186.78,
-      "last": 186.0,
-      "pnl_pct": -0.0042,
+      "last": 185.24,
+      "pnl_pct": -0.0083,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 141.09,
-      "pnl_pct": 0.0336,
+      "last": 139.48,
+      "pnl_pct": 0.0218,
       "since": "2026-11-11"
     }
-  },
-  "day_moves": {
-    "PM": 0.0061,
-    "CVX": -0.0041,
-    "MRK": -0.0033,
-    "UNP": -0.0132,
-    "AMGN": -0.0075,
-    "LLY": -0.0116,
-    "KO": -0.0028,
-    "TEVA": -0.0115,
-    "DE": -0.0038,
-    "JNJ": -0.0092,
-    "ABBV": -0.0055,
-    "XOM": 0.0018,
-    "AAPL": -0.0054,
-    "XLV": -0.01,
-    "COP": 0.0041
   },
   "events": []
 }
