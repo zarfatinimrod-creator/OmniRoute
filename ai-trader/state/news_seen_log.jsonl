@@ -7369,3 +7369,4 @@
 {"key": "d7f4127f72f48d81", "symbol": "COP", "published": "2026-11-17T13:00:03+00:00", "first_seen": "2026-11-17T19:05:57.137309+00:00", "outcome": "stale"}
 {"key": "170d6e306e4a0134", "symbol": "JPM", "published": "2026-11-17T19:04:54+00:00", "first_seen": "2026-11-17T19:09:17.182372+00:00", "outcome": "scored"}
 {"key": "4dbd6814f01887e3", "symbol": "NVDA", "published": "2026-11-17T19:00:49+00:00", "first_seen": "2026-11-17T19:09:57.205595+00:00", "outcome": "scored"}
+{"key": "0d9109a5fcc6575b", "symbol": "NVDA", "published": "2026-11-17T19:06:10+00:00", "first_seen": "2026-11-17T19:10:57.744522+00:00", "outcome": "scored"}
