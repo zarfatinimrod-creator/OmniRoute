@@ -267,6 +267,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     Two of two so far; keep counting. The R6 audit of the 11-15 decision runs only once a decision on 11-16 exists
     (`_audit_revised_close` needs decision_date < dec_bar); expect an alert of about -20 bp then.
     2026-11-17 00:13:28: the 11-16 rebuild declined (null_value); 1h 23:00, 5m 23:55 and daily all null at 00:13:41.
+    The 1h 23:00 bar first appeared at 00:36:08 (64,816.79 = the 5m 23:55 close in the same reply), was null again at
+    00:36:39 (a cycle at 00:36:21 declined too) and back at 00:38:44; the cycle at 00:38:46 decided on 64,816.79
+    (Coinbase guard gap ~0). The R6 audit of the 11-15 decision fired then: +20.0 bp (decisions.jsonl revised_close).
+    11-16 pending: compare 64,816.79 with the settled daily close.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
