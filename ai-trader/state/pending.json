@@ -1,6 +1,6 @@
 {
   "decision_date": "2026-11-16",
-  "status": "pending",
+  "status": "executed",
   "rebalance": true,
   "exits_only": false,
   "targets": {
@@ -71,5 +71,38 @@
     }
   ],
   "new_entries": [],
-  "logged_at": "2026-11-16T21:23:11+00:00"
+  "logged_at": "2026-11-16T21:23:11+00:00",
+  "open_source": {
+    "one_minute": [
+      "AAPL",
+      "ABBV",
+      "AMGN",
+      "COP",
+      "CVX",
+      "DE",
+      "JNJ",
+      "KO",
+      "LLY",
+      "MRK",
+      "PM",
+      "TEVA",
+      "UNP",
+      "XLV",
+      "XOM"
+    ],
+    "daily_fallback": []
+  },
+  "executed_on": "2026-11-17",
+  "fills": [
+    {
+      "date": "2026-11-17",
+      "symbol": "KO",
+      "side": "SELL",
+      "qty": 21,
+      "price": 98.7406,
+      "value": 2073.55,
+      "realized_pnl": 54.14,
+      "reason": "trim"
+    }
+  ]
 }

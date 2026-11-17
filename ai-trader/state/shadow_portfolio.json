@@ -1,5 +1,5 @@
 {
-  "cash": 22969.402311185364,
+  "cash": 25042.955035401825,
   "positions": {
     "MRK": {
       "qty": 17,
@@ -7,7 +7,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 148.75999450683594,
       "last_price": 144.4600067138672,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "AMGN": {
       "qty": 5,
@@ -15,7 +15,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 468.1099853515625,
       "last_price": 462.3200073242188,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "LLY": {
       "qty": 2,
@@ -23,7 +23,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 1443.5,
       "last_price": 1431.6700439453125,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "TEVA": {
       "qty": 90,
@@ -31,7 +31,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 44.5,
       "last_price": 42.56999969482422,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "DE": {
       "qty": 7,
@@ -39,7 +39,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 691.75,
       "last_price": 653.989990234375,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "JNJ": {
       "qty": 14,
@@ -47,7 +47,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 285.75,
       "last_price": 282.54998779296875,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "ABBV": {
       "qty": 14,
@@ -55,7 +55,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 295.0299987792969,
       "last_price": 294.54998779296875,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "XOM": {
       "qty": 27,
@@ -63,7 +63,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 170.58999633789062,
       "last_price": 166.8699951171875,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "PM": {
       "qty": 24,
@@ -71,7 +71,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 198.9600067138672,
       "last_price": 196.0399932861328,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "CVX": {
       "qty": 23,
@@ -79,7 +79,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 219.88999938964844,
       "last_price": 217.13999938964844,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "UNP": {
       "qty": 24,
@@ -87,7 +87,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 304.20001220703125,
       "last_price": 303.7099914550781,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "AAPL": {
       "qty": 20,
@@ -95,15 +95,15 @@
       "entry_date": "2026-11-09",
       "peak_close": 356.2699890136719,
       "last_price": 352.7799987792969,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "KO": {
-      "qty": 93,
+      "qty": 72,
       "avg_cost": 96.02702131455943,
       "entry_date": "2026-11-09",
       "peak_close": 99.4800033569336,
       "last_price": 99.4800033569336,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "XLV": {
       "qty": 54,
@@ -111,7 +111,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 188.9499969482422,
       "last_price": 187.8800048828125,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     },
     "COP": {
       "qty": 42,
@@ -119,11 +119,11 @@
       "entry_date": "2026-11-11",
       "peak_close": 142.27999877929688,
       "last_price": 140.52000427246094,
-      "ca_applied_through": "2026-11-16"
+      "ca_applied_through": "2026-11-17"
     }
   },
   "peak_equity": 101770.54685771045,
   "blocked": {},
   "last_mark": "2026-11-16",
-  "last_rebalance": "2026-11-10"
+  "last_rebalance": "2026-11-16"
 }
