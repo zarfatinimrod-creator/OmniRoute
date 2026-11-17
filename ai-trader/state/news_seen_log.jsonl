@@ -6992,3 +6992,11 @@
 {"key": "89302ad342f2283f", "symbol": "NVDA", "published": "2026-11-17T16:39:13+00:00", "first_seen": "2026-11-17T16:52:44.839233+00:00", "outcome": "scored"}
 {"key": "7b8ef7ce346a8855", "symbol": "ISRG", "published": "2026-11-17T15:47:00+00:00", "first_seen": "2026-11-17T16:53:04.651483+00:00", "outcome": "stale"}
 {"key": "0eff52ee5a567848", "symbol": "GOOGL", "published": "2026-11-17T16:50:25+00:00", "first_seen": "2026-11-17T16:53:44.624010+00:00", "outcome": "scored"}
+{"key": "aadba3bd6f28bd09", "symbol": "MSFT", "published": "2026-11-17T16:47:32+00:00", "first_seen": "2026-11-17T16:54:03.897491+00:00", "outcome": "scored"}
+{"key": "f26a99193a4f884b", "symbol": "AMD", "published": "2026-11-17T16:50:25+00:00", "first_seen": "2026-11-17T16:54:03.897578+00:00", "outcome": "scored"}
+{"key": "a8045e53749fc35b", "symbol": "UNH", "published": "2026-11-17T16:47:29+00:00", "first_seen": "2026-11-17T16:54:03.897935+00:00", "outcome": "scored"}
+{"key": "1e2b64f123434657", "symbol": "AVGO", "published": "2026-11-17T16:50:25+00:00", "first_seen": "2026-11-17T16:54:23.890913+00:00", "outcome": "scored"}
+{"key": "232a23e4c7c5afc0", "symbol": "XOM", "published": "2026-11-17T16:00:00+00:00", "first_seen": "2026-11-17T16:54:43.967503+00:00", "outcome": "stale"}
+{"key": "95ecc8426ba6b564", "symbol": "CVX", "published": "2026-11-17T16:00:00+00:00", "first_seen": "2026-11-17T16:54:43.967772+00:00", "outcome": "stale"}
+{"key": "f818aaccd24d3e05", "symbol": "NVDA", "published": "2026-11-17T16:48:43+00:00", "first_seen": "2026-11-17T16:55:43.909789+00:00", "outcome": "scored"}
+{"key": "224485ca7da5e1c0", "symbol": "DIS", "published": "2026-11-17T16:57:41+00:00", "first_seen": "2026-11-17T16:58:23.949400+00:00", "outcome": "scored"}
