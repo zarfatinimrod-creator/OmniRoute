@@ -7301,3 +7301,5 @@
 {"key": "42ca596602c29465", "symbol": "GOOGL", "published": "2026-11-17T18:26:08+00:00", "first_seen": "2026-11-17T18:37:25.772369+00:00", "outcome": "scored"}
 {"key": "5220f45497a1184f", "symbol": "NKE", "published": "2026-11-17T18:30:30+00:00", "first_seen": "2026-11-17T18:37:25.772443+00:00", "outcome": "scored"}
 {"key": "be52e5477c6226d1", "symbol": "JPM", "published": "2026-11-17T18:26:08+00:00", "first_seen": "2026-11-17T18:37:25.772514+00:00", "outcome": "scored"}
+{"key": "a4600d0c427d435e", "symbol": "IBM", "published": "2026-11-17T18:30:30+00:00", "first_seen": "2026-11-17T18:37:45.748010+00:00", "outcome": "scored"}
+{"key": "84529bbcdd40326d", "symbol": "DIS", "published": "2026-11-17T18:30:30+00:00", "first_seen": "2026-11-17T18:37:45.748136+00:00", "outcome": "scored"}
