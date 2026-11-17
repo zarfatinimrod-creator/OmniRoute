@@ -7519,3 +7519,10 @@
 {"key": "c5f609491a33bd84", "symbol": "AAPL", "published": "2026-11-17T20:20:07+00:00", "first_seen": "2026-11-17T20:30:39.326570+00:00", "outcome": "scored"}
 {"key": "d1eb5b5b1e58addf", "symbol": "NKE", "published": "2026-11-17T14:27:56+00:00", "first_seen": "2026-11-17T20:31:39.337963+00:00", "outcome": "stale"}
 {"key": "7c257b8ebc34bef3", "symbol": "HD", "published": "2026-11-17T19:59:38+00:00", "first_seen": "2026-11-17T20:33:39.330361+00:00", "outcome": "stale"}
+{"key": "fdbc50064f76d9e3", "symbol": "NVDA", "published": "2026-11-17T20:25:02+00:00", "first_seen": "2026-11-17T20:34:35.367187+00:00", "outcome": "scored"}
+{"key": "be12e2818ffc258a", "symbol": "NVDA", "published": "2026-11-17T20:22:13+00:00", "first_seen": "2026-11-17T20:34:35.367203+00:00", "outcome": "scored"}
+{"key": "28f00a97d9c00f15", "symbol": "MSFT", "published": "2026-11-17T20:34:33+00:00", "first_seen": "2026-11-17T20:35:35.403386+00:00", "outcome": "scored"}
+{"key": "30e1707357a2093c", "symbol": "NVDA", "published": "2026-11-17T20:20:02+00:00", "first_seen": "2026-11-17T20:35:35.403422+00:00", "outcome": "scored"}
+{"key": "7f08b3e43e168927", "symbol": "NVDA", "published": "2026-11-17T20:20:02+00:00", "first_seen": "2026-11-17T20:35:35.403434+00:00", "outcome": "scored"}
+{"key": "a3d84a1df7c33c61", "symbol": "GOOGL", "published": "2026-11-17T20:20:02+00:00", "first_seen": "2026-11-17T20:35:35.403647+00:00", "outcome": "scored"}
+{"key": "09cfc237d0e90b22", "symbol": "PEP", "published": "2026-11-17T20:23:48+00:00", "first_seen": "2026-11-17T20:36:55.441165+00:00", "outcome": "scored"}
