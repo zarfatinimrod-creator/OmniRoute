@@ -1,6 +1,127 @@
 {
-  "date": "2026-11-17",
+  "date": "2026-11-18",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-16",
+      "ticker": "STWD",
+      "company": "Starwood Property Trust, Inc.",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 3,
+      "price": 11.8,
+      "value": 18734234.0,
+      "delta_own": "+8%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-18",
+      "ticker": "OBK",
+      "company": "Origin Bancorp, Inc.",
+      "industry": "State Commercial Banks",
+      "insiders": 2,
+      "price": 52.91,
+      "value": 306850.0,
+      "delta_own": "+8%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-16",
+      "ticker": "PAM",
+      "company": "Pampa Energy Inc.",
+      "industry": "Electric Services",
+      "insiders": 3,
+      "price": 17.75,
+      "value": 60892779.0,
+      "delta_own": "+10%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-09-03",
+      "ticker": "TISI",
+      "company": "Team Inc",
+      "industry": "Miscellaneous Repair Services",
+      "insiders": 3,
+      "price": 24.28,
+      "value": 660376.0,
+      "delta_own": "+37%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-17",
+      "ticker": "TSM",
+      "company": "Taiwan Semiconductor Manufacturing Co Ltd",
+      "industry": "Semiconductors & Related Devices",
+      "insiders": 3,
+      "price": 271.04,
+      "value": 871409.0,
+      "delta_own": "+14%"
+    },
+    {
+      "filing_date": "2026-11-17",
+      "trade_date": "2026-11-10",
+      "ticker": "MP",
+      "company": "Mp Materials Corp. / De",
+      "industry": "Metal Mining",
+      "insiders": 3,
+      "price": 36.24,
+      "value": 3573808.0,
+      "delta_own": "+6%"
+    },
+    {
+      "filing_date": "2026-11-17",
+      "trade_date": "2026-11-16",
+      "ticker": "ATEC",
+      "company": "Alphatec Holdings, Inc.",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 4,
+      "price": 7.85,
+      "value": 1763446.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-17",
+      "trade_date": "2026-11-17",
+      "ticker": "NPCE",
+      "company": "Neuropace Inc",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 2,
+      "price": 8.34,
+      "value": 198441.0,
+      "delta_own": "+12%"
+    },
+    {
+      "filing_date": "2026-11-17",
+      "trade_date": "2026-11-13",
+      "ticker": "ITG",
+      "company": "Itg, Inc./De/",
+      "industry": "Water, Sewer, Pipeline, Comm & Power Line Construction",
+      "insiders": 4,
+      "price": 5.64,
+      "value": 1162690.0,
+      "delta_own": ">999%"
+    },
+    {
+      "filing_date": "2026-11-17",
+      "trade_date": "2026-11-13",
+      "ticker": "TH",
+      "company": "Target Hospitality Corp.",
+      "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
+      "insiders": 3,
+      "price": 13.62,
+      "value": 983399.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-17",
+      "trade_date": "2026-11-13",
+      "ticker": "UPBD",
+      "company": "Upbound Group, Inc.",
+      "industry": "Equipment Rental & Leasing",
+      "insiders": 9,
+      "price": 23.02,
+      "value": 1890018.0,
+      "delta_own": "+16%"
+    },
     {
       "filing_date": "2026-11-17",
       "trade_date": "2026-11-11",
@@ -47,17 +168,6 @@
     },
     {
       "filing_date": "2026-11-17",
-      "trade_date": "2026-11-13",
-      "ticker": "PAM",
-      "company": "Pampa Energy Inc.",
-      "industry": "Electric Services",
-      "insiders": 3,
-      "price": 12.62,
-      "value": 58319010.0,
-      "delta_own": "+13%"
-    },
-    {
-      "filing_date": "2026-11-17",
       "trade_date": "2026-11-17",
       "ticker": "BLX",
       "company": "Bladex, Inc.",
@@ -88,17 +198,6 @@
       "price": 21.34,
       "value": 648927.0,
       "delta_own": "+8%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-10",
-      "ticker": "MP",
-      "company": "Mp Materials Corp. / De",
-      "industry": "Metal Mining",
-      "insiders": 3,
-      "price": 36.28,
-      "value": 3482231.0,
-      "delta_own": "+6%"
     },
     {
       "filing_date": "2026-11-16",
@@ -140,9 +239,9 @@
       "company": "Global Self Storage, Inc.",
       "industry": "Real Estate Investment Trusts",
       "insiders": 2,
-      "price": 5.46,
-      "value": 276732.0,
-      "delta_own": "+9%"
+      "price": 5.47,
+      "value": 202153.0,
+      "delta_own": "+6%"
     },
     {
       "filing_date": "2026-11-16",
@@ -176,105 +275,6 @@
       "price": 10.05,
       "value": 286263.0,
       "delta_own": "+46%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-13",
-      "ticker": "DX",
-      "company": "Dynex Capital Inc",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 3,
-      "price": 11.68,
-      "value": 334478.0,
-      "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-13",
-      "ticker": "CSQR",
-      "company": "Csquare, Inc.",
-      "industry": "Computer Programming, Data Processing, Etc.",
-      "insiders": 3,
-      "price": 17.22,
-      "value": 413720.0,
-      "delta_own": "+6%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-12",
-      "ticker": "TH",
-      "company": "Target Hospitality Corp.",
-      "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
-      "insiders": 2,
-      "price": 13.75,
-      "value": 937839.0,
-      "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-10-05",
-      "ticker": "AGMB",
-      "company": "Agomab Therapeutics Nv",
-      "industry": "Biological Products, (No Diagnostic Substances)",
-      "insiders": 3,
-      "price": 7.79,
-      "value": 592149.0,
-      "delta_own": "+168%"
-    },
-    {
-      "filing_date": "2026-11-13",
-      "trade_date": "2026-11-10",
-      "ticker": "NXGL",
-      "company": "Nexgel, Inc.",
-      "industry": "Surgical & Medical Instruments & Apparatus",
-      "insiders": 2,
-      "price": 5.5,
-      "value": 757691.0,
-      "delta_own": ">999%"
-    },
-    {
-      "filing_date": "2026-11-13",
-      "trade_date": "2026-11-11",
-      "ticker": "STWD",
-      "company": "Starwood Property Trust, Inc.",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 2,
-      "price": 11.81,
-      "value": 16711132.0,
-      "delta_own": "+8%"
-    },
-    {
-      "filing_date": "2026-11-13",
-      "trade_date": "2026-11-11",
-      "ticker": "FUN",
-      "company": "Six Flags Entertainment Corporation/New",
-      "industry": "Amusement & Recreation Services",
-      "insiders": 3,
-      "price": 10.62,
-      "value": 24312320.0,
-      "delta_own": "+44%"
-    },
-    {
-      "filing_date": "2026-11-13",
-      "trade_date": "2026-11-10",
-      "ticker": "NXRT",
-      "company": "Nexpoint Residential Trust, Inc.",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 2,
-      "price": 17.02,
-      "value": 603299.0,
-      "delta_own": "+7%"
-    },
-    {
-      "filing_date": "2026-11-13",
-      "trade_date": "2026-11-13",
-      "ticker": "GAM",
-      "company": "General American Investors Co Inc",
-      "industry": "Closed-End Funds",
-      "insiders": 5,
-      "price": 23.04,
-      "value": 760290.0,
-      "delta_own": "+2%"
     }
   ],
   "congress_buy": null,

@@ -427,3 +427,8 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
   session no longer starts the engine (exactly one engine, in the trader session).
 - 2026-11-09: overrides bypass the rebalance band (explicit shrinks always trade); reduce-only invariant asserted
   in code; untrusted_news + data_quality in the brief; desk canary, rebuttal round, Munger inversion.
+
+81. [report][accuracy] The market line of reports/YYYY-MM-DD.md can show a stale benchmark quote after the close:
+    2026-11-18 close report said 'SPY 728.565, updated 15:52:53 UTC' while the close was 730.20 (Yahoo 1d,
+    regularMarketTime 21:00 UTC; equity.jsonl bench_price 730.20). Display only: decisions and the baseline returns use
+    the close. Basic law 2 (price age is tracked): find where market_status gets that quote and show its age or the close.
