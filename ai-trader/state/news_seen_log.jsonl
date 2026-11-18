@@ -8532,3 +8532,5 @@
 {"key": "744cfdebd1b3b4eb", "symbol": "INTC", "published": "2026-11-18T14:30:00+00:00", "first_seen": "2026-11-18T15:38:05.918360+00:00", "outcome": "stale"}
 {"key": "dbd9683410a34bd2", "symbol": "ORCL", "published": "2026-11-18T15:30:00+00:00", "first_seen": "2026-11-18T15:38:05.918261+00:00", "outcome": "scored"}
 {"key": "871403f23116bda6", "symbol": "GOOGL", "published": "2026-11-18T15:30:00+00:00", "first_seen": "2026-11-18T15:38:05.918639+00:00", "outcome": "scored"}
+{"key": "4a61e089948f43c4", "symbol": "MSFT", "published": "2026-11-18T15:30:00+00:00", "first_seen": "2026-11-18T15:38:25.914851+00:00", "outcome": "scored"}
+{"key": "24cded3ddb013be5", "symbol": "IBM", "published": "2026-11-18T15:33:00+00:00", "first_seen": "2026-11-18T15:38:45.944265+00:00", "outcome": "scored"}
