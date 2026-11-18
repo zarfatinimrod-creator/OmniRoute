@@ -22,6 +22,12 @@ falling while the price stabilises (settlements 2026-11-13, 2026-11-28).
 Sizing cap (Nimrod decides the base): whole TTWO position at most 5% of the money he invests, about a third per
 tranche. Fees, tax and currency conversion on top.
 
+Nimrod's plan (chat, 2026-11-18 ~12:00 UTC): start with 2,000 (currency asked: ILS or USD) and maybe add later.
+So: ONE buy of 2,000 when checkpoint 2 passes (not split in thirds: on a small amount a broker's minimum fee per
+trade eats too much). More money only if checkpoints 3 and 4 pass, and the whole position stays at most 5% of what
+he invests. When checkpoint 2 passes, the push says plainly "חלון קנייה נפתח לפי התוכנית: 2,000", with the price
+and the stand-aside level (close below 183.86). He buys himself at his broker; the bot never touches his account.
+
 ## State
 | checkpoint | state | date | evidence |
 |---|---|---|---|
