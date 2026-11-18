@@ -270,7 +270,13 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     The 1h 23:00 bar first appeared at 00:36:08 (64,816.79 = the 5m 23:55 close in the same reply), was null again at
     00:36:39 (a cycle at 00:36:21 declined too) and back at 00:38:44; the cycle at 00:38:46 decided on 64,816.79
     (Coinbase guard gap ~0). The R6 audit of the 11-15 decision fired then: +20.0 bp (decisions.jsonl revised_close).
-    11-16 pending: compare 64,816.79 with the settled daily close.
+    11-16: settled daily 64,855.84 (read 2026-11-18 00:13:08) vs 64,816.79 decided = -6.0 bp; the R6 audit fired +6.0 bp
+    at 00:13:05. The 1h 23:00 close was still 64,816.79 = the 5m close a day later, so the decided value WAS final:
+    the gap is the basis between Yahoo's daily close and its last 1h close (12 settled days 10-31..11-11: 1.93 to
+    140.28 USD, up to 0.19%; 11-15 final 1h vs daily +1.8 bp), not finality. So the finality check (right 3 of 3 so
+    far: 11-14 pass, 11-15 hold, 11-16 pass) cannot by itself stop R6 alerts on rebuilt closes; a fix must also say
+    whether R6 on a yahoo_1h close should allow the basis (owner/rule-4 question), or rebuild from the 1d row's own
+    source. 2026-11-18 00:13:06: the 11-17 rebuild succeeded first try (64,856.98 = 5m 23:55), daily null.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
