@@ -8394,3 +8394,10 @@
 {"key": "3a1f3138fb10a08a", "symbol": "PANW", "published": "2026-11-18T14:46:24+00:00", "first_seen": "2026-11-18T14:57:54.495812+00:00", "outcome": "scored"}
 {"key": "a68855419301f514", "symbol": "HD", "published": "2026-11-18T14:52:36+00:00", "first_seen": "2026-11-18T14:57:54.495910+00:00", "outcome": "scored"}
 {"key": "42ee5aacd8e6c43d", "symbol": "ISRG", "published": "2026-11-18T14:55:00+00:00", "first_seen": "2026-11-18T14:57:54.496103+00:00", "outcome": "scored"}
+{"key": "c051cf0c64513f73", "symbol": "NVDA", "published": "2026-11-18T14:46:24+00:00", "first_seen": "2026-11-18T14:58:14.318704+00:00", "outcome": "scored"}
+{"key": "4ad607eedadddb9b", "symbol": "ORCL", "published": "2026-11-18T14:49:00+00:00", "first_seen": "2026-11-18T14:58:14.318750+00:00", "outcome": "scored"}
+{"key": "bbc7db46dac02d7c", "symbol": "CSCO", "published": "2026-11-18T14:49:00+00:00", "first_seen": "2026-11-18T14:58:14.318787+00:00", "outcome": "scored"}
+{"key": "679b03f1fa42c1db", "symbol": "HON", "published": "2026-11-18T14:52:00+00:00", "first_seen": "2026-11-18T14:58:34.116351+00:00", "outcome": "scored"}
+{"key": "0fe1994ae934d0da", "symbol": "CSCO", "published": "2026-11-18T14:47:00+00:00", "first_seen": "2026-11-18T14:59:14.156796+00:00", "outcome": "scored"}
+{"key": "5d057b59597101ca", "symbol": "IBM", "published": "2026-11-18T14:49:00+00:00", "first_seen": "2026-11-18T14:59:14.156847+00:00", "outcome": "scored"}
+{"key": "d24eb4cf7cd392d9", "symbol": "WMT", "published": "2026-11-18T15:00:00+00:00", "first_seen": "2026-11-18T15:01:14.193813+00:00", "outcome": "scored"}
