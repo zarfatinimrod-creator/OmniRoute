@@ -9231,3 +9231,13 @@
 {"key": "6aa5dbeeb3ed1d31", "symbol": "UNH", "published": "2026-11-18T20:47:13+00:00", "first_seen": "2026-11-18T20:56:19.594401+00:00", "outcome": "scored"}
 {"key": "f5e8a9a929731f4d", "symbol": "NVDA", "published": "2026-11-18T20:52:07+00:00", "first_seen": "2026-11-18T20:56:39.651961+00:00", "outcome": "scored"}
 {"key": "1dd4c1c49ed24419", "symbol": "JPM", "published": "2026-11-18T20:47:13+00:00", "first_seen": "2026-11-18T20:56:59.628443+00:00", "outcome": "scored"}
+{"key": "de0d94a1b0911da4", "symbol": "GOOGL", "published": "2026-11-18T20:50:02+00:00", "first_seen": "2026-11-18T21:02:39.740212+00:00", "outcome": "scored"}
+{"key": "7cee286bd77b9df9", "symbol": "MSFT", "published": "2026-11-18T21:00:00+00:00", "first_seen": "2026-11-18T21:03:19.744899+00:00", "outcome": "scored"}
+{"key": "682852b596eff3ea", "symbol": "NVDA", "published": "2026-11-18T20:50:02+00:00", "first_seen": "2026-11-18T21:03:19.744929+00:00", "outcome": "scored"}
+{"key": "cdce06e9ea3730bd", "symbol": "NKE", "published": "2026-11-18T20:45:56+00:00", "first_seen": "2026-11-18T21:03:19.745188+00:00", "outcome": "scored"}
+{"key": "6036d2ab36527953", "symbol": "WMT", "published": "2026-11-18T19:52:00+00:00", "first_seen": "2026-11-18T21:03:39.727803+00:00", "outcome": "stale"}
+{"key": "d22250eb4162e94d", "symbol": "CRM", "published": "2026-11-18T21:00:00+00:00", "first_seen": "2026-11-18T21:03:39.727518+00:00", "outcome": "scored"}
+{"key": "2d02bc894ff58db3", "symbol": "NVDA", "published": "2026-11-18T21:00:00+00:00", "first_seen": "2026-11-18T21:04:19.826753+00:00", "outcome": "scored"}
+{"key": "ed1d1d6c0ed63f22", "symbol": "NVDA", "published": "2026-11-18T20:26:19+00:00", "first_seen": "2026-11-18T21:04:40.328317+00:00", "outcome": "stale"}
+{"key": "4958901000713fb4", "symbol": "NFLX", "published": "2026-11-18T15:02:04+00:00", "first_seen": "2026-11-18T21:04:40.328757+00:00", "outcome": "stale"}
+{"key": "855cb9ad0ea1f06b", "symbol": "LOW", "published": "2026-11-18T21:01:37+00:00", "first_seen": "2026-11-18T21:04:40.328940+00:00", "outcome": "scored"}
