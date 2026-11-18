@@ -8875,3 +8875,4 @@
 {"key": "dc26a0702f5fa514", "symbol": "NVDA", "published": "2026-11-18T17:50:54+00:00", "first_seen": "2026-11-18T17:51:53.911539+00:00", "outcome": "scored"}
 {"key": "51d11a86428e0665", "symbol": "AMAT", "published": "2026-11-18T16:40:00+00:00", "first_seen": "2026-11-18T17:52:13.668372+00:00", "outcome": "stale"}
 {"key": "10ddd02537ecbbc3", "symbol": "ORCL", "published": "2026-11-18T16:45:00+00:00", "first_seen": "2026-11-18T17:52:33.576846+00:00", "outcome": "stale"}
+{"key": "ce7cb1d455c27da5", "symbol": "NICE", "published": "2026-11-18T16:43:00+00:00", "first_seen": "2026-11-18T17:53:13.600141+00:00", "outcome": "stale"}
