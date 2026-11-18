@@ -25,10 +25,11 @@ tranche. Fees, tax and currency conversion on top.
 ## State
 | checkpoint | state | date | evidence |
 |---|---|---|---|
-| 1 reviews | waiting | | |
+| 1 reviews | PASS (provisional: technical reports still open until the wider unlock on 11-19) | 2026-11-18 | Metacritic 99, 141-144 critic reviews, 0 mixed/negative (metacritic.com/game/grand-theft-auto-vi, read 11:45Z); OpenCritic top critic average 98, 100% recommend, 62 reviews (opencritic.com/game/15398, read 11:45Z); no confirmed serious bugs, crashes or server problems; 30fps cap on all consoles and minor slowdowns in dense areas (VGC, TechRadar) |
 | 2 first sales figure | waiting | | |
 | 3 price confirmation | waiting | | |
 | 4 Q3 report | waiting | | |
 
 ## Log
 - 2026-11-18 09:30 UTC: watch opened. TTWO 203.93 (11-17 close), pre-market ~208.8. Metacritic tbd.
+- 2026-11-18 11:45 UTC: review embargo lifted 11:00 UTC. Metacritic 99 (ties the site's all-time high), OpenCritic 98 / 100%. No serious launch problems confirmed (NZ unlocked 11:00 UTC; Insider Gaming: no performance or networking issues). TTWO pre-market 216.63 at 11:42 UTC (+6.2% vs 203.93; Yahoo extended hours). Two independent checks (workflow wf_ac3f6465-fee: aggregator pages and press coverage) agree. Next: Take-Two's official sales figure (by about 11-23) and 1-3 sessions of holding after it. Not a buy signal by itself.
