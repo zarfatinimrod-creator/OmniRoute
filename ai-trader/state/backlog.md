@@ -277,6 +277,12 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     far: 11-14 pass, 11-15 hold, 11-16 pass) cannot by itself stop R6 alerts on rebuilt closes; a fix must also say
     whether R6 on a yahoo_1h close should allow the basis (owner/rule-4 question), or rebuild from the 1d row's own
     source. 2026-11-18 00:13:06: the 11-17 rebuild succeeded first try (64,856.98 = 5m 23:55), daily null.
+    2026-11-18 06:04:38: the 11-17 1h 23:00 close is now 64,873.18 (+2.5 bp vs the 64,856.98 decided on), and the 5m
+    23:55 close moved with it (equal at 00:13 and at 06:04). So the '1h 23:00 == 5m 23:55' check PASSED a value that
+    was not final: both bars come from the same reply and revise together. Tally of the check: 11-14 pass (final),
+    11-15 hold (not final), 11-16 pass (final), 11-17 pass (NOT final, +2.5 bp). It is not a finality test; drop it as
+    the candidate. Remaining options: a time floor measured on how late Yahoo's last revision lands, or the Coinbase
+    close as the decision close (backlog 70 option b, a data-source change through rule 4).
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying

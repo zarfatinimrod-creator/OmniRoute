@@ -16,17 +16,23 @@
 ### מילוי (01:08 UTC)
 - `verify --book crypto`: ALL CHAINS OK. `cycle --book crypto` (01:08 UTC, rc=0): לא היה מה למלא, כי להחלטה של 11-17 אין פקודות (status executed). risk_off, במזומן, equity 93,819.73 (‎-6.18%). בתשובה הזו הנר השעתי של 23:00 היה null ("no hourly rebuild ... null_value"), כמו ב-17/11 01:08. ההחלטה של 11-17 כבר נשמרה ב-00:13, ולכן זה לא משנה דבר.
 
+### סיכום בוקר (06:04 UTC, 08:04 שעון ישראל)
+- `cycle --book crypto` (06:04:37 UTC, rc=0): אין שינוי. risk_off, במזומן, equity 93,819.73 (‎-6.18%), BTC 64,575.45. השורה היומית של 11-17 עדיין null.
+- **מדידה לפריט 72:** הבנייה מחדש של 11-17 נותנת עכשיו close של 64,873.18, ולא 64,856.98 כמו בהחלטה של 00:13: תיקון של +2.5 bp. נר ה-5 דקות של 23:55 זז יחד איתו (שווה לו גם ב-00:13 וגם ב-06:04, `final72.py`). כלומר הבדיקה "שעתי 23:00 שווה ל-5 דקות 23:55" עברה על ערך שעוד לא היה סופי. שני הנרות מגיעים מאותה תשובה, ולכן הם לא בדיקה בלתי תלויה (כמו שנרשם ב-15/11). הפער קטן (מתחת לסף R6), וההחלטה לא השתנתה.
+- `summary --book crypto --send`: exit 0, נמסר דרך ntfy, בלי פריטים דחופים. בתור היו שתי התראות, כולל R6 של 11-16 (+6.0 bp). newest 2026-11-18T01:09:02+00:00, וה-ack נעשה מעצמו.
+- `postmortem`: pending ריק. הדשבורד רוענן (גרסה 64, snapshot של 06:05:03 UTC).
+
 ## קבצים ששונו
-`state/crypto/*` (latest, pending, decisions, predictions, equity, alert_queue), `reports/crypto/2026-11-18.md`, `state/backlog.md` (פריט 72), הלוג הזה.
+`state/crypto/*` (latest, pending, decisions, predictions, equity, skips, alert_queue), `reports/crypto/2026-11-18.md`, `state/backlog.md` (פריט 72), הלוג הזה.
 
 ## החלטות
-אין התערבות של Claude. אין push בלילה.
+אין התערבות של Claude: אין כניסה חדשה, ולכן אין וטו ואין הקטנה. אין push בלילה, ובבוקר לא נדרש push כי הסיכום נמסר דרך ntfy (exit 0).
 
 ## כשלים בדרך
 אין. הבנייה הצליחה בניסיון הראשון.
 
 ## אימות
-`verify` ו-`cycle` החזירו rc=0.
+`verify` (00:13, 01:08) ALL CHAINS OK; כל ריצות ה-`cycle` החזירו rc=0. `summary --send` exit 0. `postmortem`: pending ריק.
 
 ## עבודה ידנית חוזרת → לאוטומציה
 המדידה של פריט 72.
