@@ -8064,3 +8064,15 @@
 {"key": "00df98baf701e6d9", "symbol": "LIN", "published": "2026-11-18T10:43:00+00:00", "first_seen": "2026-11-18T13:11:33.775552+00:00", "outcome": "stale"}
 {"key": "b2d561ab17d44719", "symbol": "NEE", "published": "2026-11-18T11:05:56+00:00", "first_seen": "2026-11-18T13:11:33.775611+00:00", "outcome": "stale"}
 {"key": "4bdc5cf8f3aea7f9", "symbol": "NEE", "published": "2026-11-17T22:08:00+00:00", "first_seen": "2026-11-18T13:11:33.775664+00:00", "outcome": "stale"}
+{"key": "4205b6c6401eddf2", "symbol": "MSFT", "published": "2026-11-18T13:00:38+00:00", "first_seen": "2026-11-18T13:11:33.743210+00:00", "outcome": "scored"}
+{"key": "45fbe7afb6d5fbd1", "symbol": "NVDA", "published": "2026-11-18T13:01:29+00:00", "first_seen": "2026-11-18T13:11:33.745473+00:00", "outcome": "scored"}
+{"key": "f5246e6848759da9", "symbol": "NVDA", "published": "2026-11-18T13:00:00+00:00", "first_seen": "2026-11-18T13:11:33.745479+00:00", "outcome": "scored"}
+{"key": "037188dcd10b9506", "symbol": "NVDA", "published": "2026-11-18T12:59:31+00:00", "first_seen": "2026-11-18T13:11:33.745483+00:00", "outcome": "scored"}
+{"key": "a8f68312da151868", "symbol": "NVDA", "published": "2026-11-18T12:56:32+00:00", "first_seen": "2026-11-18T13:11:33.745492+00:00", "outcome": "scored"}
+{"key": "61e9401d32786188", "symbol": "NVDA", "published": "2026-11-18T12:52:50+00:00", "first_seen": "2026-11-18T13:11:33.745496+00:00", "outcome": "scored"}
+{"key": "89d3b65f1678a4d0", "symbol": "NVDA", "published": "2026-11-18T12:44:04+00:00", "first_seen": "2026-11-18T13:11:33.745499+00:00", "outcome": "scored"}
+{"key": "47fe5e888600098d", "symbol": "NVDA", "published": "2026-11-18T12:42:13+00:00", "first_seen": "2026-11-18T13:11:33.745817+00:00", "outcome": "scored"}
+{"key": "15eafccbab0b4572", "symbol": "NVDA", "published": "2026-11-18T12:50:00+00:00", "first_seen": "2026-11-18T13:11:33.746052+00:00", "outcome": "scored"}
+{"key": "a02aef344ed75c96", "symbol": "AVGO", "published": "2026-11-18T13:01:29+00:00", "first_seen": "2026-11-18T13:11:33.746993+00:00", "outcome": "scored"}
+{"key": "112979c0d0dbf512", "symbol": "ORCL", "published": "2026-11-18T13:00:00+00:00", "first_seen": "2026-11-18T13:11:33.747419+00:00", "outcome": "scored"}
+{"key": "ab447265cb522ee2", "symbol": "ORCL", "published": "2026-11-18T13:00:00+00:00", "first_seen": "2026-11-18T13:11:33.747425+00:00", "outcome": "scored"}
