@@ -222,6 +222,12 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     the pace: 1 headline of 1,190 scored above 8 on 2026-11-09 and 2026-11-10 (`state/news_scores.jsonl`), so
     about a month. The hold is lifted only on his word. The Saturday review writes the running count in the
     weekly report.
+    Running count 2026-11-19 close: the first scores above 8 since the hold, 5 headlines of 6,133 scored since
+    2026-11-10 19:42 UTC, all score 9 (`state/news_scores.jsonl`): WMT x3 (13:37, 13:58, 14:03 UTC, FY27 outlook
+    raised), PANW (14:00, results beat, forecast raised), MSFT (17:56, "Microsoft Stocks Rise 3.16% as Anthropic
+    Commits $47.2 Billion Minimum to Azure"). All refused by the hold (`state/news_checks.jsonl`); the log-mode
+    guards would also have refused PANW (no_chase +4.55%, second_check move_recap) and MSFT (second_check
+    move_recap); WMT passed the second check. None graded yet: 0 of the 10 graded headlines the review needs.
 65. [news][source] SEC filings as a faster news source, log-only first (roadmap 2026-11-10, sub-project 4).
     **Owner's decision (Nimrod, 2026-11-11, answer א):** the SEC contact address for the User-Agent is a new address
     used only by the bot; he opens it himself and gives it in chat. It lives only in the environment variable

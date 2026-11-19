@@ -1,6 +1,193 @@
 {
-  "date": "2026-11-18",
+  "date": "2026-11-19",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-11-18",
+      "ticker": "ITT",
+      "company": "Itt Inc.",
+      "industry": "Pumps & Pumping Equipment",
+      "insiders": 2,
+      "price": 202.88,
+      "value": 1503153.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-11-12",
+      "ticker": "HPP",
+      "company": "Hudson Pacific Properties, Inc.",
+      "industry": "Real Estate",
+      "insiders": 3,
+      "price": 8.97,
+      "value": 986362.0,
+      "delta_own": "+62%"
+    },
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-11-18",
+      "ticker": "HMH",
+      "company": "Hmh Holding Inc",
+      "industry": "Oil & Gas Field Machinery & Equipment",
+      "insiders": 2,
+      "price": 11.73,
+      "value": 1736052.0,
+      "delta_own": "+49%"
+    },
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-11-18",
+      "ticker": "OBK",
+      "company": "Origin Bancorp, Inc.",
+      "industry": "State Commercial Banks",
+      "insiders": 3,
+      "price": 52.81,
+      "value": 385510.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-11-18",
+      "ticker": "EFC",
+      "company": "Ellington Financial Inc.",
+      "industry": "Real Estate",
+      "insiders": 2,
+      "price": 10.8,
+      "value": 2181884.0,
+      "delta_own": "+7%"
+    },
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-11-18",
+      "ticker": "DX",
+      "company": "Dynex Capital Inc",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 3,
+      "price": 11.36,
+      "value": 384481.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-11-17",
+      "ticker": "CTGO",
+      "company": "Contango Silver & Gold Inc.",
+      "industry": "Gold & Silver Ores",
+      "insiders": 2,
+      "price": 10.88,
+      "value": 299835.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-10-05",
+      "ticker": "AGMB",
+      "company": "Agomab Therapeutics Nv",
+      "industry": "Biological Products, (No Diagnostic Substances)",
+      "insiders": 3,
+      "price": 7.66,
+      "value": 619999.0,
+      "delta_own": "+179%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-17",
+      "ticker": "RMIX",
+      "company": "Suncrete, Inc.",
+      "industry": "Concrete Products, Except Block & Brick",
+      "insiders": 4,
+      "price": 6.14,
+      "value": 1074337.0,
+      "delta_own": "+19%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-11",
+      "ticker": "EQPT",
+      "company": "Equipmentshare.Com Inc",
+      "industry": "Equipment Rental & Leasing",
+      "insiders": 3,
+      "price": 14.18,
+      "value": 949514.0,
+      "delta_own": "+4%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-16",
+      "ticker": "BPRE",
+      "company": "Bluerock Private Real Estate Fund",
+      "industry": "Closed-End Funds",
+      "insiders": 3,
+      "price": 12.62,
+      "value": 40392939.0,
+      "delta_own": ">999%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-17",
+      "ticker": "FPS",
+      "company": "Forgent Power Solutions, Inc.",
+      "industry": "Electrical Industrial Apparatus",
+      "insiders": 2,
+      "price": 20.94,
+      "value": 309936.0,
+      "delta_own": "+84%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-16",
+      "ticker": "CRMD",
+      "company": "Cormedix Inc.",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 2,
+      "price": 4.89,
+      "value": 513200.0,
+      "delta_own": "+10%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-16",
+      "ticker": "FUN",
+      "company": "Six Flags Entertainment Corporation/New",
+      "industry": "Amusement & Recreation Services",
+      "insiders": 3,
+      "price": 10.8,
+      "value": 30666320.0,
+      "delta_own": "+55%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-18",
+      "ticker": "NPCE",
+      "company": "Neuropace Inc",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 3,
+      "price": 8.33,
+      "value": 302102.0,
+      "delta_own": "+18%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-13",
+      "ticker": "FBRT",
+      "company": "Franklin Bsp Realty Trust, Inc.",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 2,
+      "price": 6.67,
+      "value": 1146000.0,
+      "delta_own": "+29%"
+    },
+    {
+      "filing_date": "2026-11-18",
+      "trade_date": "2026-11-18",
+      "ticker": "CGON",
+      "company": "Cg Oncology, Inc.",
+      "industry": "Biological Products, (No Diagnostic Substances)",
+      "insiders": 2,
+      "price": 78.98,
+      "value": 2665586.0,
+      "delta_own": "+17%"
+    },
     {
       "filing_date": "2026-11-18",
       "trade_date": "2026-11-16",
@@ -10,17 +197,6 @@
       "insiders": 3,
       "price": 11.8,
       "value": 18734234.0,
-      "delta_own": "+8%"
-    },
-    {
-      "filing_date": "2026-11-18",
-      "trade_date": "2026-11-18",
-      "ticker": "OBK",
-      "company": "Origin Bancorp, Inc.",
-      "industry": "State Commercial Banks",
-      "insiders": 2,
-      "price": 52.91,
-      "value": 306850.0,
       "delta_own": "+8%"
     },
     {
@@ -41,9 +217,9 @@
       "company": "Team Inc",
       "industry": "Miscellaneous Repair Services",
       "insiders": 3,
-      "price": 24.28,
-      "value": 660376.0,
-      "delta_own": "+37%"
+      "price": 24.4,
+      "value": 614956.0,
+      "delta_own": "+33%"
     },
     {
       "filing_date": "2026-11-18",
@@ -80,17 +256,6 @@
     },
     {
       "filing_date": "2026-11-17",
-      "trade_date": "2026-11-17",
-      "ticker": "NPCE",
-      "company": "Neuropace Inc",
-      "industry": "Surgical & Medical Instruments & Apparatus",
-      "insiders": 2,
-      "price": 8.34,
-      "value": 198441.0,
-      "delta_own": "+12%"
-    },
-    {
-      "filing_date": "2026-11-17",
       "trade_date": "2026-11-13",
       "ticker": "ITG",
       "company": "Itg, Inc./De/",
@@ -110,171 +275,6 @@
       "price": 13.62,
       "value": 983399.0,
       "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-13",
-      "ticker": "UPBD",
-      "company": "Upbound Group, Inc.",
-      "industry": "Equipment Rental & Leasing",
-      "insiders": 9,
-      "price": 23.02,
-      "value": 1890018.0,
-      "delta_own": "+16%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-11",
-      "ticker": "DKNG",
-      "company": "Draftkings Inc.",
-      "industry": "Miscellaneous Amusement & Recreation",
-      "insiders": 3,
-      "price": 18.39,
-      "value": 1450887.0,
-      "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-16",
-      "ticker": "ETN",
-      "company": "Eaton Corp Plc",
-      "industry": "Misc Industrial & Commercial Machinery & Equipment",
-      "insiders": 2,
-      "price": 341.79,
-      "value": 170894.0,
-      "delta_own": "+6%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-05",
-      "ticker": "GLXY",
-      "company": "Galaxy Digital Inc.",
-      "industry": "Security Brokers, Dealers & Flotation Companies",
-      "insiders": 2,
-      "price": 12.99,
-      "value": 10135096.0,
-      "delta_own": "+144%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-13",
-      "ticker": "KRMD",
-      "company": "Koru Medical Systems, Inc.",
-      "industry": "Surgical & Medical Instruments & Apparatus",
-      "insiders": 2,
-      "price": 3.26,
-      "value": 132142.0,
-      "delta_own": "+11%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-17",
-      "ticker": "BLX",
-      "company": "Bladex, Inc.",
-      "industry": "Commercial Banks",
-      "insiders": 4,
-      "price": 52.08,
-      "value": 396891.0,
-      "delta_own": "+6%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-16",
-      "ticker": "NGS",
-      "company": "Natural Gas Services Group Inc",
-      "industry": "Oil & Gas Field Services",
-      "insiders": 3,
-      "price": 28.8,
-      "value": 192962.0,
-      "delta_own": "+14%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-12",
-      "ticker": "ENOV",
-      "company": "Enovis Corp",
-      "industry": "Orthopedic, Prosthetic & Surgical Appliances & Supplies",
-      "insiders": 4,
-      "price": 21.34,
-      "value": 648927.0,
-      "delta_own": "+8%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-11",
-      "ticker": "CTEV",
-      "company": "Claritev Corp",
-      "industry": "Investment Advice",
-      "insiders": 2,
-      "price": 25.29,
-      "value": 10407867.0,
-      "delta_own": "+19%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-13",
-      "ticker": "ADIG",
-      "company": "Adi Global Distribution Inc.",
-      "industry": "Hardware",
-      "insiders": 5,
-      "price": 9.83,
-      "value": 325603.0,
-      "delta_own": "+13%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-13",
-      "ticker": "CTVA",
-      "company": "Corteva, Inc.",
-      "industry": "Crops",
-      "insiders": 2,
-      "price": 9.29,
-      "value": 485712.0,
-      "delta_own": "+24%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-08-25",
-      "ticker": "SELF",
-      "company": "Global Self Storage, Inc.",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 2,
-      "price": 5.47,
-      "value": 202153.0,
-      "delta_own": "+6%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-12",
-      "ticker": "NSLR",
-      "company": "Neostellar Capital Corp.",
-      "industry": "Closed-End Funds",
-      "insiders": 4,
-      "price": 6.88,
-      "value": 1650700.0,
-      "delta_own": "+12%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-16",
-      "ticker": "BW",
-      "company": "Babcock & Wilcox Enterprises, Inc.",
-      "industry": "Heating Equipment, Except Electric & Warm Air Furnaces",
-      "insiders": 3,
-      "price": 4.61,
-      "value": 138292.0,
-      "delta_own": "+1%"
-    },
-    {
-      "filing_date": "2026-11-16",
-      "trade_date": "2026-11-13",
-      "ticker": "GOOD",
-      "company": "Gladstone Commercial Corp",
-      "industry": "Lessors of Real Property",
-      "insiders": 2,
-      "price": 10.05,
-      "value": 286263.0,
-      "delta_own": "+46%"
     }
   ],
   "congress_buy": null,
