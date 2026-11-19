@@ -283,6 +283,9 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     11-15 hold (not final), 11-16 pass (final), 11-17 pass (NOT final, +2.5 bp). It is not a finality test; drop it as
     the candidate. Remaining options: a time floor measured on how late Yahoo's last revision lands, or the Coinbase
     close as the decision close (backlog 70 option b, a data-source change through rule 4).
+    2026-11-19 00:14: 11-17 settled daily 64,893.95: decided 64,856.98 = -5.7 bp (over R6 5 bp); final 1h 64,873.18 =
+    -3.2 bp vs daily (the basis again). Tally decided-vs-daily: 11-12 -3.8, 11-13 -53.8, 11-14 -2.3, 11-15 -20.0,
+    11-16 -6.0, 11-17 -5.7 bp: 4 of 6 over the 5 bp R6 line. 11-18 rebuild declined at 00:13 (all null).
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
