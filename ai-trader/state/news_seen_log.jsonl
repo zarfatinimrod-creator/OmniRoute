@@ -10156,3 +10156,4 @@
 {"key": "3483a8a58f52475f", "symbol": "GOOGL", "published": "2026-11-19T14:54:39+00:00", "first_seen": "2026-11-19T15:10:20.409930+00:00", "outcome": "scored"}
 {"key": "d0051837ad4d1efb", "symbol": "ABT", "published": "2026-11-19T15:05:00+00:00", "first_seen": "2026-11-19T15:10:20.410275+00:00", "outcome": "scored"}
 {"key": "852048fd6cb0a729", "symbol": "PANW", "published": "2026-11-19T14:00:00+00:00", "first_seen": "2026-11-19T15:10:40.426214+00:00", "outcome": "stale"}
+{"key": "456525d2ecb41875", "symbol": "MSFT", "published": "2026-11-19T15:02:00+00:00", "first_seen": "2026-11-19T15:10:40.425944+00:00", "outcome": "scored"}
