@@ -255,3 +255,29 @@
 {"t": "2026-11-19T17:07:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.6, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-19T17:08:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.4, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-19T17:09:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.6, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:10:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:11:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:12:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.1, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:13:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:14:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:15:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.4, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:16:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:17:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.0, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:18:00+00:00", "ev": "mark", "sup": 11117, "hb": 4.9, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:19:00+00:00", "ev": "mark", "sup": 11117, "hb": 4.9, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:20:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:21:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:22:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:23:00+00:00", "ev": "mark", "sup": 11117, "hb": 4.5, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:24:00+00:00", "ev": "mark", "sup": 11117, "hb": 4.6, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:25:00+00:00", "ev": "mark", "sup": 11117, "hb": 4.8, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:26:00+00:00", "ev": "mark", "sup": 11117, "hb": 4.9, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:27:00+00:00", "ev": "mark", "sup": 11117, "hb": 4.9, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:28:00+00:00", "ev": "mark", "sup": 11117, "hb": 5.0, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:28:03+00:00", "ev": "exit", "sup": 11117, "child": 11122, "rc": 143, "signal": null, "ran_s": 5992.5, "why": "planned"}
+{"t": "2026-11-19T17:28:03+00:00", "ev": "sup_stop", "sup": 11117, "why": "handover", "rc": 76}
+{"t": "2026-11-19T17:28:16+00:00", "ev": "sup_start", "sup": 17816, "until": "16:05", "handover": true, "timeout_ms": 7200000, "prev_t": "2026-11-19T17:28:03+00:00", "prev_ev": "sup_stop", "gap_s": 14, "cold": false}
+{"t": "2026-11-19T17:28:16+00:00", "ev": "mark", "sup": 17816, "hb": null, "stop": null, "n": null, "open": null, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T17:28:16+00:00", "ev": "start", "sup": 17816, "child": 17821, "n": 1, "backoff_s": 0}
+{"t": "2026-11-19T17:28:17+00:00", "ev": "up", "sup": 17816, "child": 17821, "down_from": null, "down_s": null, "blind_s": 0, "handover_s": 14.0, "held": {}, "blind": [], "commit": null, "dirty": null, "code_changed": null, "sold": []}
+{"t": "2026-11-19T17:28:17+00:00", "ev": "code", "sup": 17816, "child": 17821, "commit": "701324de", "dirty": false, "code_changed": true}
