@@ -10335,3 +10335,5 @@
 {"key": "d3ee80df50fa5089", "symbol": "AMD", "published": "2026-11-19T16:03:04+00:00", "first_seen": "2026-11-19T16:09:53.241240+00:00", "outcome": "scored"}
 {"key": "9510bcb6d556c8e3", "symbol": "GOOGL", "published": "2026-11-19T16:07:41+00:00", "first_seen": "2026-11-19T16:09:53.241394+00:00", "outcome": "scored"}
 {"key": "70899837e136f150", "symbol": "GOOGL", "published": "2026-11-19T16:03:10+00:00", "first_seen": "2026-11-19T16:09:53.241397+00:00", "outcome": "scored"}
+{"key": "70e8c828082484b0", "symbol": "PANW", "published": "2026-11-19T16:06:24+00:00", "first_seen": "2026-11-19T16:10:13.250246+00:00", "outcome": "scored"}
+{"key": "5a739623d7a5837d", "symbol": "WMT", "published": "2026-11-19T16:06:24+00:00", "first_seen": "2026-11-19T16:10:13.250454+00:00", "outcome": "scored"}
