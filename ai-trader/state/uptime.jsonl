@@ -120,3 +120,4 @@
 {"t": "2026-11-19T14:59:00+00:00", "ev": "mark", "sup": 4411, "hb": 19.9, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-19T15:00:00+00:00", "ev": "mark", "sup": 4411, "hb": 11.4, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-19T15:01:00+00:00", "ev": "mark", "sup": 4411, "hb": 19.9, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-19T15:02:00+00:00", "ev": "mark", "sup": 4411, "hb": 0.1, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
