@@ -1,26 +1,26 @@
 {
   "date": "2026-11-19",
-  "as_of_utc": "2026-11-19T14:53:33+00:00",
+  "as_of_utc": "2026-11-19T17:52:44+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-19T14:30:00+00:00",
     "regular_end_utc": "2026-11-19T21:00:00+00:00",
-    "last_trade_utc": "2026-11-19T14:53:30+00:00",
-    "price": 737.58
+    "last_trade_utc": "2026-11-19T17:52:42+00:00",
+    "price": 723.7
   },
-  "equity": 97724.67,
+  "equity": 97468.26,
   "cash": 25230.9,
-  "gross": 0.7418,
-  "return_since_start": -0.0228,
-  "shadow_return_since_start": -0.0219,
+  "gross": 0.7411,
+  "return_since_start": -0.0253,
+  "shadow_return_since_start": -0.0245,
   "baselines": {
-    "spy_since_start": 0.0034,
-    "equal_weight_since_start": -0.0056
+    "spy_since_start": -0.016,
+    "equal_weight_since_start": -0.0218
   },
   "started": "2026-11-06",
   "regime": "risk_on+defensive",
   "dd_state": "normal",
-  "drawdown": -0.0391,
+  "drawdown": -0.0416,
   "decided_now": false,
   "weights": {
     "tsmom": 0.25,
@@ -355,125 +355,130 @@
     "PM": {
       "qty": 30,
       "avg_cost": 195.42,
-      "last": 186.52,
-      "pnl_pct": -0.0455,
+      "last": 185.27,
+      "pnl_pct": -0.0519,
       "since": "2026-11-09"
     },
     "CVX": {
       "qty": 30,
       "avg_cost": 211.88,
-      "last": 206.64,
-      "pnl_pct": -0.0247,
+      "last": 206.48,
+      "pnl_pct": -0.0255,
       "since": "2026-11-09"
     },
     "MRK": {
       "qty": 17,
       "avg_cost": 148.44,
-      "last": 135.16,
-      "pnl_pct": -0.0895,
+      "last": 133.42,
+      "pnl_pct": -0.1012,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 24,
       "avg_cost": 297.59,
-      "last": 294.06,
-      "pnl_pct": -0.0119,
+      "last": 291.95,
+      "pnl_pct": -0.019,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 437.52,
-      "pnl_pct": -0.0599,
+      "last": 440.05,
+      "pnl_pct": -0.0544,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1366.04,
-      "pnl_pct": -0.0,
+      "last": 1354.56,
+      "pnl_pct": -0.0084,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 72,
       "avg_cost": 96.16,
-      "last": 95.22,
-      "pnl_pct": -0.0098,
+      "last": 95.93,
+      "pnl_pct": -0.0024,
       "since": "2026-11-09"
     },
     "TEVA": {
       "qty": 90,
       "avg_cost": 43.03,
-      "last": 40.69,
-      "pnl_pct": -0.0544,
+      "last": 39.35,
+      "pnl_pct": -0.0856,
       "since": "2026-11-09"
     },
     "DE": {
       "qty": 7,
       "avg_cost": 686.13,
-      "last": 631.26,
-      "pnl_pct": -0.08,
+      "last": 633.7,
+      "pnl_pct": -0.0764,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 266.57,
-      "pnl_pct": -0.0416,
+      "last": 266.62,
+      "pnl_pct": -0.0414,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 281.76,
-      "pnl_pct": -0.0416,
+      "last": 282.92,
+      "pnl_pct": -0.0377,
       "since": "2026-11-09"
     },
     "XOM": {
       "qty": 27,
       "avg_cost": 163.9,
-      "last": 160.39,
-      "pnl_pct": -0.0214,
+      "last": 159.24,
+      "pnl_pct": -0.0284,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 20,
       "avg_cost": 346.27,
-      "last": 348.95,
-      "pnl_pct": 0.0077,
+      "last": 349.7,
+      "pnl_pct": 0.0099,
       "since": "2026-11-09"
     },
     "XLV": {
       "qty": 54,
       "avg_cost": 186.78,
-      "last": 178.99,
-      "pnl_pct": -0.0417,
+      "last": 177.96,
+      "pnl_pct": -0.0472,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 135.04,
-      "pnl_pct": -0.0107,
+      "last": 134.24,
+      "pnl_pct": -0.0165,
       "since": "2026-11-11"
     }
   },
   "day_moves": {
-    "PM": -0.0322,
-    "CVX": 0.0037,
-    "MRK": -0.019,
-    "UNP": -0.0227,
-    "AMGN": -0.0144,
-    "LLY": -0.0121,
-    "KO": -0.0293,
-    "TEVA": -0.0365,
-    "DE": -0.0209,
-    "JNJ": -0.0225,
-    "ABBV": -0.0148,
-    "XOM": -0.0012,
-    "AAPL": -0.0099,
-    "XLV": -0.0121,
-    "COP": 0.0048
+    "PM": -0.0387,
+    "CVX": 0.0029,
+    "MRK": -0.0316,
+    "UNP": -0.0298,
+    "AMGN": -0.0087,
+    "LLY": -0.0204,
+    "KO": -0.022,
+    "TEVA": -0.0682,
+    "DE": -0.0171,
+    "JNJ": -0.0223,
+    "ABBV": -0.0108,
+    "XOM": -0.0083,
+    "AAPL": -0.0078,
+    "XLV": -0.0177,
+    "COP": -0.0012
   },
-  "events": []
+  "alert_channels": [
+    "ntfy"
+  ],
+  "events": [
+    "ירידה חדה היום: TEVA -6.8% (הסטופ ייבדק בסגירה)"
+  ]
 }

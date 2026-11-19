@@ -10674,3 +10674,5 @@
 {"key": "a9f10a175f1c5cf7", "symbol": "GE", "published": "2026-11-19T17:42:37+00:00", "first_seen": "2026-11-19T17:51:19.097671+00:00", "outcome": "scored"}
 {"key": "1e80ba73c4ecbe63", "symbol": "NVDA", "published": "2026-11-19T17:45:22+00:00", "first_seen": "2026-11-19T17:51:39.075523+00:00", "outcome": "scored"}
 {"key": "a03232bd6be80d79", "symbol": "AMD", "published": "2026-11-19T17:45:22+00:00", "first_seen": "2026-11-19T17:51:39.075592+00:00", "outcome": "scored"}
+{"key": "9908b1442cb4b43d", "symbol": "MCD", "published": "2026-11-19T17:47:21+00:00", "first_seen": "2026-11-19T17:52:39.187673+00:00", "outcome": "scored"}
+{"key": "c3305ed243994aa8", "symbol": "PLTR", "published": "2026-11-18T17:45:00+00:00", "first_seen": "2026-11-19T17:52:59.156734+00:00", "outcome": "stale"}
