@@ -10946,3 +10946,13 @@
 {"key": "718cc8f808f27e2b", "symbol": "NFLX", "published": "2026-11-19T18:47:26+00:00", "first_seen": "2026-11-19T19:07:30.457178+00:00", "outcome": "scored"}
 {"key": "1cf767c87b29ac5c", "symbol": "DIS", "published": "2026-11-19T18:47:26+00:00", "first_seen": "2026-11-19T19:07:50.543595+00:00", "outcome": "scored"}
 {"key": "b22c5e3ad31cf216", "symbol": "AMZN", "published": "2026-11-19T18:47:26+00:00", "first_seen": "2026-11-19T19:07:50.543631+00:00", "outcome": "scored"}
+{"key": "535a73655e215aee", "symbol": "AMD", "published": "2026-11-19T19:02:28+00:00", "first_seen": "2026-11-19T19:09:50.514147+00:00", "outcome": "scored"}
+{"key": "5070f463590e9c07", "symbol": "INTC", "published": "2026-11-19T19:02:28+00:00", "first_seen": "2026-11-19T19:10:30.497237+00:00", "outcome": "scored"}
+{"key": "b26946333c140199", "symbol": "NVDA", "published": "2026-11-19T19:02:28+00:00", "first_seen": "2026-11-19T19:10:50.523936+00:00", "outcome": "scored"}
+{"key": "16ee918fa79719ad", "symbol": "INTC", "published": "2026-11-19T19:08:38+00:00", "first_seen": "2026-11-19T19:11:50.570154+00:00", "outcome": "scored"}
+{"key": "096aaf78532bf6c5", "symbol": "MCD", "published": "2026-11-19T19:03:57+00:00", "first_seen": "2026-11-19T19:12:30.615245+00:00", "outcome": "scored"}
+{"key": "0183f2090728c27c", "symbol": "NVDA", "published": "2026-11-19T18:28:00+00:00", "first_seen": "2026-11-19T19:12:50.620639+00:00", "outcome": "stale"}
+{"key": "5700d3872a9bb4c9", "symbol": "NVDA", "published": "2026-11-19T19:03:57+00:00", "first_seen": "2026-11-19T19:12:50.620613+00:00", "outcome": "scored"}
+{"key": "ea9d3b421518a771", "symbol": "HD", "published": "2026-11-19T19:03:57+00:00", "first_seen": "2026-11-19T19:12:50.621306+00:00", "outcome": "scored"}
+{"key": "fb367be0210a5a1d", "symbol": "TSLA", "published": "2026-11-19T19:03:57+00:00", "first_seen": "2026-11-19T19:13:10.677533+00:00", "outcome": "scored"}
+{"key": "624e61627cdead5e", "symbol": "NVDA", "published": "2026-11-19T19:03:00+00:00", "first_seen": "2026-11-19T19:15:10.688143+00:00", "outcome": "scored"}
