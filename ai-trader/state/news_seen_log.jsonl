@@ -11154,3 +11154,13 @@
 {"key": "79110a6bbe6ee511", "symbol": "V", "published": "2026-11-19T18:46:25+00:00", "first_seen": "2026-11-19T20:57:14.530882+00:00", "outcome": "stale"}
 {"key": "eba47965ea2e875a", "symbol": "AAPL", "published": "2026-11-19T18:46:25+00:00", "first_seen": "2026-11-19T20:57:34.584898+00:00", "outcome": "stale"}
 {"key": "c5b1454f62366a19", "symbol": "AVGO", "published": "2026-11-19T18:46:25+00:00", "first_seen": "2026-11-19T20:57:34.585237+00:00", "outcome": "stale"}
+{"key": "a675a08a8d4b7a9c", "symbol": "CVX", "published": "2026-11-18T20:50:00+00:00", "first_seen": "2026-11-19T20:59:54.529202+00:00", "outcome": "stale"}
+{"key": "7fbe2a3e5f0b1f46", "symbol": "INTC", "published": "2026-11-19T20:56:02+00:00", "first_seen": "2026-11-19T21:00:14.699254+00:00", "outcome": "scored"}
+{"key": "50c3c890b517c673", "symbol": "XOM", "published": "2026-11-18T20:50:00+00:00", "first_seen": "2026-11-19T21:00:34.625475+00:00", "outcome": "stale"}
+{"key": "ecd56b242f2fd119", "symbol": "COP", "published": "2026-11-18T20:50:00+00:00", "first_seen": "2026-11-19T21:00:54.598120+00:00", "outcome": "stale"}
+{"key": "275ca8a6501243a8", "symbol": "NVDA", "published": "2026-11-19T20:56:02+00:00", "first_seen": "2026-11-19T21:00:54.597487+00:00", "outcome": "scored"}
+{"key": "b2f05bb2018b55b7", "symbol": "NVDA", "published": "2026-11-19T20:53:02+00:00", "first_seen": "2026-11-19T21:00:54.597510+00:00", "outcome": "scored"}
+{"key": "3d4962752c33ff55", "symbol": "NVDA", "published": "2026-11-19T20:50:02+00:00", "first_seen": "2026-11-19T21:00:54.597516+00:00", "outcome": "scored"}
+{"key": "c883e7d4a8e9056a", "symbol": "NVDA", "published": "2026-11-19T20:46:02+00:00", "first_seen": "2026-11-19T21:00:54.597520+00:00", "outcome": "scored"}
+{"key": "c7a6d6e285068d9f", "symbol": "AMD", "published": "2026-11-19T20:56:02+00:00", "first_seen": "2026-11-19T21:00:54.597654+00:00", "outcome": "scored"}
+{"key": "9bd19d898c9f574b", "symbol": "PEP", "published": "2026-11-19T21:00:57+00:00", "first_seen": "2026-11-19T21:04:54.771207+00:00", "outcome": "scored"}
