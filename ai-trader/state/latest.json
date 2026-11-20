@@ -1,26 +1,26 @@
 {
   "date": "2026-11-20",
-  "as_of_utc": "2026-11-20T14:53:12+00:00",
+  "as_of_utc": "2026-11-20T17:53:14+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-20T14:30:00+00:00",
     "regular_end_utc": "2026-11-20T21:00:00+00:00",
-    "last_trade_utc": "2026-11-20T14:53:08+00:00",
-    "price": 713.97
+    "last_trade_utc": "2026-11-20T17:53:12+00:00",
+    "price": 699.62
   },
-  "equity": 97756.59,
+  "equity": 97723.94,
   "cash": 44987.38,
-  "gross": 0.5398,
-  "return_since_start": -0.0224,
-  "shadow_return_since_start": -0.0215,
+  "gross": 0.5396,
+  "return_since_start": -0.0228,
+  "shadow_return_since_start": -0.0216,
   "baselines": {
-    "spy_since_start": -0.0291,
-    "equal_weight_since_start": -0.0296
+    "spy_since_start": -0.0478,
+    "equal_weight_since_start": -0.0434
   },
   "started": "2026-11-06",
   "regime": "risk_on+defensive",
   "dd_state": "normal",
-  "drawdown": -0.0387,
+  "drawdown": -0.0391,
   "decided_now": false,
   "weights": {
     "tsmom": 0.25,
@@ -94,48 +94,7 @@
       }
     ]
   },
-  "executed": [
-    {
-      "date": "2026-11-20",
-      "symbol": "XLV",
-      "side": "SELL",
-      "qty": 54,
-      "price": 178.9105,
-      "value": 9661.17,
-      "realized_pnl": -425.1,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-20",
-      "symbol": "DE",
-      "side": "SELL",
-      "qty": 7,
-      "price": 621.3892,
-      "value": 4349.72,
-      "realized_pnl": -453.19,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-20",
-      "symbol": "TEVA",
-      "side": "SELL",
-      "qty": 90,
-      "price": 38.4408,
-      "value": 3459.67,
-      "realized_pnl": -413.17,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-20",
-      "symbol": "MRK",
-      "side": "SELL",
-      "qty": 17,
-      "price": 134.2628,
-      "value": 2282.47,
-      "realized_pnl": -241.08,
-      "reason": "stop"
-    }
-  ],
+  "executed": [],
   "top_scores": null,
   "bottom_scores": null,
   "stopped": [],
@@ -433,98 +392,93 @@
     "PM": {
       "qty": 30,
       "avg_cost": 195.42,
-      "last": 187.72,
-      "pnl_pct": -0.0394,
+      "last": 186.2,
+      "pnl_pct": -0.0472,
       "since": "2026-11-09"
     },
     "CVX": {
       "qty": 30,
       "avg_cost": 211.88,
-      "last": 207.52,
-      "pnl_pct": -0.0206,
+      "last": 209.74,
+      "pnl_pct": -0.0101,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 24,
       "avg_cost": 297.59,
-      "last": 292.95,
-      "pnl_pct": -0.0156,
+      "last": 290.39,
+      "pnl_pct": -0.0242,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 442.13,
-      "pnl_pct": -0.0499,
+      "last": 438.83,
+      "pnl_pct": -0.057,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1359.9,
-      "pnl_pct": -0.0045,
+      "last": 1352.0,
+      "pnl_pct": -0.0103,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 72,
       "avg_cost": 96.16,
-      "last": 97.07,
-      "pnl_pct": 0.0094,
+      "last": 97.57,
+      "pnl_pct": 0.0146,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 270.6,
-      "pnl_pct": -0.0271,
+      "last": 270.55,
+      "pnl_pct": -0.0273,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 287.93,
-      "pnl_pct": -0.0206,
+      "last": 288.39,
+      "pnl_pct": -0.019,
       "since": "2026-11-09"
     },
     "XOM": {
       "qty": 27,
       "avg_cost": 163.9,
-      "last": 159.51,
-      "pnl_pct": -0.0268,
+      "last": 161.07,
+      "pnl_pct": -0.0172,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 20,
       "avg_cost": 346.27,
-      "last": 349.12,
-      "pnl_pct": 0.0082,
+      "last": 345.57,
+      "pnl_pct": -0.002,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 135.85,
-      "pnl_pct": -0.0047,
+      "last": 137.15,
+      "pnl_pct": 0.0048,
       "since": "2026-11-11"
     }
   },
   "day_moves": {
-    "PM": 0.0069,
-    "CVX": 0.0049,
-    "UNP": 0.008,
-    "AMGN": 0.0075,
-    "LLY": 0.0065,
-    "KO": 0.0102,
-    "JNJ": 0.013,
-    "ABBV": 0.0155,
-    "XOM": 0.0036,
-    "AAPL": -0.0002,
-    "COP": 0.0064
+    "PM": -0.0012,
+    "CVX": 0.0157,
+    "UNP": -0.0008,
+    "AMGN": 0.0,
+    "LLY": 0.0007,
+    "KO": 0.0154,
+    "JNJ": 0.0128,
+    "ABBV": 0.0171,
+    "XOM": 0.0135,
+    "AAPL": -0.0104,
+    "COP": 0.016
   },
-  "alert_channels": [
-    "ntfy"
-  ],
-  "events": [
-    "בוצע בפתיחה 2026-11-20: SELL 54 XLV @ 178.9105, SELL 7 DE @ 621.3892, SELL 90 TEVA @ 38.4408, SELL 17 MRK @ 134.2628"
-  ]
+  "events": []
 }
