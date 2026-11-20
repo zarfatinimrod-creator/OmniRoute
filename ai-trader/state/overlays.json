@@ -1,6 +1,138 @@
 {
-  "date": "2026-11-19",
+  "date": "2026-11-20",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-18",
+      "ticker": "UPBD",
+      "company": "Upbound Group, Inc.",
+      "industry": "Equipment Rental & Leasing",
+      "insiders": 10,
+      "price": 23.5,
+      "value": 2288583.0,
+      "delta_own": "+19%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-12",
+      "ticker": "HPP",
+      "company": "Hudson Pacific Properties, Inc.",
+      "industry": "Real Estate",
+      "insiders": 3,
+      "price": 8.85,
+      "value": 1061662.0,
+      "delta_own": "+68%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-19",
+      "ticker": "ANNX",
+      "company": "Annexon, Inc.",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 2,
+      "price": 3.69,
+      "value": 221549.0,
+      "delta_own": "+14%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-20",
+      "ticker": "GLXY",
+      "company": "Galaxy Digital Inc.",
+      "industry": "Security Brokers, Dealers & Flotation Companies",
+      "insiders": 2,
+      "price": 12.56,
+      "value": 15103939.0,
+      "delta_own": "+222%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-20",
+      "ticker": "NXG",
+      "company": "Nxg Nextgen Infrastructure Income Fund",
+      "industry": "Closed-End Funds",
+      "insiders": 4,
+      "price": 43.72,
+      "value": 617659.0,
+      "delta_own": "+28%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-20",
+      "ticker": "SEI",
+      "company": "Solaris Energy Infrastructure, Inc.",
+      "industry": "Oil & Gas Field Machinery & Equipment",
+      "insiders": 2,
+      "price": 60.18,
+      "value": 810611.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-10-27",
+      "ticker": "FLG",
+      "company": "Flagstar Bank, National Association",
+      "industry": "Savings Institutions, Not Federally Chartered",
+      "insiders": 3,
+      "price": 10.39,
+      "value": 647479.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-18",
+      "ticker": "CRMD",
+      "company": "Cormedix Inc.",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 3,
+      "price": 4.85,
+      "value": 565295.0,
+      "delta_own": "+10%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-09-03",
+      "ticker": "TISI",
+      "company": "Team Inc",
+      "industry": "Miscellaneous Repair Services",
+      "insiders": 3,
+      "price": 24.52,
+      "value": 764956.0,
+      "delta_own": "+41%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-18",
+      "ticker": "CTGO",
+      "company": "Contango Silver & Gold Inc.",
+      "industry": "Gold & Silver Ores",
+      "insiders": 3,
+      "price": 10.56,
+      "value": 472626.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-20",
+      "trade_date": "2026-11-20",
+      "ticker": "TSM",
+      "company": "Taiwan Semiconductor Manufacturing Co Ltd",
+      "industry": "Semiconductors & Related Devices",
+      "insiders": 4,
+      "price": 142.94,
+      "value": 1174259.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-19",
+      "trade_date": "2026-11-18",
+      "ticker": "RMIX",
+      "company": "Suncrete, Inc.",
+      "industry": "Concrete Products, Except Block & Brick",
+      "insiders": 5,
+      "price": 6.29,
+      "value": 1257137.0,
+      "delta_own": "+9%"
+    },
     {
       "filing_date": "2026-11-19",
       "trade_date": "2026-11-18",
@@ -11,17 +143,6 @@
       "price": 202.88,
       "value": 1503153.0,
       "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-19",
-      "trade_date": "2026-11-12",
-      "ticker": "HPP",
-      "company": "Hudson Pacific Properties, Inc.",
-      "industry": "Real Estate",
-      "insiders": 3,
-      "price": 8.97,
-      "value": 986362.0,
-      "delta_own": "+62%"
     },
     {
       "filing_date": "2026-11-19",
@@ -69,17 +190,6 @@
     },
     {
       "filing_date": "2026-11-19",
-      "trade_date": "2026-11-17",
-      "ticker": "CTGO",
-      "company": "Contango Silver & Gold Inc.",
-      "industry": "Gold & Silver Ores",
-      "insiders": 2,
-      "price": 10.88,
-      "value": 299835.0,
-      "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-19",
       "trade_date": "2026-10-05",
       "ticker": "AGMB",
       "company": "Agomab Therapeutics Nv",
@@ -88,17 +198,6 @@
       "price": 7.66,
       "value": 619999.0,
       "delta_own": "+179%"
-    },
-    {
-      "filing_date": "2026-11-18",
-      "trade_date": "2026-11-17",
-      "ticker": "RMIX",
-      "company": "Suncrete, Inc.",
-      "industry": "Concrete Products, Except Block & Brick",
-      "insiders": 4,
-      "price": 6.14,
-      "value": 1074337.0,
-      "delta_own": "+19%"
     },
     {
       "filing_date": "2026-11-18",
@@ -132,17 +231,6 @@
       "price": 20.94,
       "value": 309936.0,
       "delta_own": "+84%"
-    },
-    {
-      "filing_date": "2026-11-18",
-      "trade_date": "2026-11-16",
-      "ticker": "CRMD",
-      "company": "Cormedix Inc.",
-      "industry": "Pharmaceutical Preparations",
-      "insiders": 2,
-      "price": 4.89,
-      "value": 513200.0,
-      "delta_own": "+10%"
     },
     {
       "filing_date": "2026-11-18",
@@ -187,94 +275,6 @@
       "price": 78.98,
       "value": 2665586.0,
       "delta_own": "+17%"
-    },
-    {
-      "filing_date": "2026-11-18",
-      "trade_date": "2026-11-16",
-      "ticker": "STWD",
-      "company": "Starwood Property Trust, Inc.",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 3,
-      "price": 11.8,
-      "value": 18734234.0,
-      "delta_own": "+8%"
-    },
-    {
-      "filing_date": "2026-11-18",
-      "trade_date": "2026-11-16",
-      "ticker": "PAM",
-      "company": "Pampa Energy Inc.",
-      "industry": "Electric Services",
-      "insiders": 3,
-      "price": 17.75,
-      "value": 60892779.0,
-      "delta_own": "+10%"
-    },
-    {
-      "filing_date": "2026-11-18",
-      "trade_date": "2026-09-03",
-      "ticker": "TISI",
-      "company": "Team Inc",
-      "industry": "Miscellaneous Repair Services",
-      "insiders": 3,
-      "price": 24.4,
-      "value": 614956.0,
-      "delta_own": "+33%"
-    },
-    {
-      "filing_date": "2026-11-18",
-      "trade_date": "2026-11-17",
-      "ticker": "TSM",
-      "company": "Taiwan Semiconductor Manufacturing Co Ltd",
-      "industry": "Semiconductors & Related Devices",
-      "insiders": 3,
-      "price": 271.04,
-      "value": 871409.0,
-      "delta_own": "+14%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-10",
-      "ticker": "MP",
-      "company": "Mp Materials Corp. / De",
-      "industry": "Metal Mining",
-      "insiders": 3,
-      "price": 36.24,
-      "value": 3573808.0,
-      "delta_own": "+6%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-16",
-      "ticker": "ATEC",
-      "company": "Alphatec Holdings, Inc.",
-      "industry": "Surgical & Medical Instruments & Apparatus",
-      "insiders": 4,
-      "price": 7.85,
-      "value": 1763446.0,
-      "delta_own": "+3%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-13",
-      "ticker": "ITG",
-      "company": "Itg, Inc./De/",
-      "industry": "Water, Sewer, Pipeline, Comm & Power Line Construction",
-      "insiders": 4,
-      "price": 5.64,
-      "value": 1162690.0,
-      "delta_own": ">999%"
-    },
-    {
-      "filing_date": "2026-11-17",
-      "trade_date": "2026-11-13",
-      "ticker": "TH",
-      "company": "Target Hospitality Corp.",
-      "industry": "Hotels, Rooming Houses, Camps & Other Lodging Places",
-      "insiders": 3,
-      "price": 13.62,
-      "value": 983399.0,
-      "delta_own": "+3%"
     }
   ],
   "congress_buy": null,

@@ -1,11 +1,21 @@
 {
-  "date": "2026-11-10",
+  "date": "2026-11-20",
   "vetoes": {},
   "size_mult": {
-    "COP": [
+    "PG": [
       0.5,
-      "desk Hold p=0.50: The long trend is intact (tsmom 0.97, trend 0.886, 3m +7.22%, +9.9 points vs SPY) but the Q3 beat and the 10.7% dividend raise were sold (1w -6.1%; COP 136.27 t",
-      "2026-11-10T21:31:06+00:00"
+      "desk Hold p=0.50: Trend and breakout are strong (trend 0.932, breakout 0.742, +25.6 pts vs SPY over 3m) but xsmom is negative (-0.073) and reversal -0.707; the debate ended near ",
+      "2026-11-20T21:35:44+00:00"
+    ],
+    "V": [
+      0.5,
+      "desk Hold p=0.49: Slow momentum is positive (tsmom 0.86, trend 0.95) but the fast parts are weak (xsmom 0.145, breakout 0.086) and V fell 5.5% in a week; two open events (third-p",
+      "2026-11-20T21:35:45+00:00"
+    ],
+    "COST": [
+      0.5,
+      "desk Hold p=0.47: Trend 0.915 and breakout 0.822 are real, but xsmom is negative (-0.078), Q1 earnings land Dec 10 inside the 20-day window and the stock is 12.9% above its SMA20",
+      "2026-11-20T21:35:46+00:00"
     ]
   }
 }

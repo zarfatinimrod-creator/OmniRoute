@@ -1,170 +1,152 @@
 {
-  "decision_date": "2026-11-19",
-  "status": "executed",
-  "rebalance": false,
-  "exits_only": true,
+  "decision_date": "2026-11-20",
+  "status": "pending",
+  "rebalance": true,
+  "exits_only": false,
   "targets": {
-    "PM": 0.057471978236001336,
-    "CVX": 0.06365908905212342,
-    "UNP": 0.07167551132999139,
-    "AMGN": 0.022546313094516466,
-    "LLY": 0.027767899302427637,
-    "KO": 0.07109348145927741,
-    "JNJ": 0.038431389789582916,
-    "ABBV": 0.04079073142101925,
-    "XOM": 0.04409493801995542,
-    "AAPL": 0.07176881337830533,
-    "COP": 0.02912996874859648
+    "PM": 0.011640100487859805,
+    "CVX": 0.01848151581503719,
+    "UNP": 0.02170627705327576,
+    "AMGN": 0.016854863938439005,
+    "LLY": 0.017709017938204803,
+    "KO": 0.03300525535933269,
+    "JNJ": 0.02114169700666657,
+    "ABBV": 0.026647175628310437,
+    "XOM": 0.014659449477831333,
+    "AAPL": 0.025294930223852246,
+    "COP": 0.018782725148712716,
+    "V": 0.011898188778071896,
+    "XLP": 0.03019878807391243,
+    "COST": 0.01328199921886363,
+    "PG": 0.011785190724010424
   },
   "targets_raw": {
-    "PM": 0.057471978236001336,
-    "CVX": 0.06365908905212342,
-    "UNP": 0.07167551132999139,
-    "AMGN": 0.022546313094516466,
-    "LLY": 0.027767899302427637,
-    "KO": 0.07109348145927741,
-    "JNJ": 0.038431389789582916,
-    "ABBV": 0.04079073142101925,
-    "XOM": 0.04409493801995542,
-    "AAPL": 0.07176881337830533,
-    "COP": 0.02912996874859648
+    "PM": 0.011640100487859805,
+    "CVX": 0.01848151581503719,
+    "UNP": 0.02170627705327576,
+    "AMGN": 0.016854863938439005,
+    "LLY": 0.017709017938204803,
+    "KO": 0.03300525535933269,
+    "JNJ": 0.02114169700666657,
+    "ABBV": 0.026647175628310437,
+    "XOM": 0.014659449477831333,
+    "AAPL": 0.025294930223852246,
+    "COP": 0.018782725148712716,
+    "V": 0.02379637755614379,
+    "XLP": 0.03019878807391243,
+    "COST": 0.02656399843772726,
+    "PG": 0.023570381448020847
   },
-  "stopped_shadow": [
-    "MRK",
-    "TEVA",
-    "DE",
-    "XLV"
-  ],
+  "stopped_shadow": [],
   "shadow_hold": {
-    "MRK": 0.02317924178711838,
-    "AMGN": 0.022525578862711948,
-    "LLY": 0.027742363151197613,
-    "TEVA": 0.035610146937318544,
-    "DE": 0.04490773597093195,
-    "JNJ": 0.03839604718872722,
-    "ABBV": 0.0407532191023881,
-    "XOM": 0.04405438705880807,
-    "PM": 0.04593530029407682,
-    "CVX": 0.04876041886094093,
-    "UNP": 0.07160959648793302,
-    "AAPL": 0.07170281273302542,
-    "KO": 0.07102810186846858,
-    "XLV": 0.09838157910420295,
-    "COP": 0.05820635999900425
+    "AMGN": 0.02235082042149667,
+    "LLY": 0.027645773903387485,
+    "JNJ": 0.038854635537510056,
+    "ABBV": 0.04111434582373911,
+    "XOM": 0.04432536478185505,
+    "PM": 0.045335366572652074,
+    "CVX": 0.04917662485828737,
+    "UNP": 0.0707501662726885,
+    "AAPL": 0.07030113609007455,
+    "KO": 0.07165642665825342,
+    "COP": 0.05866335758985233
   },
-  "stopped": [
-    "MRK",
-    "TEVA",
-    "DE",
-    "XLV"
+  "stopped": [],
+  "overrides": [
+    {
+      "symbol": "PG",
+      "action": "size x0.5",
+      "reason": "desk Hold p=0.50: Trend and breakout are strong (trend 0.932, breakout 0.742, +25.6 pts vs SPY over 3m) but xsmom is negative (-0.073) and reversal -0.707; the debate ended near ",
+      "logged_at": "2026-11-20T21:35:44+00:00"
+    },
+    {
+      "symbol": "V",
+      "action": "size x0.5",
+      "reason": "desk Hold p=0.49: Slow momentum is positive (tsmom 0.86, trend 0.95) but the fast parts are weak (xsmom 0.145, breakout 0.086) and V fell 5.5% in a week; two open events (third-p",
+      "logged_at": "2026-11-20T21:35:45+00:00"
+    },
+    {
+      "symbol": "COST",
+      "action": "size x0.5",
+      "reason": "desk Hold p=0.47: Trend 0.915 and breakout 0.822 are real, but xsmom is negative (-0.078), Q1 earnings land Dec 10 inside the 20-day window and the stock is 12.9% above its SMA20",
+      "logged_at": "2026-11-20T21:35:46+00:00"
+    }
   ],
-  "overrides": [],
   "earnings_blackout": {},
   "preview_at_close": [
     {
-      "date": "2026-11-19",
-      "symbol": "XLV",
+      "date": "2026-11-20",
+      "symbol": "UNP",
       "side": "SELL",
-      "qty": 54,
-      "price": 177.3713,
-      "value": 9578.05,
-      "realized_pnl": -508.22,
-      "reason": "stop"
+      "qty": 16,
+      "price": 287.1464,
+      "value": 4594.34,
+      "realized_pnl": -167.13,
+      "reason": "trim"
     },
     {
-      "date": "2026-11-19",
-      "symbol": "DE",
+      "date": "2026-11-20",
+      "symbol": "CVX",
       "side": "SELL",
-      "qty": 7,
-      "price": 624.5776,
-      "value": 4372.04,
-      "realized_pnl": -430.87,
-      "reason": "stop"
+      "qty": 21,
+      "price": 208.2658,
+      "value": 4373.58,
+      "realized_pnl": -75.98,
+      "reason": "trim"
     },
     {
-      "date": "2026-11-19",
-      "symbol": "TEVA",
+      "date": "2026-11-20",
+      "symbol": "PM",
       "side": "SELL",
-      "qty": 90,
-      "price": 38.5207,
-      "value": 3466.87,
-      "realized_pnl": -405.97,
-      "reason": "stop"
+      "qty": 23,
+      "price": 183.998,
+      "value": 4231.95,
+      "realized_pnl": -262.65,
+      "reason": "trim"
     },
     {
-      "date": "2026-11-19",
-      "symbol": "MRK",
+      "date": "2026-11-20",
+      "symbol": "AAPL",
       "side": "SELL",
-      "qty": 17,
-      "price": 132.7436,
-      "value": 2256.64,
-      "realized_pnl": -266.91,
-      "reason": "stop"
+      "qty": 12,
+      "price": 342.3887,
+      "value": 4108.66,
+      "realized_pnl": -46.58,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-20",
+      "symbol": "KO",
+      "side": "SELL",
+      "qty": 38,
+      "price": 96.9415,
+      "value": 3683.78,
+      "realized_pnl": 29.6,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-20",
+      "symbol": "XOM",
+      "side": "SELL",
+      "qty": 18,
+      "price": 159.91,
+      "value": 2878.38,
+      "realized_pnl": -71.76,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-20",
+      "symbol": "XLP",
+      "side": "BUY",
+      "qty": 32,
+      "price": 90.5052,
+      "value": 2896.17,
+      "realized_pnl": 0.0,
+      "reason": "entry"
     }
   ],
-  "new_entries": [],
-  "logged_at": "2026-11-19T21:22:55+00:00",
-  "open_source": {
-    "one_minute": [
-      "AAPL",
-      "ABBV",
-      "AMGN",
-      "COP",
-      "CVX",
-      "DE",
-      "JNJ",
-      "KO",
-      "LLY",
-      "MRK",
-      "PM",
-      "TEVA",
-      "UNP",
-      "XLV",
-      "XOM"
-    ],
-    "daily_fallback": []
-  },
-  "executed_on": "2026-11-20",
-  "fills": [
-    {
-      "date": "2026-11-20",
-      "symbol": "XLV",
-      "side": "SELL",
-      "qty": 54,
-      "price": 178.9105,
-      "value": 9661.17,
-      "realized_pnl": -425.1,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-20",
-      "symbol": "DE",
-      "side": "SELL",
-      "qty": 7,
-      "price": 621.3892,
-      "value": 4349.72,
-      "realized_pnl": -453.19,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-20",
-      "symbol": "TEVA",
-      "side": "SELL",
-      "qty": 90,
-      "price": 38.4408,
-      "value": 3459.67,
-      "realized_pnl": -413.17,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-20",
-      "symbol": "MRK",
-      "side": "SELL",
-      "qty": 17,
-      "price": 134.2628,
-      "value": 2282.47,
-      "realized_pnl": -241.08,
-      "reason": "stop"
-    }
-  ]
+  "new_entries": [
+    "XLP"
+  ],
+  "logged_at": "2026-11-20T21:35:57+00:00"
 }

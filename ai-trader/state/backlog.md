@@ -465,3 +465,11 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     2026-11-20 open: -425.10, -413.17, -241.08 of the -1,532.54 total; state/trades.jsonl; loss review of
     stocks:f854cc7b, 95900f0b, c03e84a5, f4b5248b, planned_loss). One day, one case: a rule change, not a defect, and the strategy freeze of
     2026-11-16 holds. Candidate for rule 4 when the freeze allows: map each sector ETF to its sector for the cap.
+83. [desk][sizing] A desk 'Hold' on a new entry is documented as "shrink to 50%" (skills/trading-desk/SKILL.md step 5),
+    but for a new name it can act as a veto: the halved target falls under the rebalance band
+    (`risk.rebalance_band_pct` 0.02) and `broker.rebalance` skips any non-exit order with |target - current| < band
+    (the `force` path covers only shrinks of held names). 2026-11-20 close: raw targets PG 2.36%, V 2.38%, COST 2.66%
+    (state/pending.json targets_raw) were halved to 1.18%, 1.19%, 1.33% by three desk Holds, and none of them is in
+    the orders for the 2026-11-23 open (preview_at_close: only the XLP 32 entry is a buy). Reduce-only, so allowed by
+    hard rule 3, but the record says shrink while the effect is veto. Options for rule 4: let a desk shrink of a new
+    entry bypass the band (like `force`), or document that Hold on a sub-2x-band entry vetoes it.
