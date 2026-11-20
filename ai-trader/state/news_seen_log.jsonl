@@ -12118,3 +12118,4 @@
 {"key": "72aaccdc3db08249", "symbol": "META", "published": "2026-11-20T15:30:08+00:00", "first_seen": "2026-11-20T16:38:32.642257+00:00", "outcome": "stale"}
 {"key": "dd057d9f0dec0910", "symbol": "PM", "published": "2026-11-20T15:30:09+00:00", "first_seen": "2026-11-20T16:38:32.642540+00:00", "outcome": "stale"}
 {"key": "b7a38e67b1b8b520", "symbol": "ISRG", "published": "2026-11-20T15:33:00+00:00", "first_seen": "2026-11-20T16:38:32.642767+00:00", "outcome": "stale"}
+{"key": "aaf715545a581ec6", "symbol": "NVDA", "published": "2026-11-20T16:32:13+00:00", "first_seen": "2026-11-20T16:38:32.641744+00:00", "outcome": "scored"}
