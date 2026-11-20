@@ -12480,3 +12480,16 @@
 {"key": "f89431d971f6845b", "symbol": "AMZN", "published": "2026-11-20T19:04:29+00:00", "first_seen": "2026-11-20T19:08:04.189996+00:00", "outcome": "scored"}
 {"key": "e3fa46effdae3323", "symbol": "MSFT", "published": "2026-11-20T19:04:29+00:00", "first_seen": "2026-11-20T19:08:44.213106+00:00", "outcome": "scored"}
 {"key": "65103a3c1659b978", "symbol": "GOOGL", "published": "2026-11-20T19:04:29+00:00", "first_seen": "2026-11-20T19:08:44.213342+00:00", "outcome": "scored"}
+{"key": "2959f8cbda9d5c63", "symbol": "JPM", "published": "2026-11-20T19:00:00+00:00", "first_seen": "2026-11-20T19:09:24.234452+00:00", "outcome": "scored"}
+{"key": "7cbb859271bb5686", "symbol": "GOOGL", "published": "2026-11-20T18:55:31+00:00", "first_seen": "2026-11-20T19:11:44.294657+00:00", "outcome": "scored"}
+{"key": "3fd6960c50a08a9c", "symbol": "HON", "published": "2026-11-20T18:53:21+00:00", "first_seen": "2026-11-20T19:12:04.319994+00:00", "outcome": "scored"}
+{"key": "c66a5ce371275265", "symbol": "GE", "published": "2026-11-20T18:53:21+00:00", "first_seen": "2026-11-20T19:12:24.332278+00:00", "outcome": "scored"}
+{"key": "477d0530bac5dfdb", "symbol": "RTX", "published": "2026-11-20T18:53:21+00:00", "first_seen": "2026-11-20T19:12:24.332310+00:00", "outcome": "scored"}
+{"key": "2f8c54de99de83b1", "symbol": "GOOGL", "published": "2026-11-20T19:13:04+00:00", "first_seen": "2026-11-20T19:15:04.564344+00:00", "outcome": "scored"}
+{"key": "5afc5d52bd1f8d90", "symbol": "AVGO", "published": "2026-11-20T19:13:04+00:00", "first_seen": "2026-11-20T19:15:24.371583+00:00", "outcome": "scored"}
+{"key": "d88ec5462dbdea57", "symbol": "WMT", "published": "2026-11-20T18:57:34+00:00", "first_seen": "2026-11-20T19:15:24.371950+00:00", "outcome": "scored"}
+{"key": "c9c4307567a0f3e7", "symbol": "CVX", "published": "2026-11-20T19:02:05+00:00", "first_seen": "2026-11-20T19:15:24.372196+00:00", "outcome": "scored"}
+{"key": "b5a3e754b41c4820", "symbol": "AMZN", "published": "2026-11-20T18:57:34+00:00", "first_seen": "2026-11-20T19:15:44.366681+00:00", "outcome": "scored"}
+{"key": "ff640a521f613813", "symbol": "PG", "published": "2026-11-20T19:02:05+00:00", "first_seen": "2026-11-20T19:15:44.366898+00:00", "outcome": "scored"}
+{"key": "29f423c66242154c", "symbol": "KO", "published": "2026-11-20T19:02:05+00:00", "first_seen": "2026-11-20T19:15:44.366951+00:00", "outcome": "scored"}
+{"key": "d7806d2fb01b8d76", "symbol": "JNJ", "published": "2026-11-20T19:02:05+00:00", "first_seen": "2026-11-20T19:16:04.368116+00:00", "outcome": "scored"}
