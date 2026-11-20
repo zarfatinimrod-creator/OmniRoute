@@ -1,21 +1,13 @@
 {
-  "cash": 25053.213247532276,
+  "cash": 44806.24182669487,
   "positions": {
-    "MRK": {
-      "qty": 17,
-      "avg_cost": 148.44418011474608,
-      "entry_date": "2026-11-09",
-      "peak_close": 148.75999450683594,
-      "last_price": 132.80999755859375,
-      "ca_applied_through": "2026-11-19"
-    },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.3675772705078,
       "entry_date": "2026-11-09",
       "peak_close": 468.1099853515625,
       "last_price": 438.8200073242188,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "LLY": {
       "qty": 2,
@@ -23,23 +15,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 1443.5,
       "last_price": 1351.1199951171875,
-      "ca_applied_through": "2026-11-19"
-    },
-    "TEVA": {
-      "qty": 90,
-      "avg_cost": 43.031503320693965,
-      "entry_date": "2026-11-09",
-      "peak_close": 44.5,
-      "last_price": 38.540000915527344,
-      "ca_applied_through": "2026-11-19"
-    },
-    "DE": {
-      "qty": 7,
-      "avg_cost": 686.1300378243583,
-      "entry_date": "2026-11-09",
-      "peak_close": 691.75,
-      "last_price": 624.8900146484375,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "JNJ": {
       "qty": 14,
@@ -47,7 +23,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 285.75,
       "last_price": 267.1400146484375,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "ABBV": {
       "qty": 14,
@@ -55,7 +31,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 295.0299987792969,
       "last_price": 283.5400085449219,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "XOM": {
       "qty": 27,
@@ -63,7 +39,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 170.58999633789062,
       "last_price": 158.92999267578125,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "PM": {
       "qty": 24,
@@ -71,7 +47,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 198.9600067138672,
       "last_price": 186.42999267578125,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "CVX": {
       "qty": 23,
@@ -79,7 +55,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 219.88999938964844,
       "last_price": 206.5,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "UNP": {
       "qty": 24,
@@ -87,7 +63,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 304.20001220703125,
       "last_price": 290.6300048828125,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "AAPL": {
       "qty": 20,
@@ -95,7 +71,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 356.2699890136719,
       "last_price": 349.2099914550781,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "KO": {
       "qty": 72,
@@ -103,15 +79,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 99.4800033569336,
       "last_price": 96.08999633789062,
-      "ca_applied_through": "2026-11-19"
-    },
-    "XLV": {
-      "qty": 54,
-      "avg_cost": 186.78278767395017,
-      "entry_date": "2026-11-09",
-      "peak_close": 188.9499969482422,
-      "last_price": 177.4600067138672,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     },
     "COP": {
       "qty": 42,
@@ -119,11 +87,16 @@
       "entry_date": "2026-11-11",
       "peak_close": 142.27999877929688,
       "last_price": 134.99000549316406,
-      "ca_applied_through": "2026-11-19"
+      "ca_applied_through": "2026-11-20"
     }
   },
   "peak_equity": 101770.54685771045,
-  "blocked": {},
+  "blocked": {
+    "XLV": "2026-12-04",
+    "DE": "2026-12-04",
+    "TEVA": "2026-12-04",
+    "MRK": "2026-12-04"
+  },
   "last_mark": "2026-11-19",
   "last_rebalance": "2026-11-16"
 }

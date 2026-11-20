@@ -458,3 +458,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     2026-11-18 close report said 'SPY 728.565, updated 15:52:53 UTC' while the close was 730.20 (Yahoo 1d,
     regularMarketTime 21:00 UTC; equity.jsonl bench_price 730.20). Display only: decisions and the baseline returns use
     the close. Basic law 2 (price age is tracked): find where market_status gets that quote and show its age or the close.
+82. [stocks][risk][rule] The sector cap (`risk.max_sector_pct` 0.30) does not count a sector ETF with its sector:
+    `universe` labels XLV 'SectorETF', so on 2026-11-19 the cap saw Health at 19.1% (TEVA 3.8, JNJ 3.9, ABBV 4.0,
+    LLY 2.8, MRK 2.4, AMGN 2.2) while XLV added 9.9% more health exposure (~29% together; weights from
+    reports/2026-11-19.md targets). That day's health sell-off stopped out XLV, TEVA and MRK together (fills
+    2026-11-20 open: -425.10, -413.17, -241.08 of the -1,532.54 total; state/trades.jsonl; loss review of
+    stocks:f854cc7b, 95900f0b, c03e84a5, f4b5248b, planned_loss). One day, one case: a rule change, not a defect, and the strategy freeze of
+    2026-11-16 holds. Candidate for rule 4 when the freeze allows: map each sector ETF to its sector for the cap.

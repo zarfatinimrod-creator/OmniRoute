@@ -1,6 +1,6 @@
 {
   "decision_date": "2026-11-19",
-  "status": "pending",
+  "status": "executed",
   "rebalance": false,
   "exits_only": true,
   "targets": {
@@ -103,5 +103,68 @@
     }
   ],
   "new_entries": [],
-  "logged_at": "2026-11-19T21:22:55+00:00"
+  "logged_at": "2026-11-19T21:22:55+00:00",
+  "open_source": {
+    "one_minute": [
+      "AAPL",
+      "ABBV",
+      "AMGN",
+      "COP",
+      "CVX",
+      "DE",
+      "JNJ",
+      "KO",
+      "LLY",
+      "MRK",
+      "PM",
+      "TEVA",
+      "UNP",
+      "XLV",
+      "XOM"
+    ],
+    "daily_fallback": []
+  },
+  "executed_on": "2026-11-20",
+  "fills": [
+    {
+      "date": "2026-11-20",
+      "symbol": "XLV",
+      "side": "SELL",
+      "qty": 54,
+      "price": 178.9105,
+      "value": 9661.17,
+      "realized_pnl": -425.1,
+      "reason": "stop"
+    },
+    {
+      "date": "2026-11-20",
+      "symbol": "DE",
+      "side": "SELL",
+      "qty": 7,
+      "price": 621.3892,
+      "value": 4349.72,
+      "realized_pnl": -453.19,
+      "reason": "stop"
+    },
+    {
+      "date": "2026-11-20",
+      "symbol": "TEVA",
+      "side": "SELL",
+      "qty": 90,
+      "price": 38.4408,
+      "value": 3459.67,
+      "realized_pnl": -413.17,
+      "reason": "stop"
+    },
+    {
+      "date": "2026-11-20",
+      "symbol": "MRK",
+      "side": "SELL",
+      "qty": 17,
+      "price": 134.2628,
+      "value": 2282.47,
+      "realized_pnl": -241.08,
+      "reason": "stop"
+    }
+  ]
 }
