@@ -12214,3 +12214,4 @@
 {"key": "30661c051df16133", "symbol": "UNP", "published": "2026-11-20T16:35:21+00:00", "first_seen": "2026-11-20T17:08:13.588531+00:00", "outcome": "stale"}
 {"key": "186e4eb894412847", "symbol": "JPM", "published": "2026-11-20T12:00:02+00:00", "first_seen": "2026-11-20T17:08:53.449420+00:00", "outcome": "stale"}
 {"key": "7953bced5a09ba7d", "symbol": "TSLA", "published": "2026-11-20T17:01:19+00:00", "first_seen": "2026-11-20T17:09:13.457327+00:00", "outcome": "scored"}
+{"key": "c3d1af97f5c36e0c", "symbol": "NVDA", "published": "2026-11-20T17:01:19+00:00", "first_seen": "2026-11-20T17:09:33.410783+00:00", "outcome": "scored"}
