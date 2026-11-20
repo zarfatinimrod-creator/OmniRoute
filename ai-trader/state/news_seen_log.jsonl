@@ -11905,3 +11905,6 @@
 {"key": "06d2d748d1c880e5", "symbol": "ABBV", "published": "2026-11-20T14:51:48+00:00", "first_seen": "2026-11-20T15:09:53.697141+00:00", "outcome": "scored"}
 {"key": "b570e5712e5a2889", "symbol": "CVX", "published": "2026-11-20T14:50:06+00:00", "first_seen": "2026-11-20T15:09:53.697228+00:00", "outcome": "scored"}
 {"key": "958d0ee60df5b6fd", "symbol": "XOM", "published": "2026-11-20T14:50:06+00:00", "first_seen": "2026-11-20T15:10:13.691466+00:00", "outcome": "scored"}
+{"key": "3cfb5cc01b5b3bf6", "symbol": "AMD", "published": "2026-11-20T15:09:15+00:00", "first_seen": "2026-11-20T15:10:33.718324+00:00", "outcome": "scored"}
+{"key": "40fe67d7b21deb3e", "symbol": "META", "published": "2026-11-20T15:09:15+00:00", "first_seen": "2026-11-20T15:10:33.718482+00:00", "outcome": "scored"}
+{"key": "e6a4d50d625421fe", "symbol": "BLK", "published": "2026-11-20T15:00:00+00:00", "first_seen": "2026-11-20T15:10:33.718894+00:00", "outcome": "scored"}
