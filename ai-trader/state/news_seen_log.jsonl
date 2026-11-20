@@ -12478,3 +12478,5 @@
 {"key": "b293c8906f1e0b1a", "symbol": "NVDA", "published": "2026-11-20T18:50:02+00:00", "first_seen": "2026-11-20T19:06:04.068106+00:00", "outcome": "scored"}
 {"key": "a457fb74199b55a6", "symbol": "PANW", "published": "2026-11-20T13:00:02+00:00", "first_seen": "2026-11-20T19:06:44.119824+00:00", "outcome": "stale"}
 {"key": "f89431d971f6845b", "symbol": "AMZN", "published": "2026-11-20T19:04:29+00:00", "first_seen": "2026-11-20T19:08:04.189996+00:00", "outcome": "scored"}
+{"key": "e3fa46effdae3323", "symbol": "MSFT", "published": "2026-11-20T19:04:29+00:00", "first_seen": "2026-11-20T19:08:44.213106+00:00", "outcome": "scored"}
+{"key": "65103a3c1659b978", "symbol": "GOOGL", "published": "2026-11-20T19:04:29+00:00", "first_seen": "2026-11-20T19:08:44.213342+00:00", "outcome": "scored"}
