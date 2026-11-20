@@ -1,12 +1,12 @@
 {
   "date": "2026-11-20",
-  "as_of_utc": "2026-11-20T00:18:19+00:00",
+  "as_of_utc": "2026-11-20T01:08:22+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-20T00:00:00+00:00",
     "regular_end_utc": "2026-11-20T23:59:00+00:00",
-    "last_trade_utc": "2026-11-20T00:18:14+00:00",
-    "price": 62139.14
+    "last_trade_utc": "2026-11-20T01:08:15+00:00",
+    "price": 62541.98
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,8 +14,8 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.1596,
-    "equal_weight_since_start": -0.1596
+    "bench_since_start": -0.1516,
+    "equal_weight_since_start": -0.1516
   },
   "started": "2026-11-10",
   "regime": "risk_off",
