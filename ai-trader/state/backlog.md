@@ -304,6 +304,11 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     time; the value never changed; the 5m 23:55 bar never appeared. Three cycle runs (00:13, 00:18, 01:08) declined;
     no decision by 02:58. A rebuild that takes the value from any of several tries would have decided at 00:18; a
     finality rule would need the same value seen more than once. Data only: a code change goes through rule 4.
+    Correction 2026-11-20 06:05: the flickering value was NOT the final one. At 06:04:59 the 1h 23:00 bar and the 5m
+    23:55 bar both read 61,911.17 (daily row still null), and the cycle decided on that (06:05, exec_ts 07:00). The
+    62,041.00 seen 22 times overnight was +21.0 bp off it. Taking the value from any one of several tries would have
+    decided on a stale replica, so the null-declines protected the decision this time; a value seen once is not
+    final, and neither is a value seen repeatedly from one replica.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying

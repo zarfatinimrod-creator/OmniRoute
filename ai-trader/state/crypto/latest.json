@@ -1,12 +1,12 @@
 {
   "date": "2026-11-20",
-  "as_of_utc": "2026-11-20T01:08:22+00:00",
+  "as_of_utc": "2026-11-20T06:05:00+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-20T00:00:00+00:00",
     "regular_end_utc": "2026-11-20T23:59:00+00:00",
-    "last_trade_utc": "2026-11-20T01:08:15+00:00",
-    "price": 62541.98
+    "last_trade_utc": "2026-11-20T06:04:55+00:00",
+    "price": 61849.88
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,14 +14,14 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.1516,
-    "equal_weight_since_start": -0.1516
+    "bench_since_start": -0.161,
+    "equal_weight_since_start": -0.161
   },
   "started": "2026-11-10",
   "regime": "risk_off",
   "dd_state": "normal",
   "drawdown": -0.0618,
-  "decided_now": false,
+  "decided_now": true,
   "weights": {
     "tsmom": 0.0,
     "xsmom": 0.0,
@@ -33,20 +33,24 @@
     "lowvol": 0.0
   },
   "pending": {
-    "decision_date": "2026-11-18",
-    "status": "executed",
-    "rebalance": false,
+    "decision_date": "2026-11-19",
+    "status": "pending",
+    "rebalance": true,
     "targets": {},
     "overrides": [],
     "earnings_blackout": {},
     "preview_at_close": []
   },
   "executed": [],
-  "top_scores": null,
-  "bottom_scores": null,
+  "top_scores": {
+    "BTC-USD": -0.14
+  },
+  "bottom_scores": {
+    "BTC-USD": -0.14
+  },
   "stopped": [],
   "scorecard": {
-    "open": 23,
+    "open": 26,
     "evaluated": 1,
     "quant_h7": {
       "n": 1,
@@ -62,9 +66,9 @@
   "positions": {},
   "day_moves": {},
   "alert_channels": [
-    "queued"
+    "ntfy"
   ],
   "events": [
-    "אין שורה יומית של 2026-11-19 בנתונים (הנר האחרון הסופי הוא 2026-11-18) - אין החלטה בריצה הזו, הזמנה ממתינה עדיין מתמלאת, ריצה מאוחרת תנסה שוב"
+    "השורה היומית של 2026-11-19 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 61,911.17)"
   ]
 }
