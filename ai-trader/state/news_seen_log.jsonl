@@ -12572,3 +12572,4 @@
 {"key": "68321c2921ba9310", "symbol": "META", "published": "2026-11-20T20:25:02+00:00", "first_seen": "2026-11-20T20:35:14.900720+00:00", "outcome": "scored"}
 {"key": "d00a020fbace8e97", "symbol": "WMT", "published": "2026-11-20T20:05:17+00:00", "first_seen": "2026-11-20T20:36:55.104689+00:00", "outcome": "stale"}
 {"key": "22fb976d0c4a0d5f", "symbol": "LOW", "published": "2026-11-20T20:05:17+00:00", "first_seen": "2026-11-20T20:37:14.950436+00:00", "outcome": "stale"}
+{"key": "dae0148427a15415", "symbol": "NVDA", "published": "2026-11-20T20:33:06+00:00", "first_seen": "2026-11-20T20:38:14.981609+00:00", "outcome": "scored"}
