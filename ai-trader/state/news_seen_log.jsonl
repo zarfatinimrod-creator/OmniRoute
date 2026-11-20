@@ -11866,3 +11866,5 @@
 {"key": "46606186b6ffc454", "symbol": "JPM", "published": "2026-11-20T13:39:00+00:00", "first_seen": "2026-11-20T14:57:13.406810+00:00", "outcome": "stale"}
 {"key": "5e19ecebf148c39d", "symbol": "META", "published": "2026-11-20T14:53:11+00:00", "first_seen": "2026-11-20T14:57:13.406623+00:00", "outcome": "scored"}
 {"key": "735b3fc14f0a3add", "symbol": "PG", "published": "2026-11-20T13:39:00+00:00", "first_seen": "2026-11-20T14:57:33.742940+00:00", "outcome": "stale"}
+{"key": "9b65160b18664ef6", "symbol": "ABT", "published": "2026-11-20T14:40:35+00:00", "first_seen": "2026-11-20T14:58:53.465230+00:00", "outcome": "scored"}
+{"key": "f10ec8727092ad71", "symbol": "IBM", "published": "2026-11-20T14:51:00+00:00", "first_seen": "2026-11-20T14:59:13.541270+00:00", "outcome": "scored"}
