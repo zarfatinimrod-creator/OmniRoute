@@ -299,6 +299,11 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     R6). Tally decided-vs-daily now 11-12 -3.8, 11-13 -53.8, 11-14 -2.3, 11-15 -20.0, 11-16 -6.0, 11-17 -5.7,
     11-18 -0.9 bp: 4 of 7 over 5 bp. The latest-appearing value (01:28) was the closest so far, which fits a time
     floor, but n=7. 11-19 rebuild declined at 00:13 (1h 23:00 and 5m 23:55 null).
+    11-19 night (final72.py probes every ~30 s, 2026-11-20): the 1h 23:00 bar came back as 62,041.00 in 1 of 9
+    replies 00:14-00:18, 4 of 72 in 00:19-00:54 and 17 of 226 in 01:08-02:58; the next reply 5 s later was null every
+    time; the value never changed; the 5m 23:55 bar never appeared. Three cycle runs (00:13, 00:18, 01:08) declined;
+    no decision by 02:58. A rebuild that takes the value from any of several tries would have decided at 00:18; a
+    finality rule would need the same value seen more than once. Data only: a code change goes through rule 4.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
