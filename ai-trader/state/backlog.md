@@ -228,6 +228,9 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     Commits $47.2 Billion Minimum to Azure"). All refused by the hold (`state/news_checks.jsonl`); the log-mode
     guards would also have refused PANW (no_chase +4.55%, second_check move_recap) and MSFT (second_check
     move_recap); WMT passed the second check. None graded yet: 0 of the 10 graded headlines the review needs.
+    2026-11-21: all five have 1-day grades in state/news_grades.jsonl (graded 2026-11-20 21:36Z): WMT x3 hit (excess
+    +5.16%), PANW miss (-1.45%), MSFT miss (-0.08%); the 5-day grades in state/news_predictions.jsonl are pending.
+    The item does not name the grading horizon: say which one when the count reaches 10.
 65. [news][source] SEC filings as a faster news source, log-only first (roadmap 2026-11-10, sub-project 4).
     **Owner's decision (Nimrod, 2026-11-11, answer א):** the SEC contact address for the User-Agent is a new address
     used only by the bot; he opens it himself and gives it in chat. It lives only in the environment variable
