@@ -1,12 +1,12 @@
 {
-  "date": "2026-11-20",
-  "as_of_utc": "2026-11-20T06:05:00+00:00",
+  "date": "2026-11-21",
+  "as_of_utc": "2026-11-21T00:13:45+00:00",
   "market": {
     "is_open": true,
-    "regular_start_utc": "2026-11-20T00:00:00+00:00",
-    "regular_end_utc": "2026-11-20T23:59:00+00:00",
-    "last_trade_utc": "2026-11-20T06:04:55+00:00",
-    "price": 61849.88
+    "regular_start_utc": "2026-11-21T00:00:00+00:00",
+    "regular_end_utc": "2026-11-21T23:59:00+00:00",
+    "last_trade_utc": "2026-11-21T00:13:42+00:00",
+    "price": 58877.75
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,8 +14,8 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.161,
-    "equal_weight_since_start": -0.161
+    "bench_since_start": -0.2013,
+    "equal_weight_since_start": -0.2013
   },
   "started": "2026-11-10",
   "regime": "risk_off",
@@ -33,9 +33,9 @@
     "lowvol": 0.0
   },
   "pending": {
-    "decision_date": "2026-11-19",
+    "decision_date": "2026-11-20",
     "status": "pending",
-    "rebalance": true,
+    "rebalance": false,
     "targets": {},
     "overrides": [],
     "earnings_blackout": {},
@@ -43,19 +43,19 @@
   },
   "executed": [],
   "top_scores": {
-    "BTC-USD": -0.14
+    "BTC-USD": -0.173
   },
   "bottom_scores": {
-    "BTC-USD": -0.14
+    "BTC-USD": -0.173
   },
   "stopped": [],
   "scorecard": {
-    "open": 26,
-    "evaluated": 1,
+    "open": 28,
+    "evaluated": 2,
     "quant_h7": {
-      "n": 1,
+      "n": 2,
       "hit_rate": 0.0,
-      "avg_excess_up_calls": -0.1197
+      "avg_excess_up_calls": -0.126
     }
   },
   "overlays": {
@@ -66,9 +66,9 @@
   "positions": {},
   "day_moves": {},
   "alert_channels": [
-    "ntfy"
+    "queued"
   ],
   "events": [
-    "השורה היומית של 2026-11-19 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 61,911.17)"
+    "השורה היומית של 2026-11-20 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 58,868.49)"
   ]
 }
