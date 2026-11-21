@@ -309,6 +309,11 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     62,041.00 seen 22 times overnight was +21.0 bp off it. Taking the value from any one of several tries would have
     decided on a stale replica, so the null-declines protected the decision this time; a value seen once is not
     final, and neither is a value seen repeatedly from one replica.
+    2026-11-21: 11-19 settled daily 61,901.82 vs decided 61,911.17 = +1.5 bp (under R6). 11-20 was decided at 00:13:45
+    on the first try on 58,868.49 (1h 23:00; 5m 23:55 null). At 06:04 the 1h and 5m bars both read 58,811.77 (daily
+    still null), so the decided value is +9.6 bp off the newer one: the second night running that a value with the 5m
+    bar null moved later. Candidate finality rule for rule 4: decide only when the 1h 23:00 and 5m 23:55 bars agree
+    in the same reply (both nights, the agreeing pair is the later value); tally decided-vs-daily now 4 of 8 over 5 bp.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
