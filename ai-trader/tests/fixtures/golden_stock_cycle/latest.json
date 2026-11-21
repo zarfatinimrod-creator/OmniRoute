@@ -1,0 +1,196 @@
+{
+  "date": "2021-07-20",
+  "as_of_utc": "2026-01-01T00:06:19+00:00",
+  "market": {
+    "is_open": false
+  },
+  "equity": 100043.07,
+  "cash": 9440.12,
+  "gross": 0.9056,
+  "return_since_start": 0.0004,
+  "shadow_return_since_start": 0.0004,
+  "baselines": {
+    "spy_since_start": 0.0492,
+    "equal_weight_since_start": 0.0052
+  },
+  "started": "2021-07-13",
+  "regime": "risk_on",
+  "dd_state": "normal",
+  "drawdown": -0.0007,
+  "decided_now": true,
+  "weights": {
+    "tsmom": 0.25,
+    "xsmom": 0.25,
+    "trend": 0.2,
+    "breakout": 0.2,
+    "high52": 0.03,
+    "reversal": 0.02,
+    "rsi2": 0.05,
+    "lowvol": 0.0
+  },
+  "pending": {
+    "decision_date": "2021-07-20",
+    "status": "pending",
+    "rebalance": true,
+    "targets": {
+      "S18": 0.0242882841690004,
+      "S13": 0.04217147220864917,
+      "S15": 0.06699234063534855,
+      "S05": 0.1,
+      "S01": 0.07578599274095969,
+      "S27": 0.09943950835179571,
+      "S00": 0.1,
+      "S04": 0.1,
+      "S09": 0.1,
+      "S20": 0.1,
+      "S23": 0.1,
+      "S17": 0.06881127416390756,
+      "S22": 0.012964167817455564,
+      "S06": 0.01278439062527226
+    },
+    "overrides": [],
+    "earnings_blackout": {},
+    "preview_at_close": [
+      {
+        "date": "2021-07-20",
+        "symbol": "S17",
+        "side": "BUY",
+        "qty": 47,
+        "price": 143.7793,
+        "value": 6757.63,
+        "realized_pnl": 0.0,
+        "reason": "entry"
+      }
+    ]
+  },
+  "executed": [
+    {
+      "date": "2021-07-20",
+      "symbol": "S12",
+      "side": "SELL",
+      "qty": 45,
+      "price": 150.058,
+      "value": 6752.61,
+      "realized_pnl": -571.3,
+      "reason": "stop"
+    }
+  ],
+  "top_scores": {
+    "S23": 0.822,
+    "S28": 0.783,
+    "S04": 0.693,
+    "S09": 0.675,
+    "S00": 0.654,
+    "S05": 0.65,
+    "S20": 0.638,
+    "S27": 0.592,
+    "SPY": 0.512,
+    "S01": 0.432
+  },
+  "bottom_scores": {
+    "S25": -0.807,
+    "S21": -0.652,
+    "S26": -0.627,
+    "S03": -0.565,
+    "S11": -0.56
+  },
+  "stopped": [],
+  "scorecard": {
+    "open": 312,
+    "evaluated": 15,
+    "quant_h5": {
+      "n": 15,
+      "hit_rate": 0.4,
+      "avg_excess_up_calls": -0.0345
+    }
+  },
+  "overlays": {
+    "insider_cluster": null,
+    "congress_buy": null,
+    "logged": null
+  },
+  "positions": {
+    "S18": {
+      "qty": 17,
+      "avg_cost": 149.03,
+      "last": 149.77,
+      "pnl_pct": 0.0049,
+      "since": "2021-07-14"
+    },
+    "S13": {
+      "qty": 29,
+      "avg_cost": 126.53,
+      "last": 129.32,
+      "pnl_pct": 0.0221,
+      "since": "2021-07-14"
+    },
+    "S15": {
+      "qty": 69,
+      "avg_cost": 84.78,
+      "last": 88.61,
+      "pnl_pct": 0.0452,
+      "since": "2021-07-14"
+    },
+    "S05": {
+      "qty": 92,
+      "avg_cost": 99.33,
+      "last": 100.72,
+      "pnl_pct": 0.014,
+      "since": "2021-07-14"
+    },
+    "S01": {
+      "qty": 53,
+      "avg_cost": 177.88,
+      "last": 173.38,
+      "pnl_pct": -0.0253,
+      "since": "2021-07-14"
+    },
+    "S27": {
+      "qty": 71,
+      "avg_cost": 138.3,
+      "last": 139.18,
+      "pnl_pct": 0.0064,
+      "since": "2021-07-14"
+    },
+    "S00": {
+      "qty": 66,
+      "avg_cost": 151.0,
+      "last": 151.44,
+      "pnl_pct": 0.0029,
+      "since": "2021-07-14"
+    },
+    "S04": {
+      "qty": 54,
+      "avg_cost": 183.66,
+      "last": 181.44,
+      "pnl_pct": -0.0121,
+      "since": "2021-07-14"
+    },
+    "S09": {
+      "qty": 74,
+      "avg_cost": 134.22,
+      "last": 138.75,
+      "pnl_pct": 0.0338,
+      "since": "2021-07-14"
+    },
+    "S20": {
+      "qty": 62,
+      "avg_cost": 158.76,
+      "last": 163.31,
+      "pnl_pct": 0.0286,
+      "since": "2021-07-14"
+    },
+    "S23": {
+      "qty": 61,
+      "avg_cost": 162.22,
+      "last": 158.53,
+      "pnl_pct": -0.0227,
+      "since": "2021-07-14"
+    }
+  },
+  "alert_channels": [],
+  "events": [
+    "בוצע בפתיחה 2021-07-20: SELL 45 S12 @ 150.058",
+    "מתוכנן לפתיחה הבאה: BUY 47 S17"
+  ]
+}

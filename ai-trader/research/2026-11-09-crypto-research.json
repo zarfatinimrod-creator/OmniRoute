@@ -1,0 +1,994 @@
+[
+ {
+  "summary": "Codebase-impact lens: what it takes to add a separate 24/7 paper crypto book to /home/user/OmniRoute/ai-trader. I read every module in aitrader/ (3,002 lines by wc), config.json and the 5 test files. I also ran in-memory probes against real Yahoo crypto data. All scratch output is in /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/lens_codebase/. Nothing in the repo was edited and no state was written.\n\nVERDICT: most of the engine can be reused. The quant core is already driven by bar count: signals, the strategy's caps, vol-targeting, regime filter and drawdown breaker, learn's walk-forward IC with the placebo gate, the shadow book, the hash-chained journal and grading, and the backtest replay all count bars, not dates. Yahoo's crypto daily feed also fits the existing loader: tz=UTC, bars at 00:00 UTC including Sat/Sun, adjclose==close, no split or dividend events, and 3,653 daily bars for BTC-USD over 10y. My estimate (not a measurement): about 90% of the 1,826-line daily-book engine is reused as is or with a parameter. New code is about 150-250 lines plus about 150-250 lines of tests.\n\nWHERE THE STOCK MARKET IS BUILT IN, and what each place needs:\n1) Bars per year = 252 is hard-coded. signals.py:13/29/44, strategy.py:148 (cov), metrics.py:10 (summary), backtest.py:170-171 (DSR/rf) and broker.mark trading_days=252 all assume it. They need a periods_per_year parameter (365 for crypto). Measured on BTC: vol understated by a factor of 1.2035, so the 12% vol target over-sizes by about 20%. CAGR comes out -0.77% instead of -1.12%, years 2.9 instead of 2.0, and cash yield over-accrues ($105,109 instead of about $103,500).\n2) Whole shares: broker.py:141/151 use math.floor. A 10% BTC target at $74,914 buys 0 BTC. Needs a qty_step for fractional units and a fee_bps cost (crypto fees are a % of notional; today the only fee field is commission_per_share).\n3) NYSE timing in cycle.py, all new crypto behaviour behind a calendar object:\n- _bar_is_final at 16:05 NY. Reused naively, it would decide on the still-open UTC bar from 21:05 to 24:00 UTC.\n- _market_opened at 09:31 NY plus official_opens using the 09:30 NY 1-minute bar (data.py:266-287). Together, live crypto fills would land at 14:30 UTC while the backtest fills at 00:00 UTC.\n- _open_cutoff_utc and BDay at cycle.py:207/270. BDay gives a 14-calendar-day cooldown live versus 10 bars in the backtest.\n- The intraday -0.06 alert at cycle.py:371 is hard-coded.\n4) VIX: load_market (data.py:253-263) sets _require_vix. On a 7-day index, live Sat/Sun rows read as NaN, so every weekend decision would go \"defensive(no-vix)\" at x0.75, while history is forward-filled. I confirmed this with the cached _VIX_10y.csv. Turn it off per profile; defensive_vix_pct=0 already disables strategy.py:163.\n5) Earnings blackout: cycle.py:142-164 makes network calls even with days=0, because the loop is range(-1, days+1). When Nasdaq fails, its \"*\" entry blocks every new entry outside the ETF groups, which would be all crypto. Needs a feature flag. The same goes for the insider/congress overlays (alt.py) and corporate actions. Corporate actions are a harmless no-op on crypto, but should still be off.\n6) SPY/SMA200 regime: works with benchmark=\"BTC-USD\" through config. SPY inside a 7-day panel would be NaN on weekends and read as risk_off(no-data).\n7) Sectors: the ETF group set is copied in 4 places (strategy.py:10, news_live.py:34, dashboard.py:21, backtest.py:122). Move it to config. Crypto gets category labels (L1/DeFi/...) and stablecoins are excluded.\n8) Minimum of 10 names is hard-coded at learn.py:21 and strategy.py:120. With fewer than 10 coins, IC and the lowvol filter go silently inert.\n9) State: journal.STATE is a single global with fixed file names. Use state/crypto/ through a --book flag. Tests already swap STATE. Without this, placebo.json, trials.jsonl (DSR count), weights and overrides would collide.\n10) Output: report.py:89 writes reports/<date>.md, which collides with the stock report. SPY labels appear in report.py, dashboard.py (and dashboard.py:110 uses NY hours) and dashboard/index.html:496 (hard-coded series list). desk.py:45-74 hard-codes 252/SPY.\n11) news_live is NYSE-shaped throughout: market_open_now, a 09:30 queue, bdate_range, a \"stock\" prompt, and a 16:05 stop. Yahoo RSS for BTC-USD works but is noisy (20 items, including a Dow headline).\n\nTIMING ISSUE (decision for quant-critic): on Yahoo crypto the next bar's open is essentially the decision close. The median |open/prev close - 1| for BTC over 2y is 0.003% (max 0.50%). That instant has already passed when a cycle runs after 00:00 UTC. So \"fill at next open\" in the backtest is a fill at the decision price, which is optimistic. Live fills need an exec minute after the decision, using Yahoo 1-minute bars (they exist; about 5 days are kept). The backtest then needs an exec-delay cost or intraday data. A later exec time would also be the only window for Claude's veto/shrink.\n\nPROPOSED INTERFACE: keep everything in cfg.\n- config.json gets a \"crypto\" block deep-merged over the base. It holds universe, benchmark, account, costs{slippage_bps, fee_bps, qty_step}, risk/signals/learning overrides in calendar days, and a \"market\" block: calendar, periods_per_year, tz, bar_final_after_min, exec_delay_min, vix/earnings/corporate_actions/overlays flags, wide_cap_groups, state_dir, report_prefix. The stock book gets the same block with today's values.\n- Code: load_config(book); a small aitrader/market.py with two calendars (NYSE = current code moved verbatim, and UTC-daily) exposing bar_is_final, exec_time, cooldown_until, fill_prices and is_open; journal.use_book(); a CLI --book flag; and the broker and periods_per_year parameters above.",
+  "facts": [
+   {
+    "fact": "Yahoo crypto chart meta: exchangeTimezoneName=UTC, instrumentType=CRYPTOCURRENCY, exchange CCC; regular trading period runs 00:00 to 23:59 UTC, so market_status(BTC-USD) always reports is_open=True",
+    "source": "curl https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?range=1mo&interval=1d -> /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/yahoo_BTC-USD_1mo.json, inspected with lens_codebase/inspect_yahoo.py",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo daily crypto bars include Saturday and Sunday (210 weekend bars out of 731 over 2y), have no missing closes, adjclose equals close, and events are empty (no splits or dividends)",
+    "source": "lens_codebase/gaps.py and inspect_yahoo.py on y_BTC-USD_2y.json, y_ETH-USD_2y.json, y_SOL-USD_2y.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "range=10y returns 3,653 daily BTC-USD bars (2016-11-09 to 2026-11-09); range=max returns only 147 monthly bars, so the existing fetch_daily(sym,'10y') call works and 'max' must not be used",
+    "source": "lens_codebase/y_BTC_10y.json and y_BTC_max.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Next-bar open is about equal to the previous close: median |open/prev close-1| is 0.003% for BTC and ETH over 2y; max 0.50% (BTC), 0.49% (ETH), 1.09% (SOL); max 3.79% for BTC over 10y",
+    "source": "lens_codebase/gaps.py output on Yahoo 2y/10y JSON",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo serves BTC-USD 1-minute bars covering about 5 days (6,682 bars from 2026-11-05 00:00 UTC), including the 00:00 UTC minute; BTC moved from 74,740 at 00:00 to 74,520 at 00:05 UTC on 2026-11-09 (-0.29%)",
+    "source": "lens_codebase/y_BTC_1m.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "PaperBroker with whole shares: a 10% target of $100k at BTC $74,914.59 buys 0 BTC; ETH at $2,128.30 buys 4 units ($8,517.46 of a $10,000 target)",
+    "source": "lens_codebase/probe_engine.py (in-memory PaperBroker.rebalance; broker.py:141,151 math.floor)",
+    "confidence": "high"
+   },
+   {
+    "fact": "realized_vol annualizes with sqrt(252): BTC 60-day vol 0.3104 versus 0.3736 with sqrt(365), a ratio of 1.2035, so the 12% vol target would over-size crypto by about 20%",
+    "source": "lens_codebase/probe_engine.py; signals.py:13,29; strategy.py:148",
+    "confidence": "high"
+   },
+   {
+    "fact": "metrics.summary on 2 calendar years of BTC daily bars reports years=2.9 and cagr=-0.77%, while the calendar-correct CAGR is -1.12%",
+    "source": "lens_codebase/probe_engine.py; metrics.py:10,67-73",
+    "confidence": "high"
+   },
+   {
+    "fact": "broker.mark with the default trading_days=252, called 365 times at 3.5%/yr, grows $100,000 to $105,108.97 instead of about $103,500",
+    "source": "lens_codebase/probe_engine.py; broker.py:38-41; callers backtest.py:62, cycle.py:247-248",
+    "confidence": "high"
+   },
+   {
+    "fact": "The load_market VIX alignment (reindex().ffill().where(idx <= last VIX bar)) leaves Saturday and Sunday NaN on a live 7-day crypto index whose last VIX bar is Friday, so strategy.py:163-169 would apply defensive(no-vix) x0.75 on every live weekend decision, while history forward-fills them",
+    "source": "Simulation with .cache/_VIX_10y.csv truncated at 2026-11-06 and a daily index 2026-11-01..08; data.py:253-263; strategy.py:163-169",
+    "confidence": "high"
+   },
+   {
+    "fact": "cycle._bar_is_final treats a bar as final at 16:05 New York, i.e. 21:05 UTC in November, so reused for crypto it would decide on the still-open UTC daily bar between 21:05 and 24:00 UTC",
+    "source": "cycle.py:167-169 (code reading; NY is UTC-5 after 2026-11-01)",
+    "confidence": "high"
+   },
+   {
+    "fact": "cycle._market_opened (09:31 NY) plus official_opens (09:30 NY 1-minute bar) would make live crypto fills happen at 14:30 UTC, while backtest.run fills at the 00:00 UTC daily open",
+    "source": "cycle.py:182-184, 203-204; data.py:266-287; backtest.py:53-55 (code reading)",
+    "confidence": "high"
+   },
+   {
+    "fact": "The stop cooldown is BDay(10) in live (cycle.py:207), about 14 calendar days for a 7-day market, versus 10 bars (10 days) in the backtest (backtest.py:57); the override cutoff in _decide uses dec + BDay(1), so a Saturday crypto bar maps to Monday 14:30 UTC",
+    "source": "cycle.py:207, 270; backtest.py:57",
+    "confidence": "high"
+   },
+   {
+    "fact": "_earnings_blackout loops range(-1, days+1), so earnings_blackout_days=0 still calls the Nasdaq calendar twice; on failure it sets '*', which blocks every new entry outside ETF_SECTORS, i.e. all crypto names",
+    "source": "cycle.py:142-164, 259-262",
+    "confidence": "high"
+   },
+   {
+    "fact": "The ETF group set {Index, SectorETF, Bonds, Gold} is duplicated in four places",
+    "source": "strategy.py:10, news_live.py:34, dashboard.py:21, backtest.py:122",
+    "confidence": "high"
+   },
+   {
+    "fact": "Minimum cross-section of 10 names is hard-coded for rank IC and for the low-vol exclusion filter",
+    "source": "learn.py:21 (_row_spearman min_n=10), strategy.py:120 (len(vl) >= 10)",
+    "confidence": "high"
+   },
+   {
+    "fact": "All state lives under the single module-global journal.STATE with fixed file names (portfolio.json, shadow_portfolio.json, pending.json, weights.json, placebo.json, trials.jsonl, overrides.json, predictions.jsonl, ...); tests already isolate it by swapping journal.STATE",
+    "source": "journal.py:20-25; tests/test_critic_fixes.py:154-161; tests/test_cycle.py:13-15",
+    "confidence": "high"
+   },
+   {
+    "fact": "The daily report path reports/<date>.md would collide with a crypto report on the same date; SPY is hard-coded in report and dashboard labels; the dashboard series list is hard-coded",
+    "source": "report.py:30,34,89; dashboard.py:110,241,259; dashboard/index.html:496",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo Finance RSS works for BTC-USD (HTTP 200, 20 items) but includes off-topic items such as 'Stock Market Today: Dow Rallies...'",
+    "source": "lens_codebase/rss_btc.xml",
+    "confidence": "high"
+   },
+   {
+    "fact": "news_live is NYSE-shaped: market_open_now uses weekdays 09:30-16:00 NY, there is a queue filled at the 09:30 open, max_hold counts business days, the prompt says 'stock' and 'trading days', and the loop stops at 16:05 NY",
+    "source": "news_live.py:78-90, 134-136, 218, 263-274, 301-313",
+    "confidence": "high"
+   },
+   {
+    "fact": "Over the last 365 daily bars, close-to-close drops of 3% or more happened on 6.6% of days for BTC, 14.0% for ETH and 15.6% for SOL (daily vol 2.31% / 3.16% / 3.25%); intraday touches of -3% are more frequent (estimate, not measured)",
+    "source": "lens_codebase gap/vol script on Yahoo 2y JSON",
+    "confidence": "medium"
+   },
+   {
+    "fact": "The vendored trader-risk skill blocks crypto orders, but the Python engine (aitrader/) never calls it",
+    "source": "vendor/jake-trader-skill-v1/trader-risk/check.py:19, vendor/jake-trader-skill-v2/trader-risk/check.py:27; grep of aitrader/ shows no call",
+    "confidence": "high"
+   },
+   {
+    "fact": "Reuse estimate: about 90% of the 1,826-line daily-book engine (data, signals, strategy, learn, metrics, broker, backtest, journal, cycle) is reusable; about 40-60 edited lines plus 150-250 new lines plus 150-250 test lines. This is an ESTIMATE from code reading, not a measurement",
+    "source": "wc -l aitrader/*.py (3,002 total) plus the per-module review in this report",
+    "confidence": "medium"
+   }
+  ],
+  "risks": [
+   "Train/live timing mismatch is the main danger. Reusing cycle.py as is would decide on partial UTC bars, fill at 14:30 UTC instead of the backtest's 00:00 UTC, use BDay cooldowns, and go defensive every weekend because of VIX. The backtest would not show any of this.",
+   "The backtest's 'fill at next open' equals the decision close on crypto (median gap 0.003%), so it fills at the price the signal saw, which is optimistic. A live fill needs a later exec minute. That delay costs real basis points (one sample: -0.29% in 5 minutes on 2026-11-09) and must be modelled with an exec-delay cost or intraday data.",
+   "With stocks, Claude's veto/shrink window is the overnight gap; with crypto there is almost none unless the exec time is set later. A later exec time in turn needs the backtest to model that delay. This is a design decision for quant-critic and the owner.",
+   "Annualizing with 252 bars silently understates crypto vol by 20%, over-sizes positions under the vol target, misstates CAGR/Sharpe/DSR, and over-accrues cash interest. Every periods_per_year site has to change together, or stock-versus-crypto comparisons will be wrong.",
+   "Whole-share sizing means BTC is never bought at a 10% cap of $100k. The fractional qty change touches the shared broker; stock behaviour must stay byte-identical (qty_step=1 default) and keep passing the existing tests.",
+   "State collisions if journal.STATE is not split: placebo.json, trials.jsonl (DSR trial count), weights.json, overrides.json and pending.json would mix the two books and corrupt both.",
+   "A crypto universe under 10 names leaves the learner and the lowvol filter silently inert (learn.py:21, strategy.py:120).",
+   "A crypto universe picked today carries strong survivorship bias (dead coins are missing). The sweep's 'ETF-only' control has no crypto analogue unless a BTC+ETH-only variant is added.",
+   "Applying the owner's news rules (-3% stop) to crypto would trip on ordinary noise: ETH and SOL closed down 3% or more on 14-16% of the last 365 days. This is an owner question, not something to hard-code."
+  ],
+  "recommendation": "Build the crypto book as a second profile of the same engine, not a fork and not a mixed universe.\n\n1) Config: add a \"crypto\" block to config.json that is deep-merged over the base. It holds its own universe (10 or more non-stablecoin coins with category labels), benchmark BTC-USD, account (starting_cash; cash_yield_annual as a stated assumption, probably 0), costs {slippage_bps, fee_bps, qty_step}, and risk/signals/learning overrides in calendar days (rebalance_every_days 7, horizons for example [7,30,90], defensive_vix_pct 0). It also gets a \"market\" block: calendar=utc_daily, periods_per_year=365, tz=UTC, bar_final_after_min, exec_delay_min, vix/earnings/corporate_actions/overlays=false, wide_cap_groups, state_dir=crypto, report_prefix. The stock book gets the same \"market\" block filled with today's values, so no market constant stays in code (rule 5).\n\n2) Code, smallest diff, with the stock behaviour proven unchanged by the existing tests:\n(a) aitrader/market.py with NyseCalendar (current cycle/news timing moved verbatim) and UtcDailyCalendar, exposing bar_is_final, exec_time (used both for 'opened' and for the override cutoff), cooldown_until (count bars from the index, not BDay), fill_prices (official_opens generalized to any UTC minute) and is_open.\n(b) Thread periods_per_year through signals.realized_vol/tsmom, strategy (cov), metrics.summary, backtest DSR/rf and the broker.mark call sites.\n(c) PaperBroker gains qty_step (default 1) and fee_bps (default 0); qty is quantized in the 3 floor sites, and positions are deleted under a tolerance.\n(d) load_config(book) and load_market check the vix flag; earnings blackout, overlays and corporate actions are gated by flags.\n(e) journal.use_book(name) points STATE at state/crypto; add a --book flag on cycle/backtest/placebo/veto/shrink/predict/desk/status/scorecard/verify.\n(f) Reports go to reports/crypto/ with benchmark labels taken from cfg. The dashboard gets cpos rows, eq books crypto/crypto_shadow/btc, and crypto rule/slot rows; index.html:496 gets the new series.\n(g) One ETF/wide-cap group list from config instead of 4 copies; the minimum-names value of 10 moves to config.\nLeave news_live crypto out of v1 unless the owner explicitly wants crypto news trading and confirms whether the -3% stop applies.\n\n3) Before any code: quant-critic must decide the exec model. Option א: decide at 00:05 UTC and fill at the 1-minute bar at a fixed short delay, with an exec_delay cost in the backtest. Option ב: a later exec time that gives Claude a review window, which needs intraday history in the backtest. Recommend א for v1.\n\n4) Tests (add crypto variants; keep all existing ones green):\n- test_core: a 7-day synthetic_panel with a BTC-USD benchmark; NoLookahead parametrized over both calendars; broker fractional qty, fee_bps accounting, cash never negative with fees, and cash yield over 365 bars equal to the annual rate; a metrics annualization test (365 bars = 1 year).\n- test_critic_fixes: override cutoff at the UTC exec time, including Sat/Sun decisions; calendar-day cooldown; crypto NOT going defensive without VIX (the inverse of VixFailClosed), including weekends; forward-only grading with the market always open.\n- test_cycle: full CycleFlow on 7-day bars (decide Saturday, fill Sunday; no decision on today's open UTC bar; idempotent); propose creates only proposal.json, with no earnings.json; a state-isolation test showing a crypto run writes only under state/crypto.\n- test_review_fixes: RiskCaps and regime fail-closed without BTC.\n\n5) Then run the time machine for the crypto profile, with a BTC+ETH-only control variant and higher cost tiers, and send it through quant-critic per CLAUDE.md rule 4. Paper only."
+ },
+ {
+  "summary": "I tested crypto price sources from this container with small curl requests. Raw samples are in /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/data/. I changed no repo files and ran no state-changing commands.\n\nREACHABLE, NO KEY:\n(1) Yahoo chart API (HTTP 200). Exchange \"CCC\", tz UTC. Daily bars are stamped 00:00 UTC, which is the start of the bar. Weekends are included: BTC has 634 bars on every weekday name, Sat and Sun too. Depth: BTC from 2014-09-17, ETH only from 2017-11-09, SOL from 2020-04-10. No gaps. TRAP: range=max with interval=1d quietly returns 1mo bars (BTC) or 1wk bars (ETH, SOL). Daily bars need period1/period2 or range<=10y, and range=10y cuts BTC to 2016-11-09. Hourly bars cover only range=730d (17,513 bars). Of those, 8,813 have zero volume and 33 have null closes. Yahoo is an aggregate price, not a venue price. Against Coinbase, the median close gap is +41.6 bp in 2018 and 10.3 bp in 2021. The day that just closed is stale: its 2026-11-08 close was 74,584.65, while Coinbase had 74,754.08, Kraken 74,737.9 and Yahoo's own 11-09 open 74,719.82.\n(2) Coinbase Exchange candles (HTTP 200). Fields are [time, low, high, open, close, volume]; time is the bar start in UTC. Max 300 bars per request; asking for more gives HTTP 400. Docs give 10 requests/s per IP (15 in bursts). Depth: BTC-USD from 2015-07-20, ETH-USD from 2016-05-18. No gaps in the last 350 days. /products lists 846 products, 329 of them delisted, and delisted pairs still return candles (UST-USD for May 2022 works). Quoted in USD. Holes come from regulation: XRP was off Coinbase 2021-2023 (from memory, not checked here).\n(3) Kraken OHLC (HTTP 200) returns only the latest 720 bars whatever `since` says, per its docs. Full history is in bulk files at assets.kraken.com: 5 parts of about 2.1 GB each, data through 2026-09-30.\n(4) Binance: api.binance.com returns HTTP 451 (blocked from this location). data-api.binance.vision klines (HTTP 200) and the data.binance.vision bulk archive (HTTP 200, SHA256 checksums verified) both work. BTCUSDT runs from 2017-08-17 with 3,372 daily bars and no gaps. The archive holds 3,767 spot symbols, 776 of them USDT pairs, and keeps delisted ones: USTUSDT 2021-12 to 2022-05, BCCUSDT 2017-11 to 2018-11. Bars carry quote volume. From 2025 on, archive timestamps are in microseconds.\n\nLIMITED OR BLOCKED:\n- CoinGecko free: only the last 365 days (error 10012). Data for inactive coins needs a paid plan (error 10005). It throttled on the 3rd call within seconds.\n- CryptoCompare / CoinDesk: HTTP 401, API key required.\n- Coin Metrics community API: free market-cap history from 2010-07-18, but for only 135 assets. FTT is in; LUNA, UST and SOL are not.\n- CoinMarketCap internal data-api: one call returned a point-in-time ranking for 2022-05-01 (LUNA #8, $28.36B; UST #10, $18.56B). The session's safety filter blocked a second call. The endpoint is undocumented and may break CMC's terms, so I do not recommend it.\n\nDEAD COINS:\n- Yahoo: LUNC-USD (old LUNA), USTC-USD and FTT-USD return 2022 data.\n- Binance: USTUSDT is kept. The symbol LUNAUSDT is REUSED: old LUNA until 2022-05-13 (close 0.00005), a gap, then new LUNA from 2022-05-31 (close 8.87). Joining by symbol alone would splice two different coins.\n- Sources disagree by more than 10x in a crash: on 2022-05-12, Yahoo LUNC closed at 0.00417 and Binance at 0.00032.\n- FTT is not dead; it still trades.\n\nPOINT-IN-TIME UNIVERSE: free market-cap history covering dead coins was not found. A liquidity-ranked universe from the Binance archive works. As a demo, I ranked every USDT pair that had an April 2022 file by median daily quote volume. That took 776 requests: 343 files found, 431 were 404, and 2 failed on non-ASCII symbols. LUNAUSDT came out #4, beside BTC, ETH, GMT, BNB, NEAR and SOL. Survivorship bias matters most for equal weighting: Liebi and Stöckl (2022) estimate 0.93%/yr value-weighted and 62.19%/yr equal-weighted.\n\nISSUES IN THE CURRENT CODE:\n- A crypto daily open equals the prior close: Coinbase median gap 0.2 bp, Binance 0.0 bp. So \"decide at close, fill at next open\" means filling at the same price as the signal, with no real delay. An explicit delay is needed.\n- metrics.py and signals.py assume 252 trading days a year.\n- cycle.py uses BDay business-day offsets.\n- news_live.py checks NYSE hours.\n- data.fetch_panel drops any date where fewer than 50% of symbols have data. Mixing crypto with stocks in one panel would drop or misalign weekends.",
+  "facts": [
+   {
+    "fact": "Yahoo range=max&interval=1d quietly returns 1mo bars for BTC-USD and 1wk bars for ETH-USD and SOL-USD. Daily bars need period1=0&period2=now (BTC: 4,437 bars).",
+    "source": "curl query1.finance.yahoo.com/v8/finance/chart/BTC-USD?range=max&interval=1d, meta.dataGranularity; files data/yahoo_*_1d_max.json, data/yahoo_*_1d_p1.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo crypto daily bars: exchange CCC, tz UTC, timestamp 00:00 UTC (bar start). Weekends included (634 bars on each weekday name for BTC). No gaps. First dates: BTC 2014-09-17, ETH 2017-11-09, SOL 2020-04-10.",
+    "source": "data/yahoo_{BTC,ETH,SOL}-USD_1d_p1.json, inspected with scratchpad/crypto/yinspect.py",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo range=10y daily cuts BTC to 2016-11-09. data.load_market defaults to rng='10y'.",
+    "source": "data/yahoo_BTC-USD_1d_10y.json; /home/user/OmniRoute/ai-trader/aitrader/data.py:253",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo's just-completed daily close is stale. 2026-11-08 close: Yahoo 74,584.65; Yahoo 11-09 open 74,719.82; Yahoo hourly 23:00 close 74,724.93; Coinbase 74,754.08; Kraken 74,737.9.",
+    "source": "data/yahoo_BTC-USD_1d_p1.json, data/yahoo_BTC-USD_1h_730d.json, data/cb_BTC-USD_1d_latest.json, data/kr_XBTUSD_1d.json (fetched 2026-11-09 ~15:18 UTC)",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo BTC close vs Coinbase close: median |diff| 41.6 bp in 2018 (signed median +40.8 bp), 10.3 bp in 2021 (p95 60.7 bp). Yahoo is an aggregate, not a venue price.",
+    "source": "data/cb_BTC-USD_1d_2018.json, data/cb_BTC-USD_1d_2021.json vs data/yahoo_BTC-USD_1d_p1.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo hourly history is limited to range=730d (17,513 bars). 8,813 hourly bars have volume 0 and 33 have null close.",
+    "source": "data/yahoo_BTC-USD_1h_730d.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Coinbase Exchange candles: HTTP 200, no key. Format [time,low,high,open,close,volume], time = bar start in UTC. More than 300 bars per request gives HTTP 400. BTC-USD from 2015-07-20, ETH-USD from 2016-05-18.",
+    "source": "curl api.exchange.coinbase.com/products/*/candles; data/cb_*.json, data/cb_BTC-USD_1d_toolong.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Coinbase public rate limit: 10 requests/s per IP sustained, up to 15 in bursts; HTTP 429 above that.",
+    "source": "https://docs.cdp.coinbase.com/exchange/rest-api/rate-limits",
+    "confidence": "high"
+   },
+   {
+    "fact": "Coinbase /products lists 846 products (517 online, 329 delisted). Delisted UST-USD still returns daily candles for May 2022.",
+    "source": "data/cb_products.json, data/cb_ust_2022.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Kraken public OHLC returns at most 720 latest entries regardless of `since`. Full history is in bulk files: Kraken_OHLCVT_Full.zip.part00-04 (part00 = 2,097,152,000 bytes), 2026Q3 zip 576,348,633 bytes, data through 2026-09-30.",
+    "source": "https://docs.kraken.com/api/docs/rest-api/get-ohlc-data; data/kr_XBTUSD_1d_since2014.json; curl -I assets.kraken.com/marketing/institutions/...; Kraken support article 360047124832",
+    "confidence": "high"
+   },
+   {
+    "fact": "api.binance.com klines returns HTTP 451 (restricted location). data-api.binance.vision klines and data.binance.vision bulk zips return HTTP 200, no key.",
+    "source": "data/bn_btc_1d.json, data/bn_dataapi.json, data/bn_vision_luna_2022-05.zip",
+    "confidence": "high"
+   },
+   {
+    "fact": "Binance BTCUSDT daily: 3,372 bars from 2017-08-17 to 2026-11-09, no gaps. Bar = 00:00:00 to 23:59:59.999 UTC.",
+    "source": "data/bnd_BTCUSDT_1d_full.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "The data.binance.vision archive lists 3,767 spot symbols (776 USDT pairs), delisted included: USTUSDT 2021-12 to 2022-05, BCCUSDT 2017-11 to 2018-11. Archive spot timestamps are in microseconds from 2025-01-01. Checksums match.",
+    "source": "data/binance_vision_spot_symbols.json, data/bn_list_*.xml, data/unz_btc25/, https://github.com/binance/binance-public-data",
+    "confidence": "high"
+   },
+   {
+    "fact": "The Binance symbol LUNAUSDT is reused: old LUNA closed 0.00005 on 2022-05-13, then there are no bars until 2022-05-31, when the new LUNA closed at 8.87.",
+    "source": "data/unz_luna/LUNAUSDT-1d-2022-05.csv",
+    "confidence": "high"
+   },
+   {
+    "fact": "Point-in-time top 25 Binance USDT pairs by median daily quote volume, April 2022: BTC, ETH, GMT, LUNA (#4, $332M/day), BNB, NEAR, SOL ... (343 of 776 USDT symbols had an Apr-2022 file).",
+    "source": "data/binance_pit_top25_2022-04.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "CoinGecko free (no key): market_chart works for 365 days only (error 10012 'Public API users are limited to querying historical data within the past 365 days'). Inactive-coin list is pro-only (error 10005). HTTP 429 'Throttled' on the 3rd call within ~5 s.",
+    "source": "data/cg_btc_mc_max.json, data/cg_luna_hist_2022.json, data/cg_list_inactive.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "CoinGecko daily points sit at 00:00 UTC and equal the price at that moment, i.e. the previous day's close (2026-11-09 00:00 = 74,740.4).",
+    "source": "data/cg_btc_mc_365.json",
+    "confidence": "medium"
+   },
+   {
+    "fact": "CryptoCompare min-api and CoinDesk data-api return HTTP 401 'API key required'.",
+    "source": "data/cc_btc_histoday.json, data/cdx_btc.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Coin Metrics community API: free CapMrktCurUSD for 135 assets. BTC from 2010-07-18. FTT included (from 2019-08-20). LUNA, UST and SOL absent.",
+    "source": "data/cm_catalog.json, data/cm_ftt_luna.json, data/cm_btc_first.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "The CoinMarketCap internal data-api returned a point-in-time listing for 2022-05-01 (LUNA #8 $28.36B, UST #10 $18.56B). A second call was blocked by the session's safety filter. The endpoint is undocumented.",
+    "source": "data/cmc_dataapi_hist.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo still serves 2022 data for LUNC-USD (old LUNA), USTC-USD and FTT-USD. LUNA-USD, LUNA1-USD and UST-USD return 404 for that range. On 2022-05-12, Yahoo LUNC closed at 0.00417 vs Binance LUNAUSDT 0.00032.",
+    "source": "data/yahoo_dead_*.json (curl only; I did not keep them all), data/unz_luna/",
+    "confidence": "high"
+   },
+   {
+    "fact": "Crypto daily open equals prior close: Coinbase 2021 median |open/prev close - 1| is 0.2 bp (max 5.7). Binance BTCUSDT median 0.0 bp (p99 22.1).",
+    "source": "data/cb_BTC-USD_1d_2021.json, data/bnd_BTCUSDT_1d_full.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Binance BTCUSDT vs Coinbase BTC-USD daily close, 2021: median -5.3 bp, max |diff| 42 bp (USDT vs USD basis plus venue).",
+    "source": "data/bnd_btc_2021.json vs data/cb_BTC-USD_1d_2021.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "Survivorship bias in crypto, 2014-2021 (3,904 coins): 0.93%/yr for value-weighted and 62.19%/yr for equal-weighted portfolios.",
+    "source": "https://diffform.netlify.app/publication/2022_liebi_survivorship (Liebi & Stöckl 2022, secondary page; I did not read the PDF)",
+    "confidence": "medium"
+   },
+   {
+    "fact": "The current code assumes a stock calendar: TD=252 in metrics.py, TRADING_DAYS=252 in signals.py, BDay offsets in cycle.py:207/270, NYSE hours in news_live.py:136. fetch_panel drops dates where fewer than 50% of symbols have data.",
+    "source": "grep of /home/user/OmniRoute/ai-trader/aitrader/*.py; data.py fetch_panel",
+    "confidence": "high"
+   }
+  ],
+  "risks": [
+   "Same price for signal and fill: on 24/7 markets, open[t+1] equals close[t] (median 0-0.2 bp). Reusing the stock rule 'decide at close, fill at next open' means filling at the signal price. Backtests need an explicit delay (for example the 01:00 UTC hourly open, or a VWAP over several hours) plus realistic spread and fees. This needs quant-critic review.",
+   "Stale last bar: Yahoo's just-completed daily close can be off by ~20 bp (11-08: 74,584.65 vs ~74,740 on the venues). Live decisions at 00:00 UTC should use exchange candles (Binance, Coinbase or Kraken), not Yahoo.",
+   "Silent downgrade to coarse bars: Yahoo range=max returns monthly or weekly bars without an error. Code must check meta.dataGranularity == '1d'.",
+   "Ticker reuse and renames: LUNAUSDT on Binance is two different coins, and Yahoo renamed old LUNA to LUNC-USD. Joining by symbol alone splices different assets. Split a symbol's history on gaps longer than a few days and key on a stable asset ID.",
+   "Delisting and halts: Binance halted LUNA on 2022-05-13 at 0.00005 and printed no bars until a different coin on 05-31. A backtest must close a delisted holding at the last price (consider a haircut) and must not carry it into the reused symbol.",
+   "Sources disagree in crashes: Yahoo and Binance LUNA closes differed 13x on 2022-05-12. Crash results depend on which source is used, so pick one per asset, record it, and cross-check.",
+   "USDT is not USD: Binance prices are in USDT. The 2021 basis vs Coinbase USD had median -5 bp, max 42 bp. A USDT de-peg would distort returns. Convert to USD or record the basis (USDT-USD conversion was not tested here).",
+   "Binance universe bias: a liquidity rank picks hype tokens (GMT #3, APE, JASMY in Apr-2022) and depends on Binance's own listing choices, which tend to follow pumps. History starts only in 2017-08. Coinbase has regulation-driven holes (XRP absence is from memory, not checked).",
+   "No free point-in-time market caps: CoinGecko free is capped at 365 days, CryptoCompare needs a key, Coin Metrics covers only 135 assets (no LUNA, UST or SOL), and the CMC internal endpoint is undocumented and possibly against its terms. A market-cap universe needs a paid plan or a key that Nimrod would have to sign up for himself.",
+   "Integration risk in the code: 252-day annualization and lookbacks, BDay offsets, NYSE-hours checks, and fetch_panel's 50% date filter would all mis-handle crypto's 365 days and weekends. A separate crypto panel and calendar is needed.",
+   "Binance archive names: 2 symbols failed on non-ASCII characters, so URLs must be percent-encoded. data.binance.vision daily files appear only the next day; live use should take data-api.binance.vision klines."
+  ],
+  "recommendation": "PRIMARY: Binance public market data with no key. Use the data.binance.vision bulk archive (monthly 1d and 1h zips with SHA256 checksums, delisted pairs kept) for history from 2017-08. Use data-api.binance.vision /api/v3/klines for live and incremental bars. Only take bars whose close time is before the decision time, and parse archive timestamps as microseconds from 2025 on. It is the only free source that gives a broad universe including delisted coins, with quote volume, that can be downloaded in bulk.\n\nFALLBACK and cross-check: Coinbase Exchange candles (USD, no key, delisted products kept, BTC from 2015-07-20, 300 bars/request, 10 requests/s). Use them to cross-check closes on overlapping names, and as the USD-quoted source if Nimrod wants USD rather than USDT.\n\nTERTIARY: Yahoo, which data.py already handles. It is useful for long BTC-only history (from 2014-09-17) and for quick checks. It must use period1/period2 or range<=10y and verify dataGranularity, and must never be trusted for the just-completed day. Kraken bulk files (about 10 GB) are an optional deep-history source for later; skip CoinGecko, CryptoCompare and CMC for now.\n\nUNIVERSE (survivorship-safe, free):\n- Rebalance monthly at a 00:00 UTC close t.\n- Candidates are every Binance USDT spot pair whose bars exist through t, including pairs delisted later.\n- Require at least 90 days of history. That number is an estimate and belongs in config.json.\n- Exclude stablecoins, fiat, wrapped coins, gold tokens and leveraged UP/DOWN/BULL/BEAR tokens via a deny-list in config.json.\n- Rank by trailing 30-day median daily quote volume ending at the t-1 close, and keep the top N (10-20, set in config.json).\n- Split a symbol's identity on data gaps longer than about 3 days (the LUNAUSDT case).\n- Close delisted holdings at the last print, with a configurable haircut.\n- Prefer value or liquidity weighting over equal weighting, where survivorship bias is far larger (0.93%/yr vs 62.19%/yr in Liebi & Stöckl).\n\nThe April 2022 demo (LUNA ranked #4) shows the method keeps coins that later died. Before any strategy work:\n- Add an explicit execution delay; next open equals this close in crypto.\n- Use 365-day annualization and a separate crypto calendar and panel.\n- Run it through the time machine and quant-critic, per the repo's CLAUDE.md rule 4."
+ },
+ {
+  "summary": "Bottom line: for a daily, long-only, paper spot bot, the evidence points to one main signal family, time-series trend on BTC/ETH, with volatility targeting as a sizing layer. Cross-sectional coin momentum is a weak third candidate. Everything else is a skip, mostly because it lives in illiquid coins, has faded since publication, or moves faster than a decide-at-close/fill-next-open loop can act.\n\nWhat the papers show:\n- **Short-horizon momentum was real early on.** Liu & Tsyvinski (NBER WP 24877, BTC 2011-01 to 2018-05): a 1 SD rise in today's BTC return predicted +0.33% the next day. The top weekly quintile earned 11.22%/wk (Sharpe 0.45) against 2.60%/wk (0.19) for the bottom one.\n- **Cross-sectional momentum among coins.** Liu, Tsyvinski & Wu (JF 2022; coins above $1M market cap, 2014-2018, weekly quintiles) found 1- to 4-week long-short momentum of 2.7/3.3/4.1/2.5% per week, gross. It came entirely from larger coins: 4.2%/wk above the median size, an insignificant 0.6% below it.\n- **The short-horizon effect decayed.** Liu, Wang & Yan (AEL 2023) found BTC momentum significant before the Dec-2017 futures launch, then an insignificant reversal, and both gone after COVID. A Swinkels seminar abstract (3,100 coins, 2013-2018; seen only as a search snippet) says 1-day to 1-month TSMOM disappeared after futures. Grobys & Sapkota (143 coins, 2014-2018) found no significant momentum.\n- **Costs kill the cross-section.** Han, Kang & Ryu: under realistic costs and intraday swings, many momentum portfolios get liquidated; time-series evidence stays strong while cross-sectional evidence is weak, and TSMOM is concentrated in bull markets. Fieberg, Liedtke & Zaremba (IRFA 2024): momentum survives in large coins but costs a lot, earns its alpha mostly on the short side (not available to us on spot), and fades over time. Size and volume effects come from micro-caps.\n- **Slower trend rules held up better.** Hudson & Urquhart: about 15,000 rules stay significant after data-snooping corrections. Detzel et al. (FM 2021): price-to-moving-average ratios forecast daily BTC returns out of sample. Deprez & Frommel (2024): out-of-sample, the best rules after costs beat buy-and-hold on a risk-adjusted basis. Zarattini, Pagani & Barbon (2025; Jan 2015 to Mar 2025; survivorship-free data; top-20 rotation; Donchian ensemble; 25% vol target): net Sharpe above 1.5 and 10.8% alpha versus BTC. Their headline assumes only 0.10% cost per trade.\n- **Volatility management.** Grobys et al. (FMPM 2025): crypto momentum crashes badly. Vol scaling lifts average weekly raw returns by more than 200%, but the tail risk stays the same.\n\nSignals to skip:\n- **Day-of-week:** BTC showed a Monday effect in 2013-2017, but the trading simulation was no better than random (Caporale & Plastun).\n- **Short-term reversal:** the largest coins show daily momentum, not reversal (Zaremba et al. 2021), so reversal lives where trading costs are highest.\n- **On-chain data:** no rigorous out-of-sample daily evidence. The best paper finds USDT exchange inflows predict returns only at intraday horizons.\n- **News as an entry signal:** ChatGPT-labelled BTC news sentiment improves in-sample fit but gives no significant out-of-sample gain (Fiszeder, Orzeszko & Pietrzyk). A single Musk tweet moved DOGE +8.16% in 5 minutes, peaking at 17.31% after 60 minutes (Ante), so a daily loop arrives after the move.\n\nCosts for a retail trader:\n- **Kraken Pro tier 1:** 0.40% maker / 0.80% taker.\n- **Coinbase Advanced (US Intro tier):** 0.50% / 0.90%, per a secondary source that checked it on 21-Oct-2026.\n- **Binance Regular:** 0.10% / 0.10%.\n- **Kraken instant buy:** 1%.\n- **Spreads and depth:** BTC spread on Coinbase was under 1 bp in early 2024 (Kaiko). 1% depth is about $16-20M on Coinbase and about $30M on Binance.\n- **Weekends:** weekend volume fell to 16% of the total in 2023 (28% in 2019), and recent crashes started on thin weekends.\n\nFor our size, fees matter far more than slippage. Turnover of 85%/week at 0.80% taker works out to roughly 35%/yr of drag (my arithmetic). That kills weekly coin rotation at retail fee tiers.\n\nRepo facts that block a direct port:\n- **252 is hard-coded:** `/home/user/OmniRoute/ai-trader/aitrader/signals.py:13` (TRADING_DAYS), `/home/user/OmniRoute/ai-trader/aitrader/metrics.py:10` (TD), `/home/user/OmniRoute/ai-trader/aitrader/broker.py:38` and `/home/user/OmniRoute/ai-trader/aitrader/backtest.py:170-171`. Crypto trades 365 days a year. This also breaks hard rule 5.\n- **Weekend rows get dropped:** `/home/user/OmniRoute/ai-trader/aitrader/data.py:150-151` drops dates where fewer than 50% of symbols have a bar. Crypto mixed into the stock universe loses its weekend bars, and fills are keyed to 09:30 New York opens (`official_opens`, data.py:266).\n- **The -3% stop is too tight:** the owner's stop (config.json line 210) is about 1.3 daily SD for BTC. K33 put 2025 BTC daily vol at 2.24%. A driftless random walk would hit -3% within 5 days about 55% of the time (estimate, Brownian-motion approximation).",
+  "facts": [
+   {
+    "fact": "Liu & Tsyvinski (NBER WP 24877, Aug 2018; published RFS 34(6) 2021): BTC sample 2011-01-01 to 2018-05-31 (ETH from 2015-08-07). Weekly mean BTC return 3.79%, SD 16.64%. A 1 SD rise in the current day's BTC return predicts +0.33% the next day. Weekly quintiles at the 1-week horizon: top 11.22%/wk (Sharpe 0.45) vs bottom 2.60%/wk (Sharpe 0.19). The momentum effect is weaker for ETH.",
+    "source": "https://www.nber.org/system/files/working_papers/w24877/w24877.pdf (pages 2-4)",
+    "confidence": "high"
+   },
+   {
+    "fact": "Liu & Tsyvinski WP: investor attention predicts returns. A 1 SD rise in Google searches for 'Bitcoin' gives +2.3% 2-week-ahead BTC return; a 1 SD rise in Twitter post count gives +2.50% the next week. Price-to-'dividend' (wallet users) has no predictive power. Sample ends May 2018.",
+    "source": "https://www.nber.org/system/files/working_papers/w24877/w24877.pdf (page 3)",
+    "confidence": "high"
+   },
+   {
+    "fact": "Liu, Tsyvinski & Wu (JF 77(2) 2022; coins above $1M market cap, Jan 2014 to Dec 2018, 109 growing to 1,583 coins): weekly long-short quintile momentum earns 2.7% (1-wk), 3.3% (2-wk), 4.1% (3-wk) and 2.5% (4-wk) per week, gross excess. Size long-short earns 3.4%/wk. Momentum is 4.2%/wk among above-median-size coins vs an insignificant 0.6%/wk below the median. Shorting BTC instead of the bottom quintile barely changes results.",
+    "source": "https://cowles.yale.edu/sites/default/files/2022-10/LiuTsyvinskiWu2019%20COMMON%20RISK%20FACTORS.pdf (pages 2-3)",
+    "confidence": "high"
+   },
+   {
+    "fact": "Liu, Wang & Yan (Applied Economics Letters 30(12), 2023): Bitcoin had significant momentum before the futures launch (Dec 2017), then an insignificant reversal. After COVID-19 both effects disappeared. The authors attribute this to faster response to information.",
+    "source": "https://ideas.repec.org/a/taf/apeclt/v30y2023i12p1685-1691.html",
+    "confidence": "high"
+   },
+   {
+    "fact": "Swinkels seminar (Erasmus, Nov 2018; over 3,100 coins, Apr 2013 to Aug 2018): short-horizon (1 day to 1 month) time-series momentum 'seems to have disappeared after the introduction of bitcoin futures'. The page returned 503; seen only via a search-result snippet.",
+    "source": "https://utilities.tinbergen.nl/?p=66235",
+    "confidence": "low"
+   },
+   {
+    "fact": "Grobys & Sapkota (Economics Letters 180, 2019; 143 coins, 2014-2018): no significant momentum payoffs and no strong support for Moskowitz-Ooi-Pedersen-style TSMOM.",
+    "source": "https://econpapers.repec.org/RePEc:eee:ecolet:v:180:y:2019:i:c:p:6-10",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Han, Kang & Ryu (working paper, 'under Realistic Assumptions'): accounting for transaction costs and daily price swings, many momentum portfolios are liquidated and many significant returns become insignificant. Evidence for time-series momentum is strong, for cross-sectional momentum weak. TSMOM is concentrated in bull markets.",
+    "source": "https://acfr.aut.ac.nz/__data/assets/pdf_file/0009/918729/Time_Series_and_Cross_Sectional_Momentum_in_the_Cryptocurrency_Market_with_IA.pdf (403 on fetch; abstract via search results)",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Fieberg, Liedtke & Zaremba (IRFA vol 94, 2024): size and volume anomalies trace to micro-caps. Momentum persists in larger coins but incurs substantial trading costs, gets its alpha mostly from short positions, and abnormal returns appear mainly in bull markets and fade over time. A search snippet adds that alphas fall 26-53% after costs and turnover reaches up to 85% per week.",
+    "source": "https://open.icm.edu.pl/bitstreams/745c4481-39b0-43b6-bac6-cc28a745d332/download (403; abstract via search results); https://www.econbiz.de/Record/cryptocurrency-anomalies-and-economic-constraints/10014543917",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Dobrynskaya (about 2,000 coins, 2014-2020): momentum peaks with a 2-week ranking/holding/rebalance period (about 70% per year). Reversal starts around 4-6 weeks. Returns vary a lot over time. Press release only.",
+    "source": "https://www.hse.ru/en/news/research/559533243.html",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Hudson & Urquhart (Annals of OR 297, 2021): about 15,000 technical rules on BTC, LTC, ETH and XRP. Each rule family's average return is significant at 5%, and a large share stays significant after data-snooping corrections. Breakeven costs are well above typical crypto costs.",
+    "source": "https://centaur.reading.ac.uk/85715",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Detzel, Liu, Strauss, Zhou & Zhu (Financial Management 50(1), 2021): ratios of price to moving averages forecast daily Bitcoin returns in and out of sample. Strategies built on them give positive alpha and a higher Sharpe than buy-and-hold.",
+    "source": "https://profiles.wustl.edu/en/publications/learning-and-predictability-via-technical-analysis-evidence-from-/",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Deprez & Frommel (IREF 93, 2024): 75,360 simple rules at daily and intraday frequency. The best rules after costs, picked by a multiple-testing procedure, beat buy-and-hold out of sample, especially on a risk-return basis.",
+    "source": "https://ideas.repec.org/a/eee/reveco/v93y2024ipbp858-874.html",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Zarattini, Pagani & Barbon (SFI RP 25-80, 2025): long-only Donchian-ensemble trend strategy, survivorship-free data since 2015, rotating top-20 most liquid coins. Net of fees: Sharpe above 1.5 and annualized alpha of 10.8% vs BTC. Per CXO: backtest Jan 2015 to mid-Mar 2025; costs tested at 0.10/0.25/0.50% with the headline at 0.10%; positions sized daily to 25% annual vol, leverage capped at 200%; net CAGR 18% (it is unclear which variant that refers to).",
+    "source": "https://abarbon.com/papers/catching-crypto-trends ; https://www.cxoadvisory.com/technical-trading/crypto-asset-trend-following-strategies/",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Grobys et al. ('Cryptocurrency momentum has (not) its moments', FMPM 2025; large-cap coins): crypto momentum is subject to severe crashes. Volatility-managed (Barroso/Santa-Clara) versions raise average weekly raw returns by more than 200% and keep significant intercepts after factor adjustment. Tail-risk power-law exponents are unchanged. A single coin can make momentum returns insignificant.",
+    "source": "https://link.springer.com/article/10.1007/s11408-025-00474-9 (auth redirect; abstract via search results)",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Caporale & Plastun (Finance Research Letters 31, 2019; 2013-2017): only BTC shows a day-of-week anomaly (higher Monday returns). LTC, XRP and DASH do not. The trading simulation is mostly not statistically different from random trading.",
+    "source": "https://bura.brunel.ac.uk/handle/2438/17208",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Zaremba, Bilgin, Long, Mercik & Szczygielski (IRFA 78, 2021): yesterday's return predicts crypto returns. The largest and most tradeable coins show daily momentum rather than reversal. Fičura (2023) links reversal to small, low-volume coins.",
+    "source": "https://ideas.repec.org/a/eee/finana/v78y2021ics1057521921002349.html ; https://ideas.repec.org/p/prg/jnlwps/v5y2023id5.003.html",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Fiszeder, Orzeszko & Pietrzyk: ChatGPT-labelled Bitcoin news sentiment significantly improves in-sample estimation of returns and volatility but gives no statistically significant out-of-sample forecasting gain. This is consistent with semi-strong efficiency.",
+    "source": "https://www.wne.uw.edu.pl/en/research/conferences-and-seminars/upcoming-events/lecture-researchers-nicolaus-copernicus-university-torun",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Ante (Blockchain Research Lab): after a Musk tweet, DOGE abnormal return was 8.16% within 5 minutes and peaked at 17.31% after 60 minutes. Abnormal returns reached up to 18.99% for BTC. Not all tweets move prices.",
+    "source": "https://www.blockchainresearchlab.org/2021/02/08/the-musk-effect-how-elon-musks-tweets-affect-the-cryptocurrency-market/",
+    "confidence": "medium"
+   },
+   {
+    "fact": "On-chain flows (arXiv 2411.06327): USDT inflows into exchanges predict higher BTC/ETH returns at some intraday horizons. BTC's own net inflows have no predictive power for BTC returns except at 4 hours, and they negatively predict volatility.",
+    "source": "https://arxiv.org/pdf/2411.06327",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Kraken Pro spot fees, Tier 1 ($0+ 30-day volume): 0.40% maker / 0.80% taker. Tier 2 ($2.5K+): 0.30% / 0.60%. Tier 3 ($10K+): 0.22% / 0.38%. Kraken app instant buy: 1%, custom orders 1.5%.",
+    "source": "https://www.kraken.com/pro/fees ; https://www.kraken.com/features/fee-schedule",
+    "confidence": "high"
+   },
+   {
+    "fact": "Coinbase Advanced US Intro tier ($0 volume): 0.50% maker / 0.90% taker after a 16-Sep-2026 restructuring, per a secondary source checked 21-Oct-2026. Older sources cite 0.40%/0.60% or 0.60%/1.20%. Coinbase's own page returned 403, and Coinbase shows the personal rate only after login.",
+    "source": "https://www.altrady.com/blog/crypto-trading-platforms/coinbase-advanced-trade ; https://brokerchooser.com/news/coinbase-vs-kraken-fee-structures-and-trading-features-compared--bbeea493",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Binance spot, Regular tier: 0.100% maker / 0.100% taker, or 0.075% with the BNB 25% discount.",
+    "source": "https://www.binance.com/en/fee/schedule",
+    "confidence": "high"
+   },
+   {
+    "fact": "Kaiko: BTC spreads on Coinbase peaked at 1.7 bp (Bitstamp 6.7 bp) during 8-13 Jan 2024, then fell below 1 bp. BTC 1% order-book depth averaged about $30M on Binance and $16-20M on Coinbase (Jan 2025 to Apr 2026).",
+    "source": "https://crypto.news/?p=14245733 ; https://cryptoslate.com/?p=528752",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Kaiko: weekend share of BTC volume fell from 28% in 2019 to 16% over the following year (about 2023), and to about 13% in early 2024. US exchanges are lower (11%). Recent sharp sell-offs (Oct 2025, Mar 2026) began on thin weekends.",
+    "source": "https://www.theblock.co/news/ecosystems/2024-06-30-bitcoin-sees-all-time-low-weekend-trading-levels-following-etf-approvals-kaiko-302705 ; https://decrypt.co/219288/bitcoin-crypto-weekend-trading-liquidity-kaiko ; https://cryptoslate.com/?p=528752",
+    "confidence": "medium"
+   },
+   {
+    "fact": "K33 Research: BTC realized daily volatility was 2.24% in 2025, the lowest in its history (seen via a KuCoin news page). Annualized with sqrt(365) that is about 43% (my calculation). Against that, a -3% stop is about 1.3 daily SD. In a driftless Brownian-motion approximation the touch probability is about 55% within 5 days and about 76% within 20 days (my estimate, ignoring fat tails).",
+    "source": "https://www.kucoin.com/news/flash/bitcoin-volatility-drops-to-2-24-in-2025-lower-than-nvidia (secondary); touch probabilities are my own calculation",
+    "confidence": "low"
+   },
+   {
+    "fact": "The repo hard-codes a 252-day year for crypto-relevant math: TRADING_DAYS=252 in signals.py:13 (realized_vol, tsmom horizon scaling), TD=252 in metrics.py:10, trading_days=252 default in broker.py:38, and 252 in backtest.py:170-171. tsmom/xsmom default lookback=252 bars with skip=21.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/signals.py, metrics.py, broker.py, backtest.py (Grep output)",
+    "confidence": "high"
+   },
+   {
+    "fact": "data.py fetch_panel keeps only dates where at least 50% of symbols have a close (lines 150-151). Live fills use the 09:30 New York 1-minute open (official_opens, line 266). The owner's news rules in config.json: buy_min_score 8, max_position_pct 0.05, stop_loss_pct 0.03.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/data.py ; /home/user/OmniRoute/ai-trader/config.json lines 205-211",
+    "confidence": "high"
+   }
+  ],
+  "risks": [
+   "Fee mismatch: published trend results assume about 0.10% per trade (Zarattini headline; Binance-level fees). Retail entry tiers are 0.80% taker on Kraken Pro and 0.90% on Coinbase Advanced US, 8-9x higher. Any crypto backtest must use the venue's real tier-1 fee as the base case, with maker or lower fees only as a sensitivity.",
+   "Short-horizon momentum (daily/weekly, 1-4 weeks) has documented post-2017 decay: Liu-Wang-Yan 2023, the Swinkels snippet, and Grobys-Sapkota. The famous Liu-Tsyvinski and LTW numbers come from 2011-2018 and are gross of costs. Do not use them as priors for effect size.",
+   "Cross-sectional coin momentum earns its alpha largely from shorts and in bull markets, and fades over time (FLZ 2024). A spot long-only bot cannot capture the short leg.",
+   "Survivorship bias: Yahoo lists only coins that still trade, while dead coins vanish. Any altcoin-universe backtest on Yahoo data will be biased upward. Zarattini used a survivorship-free dataset. Restrict to BTC/ETH or a universe frozen ex-ante.",
+   "Short sample and regime dependence: Yahoo BTC-USD history starts around Sep 2014 (start date unverified) and ETH later. That is only about 3 bull/bear cycles, so there are few independent trend episodes, the DSR haircut is large, and TSMOM is reported as concentrated in bull markets (Han-Kang-Ryu).",
+   "Calendar bug risk: hard-coded 252 understates crypto annualized vol by sqrt(365/252), about 1.20x. That mis-scales vol targeting, and lookback=252 bars means about 8.3 months, not 12. data.py's 50%-coverage filter would silently drop crypto weekend bars or blank stocks on weekends. Crypto needs its own panel, calendar and annualization constant in config.json (rule 5).",
+   "Fill timing: the cycle fills at the 09:30 New York open. Crypto has no session open (Yahoo's daily bar opens at 00:00 UTC). Mixing those timestamps could create look-ahead or stale fills in the time machine.",
+   "The owner's -3% stop is about 1.3 daily SD for BTC (2025 vol) and less for ETH and altcoins. It will trigger on noise most weeks and turn trend positions into churn plus fees. This needs evidence from the time machine and a decision from Nimrod, not a silent change.",
+   "The news-headline buy rule (score > 8) has the weakest support for crypto. LLM sentiment shows no out-of-sample gain for BTC (Fiszeder et al.), and tweet shocks are priced within 5-60 minutes (Ante), long before a daily cycle acts. Use news only as a risk-reducing veto (rule 3). Claude's own scoring also cannot be backtested (rule 7).",
+   "Weekend liquidity is thin: weekend volume is 13-16% of the total, spreads are wider, and crashes started on weekends. A bot that only acts on weekdays carries weekend gap risk without being able to react.",
+   "Evidence gaps: several key papers were read only through abstracts or search snippets (Han-Kang-Ryu, FLZ 2024, Grobys 2025, Swinkels). The Coinbase fee figure is secondary. The K33 vol figure is secondary. The touch probabilities are my own estimates.",
+   "Wider risks: exchange/custody, regulatory and stablecoin risks are not modelled in a paper broker. Paper results will flatter real-money results."
+  ],
+  "recommendation": "Test in the time machine, in this order, with crypto on its own panel (365-day year, crypto-specific annualization in config.json, fills at the daily 00:00 UTC bar, never mixed into the stock panel). Base-case costs: 0.80% per side, the Kraken Pro tier-1 taker fee. Sensitivities: 0.40% maker, 0.25% and 0.10%.\n\n1) Long-only time-series trend on BTC and ETH only. Use a multi-horizon ensemble rather than one tuned lookback: for example price vs 20/50/100/200-day MAs or Donchian breakouts, roughly 3 weeks to 12 months. A daily signal with weekly or slower rebalancing and no-trade bands to cut fees, and cash when the trend is off. This is the best-supported family: Hudson-Urquhart, Detzel et al., Deprez-Frommel, Zarattini 2015-2025, and Han-Kang-Ryu's 'TS strong' finding. Expect much less than the published Sharpe of about 1.5 at retail fees.\n\n2) A volatility-targeting overlay on that trend sleeve. Size by an inverse of realized vol with no leverage (cap 1x), and use a crypto sleeve budget small enough that a 70-80% BTC drawdown cannot breach the account drawdown breaker. Supported by Grobys 2025 (crash mitigation) and Zarattini (25% target). Judge it on drawdown and Sharpe, not return.\n\n3) Optional, lowest priority: a long-only 2-4 week cross-sectional momentum tilt among a fixed, ex-ante list of the top ~10 liquid coins. Expect it to fail after costs, survivorship bias and decay (FLZ 2024, Han-Kang-Ryu). Run it only as a falsification test with the quant-critic.\n\nSkip:\n- short-term reversal (illiquid coins only),\n- size and volume factors (micro-caps),\n- day-of-week and weekend effects (no better than random),\n- Google Trends and Twitter attention (2011-2018 evidence only, and the data rescales over time),\n- on-chain metrics (no out-of-sample daily evidence, paid data),\n- news or LLM headline score as an entry signal (no out-of-sample gain; priced within minutes). Keep news only as a veto/shrink that can reduce risk.\n\nBefore any live paper cycle, raise the -3% stop question with Nimrod, one question with options. Present time-machine evidence of how often -3% triggers on BTC/ETH versus a vol-scaled stop. Do not change his rule silently."
+ },
+ {
+  "summary": "What is worth borrowing for a paper-only, long-only crypto spot book: ideas, not installs.\n\n1. Freqtrade's two bias checkers are the best ideas. The licence is GPL-3.0, so we rewrite the ideas in our own code and copy none of theirs.\n   - lookahead-analysis: run one full backtest, then rerun on sliced data for each entry and exit signal, and compare the dataframes. It reports which signals and indicators are biased. Limit: signals that never fire are never checked.\n   - recursive-analysis: compute the indicators with different startup lengths and compare the last-row values against a long baseline (5000+ candles).\n   - Both map onto `unittest` checks we can write ourselves. One test: recompute the signals on data cut off at day t and assert they equal the full-history values at t. The other: measure how much indicators drift with startup length. This matters because `signals.py:95-96` computes RSI with `ewm(adjust=False)`, which is recursive, and new coins have short histories.\n   - Also worth taking: freqtrade's list of common mistakes (`shift(-1)`, means over a whole column, `resample` labelled on the left, plain merges of higher timeframes), its pair filters (AgeFilter, SpreadFilter, PriceFilter, DelistFilter) and its protections (StoplossGuard, MaxDrawdown, CooldownPeriod).\n   - Not worth taking: VolumePairList cannot be backtested. Freqtrade fills stops exactly at the stop price even when the low went below it, and models no slippage. Both are too optimistic for crypto gaps.\n\n2. NautilusTrader (LGPL-3.0) gives the key timestamp rule.\n   - A bar must become visible only at its close. If the data stamps a bar with its open time, add one interval.\n   - Exchange klines are stamped with the open time: Binance identifies klines by their open time. CoinGecko's OHLC timestamp is the close time.\n   - Mixing the two conventions silently creates a one-bar look-ahead.\n\n3. Yahoo already serves crypto through the same endpoint `data.py:29` uses, so no new dependency is needed.\n   - BTC-USD returns timezone UTC, exchange \"CCC\", daily bars stamped 00:00 UTC.\n   - The last row is today's unfinished day (trading period 00:00 to 23:59 UTC).\n   - So a decision at the US close (16:00 ET = 21:00 UTC in winter) sees an incomplete crypto day. A backtest that uses the full day-D bar for that decision looks about 3 hours ahead (4 hours in summer). Crypto needs its own decision time: the completed UTC day.\n   - 252 trading days is hard-coded in `signals.py:13`, `metrics.py:10`, `broker.py:38` and `backtest.py:170-171`. Crypto trades 365 days a year, so using 252 understates annual volatility by about 1.20x (sqrt(365/252), my own arithmetic), and a \"1-year\" lookback of 252 rows covers only about 8.3 months.\n\n4. ccxt (MIT, 103 exchanges) is fine as an optional second, public, keyless OHLCV source for cross-checking. Caveats:\n   - The newest candle may be incomplete, and history depth is limited.\n   - Kraken returns only the 720 most recent candles (about 2 years of daily bars), and its last entry is not final.\n   - Binance blocks US IPs with HTTP 451 (forum evidence).\n\n5. CoinGecko's keyless MCP server (`https://mcp.api.coingecko.com/mcp`) is useful only for research and universe context. Its Demo history is limited to 365 days, and OHLC requests longer than 31 days come back as 4-day candles. Picking coins by today's market-cap rank adds survivorship bias to any backtest.\n\n6. Paper-trading engines we could later use as an independent forward check, not as our ledger. Each needs Nimrod's yes before anything is installed or connected.\n   - Kraken CLI (MIT, Rust): spot paper trading against live prices with no sign-in. Default fee 0.26% taker. Buys fill at the ask, sells at the bid. Its MCP server enables `market`, `account`, `paper`, `workspace` and `feedback` by default; live trading (`trade`) has to be switched on deliberately.\n   - Alpaca: crypto paper trading, no shorting, no margin, 24/7, about 20 coins. Fees 25 bps taker at the lowest tier. Its MCP server (MIT) defaults to paper, but a single environment variable (`ALPACA_PAPER_TRADE=false`) switches it to live.\n\n7. Liquid (liquid.trade) does not fit.\n   - It is mainly perpetual futures: crypto up to 40x leverage, up to 50x on some markets. It also has spot (USDC pairs, no leverage, $10 minimum, market and limit orders only).\n   - Its paper mode exists, but its docs say \"Spot markets aren't available\" in paper mode. So paper trading on Liquid means leveraged perps, with funding and liquidation.\n   - Its MCP server (`https://coinvest.liquid.trade/mcp`) uses an OAuth sign-in and offers `read` and `trade` scopes. Its \"Co-Invest Computer\" can send orders automatically within user-set limits.\n   - Orders route to Hyperliquid, Lighter and Ostium.\n   - One idea worth taking: its limit list (max notional, required stop-loss, symbol list, daily order cap, expiry) is a good template for our own `config.json`.\n\n8. Frameworks to skip installing:\n   - Jesse (MIT): live and paper trading need a paid plugin, with conflicting prices; its Optuna parameter search invites overfitting.\n   - Hummingbot (Apache-2.0): built for market making; its MCP server needs a running Hummingbot API.\n   - NautilusTrader: heavy, Rust-based.\n   - vectorbt (Apache-2.0 with Commons Clause): vectorized backtests make look-ahead easy; we already replay day by day.\n   - Community Claude skills (tradermonty `crypto-regime-analyzer`, jeremylongshore backtest skill): worth reading for ideas only.\n\nNothing was installed, edited or run against the repo. The only network calls were public reads.",
+  "facts": [
+   {
+    "fact": "freqtrade is licensed GNU GPL v3 (29 June 2007)",
+    "source": "https://raw.githubusercontent.com/freqtrade/freqtrade/develop/LICENSE",
+    "confidence": "high"
+   },
+   {
+    "fact": "freqtrade README: 56.7k stars; spot and futures supported; dry-run recommended before risking money; 'Do not risk money which you are afraid to lose'",
+    "source": "https://github.com/freqtrade/freqtrade",
+    "confidence": "high"
+   },
+   {
+    "fact": "freqtrade lookahead-analysis runs a baseline backtest, then sliced backtests per entry/exit signal, compares dataframes; reports has_bias, biased_entry_signals, biased_exit_signals, biased_indicators; default 20 signals checked; untriggered signals are not verified (false negatives possible)",
+    "source": "https://www.freqtrade.io/en/stable/lookahead-analysis/",
+    "confidence": "high"
+   },
+   {
+    "fact": "freqtrade recursive-analysis recomputes indicators with different startup_candle_count values (e.g. 20..999), compares last-row values to a benchmark (recommended at least 5000 candles), reports % variance; only checks populate_indicators, only the last row",
+    "source": "https://www.freqtrade.io/en/stable/recursive-analysis/",
+    "confidence": "high"
+   },
+   {
+    "fact": "freqtrade common mistakes: no shift(-1), no iloc[-1] in populate_ functions, no whole-column functions like mean (use rolling), resample needs label='right', no plain merge of longer timeframes; example startup_candle_count 400 for EMA100",
+    "source": "https://www.freqtrade.io/en/stable/strategy-customization/",
+    "confidence": "high"
+   },
+   {
+    "fact": "freqtrade backtest assumptions: entries at open price; signal exits at open of the following candle; no slippage; stoploss exits exactly at stop price even if low was lower; low assumed before high",
+    "source": "https://www.freqtrade.io/en/stable/backtesting/",
+    "confidence": "high"
+   },
+   {
+    "fact": "freqtrade dry-run: orders simulated, read-only exchange calls; market orders fill on orderbook volume with max 5% slippage; dry_run_wallet defaults to 1000",
+    "source": "https://www.freqtrade.io/en/stable/configuration/",
+    "confidence": "high"
+   },
+   {
+    "fact": "freqtrade AgeFilter default min_days_listed 10; SpreadFilter default max_spread_ratio 0.005; DelistFilter, PriceFilter low_price_ratio; VolumePairList does not support backtesting; protections StoplossGuard, MaxDrawdown, LowProfitPairs, CooldownPeriod; MarketCapPairList uses CoinGecko rank",
+    "source": "https://www.freqtrade.io/en/stable/plugins/",
+    "confidence": "high"
+   },
+   {
+    "fact": "freqtrade download-data: downloads reaching further back 'will silently return no data for the missing period'; --dl-trades advised only for Kraken because Kraken lacks historic OHLCV",
+    "source": "https://www.freqtrade.io/en/stable/data-download/",
+    "confidence": "high"
+   },
+   {
+    "fact": "Jesse: MIT license, 8.8k stars, claims backtests without look-ahead bias, Optuna optimization with Ray, ships a local MCP server for Claude/Codex/Cursor",
+    "source": "https://github.com/jesse-ai/jesse",
+    "confidence": "high"
+   },
+   {
+    "fact": "Jesse live/paper trading uses an official plugin needing a license key; reported price conflicts (Toolradar lists Pro Lifetime $999; Gainium lists $800/yr); jesse.trade/pricing returned 403",
+    "source": "https://docs.jesse.trade/docs/livetrade ; https://toolradar.com/tools/jesse/pricing ; https://gainium.io/review/jesse",
+    "confidence": "low"
+   },
+   {
+    "fact": "NautilusTrader: LGPL-3.0, 31.4k stars, Rust core with Python control plane; stable CEX adapters Binance, Bybit, Coinbase, Deribit, Kraken, OKX",
+    "source": "https://github.com/nautechsystems/nautilus_trader",
+    "confidence": "high"
+   },
+   {
+    "fact": "NautilusTrader bar execution: ts_init must be the bar close; if ts_event is the open, ts_init = ts_event + interval; using the current bar's open inside on_bar is look-ahead; adaptive high/low ordering is 'a deterministic heuristic'; no native next-bar-open fill mode",
+    "source": "https://nautilustrader.io/docs/latest/concepts/backtesting/bar-execution/",
+    "confidence": "high"
+   },
+   {
+    "fact": "NautilusTrader has a sandbox adapter: simulated execution against live market data via OrderMatchingEngine",
+    "source": "https://docs.rs/crate/nautilus-sandbox/latest",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Hummingbot: Apache 2.0, 21.1k stars; paper trading script simulates against live Binance data with no API keys; market-making focus",
+    "source": "https://github.com/hummingbot/hummingbot",
+    "confidence": "high"
+   },
+   {
+    "fact": "Official Hummingbot MCP server (github.com/hummingbot/mcp) needs a running Hummingbot API with credentials; supports Claude Code",
+    "source": "https://hummingbot.org/mcp/",
+    "confidence": "medium"
+   },
+   {
+    "fact": "vectorbt open-source: 'Apache 2.0 with Commons Clause' (may not sell products primarily built on it); crypto examples use Yahoo BTC-USD; README has no look-ahead caveat",
+    "source": "https://github.com/polakowo/vectorbt",
+    "confidence": "high"
+   },
+   {
+    "fact": "ccxt: MIT, 44.8k stars, 103 exchanges, Python 3 supported",
+    "source": "https://github.com/ccxt/ccxt",
+    "confidence": "high"
+   },
+   {
+    "fact": "ccxt manual: 'the info from the last (current) candle may be incomplete until the candle is closed'; 'There's a limit on how far back in time your requests can go'; timestamp is UTC ms",
+    "source": "https://docs.ccxt.com/docs/manual (offset 200000)",
+    "confidence": "high"
+   },
+   {
+    "fact": "Kraken public OHLC: 'Returns up to 720 of the most recent entries (older data cannot be retrieved, regardless of the value of since)'; last entry is the current not-yet-committed timeframe; intervals 1..21600 min; no auth",
+    "source": "https://docs.kraken.com/api/docs/rest-api/get-ohlc-data",
+    "confidence": "high"
+   },
+   {
+    "fact": "Binance /api/v3/klines: max limit 1000, default 500, klines uniquely identified by open time, weight 2",
+    "source": "https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints",
+    "confidence": "high"
+   },
+   {
+    "fact": "Binance returns HTTP 451 to requests from restricted locations including the US (forum and vendor reports, mostly 2022-2023)",
+    "source": "https://dev.binance.vision/t/api-error-451-unavailable-for-legal-reasons/13828",
+    "confidence": "medium"
+   },
+   {
+    "fact": "CoinGecko MCP: free keyless server https://mcp.api.coingecko.com/mcp with 'Shared rate limits'; keyed https://mcp.pro-api.coingecko.com/mcp; local npm @coingecko/coingecko-mcp needs Demo/Pro key; Claude Code: claude mcp add --transport http coingecko <url>",
+    "source": "https://docs.coingecko.com/reference/mcp-server",
+    "confidence": "high"
+   },
+   {
+    "fact": "CoinGecko OHLC: auto-granularity 1-2 days 30m, 3-30 days 4h, 31+ days 4-day candles; timestamp is the candle CLOSE time; Demo API history restricted to past 365 days",
+    "source": "https://docs.coingecko.com/v3.0.1/reference/coins-id-ohlc",
+    "confidence": "high"
+   },
+   {
+    "fact": "CoinGecko market_chart: daily granularity for >90 days stamped 00:00 UTC; last completed UTC day available 00:10 UTC; Demo limited to 365 days",
+    "source": "https://docs.coingecko.com/v3.0.1/reference/coins-id-market-chart",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo chart API for BTC-USD returns exchangeTimezoneName UTC, gmtoffset 0, exchangeName CCC; daily timestamps 1793836800..1794182400 (00:00 UTC each day); regular period start 1794182400 end 1794268740, i.e. last row is the in-progress UTC day (2026-11-09; date conversion is my own arithmetic)",
+    "source": "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?range=5d&interval=1d",
+    "confidence": "high"
+   },
+   {
+    "fact": "ai-trader data loader already uses this same Yahoo chart endpoint",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/data.py:29",
+    "confidence": "high"
+   },
+   {
+    "fact": "252-day year is hard-coded: TRADING_DAYS = 252 (signals.py:13), TD = 252 (metrics.py:10), trading_days=252 (broker.py:38), 252 ** 0.5 and 1/252 (backtest.py:170-171)",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/signals.py ; metrics.py ; broker.py ; backtest.py",
+    "confidence": "high"
+   },
+   {
+    "fact": "Annualizing 365-day crypto returns with sqrt(252) understates vol by sqrt(365/252) ~= 1.20x (computed, not measured)",
+    "source": "own arithmetic",
+    "confidence": "medium"
+   },
+   {
+    "fact": "RSI in signals.py uses ewm(alpha=1/period, adjust=False), a recursive indicator whose value depends on history length (the case recursive-analysis targets)",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/signals.py:95-96",
+    "confidence": "high"
+   },
+   {
+    "fact": "learn.py forward_excess uses shift(-horizon) but signal_stats only uses rows matured by asof_pos - horizon",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/learn.py:17,45",
+    "confidence": "high"
+   },
+   {
+    "fact": "Alpaca crypto: available 24h every day; 'Cryptocurrencies can not be sold short'; no margin; 20+ assets / 56 pairs; Tier 1 fees 15 bps maker / 25 bps taker; market, limit, stop-limit; max $200k notional per order",
+    "source": "https://docs.alpaca.markets/docs/crypto-trading",
+    "confidence": "high"
+   },
+   {
+    "fact": "Alpaca MCP server: MIT; ALPACA_PAPER_TRADE defaults to true (false enables live); crypto tools place_crypto_order, get_crypto_bars etc.; warns it can place real trades",
+    "source": "https://github.com/alpacahq/alpaca-mcp-server",
+    "confidence": "high"
+   },
+   {
+    "fact": "Kraken CLI: MIT, Rust; spot paper default 0.26% taker fee, market buys at ask / sells at bid, slippage default 0, no partial fills; limit fills at limit price once crossed; spot paper default balance 10,000 USD; self-described experimental, can execute real transactions",
+    "source": "https://github.com/krakenfx/kraken-cli",
+    "confidence": "high"
+   },
+   {
+    "fact": "Kraken MCP default services: market, account, paper, workspace, feedback; live trading requires adding 'trade'; dangerous tools need per-call elicitation unless --allow-dangerous; on clients without elicitation the call runs when the model sets acknowledged: true",
+    "source": "https://docs.kraken.com/home/mcp",
+    "confidence": "high"
+   },
+   {
+    "fact": "Kraken CLI paper engine runs against live prices with no authentication; auth login creates a restricted spot key with no withdrawal rights, 90-day default expiry",
+    "source": "https://docs.kraken.com/home/cli",
+    "confidence": "high"
+   },
+   {
+    "fact": "OKX Agent Trade Kit (okx-trade-mcp) is MIT with a demo mode using simulated assets (per OKX marketing page, not verified in docs/repo)",
+    "source": "https://web3.okx.com/learn/agent-trade-kit",
+    "confidence": "low"
+   },
+   {
+    "fact": "Liquid: non-custodial app; perpetual contracts on crypto, stocks, indices, commodities, FX, pre-IPO; 'Crypto perpetuals support up to 40x; FX and indices support up to 50x'; trades 24/7",
+    "source": "https://liquid.trade",
+    "confidence": "high"
+   },
+   {
+    "fact": "Liquid paper trading: simulated money on live markets, toggled in Settings or by asking Co-Invest; in paper mode deposits/withdrawals off and 'Spot markets aren't available'",
+    "source": "https://docs.liquid.trade/trading/paper-trading.md",
+    "confidence": "high"
+   },
+   {
+    "fact": "Liquid spot: USDC-quoted (BTC, ETH, SOL, HYPE), no leverage, min order $10, market/limit only, no TP/SL; fees from 0.070% taker / 0.040% maker; paper trading not supported for spot",
+    "source": "https://docs.liquid.trade/trading/spot-trading.md",
+    "confidence": "high"
+   },
+   {
+    "fact": "Liquid Co-Invest MCP: https://coinvest.liquid.trade/mcp, OAuth 2.1 + PKCE sign-in on app.liquid.trade, scopes read and trade; trading tools return a confirmation step",
+    "source": "https://docs.liquid.trade/co-invest/developers.md",
+    "confidence": "high"
+   },
+   {
+    "fact": "Liquid Co-Invest Computer guardrails: max notional, required stop-losses, eligible symbol list, daily order caps, expiry; user chooses approve-each or auto-send within limits",
+    "source": "https://partners.circle.com/partner/liquid",
+    "confidence": "high"
+   },
+   {
+    "fact": "Liquid routes orders to Hyperliquid, Lighter and Ostium; available in all 50 US states; Co-Invest launched May 2026; ~$25.6M total funding",
+    "source": "https://www.theblock.co/news/ecosystems/2026-05-26-liquid-launches-co-invest-402496",
+    "confidence": "medium"
+   },
+   {
+    "fact": "tradermonty/claude-trading-skills: MIT, 3.7k stars; crypto-regime-analyzer (beta) scores regime 0-100 from keyless CoinGecko data, recommends Binance funding data",
+    "source": "https://github.com/tradermonty/claude-trading-skills",
+    "confidence": "high"
+   },
+   {
+    "fact": "jeremylongshore backtesting-trading-strategies Claude skill fetches data from yfinance and CoinGecko (per Tessl review)",
+    "source": "https://tessl.io/registry/skills/github/jeremylongshore/claude-code-plugins-plus-skills/backtesting-trading-strategies",
+    "confidence": "medium"
+   }
+  ],
+  "risks": [
+   "Look-ahead from timing: Yahoo crypto daily bars close at 00:00 UTC (the bar for day D runs 00:00-23:59 UTC). A decision at 16:00 ET (21:00 UTC in winter) sees an incomplete bar, while the backtest uses the full bar, about 3 hours of future data (4 hours in summer). Crypto needs its own decide/fill clock.",
+   "Timestamp mix-up: exchange klines (Binance, ccxt, Kraken) are stamped with the open time, CoinGecko OHLC with the close time. Mixing sources without shifting by one interval creates a silent one-bar look-ahead.",
+   "Calendar mismatch: 252 is hard-coded in signals.py:13, metrics.py:10, broker.py:38 and backtest.py:170-171. For crypto, annual volatility comes out about 1.20x too low, so vol-targeting oversizes positions. A '1-year' lookback covers only about 8.3 months. Lining up stocks and crypto on one date index either drops weekend moves or forward-fills stocks.",
+   "Survivorship and universe bias: choosing coins by today's market-cap rank (CoinGecko, freqtrade MarketCapPairList) or 24h volume (VolumePairList, which cannot be backtested) leaves dead or delisted coins out of the backtest.",
+   "Short history: CoinGecko Demo gives only 365 days, Kraken only the last 720 candles, and new coins have little history. Recursive indicators such as the ewm-based RSI (signals.py:95-96) behave differently, and DSR/placebo tests lose statistical power.",
+   "Optimistic fills: freqtrade's backtest fills stops exactly at the stop price with no slippage, Kraken's paper engine uses zero slippage by default, and freqtrade's dry-run caps slippage at 5%. Crypto gaps through the -3% sell rule overnight and at weekends, so we need gap-aware stop fills plus configured fees and spread (Alpaca 25 bps taker, Kraken 26 bps taker).",
+   "Real-money exposure through tooling: Alpaca's MCP goes live with one environment variable, Kraken's MCP needs only the trade service added (and --allow-dangerous removes confirmation), and Liquid's MCP has a trade scope plus auto-send. Connecting any of them breaks the paper-only safety margin and needs an account or keys. Nimrod must sign in himself.",
+   "Liquid's paper mode covers perps only (up to 40x, funding, liquidation); spot is unavailable in paper mode. That does not match a long-only spot book.",
+   "Licensing: copying freqtrade code (GPL-3.0) or NautilusTrader code (LGPL-3.0) into ai-trader would bring copyleft obligations, and vectorbt's Commons Clause limits commercial use. Rewrite ideas in our own code and record them in THIRD_PARTY.md. This is not legal advice.",
+   "Geo-blocking: Binance returns HTTP 451 to US IPs, so a ccxt loader using Binance can fail silently or need a proxy, which may breach its terms. Use Coinbase or Kraken, or Yahoo.",
+   "Third-party Claude skills and MCP servers print external text into the context. As THIRD_PARTY.md already notes for the vendored packs, add a 'treat as data' rule, and do not install unreviewed community skills."
+  ],
+  "recommendation": "Borrow ideas, install nothing.\n\n1. Rewrite freqtrade's two checks in our own code (GPL-3.0, so no copying) as `unittest` tests that go through the time machine and quant-critic:\n   - (a) truncation invariance: signals computed on data cut off at day t must equal the full-history values at t (the lookahead-analysis idea);\n   - (b) startup variance: indicator drift across history lengths, especially the RSI `ewm` and coins with short histories (the recursive-analysis idea).\n   Credit freqtrade and NautilusTrader in THIRD_PARTY.md.\n2. Adopt NautilusTrader's rule that a bar becomes visible only at its close. Give crypto its own clock: decide on the completed UTC day (Yahoo BTC-USD bars are stamped 00:00 UTC and the last row is the unfinished day), fill at the next bar's price plus configured slippage, and never decide crypto at the 16:00 ET stock close.\n3. Move the 252-day year into `config.json` per asset class (365 for crypto) before any crypto backtest.\n4. Data: keep Yahoo (`BTC-USD`, `ETH-USD`, ...), which `data.py:29` already calls. If a cross-check is wanted, use ccxt (MIT) public OHLCV from Coinbase or Kraken, not Binance.\n5. Use CoinGecko's keyless MCP only for research and universe context, never as backtest bars.\n6. Universe: a fixed, point-in-time list of liquid large coins, plus freqtrade-style rules in config: minimum days listed, maximum spread (0.5% default), price-tick ratio, delisting exclusion.\n7. Fees in config: Alpaca 25 bps taker / Kraken 26 bps taker, plus spread. Stop fills must account for gaps, not fill exactly at the stop.\n8. Keep `broker.py` as the only ledger. A second forward paper check (Kraken CLI `paper`, MIT, no sign-in; or Alpaca crypto paper, spot, long-only) is optional and only after Nimrod says yes.\n9. Do not use Liquid for this: paper mode is perps only (crypto up to 40x), spot has no paper mode, and the MCP has a trade scope. Borrow only its limit list (max notional, required stop, symbol whitelist, daily order cap, expiry) for our own config.\n10. Skip Jesse, Hummingbot, NautilusTrader and vectorbt as installs, and any MCP server with a trade scope."
+ },
+ {
+  "summary": "LENS: crypto risk rules, measured on Yahoo data. The data was fetched 2026-11-09 15:34 UTC, and today's unfinished bar is excluded. Daily bars: BTC from 2014-09-17, ETH from 2017-11-09, SOL from 2020-04-10. Hourly bars cover the last 730 days. Note: Yahoo's range=max&interval=1d silently returns MONTHLY bars (dataGranularity=1mo, 147 bars), so I used period1=0/period2=now instead. All scripts and outputs are in /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/risk/ (out/*.txt and *.csv).\n\nVOLATILITY. Annualized vol over the last 2 years: BTC 44.1%, ETH 68.5%, SOL 75.9%, SPY 16.7%. The median stock in the config.json universe (74 names) is 30.9%. BTC carries 2.2 to 14 times SPY's vol depending on the year (2025: 41.9% vs 19.3%). BTC behaves like NVDA (44.5%). ETH and SOL behave like AMD, PLTR and TSLA (57-65%). Daily sd since 2022-11: BTC 2.45%, ETH 3.33%, SOL 4.61%, SPY 0.97%. Fat tails: excess kurtosis 4 to 9.\n\nDRAWDOWNS. Max drawdown: BTC -83.4%, ETH -94.0%, SOL -96.3%, SPY -55.2%. Worst single day is -37% to -42% (2020-03-12, 2022-11-09). The coins are deep in drawdown today: BTC -40%, ETH -56%, SOL -67%.\n\nCORRELATION. BTC vs ETH 0.83-0.92 and BTC vs SOL 0.74-0.88 since 2022, so the three coins are mostly one bet. The equal-weight 3-coin basket has 58.6% vol vs BTC's 46.1%. BTC vs SPY is about 0.4-0.5 (rolling 90-day median 0.40, max 0.62). On SPY days of -2% or worse, BTC fell 84% of the time (mean -4.4%). Crypto gives no crash protection.\n\nWEEKENDS. Weekend days are calmer than weekdays (sd ratio 0.60-0.84). Weekends hold 13-22% of the variance, against 28.6% if every day were equal. Even so, if crypto is only watched in NYSE hours, the Friday-to-Monday path touched -10% on 7% of ETH and SOL weekends. The worst ETH weekend low was -34.3%.\n\nTHE -3% STOP. Random entry at the day's open, hourly bars, ambiguous bars counted as stop-first. The share that touches -3% within 1/3/5 days:\n\n| Asset | 1 day | 3 days | 5 days |\n|---|---|---|---|\n| BTC | 17% | 38% | 48% |\n| ETH | 31% | 51% | 61% |\n| SOL | 37% | 62% | 69% |\n| SPY | 0.7% | 5% | 10% |\n| Universe median stock | 5.8% | 27.4% | 40.3% |\n| Universe p75 stock | 10.8% | 37.1% | 49.3% |\n\nVerdict: -3% is workable for BTC. It is as noisy as top-quartile stocks and NVDA, which the news bot already trades with -3%. For ETH and SOL it mostly measures noise: a majority of random entries get stopped within 3 days, worse than the p75 stock. Two other points:\n- The stop does not add edge. Random-entry trades with the stop averaged about the same as buy-and-hold (BTC 3-day: -0.03% vs +0.04%).\n- Equal-noise stop: the stop distance that gives the universe-median stop-out rate is -3.9% BTC, -5.8% ETH, -6.6% SOL. That is about 1.2x ATR14 in every case.\n- At the config's 3x ATR trailing stop (about 9.9% BTC / 13.9% ETH / 17.2% SOL), only 4-8% of random entries are stopped within 5 days.\n\nREGIME FILTER. Hold crypto only when BTC is above its 200-day average. Tested with a 2% band, 10 basis points per switch, cash earning 0. This is in-sample and was not run through the time machine. Max drawdown with vs without the filter:\n\n| Coin | With filter | Buy-and-hold |\n|---|---|---|\n| BTC | -67% | -83% |\n| ETH | -61% | -86% |\n| SOL | -65% | -96% |\n\n- 2021-22 bear: BTC lost -31% with the filter vs -77% without; SOL -31% vs -95%.\n- The filter is slow after parabolic tops: 2018 BTC still lost -67%.\n- Adding a 40% vol target cuts max drawdown to -46% (BTC), -37% (ETH), -34% (SOL).\n- The band cuts switches from 6.5-9 per year to about 3.\n- The 100-day average looked better, but that is a selection risk.\n- Today: BTC is 74,585, +1.9% above its 200-day average of 73,170. It has been risk-on since 2026-08-20 and is about 3.9% above the risk-off line.\n\nCODE INTEGRATION RISKS (READ-ONLY review):\n- news_live.check_stops runs only while market_open_now() (NYSE hours), so crypto stops would go unchecked about 80% of the week.\n- max_hold_days counts business days (pd.bdate_range).\n- Crypto news outside NYSE hours is queued for the 09:30 open.\n- signals.TRADING_DAYS=252: on a 7-day crypto calendar, vol is understated by about 1.2x (sqrt(365/252)), so positions come out about 20% too big.\n- Yahoo's crypto daily bar dated t closes at 00:00 UTC, which is 3-4 hours after the NYSE close. Mixing it into decide-at-16:00-ET breaks the no-look-ahead rule (rule 7), and a live cycle would see a partial bar.\n- fetch_panel drops crypto weekend rows when crypto is mixed with stocks.\n\nPROPOSED SETTINGS (all must pass the time machine and quant-critic before use):\n- Per-coin cap, risk-equivalent to the stock cap: 10% x (30.9% / coin vol), which gives BTC 7%, ETH 4.5%, SOL 4.1%. Round down to 5% / 3% / 2%.\n- Total crypto: start at 5%, hard cap 7.5%. At a 12% equity vol, a 5% basket is about 13% of portfolio variance and 7.5% is about 20%.\n- Put crypto inside the existing vol-target covariance, with consistent annualization.\n- Quant engine: keep the ATR trailing stop rather than a fixed percentage.\n- Regime: BTC above its 200-day average with a 2% band, else no new crypto entries and the crypto sleeve goes to cash.\n- News trades: keep a 0.15% loss per trade (the owner's 5% x 3%) with stop = max(3%, 1.2x ATR14) and size = min(5%, 0.15% / stop). For example ETH: stop about 5.8%, size about 2.6%. This is a change to Nimrod's rule and needs his explicit yes. Claude may only apply the risk-reducing parts (smaller size, fewer coins) on its own.\n- Stops must be checked 24/7 for crypto.",
+  "facts": [
+   {
+    "fact": "Yahoo v8 chart range=max&interval=1d returns monthly bars (dataGranularity '1mo', only 147 bars for BTC-USD); full daily history needs period1=0&period2=<now>, which gave BTC 4437, ETH 3288, SOL 2405, SPY 8503 bars.",
+    "source": "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?range=max&interval=1d (meta.dataGranularity) vs ?period1=0&period2=now&interval=1d; scripts fetch.py/fetch2.py in /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/risk/",
+    "confidence": "high"
+   },
+   {
+    "fact": "2-year annualized vol (2024-11-09..2026-11-08): BTC 44.1%, ETH 68.5%, SOL 75.9%, SPY 16.7%; config.json stock universe (74 names) median 30.9%, p75 41.4%; 14 universe stocks are at least as volatile as BTC (NVDA, TSLA, AMD, PLTR, MU, INTC...).",
+    "source": "out/a6_sizing.txt and out/a7_universe.txt (Yahoo daily)",
+    "confidence": "high"
+   },
+   {
+    "fact": "BTC annual vol by year (x sqrt 365): 2017 94.2%, 2021 80.3%, 2022 64.2%, 2023 43.3%, 2024 53.1%, 2025 41.9%, 2026 YTD 45.0%; SPY 2025 19.3%, 2026 13.9%. ETH 2026 60.7%, SOL 2026 62.1%. Sampling crypto on SPY trading dates x sqrt(252) gives nearly the same numbers.",
+    "source": "out/a1_vol_dist.txt, out/vol_by_year.csv",
+    "confidence": "high"
+   },
+   {
+    "fact": "Daily return sd since 2022-11-09: BTC 2.45%, ETH 3.33%, SOL 4.61%, SPY 0.97%. Share of days below -3%: BTC 7.5%, ETH 12.8%, SOL 20.1%, SPY 0.4%. Worst days ever: BTC -37.2% and ETH -42.3% (2020-03-12), SOL -42.3% (2022-11-09).",
+    "source": "out/a1_vol_dist.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "Max drawdown (close-to-close): BTC -83.4% (2017-12-16 to 2018-12-15), ETH -94.0%, SOL -96.3% (2021-11 to 2022-12), SPY -55.2%. Current drawdown on 2026-11-08: BTC -40.2% (74,585 vs peak 124,753), ETH -56.1%, SOL -67.1%.",
+    "source": "out/a3_dd_corr.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "Correlation of daily returns, 2024-2026: BTC-ETH 0.83, BTC-SOL 0.78, BTC-SPY 0.39 (weekly 0.42); last 365 days: BTC-ETH 0.92, BTC-SOL 0.87, BTC-SPY 0.48. Rolling 90-day BTC-SPY since 2020: median 0.40, max 0.62.",
+    "source": "out/a3_dd_corr.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "On SPY days of -2% or worse since 2020-04 (n=55), mean BTC -4.37%, ETH -6.08%, SOL -6.71%, and BTC was down on 84% of them. On BTC days of -10% or worse (n=13), ETH averaged -15.3% and SOL -16.7%.",
+    "source": "out/a3_dd_corr.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "An equal-weight BTC/ETH/SOL basket had 58.6% annual vol since 2023 vs BTC alone 46.1%: diversification inside crypto is weak.",
+    "source": "out/a3_dd_corr.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "Weekend vs weekday daily sd since the BTC spot ETFs (2024-01-11+): BTC 1.68% vs 2.71% (ratio 0.62), ETH 0.71, SOL 0.84. Weekends carry 13-22% of variance (28.6% if every day were equal). US-session hours are 1.32-1.56x more volatile than other hours.",
+    "source": "out/a1_vol_dist.txt, out/a5_stopcal.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "Random entry at the 00:00 UTC open, hourly bars, last 730 days: chance of touching -3% within 1/3/5 days is BTC 17.4/37.8/48.1%, ETH 31.1/51.4/61.3%, SOL 36.6/61.7/69.4%, SPY 0.7/5.1/9.6%, NVDA 17.0/42.2/52.1%, TSLA 23.8/52.5/62.0%.",
+    "source": "out/a2_stop.txt, out/stop_test_hourly.csv",
+    "confidence": "high"
+   },
+   {
+    "fact": "Config universe baseline (74 stocks, 2y daily): chance of touching -3% within 3 trading days has median 27.4% and p75 37.1%; within 5 days median 40.3%, p75 49.3%. BTC (38.6% / 48.8% over the same window) sits at about the p75 stock; ETH (53.0/62.3) and SOL (60.2/68.6) are above p75.",
+    "source": "out/a7_universe.txt, out/a5_stopcal.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "Owner's -3% stop with a +6% target, 3 days, random daily-open entry: stop first vs target first is BTC 37.6% vs 9.1%, ETH 50.5% vs 22.1%, SOL 59.8% vs 24.3%. With a +3% target it is roughly a coin flip (BTC 36.3% vs 33.2%).",
+    "source": "out/a2_stop.txt (hourly)",
+    "confidence": "high"
+   },
+   {
+    "fact": "For random entries the -3% stop does not change the mean outcome. BTC 3-day mean trade return with stop -0.03% vs buy-and-hold +0.04%; ETH +0.21% vs +0.02%. The stop caps loss and adds churn; it adds no edge.",
+    "source": "out/a2_stop.txt detail table",
+    "confidence": "high"
+   },
+   {
+    "fact": "Equal-noise stop (same stop-out rate as the universe-median stock at -3%): BTC -3.9%, ETH -5.8%, SOL -6.6% for 3 days; -3.8/-5.3/-6.4% for 5 days. Each is about 1.1-1.3x the median ATR14.",
+    "source": "out/a8_equalnoise.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "ATR14 as % of price, 2y median: BTC 3.29%, ETH 4.64%, SOL 5.74%, SPY 0.97%. The config's 3x ATR stop is therefore about 9.9% / 13.9% / 17.2%. The owner's -3% equals 0.91 ATR for BTC, 0.65 for ETH, 0.52 for SOL, and 3.08 for SPY.",
+    "source": "out/a3_dd_corr.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "ATR-multiple stops with a 2R target (hourly, last 730d): at 1.0x ATR, 34-35% of random entries are stopped within 3 days; at 3x ATR only 3.6-4.4% within 3 days and 6-8% within 5 days.",
+    "source": "out/a5_stopcal.txt, out/atr_stop.csv",
+    "confidence": "high"
+   },
+   {
+    "fact": "Worst single-hour drop inside one Yahoo hourly bar (last 730d): BTC -8.1% (2025-10-10 21:00Z), ETH -13.8% (2025-02-03 02:00Z), SOL -13.2% (2025-10-10 21:00Z); SPY -2.7%. Stop fills on hourly bars averaged about -3.0% for crypto (worst -4.9% ETH) and -3.1 to -3.3% for stocks (worst -14% NVDA, overnight gaps).",
+    "source": "out/a5_stopcal.txt, out/a2_stop.txt",
+    "confidence": "medium"
+   },
+   {
+    "fact": "If crypto is only acted on in NYSE hours (Fri 20:00 to Mon 14:00 UTC, 103 weekends): the path low touched -10% on 4% of BTC weekends and 7% of ETH and SOL weekends; worst path lows were BTC -11.4%, ETH -34.3%, SOL -21.2%.",
+    "source": "out/a5_stopcal.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "Regime filter 'BTC close > SMA200, 2% band, 10 bp per switch, cash 0%' vs buy-and-hold. BTC 2015-04+: CAGR 61.1% vs 63.2%, vol 52.1% vs 65.1%, maxDD -67.1% vs -83.4%. ETH 2018-06+: CAGR 43.9% vs 16.6%, maxDD -61.0% vs -86.4%. SOL 2021+: maxDD -64.5% vs -96.3%. About 3-4 switches per year with the band vs 6.5-9 without. In-sample, 8 variants tried.",
+    "source": "out/a4_regime.txt, out/regime_filter.csv",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Crash windows with the filter vs buy-and-hold: 2021-22 bear BTC -31.3% vs -76.6%, SOL -31.4% vs -95.2%. But the 2018 bear still cost BTC -67.1% vs -83.4%, because the 200-day average lags after a parabolic top. 2020-03 crash: -25.4% vs -51.3%.",
+    "source": "out/a4_regime.txt",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Adding a 40% vol target (30-day lookback, capped at 1x) to the BTC>SMA200 filter gave max drawdown of BTC -45.9% (full history), ETH -37.3%, SOL -33.5%, the lowest of all variants tested.",
+    "source": "out/a4_regime.txt",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Current regime: BTC 74,585 on 2026-11-08 vs SMA200 73,170 (+1.9%). With the 2% band it has been risk-on since 2026-08-20, down from +11% above the SMA on 2026-10-28. It would turn risk-off below about 71,707. ETH is -1.6% and SOL -3.1% below their own SMA200.",
+    "source": "out/a4_regime.txt plus an inline check in this session",
+    "confidence": "high"
+   },
+   {
+    "fact": "At a 12% equity-book vol and crypto/equity correlation 0.45: a 5% 3-coin crypto sleeve gives portfolio vol 13.5% and 12.8% of variance; 7.5% gives 14.4% and 19.8%; 10% gives 15.4% and 26.5%. A BTC-only 10% sleeve is 20.0% of variance.",
+    "source": "out/a6_sizing.txt",
+    "confidence": "medium"
+   },
+   {
+    "fact": "The news engine checks stops only when market_open_now() (NYSE session); max_hold_days counts business days with pd.bdate_range; trade_outside_hours=false queues off-hours buys for the 09:30 open.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/news_live.py lines 134-137, 213-226, 290-291; config.json news block",
+    "confidence": "high"
+   },
+   {
+    "fact": "Vol is annualized with TRADING_DAYS=252 (signals.realized_vol, tsmom horizon). fetch_panel keeps only dates where at least 50% of symbols have data, so crypto weekend rows are dropped in a mixed panel. Yahoo crypto bars are UTC days that close at 00:00 UTC, 3-4 hours after the NYSE close.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/signals.py lines 13, 28-29; aitrader/data.py fetch_panel; Yahoo meta exchangeTimezoneName=UTC",
+    "confidence": "high"
+   }
+  ],
+  "risks": [
+   "Look-ahead (rule 7): Yahoo's crypto daily bar for date t closes at 00:00 UTC, which is 19:00/20:00 ET, after the NYSE close used for decisions. A backtest that mixes these closes with decide-at-16:00-ET sees 3-4 hours of the future, and a live cycle at 16:xx ET would read a partial bar. Crypto needs its own clock (decide at 00:00 UTC, fill at the next hour's open), or 16:00-ET snapshots from hourly bars, which Yahoo keeps for only 730 days.",
+   "In news_live.py, stops are checked only in NYSE hours, which is about 19% of the crypto week. A crypto -3% stop would be unenforced on nights and weekends; measured weekend path lows reached -34.3% (ETH). The engine must check crypto stops 24/7, count max_hold_days in calendar days, and stop queueing crypto buys for 09:30.",
+   "Annualizing with 252 on a 7-day crypto return series understates vol by sqrt(365/252) = 1.20, so vol-targeted crypto positions would be about 20% too big. Use either stock-day sampling x sqrt(252) or 7-day returns x sqrt(365), consistently.",
+   "The regime-filter and vol-target numbers are in-sample, on one path that holds only about 3-4 crypto bear markets, with 8 variants tried per coin and no deflated Sharpe. SMA100 looked best, which is a selection-bias warning. None of this may enter config.json without the time-machine sweep, DSR and quant-critic (rule 4).",
+   "The 200-day filter is slow after parabolic tops: 2018 BTC still lost -67% filtered, and the filtered max drawdown over full history is still -61% to -67% per coin. The filter is not a substitute for a per-coin cap, a vol target or stops.",
+   "Yahoo crypto prices are a composite feed. Venue-specific wicks, such as the 2025-10-10 liquidation cascade, can be much deeper than Yahoo's hourly low (-8.1% BTC, -13.2% SOL); real stop fills on an exchange could be worse than measured. Not measured here.",
+   "Costs are estimates. The config's 10 basis points slippage for news trades is not verified for crypto venues, and exchange fees were not measured. More stop-outs (ETH/SOL at -3%) mean more round trips and more cost drag.",
+   "The three coins are about 0.8-0.9 correlated and BTC is about 0.4-0.5 correlated with SPY, rising in sell-offs (BTC down on 84% of SPY days of -2% or worse). Per-coin caps alone understate crash risk, so a total crypto cap is required.",
+   "Widening the news stop for ETH/SOL (the equal-noise option) changes the owner's explicit rule (sell at -3%). Even with the dollar loss per trade held at 0.15% of the account, it needs Nimrod's explicit approval. Claude may only shrink size or skip coins on its own (rule 3).",
+   "Early BTC data on Yahoo (2014-2016) and the DOGE/XRP tails (e.g. DOGE +355% on one day in 2021) are thin-market artifacts. The full-history statistics are dominated by regimes unlike today's ETF-era market, so prefer the 2-year and since-2022 windows for sizing."
+  ],
+  "recommendation": "Settings to propose, all paper money, none applied without time machine + quant-critic + Nimrod's approval. (1) Universe: BTC and ETH first; SOL only at a smaller cap, because its history includes -96% and 62% of random entries hit -3% within 3 days. (2) Per-coin cap, risk-equivalent to the stock cap and rounded down: BTC 5%, ETH 3%, SOL 2%. Total crypto starts at 5% (about 13% of portfolio variance), with a hard cap of 7.5%. Crypto goes inside the existing 12% vol-target covariance, with consistent annualization. (3) Quant engine stop: keep the config's ATR trailing stop (3x ATR, which scales with vol by itself), not a fixed %. (4) Regime: BTC close above SMA200 with a 2% hysteresis band (the config's regime_band_pct) is required for any new crypto entry; otherwise the crypto sleeve goes to cash. Optionally add a 40% per-coin vol target, which gave the lowest drawdowns (-34% to -46%). (5) News trades: the owner's -3% is viable for BTC, which is as noisy as NVDA or a top-quartile stock (38.6% touch within 3 days vs universe p75 37.1%). For ETH and SOL, -3% mostly measures noise. Offer Nimrod three options, recommending ב. Option א: crypto news trades on BTC only, with -3% and 5% unchanged. Option ב: one rule with a fixed 0.15% account risk per trade (his 5% x 3%), stop = max(3%, 1.2x ATR14), size = min(5%, 0.15% / stop): BTC about -3.9% / 3.8%, ETH about -5.8% / 2.6%, SOL about -6.6% / 2.3%. Option ג: -3% and 5% for every coin, not recommended. (6) Before any crypto goes live on paper: news_live must check crypto stops 24/7, count max_hold in calendar days, and drop the 09:30 queue for crypto. Crypto needs its own 00:00 UTC clock (or 16:00-ET hourly snapshots) to avoid 3-4 hours of look-ahead. Note: today BTC is only 1.9% above its SMA200 and falling, so the regime rule is close to risk-off."
+ },
+ {
+  "approaches": [
+   {
+    "name": "A. Crypto sleeve inside the stock book",
+    "what": "Add BTC-USD and ETH-USD to config.json's universe under a 'Crypto' group. They would share the stock panel, the daily NYSE cycle (decide at 16:05 ET, fill at the 09:30 open), the 12% vol-target covariance and the SPY regime filter.",
+    "pros": "Fewest new files: config, fractional qty and a group cap. Crypto risk sits inside the one covariance, which is how the risk lens wanted it sized. One equity curve and one set of reports.",
+    "cons": "1) Look-ahead. Yahoo's crypto bar for day t closes at 00:00 UTC, which is 19:00 ET in winter, 3-4 hours after the stock decision. The backtest would see the future and a live run would read a partial bar.\n2) fetch_panel's 50% coverage filter drops every weekend row: 0 kept in my probe. Weekend moves turn into Monday gaps, and stops go unchecked Sat/Sun. The worst measured ETH weekend path low was -34.3%.\n3) The existing low-vol entry filter would block them. As of 2026-11-06, ranked by 252-bar vol, ETH is 9/95 and BTC 19/95 (0.436 against a threshold of 0.427). Both fall in the excluded top 20%, so the sleeve would mostly sit empty.\n4) When the Nasdaq earnings calendar fails, its '*' entry blocks every non-ETF name, crypto included.\n5) SPY, not BTC, would decide the crypto regime.\n6) Whole shares: a 10% cap on $100k ($10,000) cannot buy one BTC at $74,914.\n7) It contaminates the stock book's state, trials.jsonl and DSR count.",
+    "evidence": "data.py:150-151 (50% filter); strategy.py:115-121 (lowvol filter, len>=10); cycle.py:142-164 (earnings '*'), 167-169 (16:05 NY bar-final); broker.py:141,151 (math.floor). Probe /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/lead/lowvol_probe.py (output: BTC vol252 0.436 rank 19/95, ETH 0.604 rank 9/95, threshold 0.427, 0 weekend rows kept). Risk lens risk/out/a5_stopcal.txt (weekend path lows). Code lens probe_engine.py (0 BTC bought)."
+   },
+   {
+    "name": "B. Separate 24/7 crypto book: a second profile of the same engine",
+    "what": "A 'crypto' profile in config.json, deep-merged over the base, with:\n- its own state dir (state/crypto) and a UTC-daily calendar with 365 periods/yr;\n- fractional units and fee_bps;\n- BTC-USD as benchmark and regime;\n- a v1 universe of BTC and ETH, with time-series signals only (tsmom, trend, breakout);\n- go to cash below SMA200 with a 2% band, vol target, 3x ATR trailing stop;\n- decide on the completed UTC bar, fill at the 01:00 UTC 1-hour open.\nThe time machine and quant-critic run before any paper trading.",
+    "pros": "Correct calendar and no look-ahead. Reuses most of the engine: the backtest, shadow book, hash-chained journal, reduce-only overrides and forward grading are all bar-count driven (about 90%, an estimate). State, trials and DSR stay separate from stocks. It fits the best-supported evidence: time-series trend on BTC/ETH plus vol targeting. The stock book stays provably unchanged, since the defaults are qty_step=1, periods_per_year=252 and fee_bps=0, and the existing tests plus a golden backtest check it.",
+    "cons": "About 250 new or edited lines plus about 200 test lines (estimate). The refactor touches shared modules (signals, strategy, broker, cycle, metrics, backtest), so the stock book carries regression risk. The dashboard has to show two books. With 2 coins, learning and the placebo gate are inert (min_n=10), so the book runs on prior weights. History holds only about 3 crypto bear markets, so DSR power is weak. All evidence so far is in-sample, and the likely outcome is calmer, not richer: in-sample BTC>SMA200 cut CAGR from 63.2% to 61.1% while cutting maxDD from -83% to -67%.",
+    "evidence": "Code lens: 252 hard-coded at signals.py:13, strategy.py:148, metrics.py:10, backtest.py:170-171 and broker.py:38. Using 252 understates BTC vol 1.2035x. journal.STATE is a single global. Data lens: Yahoo crypto bars are UTC 00:00, include weekends, have no gaps; next open equals prior close (median 0.003%). Risk lens risk/out/a4_regime.txt: BTC>SMA200 band2% maxDD -67.1% vs -83.4%, 2022+ -30.8% vs -66.9%; ETH 2018-06+ -61.0% vs -86.4%; 3-4 switches/yr; voltgt40% plus regime -45.9%. Evidence lens: Hudson & Urquhart 2021, Detzel et al. 2021, Deprez & Frommel 2024 and Zarattini et al. 2025 support time-series trend; Han-Kang-Ryu find time-series momentum strong and cross-sectional weak; Grobys 2025 supports vol management."
+   },
+   {
+    "name": "C. Crypto news trader under the owner's rules",
+    "what": "Extend news_live to crypto tickers. Claude scores headlines; buy if the score is above 8, 5% of the account per trade, sell at -3%, running 24/7.",
+    "pros": "It literally applies the rules Nimrod set. Yahoo RSS works for BTC-USD (HTTP 200, 20 items). No historical modelling needed.",
+    "cons": "No supporting evidence:\n- ChatGPT-labelled BTC news sentiment gives no significant out-of-sample gain (Fiszeder et al.).\n- Tweet shocks are priced in 5-60 minutes (Ante: DOGE +8.16% in 5 minutes), long before a scored-and-queued trade.\n- Claude's scoring cannot be backtested (rule 7), so it can only be graded forward.\n\nThe -3% stop mostly measures noise. Random entries touched -3% within 3 days 37.8% (BTC), 51.4% (ETH) and 61.7% (SOL) of the time, against 27.4% for the median universe stock. The stop added no edge: BTC 3-day mean -0.03% with it vs +0.04% without.\n\nScheduled tasks run at most hourly, so stops would be checked hourly. The worst single-hour drops were BTC -8.1% and ETH -13.8%, so a '-3%' stop could fill far lower.\n\nnews_live is built around NYSE hours: market_open_now, the 09:30 queue, bdate_range, a 'stock' prompt and a 16:05 stop. It would need a 24/7 daemon this environment cannot guarantee. The RSS feed is noisy (it included a Dow headline).",
+    "evidence": "news_live.py:134-137, 213-226, 290-291 and 301-313. Risk lens risk/out/a2_stop.txt, a5_stopcal.txt and a7_universe.txt. Evidence lens: Fiszeder/Orzeszko/Pietrzyk (WNE UW seminar page); Ante (blockchainresearchlab.org 2021-02-08). Code lens lens_codebase/rss_btc.xml."
+   }
+  ],
+  "recommended": "Approach B, in stages:\\n- v1 is a separate paper crypto book. Universe BTC and ETH, time-series trend, BTC-SMA200 regime that goes to cash, 30% vol target, 3x ATR trailing stop.\\n- It decides on the completed UTC daily bar and fills at the 01:00 UTC hourly open.\\n- Fees are modelled at about 10x stock costs.\\n- The time machine and quant-critic run before paper trading.\\n\\nReject A: it adds 3-4 hours of look-ahead, drops weekends, and the existing low-vol filter would block BTC and ETH anyway (probe: ranks 19 and 9 of 95). Defer C until Nimrod chooses: there is no out-of-sample evidence for news entries, and the -3% stop is noise for ETH and SOL and cannot be enforced better than hourly.\\n\\nBe honest with the owner. The likely result, as with stocks, is 'calmer, not richer': the in-sample regime filter cut BTC's maxDD from -83% to -67% but also cut CAGR from 63.2% to 61.1%. Published Sharpe of about 1.5 assumes 0.10% costs, against roughly 0.50-0.80% at retail venues.",
+  "design": "ARCHITECTURE. One engine, two books. load_config(book) deep-merges config.json[\"books\"][\"crypto\"] over the base. journal.use_book(\"crypto\") points journal.STATE at state/crypto/, so portfolio, shadow, pending, overrides, predictions and trials.jsonl never mix with the stock book; a shared trials file would corrupt both DSR counts. CLI: --book crypto on every command. Stocks get an explicit \"market\" block holding today's constants, so the defaults reproduce current behaviour exactly (rule 5).\n\nCOMPONENTS (estimate: ~250 new or edited lines + ~200 test lines).\n- aitrader/market.py (new) holds NyseCalendar and UtcDailyCalendar. NyseCalendar is today's _bar_is_final, _market_opened, official_opens and BDay cooldown, moved verbatim. The interface:\n  - periods_per_year;\n  - bar_is_final(bar, now): now >= bar + 24h + 5 min;\n  - exec_time(decision_bar): bar + 1 day + exec_hour_utc;\n  - fill_prices(names, exec_ts): open of the 1-hour bar starting at exec_ts, falling back to the 1-minute bar, then the daily open;\n  - cooldown_until: counts bars, not business days.\n- periods_per_year is threaded through signals.py:13, strategy.py:148, metrics.py:10, backtest.py:170-171 and broker.py:38. Using 252 understates crypto vol 1.2035x (measured on BTC), so positions come out ~20% too big.\n- PaperBroker gains qty_step (stocks keep 1, today's floor) and fee_bps (stocks keep 0). Today a 10% target of $100k buys 0 BTC.\n- strategy: per-symbol caps, group lists and the 10-name minimum come from config. VIX is skipped when market.vix=false; otherwise every live weekend goes defensive(no-vix).\n- cycle: calendar calls replace the NY constants. Flags turn off three things: the earnings blackout (a Nasdaq failure sets \"*\", which blocks every non-ETF name), the overlays and corporate actions. The -0.06 intraday alert threshold moves to config.\n- data: history \"max\" goes through period1/period2 and asserts meta.dataGranularity == \"1d\". range=max silently returns monthly bars.\n- backtest: fee_bps, exec_delay_bps, and a variant list read from the profile.\n- news_live stays untouched, and crypto never enters the stock universe.\n\nDATA AND UNIVERSE. v1 uses Yahoo BTC-USD (daily from 2014-09-17) and ETH-USD (from 2017-11-09), the feed data.py already reads. The bars are UTC, include weekends, have no gaps, and adjclose equals close.\n\nThe two-coin list is chosen after the fact. Value-weighted survivorship bias is small (0.93%/yr vs 62.19%/yr equal-weighted, Liebi & Stöckl, secondary source), and the report must say so.\n\nLive guard: if the Yahoo decision close differs from the Coinbase candle (no key needed) by more than 1%, skip the decision and alert. Yahoo's 2026-11-08 close sat ~20 bp below Coinbase and Kraken.\n\nv2, only after v1 passes: a point-in-time top-N by trailing 30-day quote volume from the data.binance.vision archive, which keeps delisted pairs. Split a symbol's identity on data gaps; LUNAUSDT is two different coins.\n\nSIGNALS. Time-series signals only; cross-sectional z-scores mean nothing across two names. tsmom 365/30, trend 50/200 and breakout 55, with priors 0.35/0.35/0.30 and the rest at 0. Lookbacks are translated once from the stock config (252 to 365, 21 to 30), not tuned. Learning is switched off explicitly; with fewer than 10 names, learn.py:21 would leave it silently inert.\n\nRISK RULES (crypto profile, base values for the sweep).\n- Regime: BTC close above SMA200 with the 2% band, risk_off_gross_mult 0 (cash). In-sample results (8 variants, no DSR, risk/out/a4_regime.txt):\n  - BTC maxDD -67% vs -83% buy-and-hold; since 2022, -31% vs -67%;\n  - ETH since 2018-06: -61% vs -86%;\n  - 3-4 switches a year.\n- target_vol_annual 0.30, against 2-year vol of 44.1% for BTC and 68.5% for ETH. The regime plus a 40% target gave BTC maxDD -46% over its full history; 0.30 should land near -35% (estimate).\n- max_gross 1.0, no leverage. max_sector_pct 1.0, since the stock value of 0.30 would cap the whole book at 30%. In-book caps are BTC 1.0 and ETH 0.6, derived from risk-equivalent account caps (BTC 5%, ETH 3%) with crypto at 5% of the total.\n- Stop: 3x ATR14 trailing, about 9.9% for BTC and 13.9% for ETH; 4-8% of random entries get stopped within 5 days. Not -3%: random entries touched -3% within 3 days 37.8% (BTC) and 51.4% (ETH) of the time, against 27.4% for the median stock. The -3% stop also added no edge: BTC 3-day mean -0.03% with it vs +0.04% without.\n- Drawdown breaker scaled by vol (30/12): halve at -25%, flat at -50%. The stock thresholds of -10%/-20% would leave the book flat most of the time.\n- Rebalance every 7 days, band 0.05, cooldown 14 bars, minimum trade $100. Fees run about 10x stock costs. The stock book turns over ~14-15x a year, which at 0.50% per side would cost ~7%/yr (arithmetic).\n- Costs: fee 50 bp per side (an assumption between Alpaca's 25 bp and Kraken's 80 bp taker), 5 bp slippage, 10 bp exec delay; cash yield 0. VIX, earnings and overlays are off.\n\nSCHEDULE. One idempotent scheduled task, every hour at :10; hourly is the scheduler's floor. Each run:\n1. Checks the hash chains and fails closed.\n2. Fills a pending decision whose exec time has passed, at the open of the 01:00 UTC 1-hour bar. A late run still uses that official price, as the stock book does with the 09:30 open.\n3. Decides, if bar D is final (after 00:05 UTC on D+1) and has no decision yet, using data through that close.\n4. Alerts only: a holding down 8% or more from the last daily close triggers a push, with no trade.\n\nStops are judged at the daily close, as the backtest assumes. Claude's reduce-only window is 00:10-01:00 UTC (02:10-03:00 Israel winter time), and overrides logged after 01:00 are ignored. Intraday stops wait for v2, tested on the Binance 1-hour archive.\n\nDASHBOARD. A crypto section shows:\n- equity of the crypto book vs its no-Claude shadow vs BTC buy-and-hold (and 50/50 BTC/ETH);\n- positions in fractional units;\n- a regime gauge (today BTC is +1.9% over its SMA200; risk-off below ~71,707);\n- fees paid;\n- the next decision and fill times in Israel time;\n- overrides.\nIt also adds a total-paper line and crypto's share of it. Reports go to reports/crypto/. Benchmark labels come from cfg; SPY is hard-coded today in report.py, dashboard.py and index.html:496.\n\nTESTING. All existing tests stay green, plus a golden test: the stock backtest on the cached panel gives identical results before and after the refactor. New tests:\n- NoLookahead and truncation invariance on the UTC calendar;\n- a 7-day CycleFlow: decide Saturday, fill Sunday 01:00, never decide on an unfinished bar, and a second run in the same hour does nothing new;\n- fractional qty, fee accounting, cash never negative, and 365 bars = 1 year in metrics and mark;\n- no VIX defensive mode on weekends;\n- override cutoff = exec time;\n- state isolation;\n- regime fails closed without BTC.\n\nTime machine: 2018-01-01 to today, all 7 weekly phases. Variants:\n- fees 10/25/80 bp and exec delay 0/50 bp;\n- no regime filter, and risk-off at 0.5;\n- vol target 0.20/0.40;\n- BTC-only, and +SOL (cap 0.4);\n- ATR 2x/4x;\n- stock breaker thresholds;\n- monthly rebalance;\n- regime-only.\n\nPass rule, written down before the run: the base beats BTC buy-and-hold on maxDD and Calmar in at least 5 of 7 phases, its Sharpe is no worse, and the sign holds at 80 bp and in both halves (2018-21 and 2022-26). DSR is reported, then the quant-critic reviews.\n\nROLLOUT.\n1. Nimrod answers the owner questions.\n2. Refactor commit; the stock book stays byte-identical.\n3. Crypto profile commit.\n4. Sweep saved to research/, a lesson recorded, and a quant-critic PASS.\n5. Nimrod sees the result and approves paper trading.\n6. Paper trading on the hourly task: no parameter changes for 3 months except reduce-only, with a monthly review against BTC.\n\nCrypto news trading happens only if Nimrod chooses it, graded forward only, in a separate small book.",
+  "open_questions_for_owner": [
+   "Crypto paper book size, separate from the $100k stock book: א $5,000, about 5% of the total, which matches the in-book caps (recommended); ב $10,000; ג $100,000, the same as stocks. Percentage results are the same either way.",
+   "Which coins: א BTC and ETH only (recommended); ב BTC, ETH and SOL, with SOL at a small cap (its history includes -96%); ג top-10 by liquidity (needs Binance data and carries more survivorship risk).",
+   "Crypto news trading: א none in v1; crypto news is used only for Claude's veto or shrink on the crypto book (recommended); ב BTC-only news trades under your rules (score above 8, 5%, -3%); ג all coins, with a fixed 0.15% account risk per trade (your 5% x 3%), stop = max(3%, 1.2x ATR14), size = min(5%, 0.15% / stop).",
+   "Does 'sell at -3%, no exceptions' also apply to crypto? א only to news trades; the crypto quant book uses the 3x ATR trailing stop, about 9.9% for BTC and 13.9% for ETH (recommended); ב every crypto position. Evidence: -3% is touched within 3 days by 51% of random ETH entries and 62% of SOL entries, and checks can only happen hourly.",
+   "Which exchange or broker would you use if this ever went to real money? It sets the fee assumption: א assume 0.50% per side until you choose (recommended); ב name a venue now.",
+   "The decision runs at 02:10 and the fill at 03:00 Israel time (winter). Night alerts: א quiet hours 23:00-07:00 with a morning summary, urgent alerts only at night (recommended); ב push everything at once.",
+   "How the crypto book is judged: א against BTC buy-and-hold, risk-adjusted, on its own 3-month paper clock before any real-money talk (recommended); ב against SPY like the stock book.",
+   "Interest on the crypto book's idle cash: א 0% (recommended); ב 3.5%, like the stock book."
+  ],
+  "numbers_to_verify": [
+   "Does Yahoo revise a crypto daily close after the fact? Its 2026-11-08 BTC close was 74,584.65 against Coinbase's 74,754.08. Re-fetch it after 48 hours; if Yahoo revises, live decisions see a different close than the backtest.",
+   "Yahoo period1=0 daily depth: BTC 4,437 bars from 2014-09-17, ETH 3,288 from 2017-11-09. Also check meta.dataGranularity == '1d' (range=max returned 147 monthly bars).",
+   "Exec-delay cost: the 10 bp base is a guess, from one sample of -0.29% between 00:00 and 00:05 UTC on 2026-11-09. Measure the signed 00:00 to 01:00 UTC return on the backtest's actual trades with the Binance 1h archive (2017-08 onward).",
+   "Retail fees: Kraken Pro tier 1 is 0.40%/0.80% maker/taker (primary source). Coinbase Advanced is 0.50%/0.90% (secondary source, after 2026-09-16). Alpaca is 0.15%/0.25%, Binance 0.10%/0.10%. Which venues are available to Nimrod in Israel was not checked.",
+   "Regime-filter and vol-target results are in-sample: 8 variants per coin, no DSR (risk/out/a4_regime.txt). They must be re-measured in the time machine with the paired-phase sweep.",
+   "The -3% touch rates and the 4-8% stop-out rate for the 3x ATR stop rest on only 730 days of Yahoo hourly bars, 8,813 of 17,513 of which have zero volume and 33 a null close.",
+   "Low-vol filter probe, as of 2026-11-06: BTC 252-bar vol 0.436 against a 0.427 threshold (rank 19/95), ETH 0.604 (rank 9/95). BTC is marginal and would flip in and out. Source: scratchpad/crypto/lead/lowvol_probe.py.",
+   "Expected crypto-book maxDD of about -35% at a 0.30 vol target is scaled from the -46% measured at 40%. It is an estimate, not a measurement.",
+   "Fee drag: stock-book turnover of about 14-15x a year (state/trials.jsonl, sweep v4) means about 7%/yr at 0.50% per side (arithmetic). The crypto book's turnover is unknown until the sweep runs.",
+   "Code footprint (about 250 edited or new lines plus 200 test lines) and about 90% engine reuse are estimates from reading the code.",
+   "Survivorship bias of 0.93%/yr value-weighted and 62.19%/yr equal-weighted (Liebi & Stöckl 2022) was read on a secondary page, not the PDF. The claim that BTC and ETH were the top two coins for most of 2018-2026 is from memory; XRP was briefly #2 around late 2017 and early 2018.",
+   "Portfolio variance share (a 5% crypto sleeve is 12.8% of variance, 7.5% is 19.8%) assumes 12% equity vol and a 0.45 crypto/equity correlation.",
+   "Several papers were read only as abstracts or search snippets: Han-Kang-Ryu, Fieberg-Liedtke-Zaremba 2024, Grobys 2025, Swinkels. The 2025 BTC daily vol of 2.24% from K33 comes from a secondary source.",
+   "BTC's risk-off line of about 71,707 (SMA200 73,170, minus the 2% band) as of 2026-11-08 moves daily. Recompute it at launch; the regime is close to flipping to cash."
+  ]
+ },
+ {
+  "summary": "Adversarial review of the crypto design (Approach B), checked against the repo code, CLAUDE.md, the lens outputs and my own read-only checks. Scratch files: /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/critic/ (band_check.txt, code/band_check.py, net/*.json). I edited nothing in the repo.\n\nRANKED PROBLEMS (each with a fix):\n1. CRITICAL. The evidence describes a different rule from the one the engine runs. The risk lens tested a true hysteresis band: off below SMA200 x 0.98, back on only above SMA200 x 1.02 (risk/a4_regime.py, filt()). strategy.py:157 runs a memoryless offset instead: risk-off only when px < SMA x 0.98, risk-on otherwise. Re-measured on the same data, the offset switches 7.7 times/yr (BTC 2015+), 9.7 (BTC 2018+) and 9.6 (ETH 2018-06+). The hysteresis band switches 3.5 / 4.3 / 3.9 times. The offset switches MORE than having no band at all (6.5). So the claim of \"3-4 switches/yr\" and the claimed CAGR/maxDD figures do not describe what would be built. Fix: add a config flag for hysteresis mode. Stocks keep the offset; crypto gets hysteresis, using the prev_regime that backtest.py:48,70 and cycle.py already track. Then re-measure (rule 4).\n2. CRITICAL. Yahoo rewrites the latest completed crypto close, so live decisions would see values that the replay never sees. Re-fetched at 15:56 UTC: on older bars close equals the next open exactly (0.0 bp) for BTC, ETH and SOL. Only the latest completed bar differs: 15.8 bp, 15.8 bp and 8.5 bp (BTC 74,584.65 vs next open 74,719.82). The 1% Coinbase guard cannot catch this. Fix: in live, set close_D to the open of the D+1 row (it exists at 00:10). Confirm after 48 h.\n3. HIGH. Partial bars come back from the stale cache. On a failed fetch, fetch_daily (data.py:104-110) returns the cache. With hourly runs, the 23:10 cache holds a partial bar D. If the 00:10 fetch fails, bar D passes the clock test and the run decides and runs stops on a partial close. The stock book already has this latent bug after intraday runs. Fix: treat a bar as final only if the cache file's mtime is at or after the bar's end plus a buffer. Otherwise skip the run and retry next hour.\n4. HIGH. Two conflicts with the owner's rules. (a) Q7-א judges crypto against BTC \"before any real-money talk\". CLAUDE.md rule 1 fixes the real-money gate as SPY, risk-adjusted, after 3 months. (b) Q1-ג ($100k with BTC cap 1.0) would put about 50% of the combined paper money in BTC. That breaks the design's own account caps (BTC 5% / ETH 3%) and plausibly the owner's 5%-per-trade rule. \"Percentage results the same\" hides this. Fix: drop Q7, keep BTC as a research benchmark only, and drop ג or rescale the caps.\n5. HIGH. The pass rule is nearly automatic. Over 2018+, BTC buy-and-hold maxDD is -81.5%. Regime-only already reaches -63.4%, and vol target plus regime -45.9% (a4_regime.txt), so any go-to-cash rule \"beats\" buy-and-hold. The rule never asks whether the ensemble, the ATR stop, the breaker and ETH add anything. It also skips the skill's PSR ≥ 0.95 bar (SKILL.md:48). Fix: make the base the simplest rule (BTC only, SMA200 with hysteresis, 30% vol target). Ship the ensemble only if it beats that base paired in at least 6 of 7 phases with PSR ≥ 0.95.\n6. HIGH. The DSR undercounts trials. The new crypto trials.jsonl starts at N=0, but SMA200 vs SMA100, a BTC vs own-coin regime, the band and the vol target were picked after 8 in-sample variants x 3 coins x 3-4 windows. Fix: seed the file with those looks and shorten the variant list.\n7. MEDIUM-HIGH. The coin list is hindsight. On the sweep start date (2018-01-01), XRP, not ETH, was #2. Coin Metrics shows XRP above ETH on every day from 2017-12-26 to 2018-01-12. Its figures count XRP's escrowed supply; on circulating supply XRP was still about $78B vs $73B (estimate). The Liebi-Stöckl value-weighted figure answers a different question. Fix: make BTC-only the primary result, and add a BTC+XRP variant.\n8. MEDIUM. Fees: the stress test stops at 80 bp, but eToro's published crypto fee is 1% per side, and which venues Nimrod can use in Israel was not checked. Fix: add a 100 bp tier and drop Q5.\n9. MEDIUM. YAGNI on order. The design refactors 6 shared modules, builds a 24/7 scheduler and a dashboard, and only then runs the sweep. Fix: build only what the sweep needs first; build the live parts only after a PASS and Nimrod's yes.\n10. MEDIUM. Schedule. There would be 24 runs a day, but cycle.py:353 appends a row to equity.jsonl on every run. That puts intraday marks in a hash-chained file, cuts the dashboard's last-400 window to about 16 days, and forces 24 state commits a day. Fix: 2 runs a day plus a rare alert run, one mark per day, and no writes on no-op runs.\n11. MEDIUM. The fill fallback to the daily open means filling at the decision price, which removes the modelled exec delay. Fix: never fall back to the daily open. A one-day delay moves in-sample ETH maxDD from -61.0% to -71.7% (band_check.txt), so the in-sample numbers are fragile.\n12. MEDIUM. The parameter translation is inconsistent. Only tsmom lookbacks are translated to calendar days; trend, breakout, SMA200, the vol window and ATR keep bar counts. The priors 0.35/0.35/0.30 are new numbers. Fix: one written rule, and keep the stock priors with xsmom at 0 (combine() renormalizes, strategy.py:27).\n13. LOW-MEDIUM. The guard skips the whole decision, so stops wait too. What happens during a Coinbase outage is undefined. Eight owner questions mean 8 round trips under the one-question-per-message rule. A few numbers are off: \"10x\" fees is really 13x (65 vs 5 bp); the quoted -67/-83 drawdowns come from 2015+, while the sweep window 2018+ gives -63/-82; \"calmer, not richer\" holds only for BTC (ETH in-sample regime CAGR 43.9% vs 16.6%). The golden test needs a frozen fixture. Depeg handling is not needed in v1.",
+  "facts": [
+   {
+    "fact": "strategy.py implements the regime band as a memoryless offset: risk-off iff bench < SMA*(1-regime_band_pct), risk-on otherwise.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/strategy.py:157",
+    "confidence": "high"
+   },
+   {
+    "fact": "The risk lens's 'band2%' results come from a hysteresis rule: off below sma*(1-band), back on only above sma*(1+band), state carried forward.",
+    "source": "/tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/risk/a4_regime.py (filt)",
+    "confidence": "high"
+   },
+   {
+    "fact": "Switches per year at 10 bp per switch. BTC 2015-04+: no band 6.46, hysteresis 3.53, offset (strategy.py) 7.67. BTC 2018+: no band 7.67, hysteresis 4.29, offset 9.71. ETH 2018-06+: no band 7.22, hysteresis 3.91, offset 9.59. In-sample.",
+    "source": "/tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/critic/band_check.txt (code/band_check.py on risk/data Yahoo JSON)",
+    "confidence": "high"
+   },
+   {
+    "fact": "With a 1-day execution delay (t+1 close), hysteresis results moved: BTC 2018+ maxDD -63.4% to -60.3% (CAGR 21.6% to 21.5%); ETH 2018-06+ maxDD -61.0% to -71.7% (CAGR 43.9% to 38.2%). The in-sample numbers are fragile.",
+    "source": "/tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/critic/band_check.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "Yahoo daily crypto bars, re-fetched 2026-11-09 15:56 UTC: on 11-05, 11-06 and 11-07, close equals the next open exactly (0.0 bp) for BTC, ETH and SOL. The latest completed bar (11-08) differs: BTC 74,584.65 vs next open 74,719.82; ETH 2,120.98 vs 2,124.33 (15.8 bp); SOL 86.24 vs 86.32 (8.5 bp). This points to the latest close being rewritten later (circumstantial; a 48 h re-check is still pending).",
+    "source": "curl query1.finance.yahoo.com/v8/finance/chart/{BTC,ETH,SOL}-USD?range=5d&interval=1d -> scratchpad/crypto/critic/net/y5d.json, y_ETH-USD.json, y_SOL-USD.json",
+    "confidence": "medium"
+   },
+   {
+    "fact": "Coinbase BTC-USD 11-08 daily close was 74,754.08. Yahoo's hourly 23:00 bar on 11-08 closed at 74,724.93.",
+    "source": "scratchpad/crypto/critic/net/cb.json, y5d_1h.json",
+    "confidence": "high"
+   },
+   {
+    "fact": "On a failed fetch, fetch_daily returns the stale cache. The cache keeps the in-progress last bar, since only rows with no close are dropped. run_cycle picks the decision bar as the last cached bar whenever the clock says it is final.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/data.py:77,102-110; cycle.py:311",
+    "confidence": "high"
+   },
+   {
+    "fact": "run_cycle appends a row to the hash-chained equity.jsonl on every run, whether or not it decided. The dashboard reads only the last 400 rows.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/cycle.py:353; dashboard.py:157",
+    "confidence": "high"
+   },
+   {
+    "fact": "CLAUDE.md rule 1 says paper only until Nimrod says otherwise, after at least 3 months of paper results that beat SPY on a risk-adjusted basis.",
+    "source": "/home/user/OmniRoute/ai-trader/CLAUDE.md (Hard rules, 1)",
+    "confidence": "high"
+   },
+   {
+    "fact": "The time-machine skill says PSR below 0.95 means indistinguishable from zero. Its acceptance rule is: paired wins in 4 of 5 phases, median Sharpe and Calmar improving, maxDD no worse by more than 2 points.",
+    "source": "/home/user/OmniRoute/ai-trader/skills/strategy-time-machine/SKILL.md:41,48",
+    "confidence": "high"
+   },
+   {
+    "fact": "In-sample over 2018-01-01+: BTC buy-and-hold maxDD -81.5% (CAGR 20.6%); BTC>SMA200 with hysteresis 2% maxDD -63.4%; vol target 40% plus BTC>SMA200 maxDD -45.9%. The design quotes the 2015-04+ figures (-67.1% vs -83.4%).",
+    "source": "/tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/crypto/risk/out/a4_regime.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "In-sample over ETH 2018-06+: the BTC>SMA200 hysteresis filter gave CAGR 43.9% vs 16.6% buy-and-hold. 'Calmer, not richer' is a BTC-only framing.",
+    "source": "risk/out/a4_regime.txt",
+    "confidence": "high"
+   },
+   {
+    "fact": "Coin Metrics CapMrktCurUSD shows XRP above ETH on every day from 2017-12-26 to 2018-01-12 (2018-01-01: BTC 225.9B, XRP 201.0B, ETH 73.1B). Coin Metrics counts XRP's escrowed supply. On circulating supply (~38.7B XRP, from memory) XRP was about $78B vs ETH $73B on 2018-01-01; that figure is an estimate.",
+    "source": "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc,eth,xrp&metrics=CapMrktCurUSD&start_time=2017-12-26&end_time=2018-01-12 -> scratchpad/crypto/critic/net/cm_caps.json",
+    "confidence": "medium"
+   },
+   {
+    "fact": "eToro charges a flat 1% per side on crypto for its standard Club tiers (Bronze, Silver, Gold).",
+    "source": "https://www.etoro.com/trading/fees/ (fetched 2026-11-09)",
+    "confidence": "high"
+   },
+   {
+    "fact": "Stock-book cost is 5 bp of slippage and zero commission. The design's crypto cost is 50 bp fee + 5 bp slippage + 10 bp exec delay = 65 bp, which is 13x, not 'about 10x'.",
+    "source": "/home/user/OmniRoute/ai-trader/config.json costs; design text",
+    "confidence": "high"
+   },
+   {
+    "fact": "Stock-book turnover in the recorded sweep is 14.72x/yr, counting both sides (sum of buy and sell value over equity). So '~7%/yr at 0.50% per side' is correct arithmetic.",
+    "source": "/home/user/OmniRoute/ai-trader/state/trials.jsonl (base turnover_med 14.72); backtest.py:59; metrics.py:91",
+    "confidence": "high"
+   },
+   {
+    "fact": "The stock trials.jsonl holds 62 trial rows. A separate crypto trials file would start the DSR count at N=0.",
+    "source": "state/trials.jsonl (count via python); backtest.py:169",
+    "confidence": "high"
+   },
+   {
+    "fact": "combine() divides by the sum of the available weights, so prior weights are renormalized automatically. Zeroing xsmom in the stock priors gives tsmom/trend/breakout 0.385/0.308/0.308, not the design's 0.35/0.35/0.30.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/strategy.py:13-29; config.json prior_weights",
+    "confidence": "high"
+   },
+   {
+    "fact": "With 2 symbols, fetch_panel keeps any row where at least 1 symbol has data (int(0.5*2)=1), so BTC-only history before ETH's start is kept. A pure BTC/ETH panel does not lose rows.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/data.py:151",
+    "confidence": "high"
+   },
+   {
+    "fact": "maybe_reset_peak resets the breaker after `dd_reentry_days` consecutive risk-on decisions. On a crypto book that decides every day, 20 means 20 calendar days.",
+    "source": "/home/user/OmniRoute/ai-trader/aitrader/broker.py:82-97",
+    "confidence": "high"
+   }
+  ],
+  "risks": [
+   "The in-sample regime evidence (3-4 switches/yr, the maxDD and CAGR figures) was produced by a hysteresis rule the engine does not implement. Built as written, the book would switch about 2.3x more often than the research shows, with no backtest evidence for the rule actually running.",
+   "The live decision close (Yahoo's latest completed bar) differs by 8-16 bp from the value history later stores. Near the regime line (BTC is only +1.9% above SMA200 today) or a stop line, live and replay can take opposite decisions, and forward grading would compare against a backtest that never saw the live inputs.",
+   "A failed Yahoo fetch at 00:10 UTC makes the cycle decide and run stops on a partial bar cached at 23:10. The stock book has the same latent bug after intraday runs.",
+   "Judging crypto against BTC instead of SPY would quietly rewrite CLAUDE.md rule 1's real-money gate.",
+   "Option ג ($100k crypto book) puts about half of all paper money in BTC, against the design's own 5%-of-total caps and possibly the owner's 5%-per-trade rule.",
+   "The pass rule (beat BTC buy-and-hold on maxDD and Calmar) is met by any go-to-cash filter. The ensemble, ATR stop, breaker and ETH could all be dead weight and still PASS.",
+   "The DSR is overstated: the crypto trials file starts at N=0 although the rule was picked after dozens of in-sample looks.",
+   "BTC+ETH is a hindsight pick: XRP was #2 by market cap on the sweep start date.",
+   "A fee base of 50 bp, with 80 bp as the worst tier, can understate retail costs: eToro publishes 1% per side.",
+   "Refactoring 6 shared modules before any crypto evidence puts the stock book at regression risk for a feature that may fail its gate.",
+   "24 hourly runs a day mean intraday rows in the hash-chained equity log, a dashboard window of about 16 days, 24 state commits a day, and the token cost of 24 Claude sessions, for 2 runs that actually do work.",
+   "If the fill falls back to the daily open, the fill price equals the decision price, which silently removes the modelled exec delay.",
+   "A one-day shift in execution moves in-sample ETH maxDD by 10.7 points. Every in-sample number in the design is noisy and should not be shown to Nimrod as an expectation."
+  ],
+  "recommendation": "Keep Approach B and its staging, but fix these before any code ships.\n\nPHASE 1: build only what the sweep needs, so stock-book risk stays small.\n(a) Thread periods_per_year through signals.py:13, strategy.py:148, metrics.py:10, backtest.py:170-171 and broker.mark. Add qty_step and fee_bps to PaperBroker. Give crypto its own state/crypto/trials.jsonl.\n(b) Add a config flag \"regime_band_mode\": \"offset\" for stocks (today's behaviour) and \"hysteresis\" for crypto. It uses the prev_regime that backtest.py and cycle.py already keep. This is the only way the risk-lens evidence describes the rule that would run.\n(c) Golden test on a frozen panel fixture committed under tests/. .cache refreshes every 6 h, so a test on the live cache is not reproducible.\n(d) Seed the crypto trials file with the in-sample looks already taken: a4_regime's 8 variants (SMA200/SMA100, BTC vs own regime, band, vol target).\n\nSWEEP: rewrite the pass rule before running anything.\n- Base = the simplest rule: BTC only, SMA200 with 2% hysteresis, 30% vol target, cash 0, fees 50 bp + slippage 5 bp + delay 10 bp.\n- Candidate = the ensemble book (tsmom/trend/breakout, ATR stop, breaker, +ETH).\n- The candidate ships only if it beats the base paired in at least 6 of 7 phases on Sharpe, maxDD is no worse by more than 2 points, median PSR is at least 0.95 (SKILL.md:48), and the sign holds at 100 bp per side (eToro's published 1%) and in both halves. Otherwise ship the simple rule (quant-critic: prefer fewer knobs).\n- Keep the variant list short, since each variant raises N: fees 25/80/100 bp; delay 0/50 bp or a t+1-close fill; no regime; BTC+ETH; BTC+XRP (XRP was #2 on 2018-01-01); +SOL. Drop ATR 2x/4x, vol 0.20/0.40, monthly rebalance and stock breaker thresholds unless one of them decides something.\n- Report BTC-only as the primary result and call BTC+ETH hindsight-tinted.\n- Quote 2018+ numbers, the window actually tested: BTC buy-and-hold maxDD -81.5%; regime with hysteresis -63.4%. For ETH, in-sample results are mixed, not simply calmer.\n\nPHASE 2: live parts, only after a quant-critic PASS and Nimrod's yes.\n1. Close revision: the live decision uses close_D := the open of Yahoo's D+1 row, read at 00:10. Log both values. Re-check after 48 h that history stores that value.\n2. Stale-cache guard: a bar counts as final only if the cache file's mtime is at or after the bar end plus the buffer (in config). Otherwise, no decision this run. Apply the same fix to the stock book's latent bug.\n3. Fill: the 01:00 1h open, then the 1m bar. Never fall back to the daily open; log where each fill price came from.\n4. Schedule: a 00:10 UTC run (decide, plus Claude's reduce-only review) and a 01:10 run (fill). An optional alert run every 6 h writes nothing unless it alerts. One equity mark per day, written at decision time. No-op runs write and commit nothing.\n5. Coinbase guard: if its threshold is breached, run exits-only (stops still fire). If Coinbase is down, proceed and log. The threshold goes in config. The guard can also be deferred, since fix 1 handles the known discrepancy.\n6. Dashboard times use the Asia/Jerusalem zone (03:10/04:00 in summer). Report labels use cfg['benchmark'].\n7. No depeg logic in v1: prices are in USD and paper cash is USD. Note it for v2 only, where Binance quotes in USDT.\n\nOWNER QUESTIONS: cut 8 down to 3, one per message.\n1. You asked for crypto: a separate quant book (recommended) or the news bot trading crypto under your rules (score above 8, 5%, -3%)?\n2. Does -3% and 5% per trade apply to the quant crypto book too? Note that in the quant book, BTC could be 100% of the crypto money.\n3. Book size: א $5,000 (recommended) or ב $10,000. Drop ג.\n\nDrop Q7, because rule 1 already sets SPY as the real-money gate; BTC stays a research benchmark. Drop Q5, which only matters for real money. Make Q6 and Q8 defaults (quiet hours, 0% interest on idle cash).\n\nALSO:\n- Pick one written rule for lookbacks (keep bar counts everywhere, or translate all of them), and record it in the config note.\n- Use the stock priors with xsmom/high52/reversal/rsi2 at 0 rather than inventing 0.35/0.35/0.30.\n- Correct \"10x\" fees to 13x.\n- Show the breaker to Nimrod in dollars (on $5,000: halve at -$1,250, flat at -$2,500)."
+ }
+]

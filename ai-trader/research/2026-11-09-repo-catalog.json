@@ -1,0 +1,2697 @@
+[
+ {
+  "repo": "OpenBB-finance/OpenBB",
+  "stars": 75262,
+  "category": "data-tool",
+  "why": "OpenBB's Open Data Platform: a Python data layer with an MCP surface for agents, normalizing many free providers (yfinance, SEC, FRED and others). A candidate to unify ai-trader's data fetching behind",
+  "pushed_at": "2026-11-07T00:09:44Z"
+ },
+ {
+  "repo": "ZhuLinsen/daily_stock_analysis",
+  "stars": 68402,
+  "category": "llm-single-agent-trader",
+  "why": "Highest-starred LLM stock-analysis system (covers US, A-share, HK and more). Runs on a schedule at zero cost and pushes a daily 'decision dashboard' (verdict, score, entry/exit levels, risk alerts, ca",
+  "pushed_at": "2026-11-08T12:37:00Z"
+ },
+ {
+  "repo": "virattt/ai-hedge-fund",
+  "stars": 64584,
+  "category": "llm-multi-agent-trader",
+  "why": "Second most famous TradingAgents-style repo: investor-persona agents (Buffett, Munger, etc.) feed a risk manager and a portfolio manager. It supports Anthropic. Its new CLI adds paper funds with an ap",
+  "pushed_at": "2026-11-08T02:14:20Z"
+ },
+ {
+  "repo": "microsoft/qlib",
+  "stars": 50151,
+  "category": "quant-framework",
+  "why": "The reference AI quant platform: point-in-time data handling, alpha factor libraries, rolling retraining, model zoo, and portfolio and backtest analysis. Too heavy to adopt, but its rolling, past-only",
+  "pushed_at": "2026-11-04T22:48:24Z"
+ },
+ {
+  "repo": "shiyu-coder/Kronos",
+  "stars": 47380,
+  "category": "research-paper-code",
+  "why": "Kronos (AAAI 2026), a foundation model trained on candlestick (K-line) data from 45+ exchanges. The small/mini checkpoints run locally with no LLM API key and give zero-shot OHLCV forecasts. A plausib",
+  "pushed_at": "2026-04-13"
+ },
+ {
+  "repo": "anthropics/financial-services",
+  "stars": 41166,
+  "category": "claude-skill-or-plugin",
+  "why": "Anthropic's official reference agents, skills and data connectors for financial services, such as Earnings Reviewer and Market Researcher. Each ships as a Cowork/Claude Code plugin and as a Managed Ag",
+  "pushed_at": "2026-10-28T17:23:24Z"
+ },
+ {
+  "repo": "HKUDS/Vibe-Trading",
+  "stars": 37931,
+  "category": "llm-single-agent-trader",
+  "why": "Very active personal trading agent (commits daily). Its Research Lab reruns saved prices under different fees and slippage, picks parameters on training data only, then freezes them for out-of-sample ",
+  "pushed_at": "2026-11-09T08:55:21Z"
+ },
+ {
+  "repo": "hsliuping/TradingAgents-CN",
+  "stars": 32856,
+  "category": "llm-multi-agent-trader",
+  "why": "The largest TradingAgents derivative, adapted for Chinese A-shares. Version 2 added holdings analysis plus per-trade and periodic reviews; version 3 adds AI memory with fact storage, paper trading wit",
+  "pushed_at": "2026-09-22"
+ },
+ {
+  "repo": "virattt/dexter",
+  "stars": 27802,
+  "category": "llm-single-agent-trader",
+  "why": "'Claude Code for financial research': an autonomous agent that plans tasks, self-reflects and checks its own work on live market data, with an eval harness. Its plan, research, verify loop and evaluat",
+  "pushed_at": "2026-09-23T19:56:36Z"
+ },
+ {
+  "repo": "HKUDS/AI-Trader",
+  "stars": 23199,
+  "category": "other",
+  "why": "An agent-native paper-trading platform: any agent, Claude Code included, joins by reading a SKILL.md. Live mark-to-market leaderboards and experiment tracking, with yfinance fallback for US prices. Co",
+  "pushed_at": "2026-06-11T09:26:03Z"
+ },
+ {
+  "repo": "AI4Finance-Foundation/FinGPT",
+  "stars": 21542,
+  "category": "research-paper-code",
+  "why": "The main open financial-LLM project: fine-tuned sentiment and forecasting models with datasets on HuggingFace. Not directly reusable without a GPU or an API, but its news-sentiment labelling recipes a",
+  "pushed_at": "2026-10-25T13:49:15Z"
+ },
+ {
+  "repo": "xbtlin/ai-berkshire",
+  "stars": 17066,
+  "category": "claude-skill-or-plugin",
+  "why": "The most-starred Claude Code finance research framework found: 22 skills that systematize Buffett, Munger, Duan Yongping and Li Lu methods, with parallel multi-agent research. It has produced 2,281 re",
+  "pushed_at": "2026-11-04T07:20:01Z"
+ },
+ {
+  "repo": "microsoft/RD-Agent",
+  "stars": 15295,
+  "category": "research-paper-code",
+  "why": "Contains R&D-Agent-Quant (NeurIPS 2025): a hypothesis, implement, backtest, feedback loop that co-evolves factors and models on Qlib (rdagent fin_factor / fin_model / fin_quant). This is the canonical",
+  "pushed_at": "2026-10-21T16:01:22Z"
+ },
+ {
+  "repo": "OpenByteInc/QuantDinger",
+  "stars": 13646,
+  "category": "quant-framework",
+  "why": "Large, very active self-hosted agentic trading OS: AI research, Python strategies, backtests and paper/live execution. Deterministic entry-risk and order-budget checks are stored with each order's con",
+  "pushed_at": "2026-11-08T08:17:07Z"
+ },
+ {
+  "repo": "NoFxAiOS/nofx",
+  "stars": 13243,
+  "category": "llm-single-agent-trader",
+  "why": "The most-starred open-source AI trading system we have not covered yet. Its split is relevant: Frontier generates inspectable plans (entry, stop, targets, size) that need explicit approval per trade, ",
+  "pushed_at": "2026-11-04T12:47:06Z"
+ },
+ {
+  "repo": "ValueCell-ai/valuecell",
+  "stars": 11054,
+  "category": "llm-multi-agent-trader",
+  "why": "The highest-starred new multi-agent finance platform in this round: DeepResearch, stock-selection, tracking and trading agents, data kept local. Needs external LLM APIs, so it is useful as a reference",
+  "pushed_at": "2026-03-09T08:30:21Z"
+ },
+ {
+  "repo": "AI4Finance-Foundation/FinRobot",
+  "stars": 8396,
+  "category": "llm-multi-agent-trader",
+  "why": "Established open-source AI agent platform for finance from the FinRL/FinGPT group: financial chain-of-thought, equity-research report agents, and market-forecaster roles. Heavy and needs an OpenAI key",
+  "pushed_at": "2026-10-24T13:58:26Z"
+ },
+ {
+  "repo": "LuckyOne7777/LLM-Trading-Lab",
+  "stars": 7548,
+  "category": "llm-single-agent-trader",
+  "why": "The well-known ChatGPT real-money micro-cap experiment: an LLM is the portfolio decision-maker under strict predefined rules, with a daily-updates CSV, a trade log, weekly deep-research summaries, and",
+  "pushed_at": "2026-06-24T16:34:59Z"
+ },
+ {
+  "repo": "TraderAlice/OpenAlice",
+  "stars": 7442,
+  "category": "other",
+  "why": "Local AI trading orchestrator that plugs Claude Code (and other native agents) into market data, research workspaces with git history, scheduled tasks and trading accounts. Theses are kept under revie",
+  "pushed_at": "2026-11-09T09:07:25Z"
+ },
+ {
+  "repo": "tradesdontlie/tradingview-mcp",
+  "stars": 7127,
+  "category": "mcp-server",
+  "why": "The most-starred TradingView MCP (a different repo from the excluded atilaahmettaner one). It bridges Claude Code to a locally running TradingView Desktop over Chrome DevTools for chart reading and Pi",
+  "pushed_at": "2026-10-21T15:03:51Z"
+ },
+ {
+  "repo": "The-Swarm-Corporation/AutoHedge",
+  "stars": 6662,
+  "category": "llm-multi-agent-trader",
+  "why": "Well-starred swarm 'autonomous hedge fund' with a Director (thesis), Quant, Risk Management (sizing before any execution) and Execution agents, structured JSON outputs and audit logging. It now trades",
+  "pushed_at": "2026-05-11T05:44:09Z"
+ },
+ {
+  "repo": "Jakeschincariol/day-trader-skill",
+  "stars": 6263,
+  "category": "claude-skill-or-plugin",
+  "why": "11 Claude skills, installable as a Claude Code plugin, using only free data (Yahoo, Nasdaq Trader symbol lists, SEC EDGAR, House Clerk) and no API key. Includes a scanner, a news tracker, stop/target ",
+  "pushed_at": "2026-10-20T14:18:00Z"
+ },
+ {
+  "repo": "atilaahmettaner/tradingview-mcp",
+  "stars": 5244,
+  "category": "mcp-server",
+  "why": "A headless TradingView-data MCP with 30+ tools: screeners, multi-timeframe technical analysis, smart-money and volume scans, walk-forward backtests, and Reddit and news sentiment for stocks, crypto, f",
+  "pushed_at": "2026-11-07T14:05:59Z"
+ },
+ {
+  "repo": "simonlin1212/TradingAgents-astock",
+  "stars": 3937,
+  "category": "llm-multi-agent-trader",
+  "why": "The most-starred deep A-share fork (Apache-2.0). It has 7 analysts, adding policy, hot-money and share-unlock roles. Market rules (T+1, price limits, lot sizes, ST stocks) are encoded as hard constrai",
+  "pushed_at": "2026-10-30"
+ },
+ {
+  "repo": "AI4Finance-Foundation/FinRL-Trading",
+  "stars": 3922,
+  "category": "quant-framework",
+  "why": "FinRL-X (arXiv:2603.21330). Its weight-centric contract is w_t = Risk(Timing(Allocation(Selection(data)))): the risk overlay is the last transformation, and every module can be swapped. It adds LLM se",
+  "pushed_at": "2026-09-18"
+ },
+ {
+  "repo": "tradermonty/claude-trading-skills",
+  "stars": 3705,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code skills for equity investors, directly reusable without an API key. Workflows for market review, risk management before choosing candidates, trade planning, journaling and continuous improv",
+  "pushed_at": "2026-11-09T09:25:41Z"
+ },
+ {
+  "repo": "himself65/finance-skills",
+  "stars": 3517,
+  "category": "claude-skill-or-plugin",
+  "why": "A popular skill collection for gathering finance data inside Claude sessions: yfinance-data, earnings-preview and earnings-recap, estimate-analysis, stock-correlation, stock-liquidity, finance-sentime",
+  "pushed_at": "2026-11-04T06:45:41Z"
+ },
+ {
+  "repo": "LLMQuant/quant-mind",
+  "stars": 3126,
+  "category": "data-tool",
+  "why": "NeurIPS 2025 GenAI-in-Finance workshop paper (arXiv:2509.21507). It turns papers, news and filings into typed knowledge cards (News, Earnings, Factor, Thesis), each with an as_of timestamp and a citat",
+  "pushed_at": "2026-08-15"
+ },
+ {
+  "repo": "Y-Research-SBU/QuantHarness",
+  "stars": 2894,
+  "category": "llm-multi-agent-trader",
+  "why": "The renamed official QuantAgent repo (arXiv 2509.09995, price-driven multi-agent HFT). Indicator, Pattern and Trend agents work from rendered K-line charts with fitted trend channels, and a Decision a",
+  "pushed_at": "2026-08-18T08:35:31Z"
+ },
+ {
+  "repo": "dgunning/edgartools",
+  "stars": 2844,
+  "category": "data-tool",
+  "why": "Well-maintained Python library for SEC EDGAR (10-K, 8-K, XBRL financials, Form 3/4/5 insiders, 13F). It ships a local MCP server (uvx edgartools[ai] edgartools-mcp) plus an agent skill. Because it is ",
+  "pushed_at": "2026-11-08T14:12:29Z"
+ },
+ {
+  "repo": "wquguru/nof0",
+  "stars": 2754,
+  "category": "other",
+  "why": "Open-source reproduction of the nof1.ai Alpha Arena: several LLMs each start with $10k on live crypto (Hyperliquid), with a prompt-centric loop of strategy, prompt, live trading, PnL leaderboard, then",
+  "pushed_at": "2025-12-07T08:58:49Z"
+ },
+ {
+  "repo": "HuaYaoAI/FinGenius",
+  "stars": 2720,
+  "category": "llm-multi-agent-trader",
+  "why": "Well-starred Chinese A-share multi-agent app with a Research–Battle dual-environment design. Specialist agents (sentiment, hot-money and dragon-tiger list, policy risk, technical red lines, chip distr",
+  "pushed_at": "2025-08-06T03:18:07Z"
+ },
+ {
+  "repo": "quantskills/quantskills",
+  "stars": 2618,
+  "category": "claude-skill-or-plugin",
+  "why": "Hub and registry (PandaAI community) for about 200 agent quant skills. The relevant ones for us are in the validation category: skill-ml-purged-cv (purged K-fold, CPCV, PBO, DSR), skill-walk-forward-v",
+  "pushed_at": "2026-11-09T00:56:49Z"
+ },
+ {
+  "repo": "24mlight/A_Share_investment_Agent",
+  "stars": 2489,
+  "category": "llm-multi-agent-trader",
+  "why": "Popular Chinese A-share agent system with bull/bear researchers and a 'debate room' where an LLM weighs both sides before a final decision. Most reusable piece: a SQLite TTL cache over market data wit",
+  "pushed_at": "2026-05-26T14:40:51Z"
+ },
+ {
+  "repo": "chrisworsey55/atlas-gic",
+  "stars": 2434,
+  "category": "llm-multi-agent-trader",
+  "why": "Self-improving agents using Karpathy-style autoresearch. Every recommendation is scored against real outcomes. The worst agent by rolling Sharpe gets one prompt edit, which runs for 5 days and is then",
+  "pushed_at": "2026-09-22T11:51:44Z"
+ },
+ {
+  "repo": "TNT-Likely/PanWatch",
+  "stars": 2415,
+  "category": "llm-multi-agent-trader",
+  "why": "Portfolio-first wrapper around TradingAgents. Starting from a holding, a 9-agent team runs the bull/bear debate and risk review and sends a PM decision memo with the full reasoning trail to a messagin",
+  "pushed_at": "2026-11-08"
+ },
+ {
+  "repo": "financial-datasets/mcp-server",
+  "stars": 2321,
+  "category": "mcp-server",
+  "why": "The most-starred stock-data MCP: income statements, balance sheets, cash flow, prices, news and crypto from the Financial Datasets API, the same data source used by the ai-hedge-fund project. Needs a ",
+  "pushed_at": "2025-06-05T19:50:38Z"
+ },
+ {
+  "repo": "ginlix-ai/LangAlpha",
+  "stars": 2254,
+  "category": "llm-single-agent-trader",
+  "why": "Billed as 'Claude Code for financial markets'. Treats research as Bayesian: write a thesis and its invalidation conditions, and let each earnings print, filing or price move raise or lower conviction ",
+  "pushed_at": "2026-11-09T09:45:53Z"
+ },
+ {
+  "repo": "Lumiwealth/lumibot",
+  "stars": 2219,
+  "category": "quant-framework",
+  "why": "Mature Python trading framework where AI agents decide inside a strategy class. The same class runs in backtest, paper and live on 12 brokers, and it keeps decision records, orders and fills. Worth st",
+  "pushed_at": "2026-11-09T07:32:34Z"
+ },
+ {
+  "repo": "olaxbt/ai-market-maker",
+  "stars": 2108,
+  "category": "llm-multi-agent-trader",
+  "why": "Hedge-fund-style agent desks with LangGraph and a hard Risk Guard that can veto any trade. Historical data is pinned with a sha256 manifest so CSV-only reruns reproduce exactly. Strategy, policy and s",
+  "pushed_at": "2026-08-20T14:00:25Z"
+ },
+ {
+  "repo": "oficcejo/aiagents-stock",
+  "stars": 2080,
+  "category": "llm-multi-agent-trader",
+  "why": "Popular Chinese multi-agent 'analyst team' system (A-shares, HK, US; DeepSeek): team analysis, strategy stock picking, batch multithreaded analysis, sector-rotation alerts, top-trader tracking from ex",
+  "pushed_at": "2026-10-10T10:42:49Z"
+ },
+ {
+  "repo": "questflowai/investorskills",
+  "stars": 1916,
+  "category": "claude-skill-or-plugin",
+  "why": "An open library that turns how famous investors filter ideas, size risk and invalidate theses into portable SKILL.md packages, with a skill template and an investment schema. Useful as structured pers",
+  "pushed_at": "2026-08-23T07:17:36Z"
+ },
+ {
+  "repo": "qusong0627/QuantMind",
+  "stars": 1896,
+  "category": "quant-framework",
+  "why": "Chinese AI-native quant platform that combines Microsoft Qlib (Alpha158 factors, LightGBM), RD-Agent (automatic factor evolution) and a TradingAgents-Astock multi-agent desk. Full pipeline: data, fact",
+  "pushed_at": "2026-11-09T05:42:50Z"
+ },
+ {
+  "repo": "simonlin1212/global-stock-data",
+  "stars": 1849,
+  "category": "data-tool",
+  "why": "A zero-auth US market data toolkit built for AI coding assistants (needs only `requests`): 17 layers, 50+ endpoints, 18 official-first sources. Covers CBOE options with Greeks and 0DTE flow, FINRA sho",
+  "pushed_at": "2026-11-02T09:31:44Z"
+ },
+ {
+  "repo": "jundizhou/easy-stock",
+  "stars": 1794,
+  "category": "other",
+  "why": "Actively developed Chinese A-share AI research workbench that turns intraday observation, post-close review and long-term knowledge into a 'continuously evolving research system'. AI portfolio inspect",
+  "pushed_at": "2026-11-09T06:13:11Z"
+ },
+ {
+  "repo": "QuantaAlpha/QuantaAlpha",
+  "stars": 1654,
+  "category": "research-paper-code",
+  "why": "Self-evolving LLM factor mining: you give a research direction, it plans diverse starting points, evolves at the trajectory level, and enforces structured hypothesis-to-code constraints. Reports CSI30",
+  "pushed_at": "2026-06-29T16:55:22Z"
+ },
+ {
+  "repo": "Jakeschincariol/trader-skill",
+  "stars": 1578,
+  "category": "claude-skill-or-plugin",
+  "why": "11 MIT skills built on stdlib Python and free public data with no API key: a 13F copycat (rebuilds an investor's weights and quarter-over-quarter changes from SEC EDGAR), a Congress PTR tracker that p",
+  "pushed_at": "2026-10-14T21:13:22Z"
+ },
+ {
+  "repo": "mnemox-ai/tradememory-protocol",
+  "stars": 1441,
+  "category": "mcp-server",
+  "why": "MCP memory and brake for AI trading agents. Syncs fills (including Alpaca), finds where your own history loses money (e.g. sizing up after losing streaks), and puts the bigger past losses in similar c",
+  "pushed_at": "2026-10-23T17:29:16Z"
+ },
+ {
+  "repo": "run-bigpig/jcp",
+  "stars": 1321,
+  "category": "llm-multi-agent-trader",
+  "why": "Go/Wails desktop app (Chinese, A-shares) with a multi-agent 'think tank' meeting room. Long-term memory is kept separately per stock, so agents remember past discussions and conclusions on that ticker",
+  "pushed_at": "2026-04-09T06:35:29Z"
+ },
+ {
+  "repo": "ICT-FinD-Lab/alphagen",
+  "stars": 1293,
+  "category": "research-paper-code",
+  "why": "KDD'23 code that generates a synergistic set of formulaic alphas and learns their combination weights jointly, optimising the IC of the combined signal rather than each factor alone. This is the acade",
+  "pushed_at": "2026-06-04T05:54:38Z"
+ },
+ {
+  "repo": "kyky2347/ALTA",
+  "stars": 1076,
+  "category": "llm-multi-agent-trader",
+  "why": "Evidence-first multi-agent research firm. Scouts find leads, independent reviewers challenge the evidence, a strategy desk compares instruments, and every handoff leaves an inspectable record. Shadow ",
+  "pushed_at": "2026-11-05T09:51:49Z"
+ },
+ {
+  "repo": "alpacahq/alpaca-mcp-server",
+  "stars": 1072,
+  "category": "mcp-server",
+  "why": "Alpaca's official MCP server (v2, FastMCP/OpenAPI rewrite) for stocks, ETFs, options and crypto. ALPACA_PAPER_TRADE defaults to true, and ALPACA_TOOLSETS can limit it to data-only toolsets such as sto",
+  "pushed_at": "2026-11-04T12:51:37Z"
+ },
+ {
+  "repo": "marc-shade/world-intel-mcp",
+  "stars": 1066,
+  "category": "mcp-server",
+  "why": "160 tools built on free public APIs. The market-relevant ones: a 6-signal macro composite verdict (Fear&Greed, VIX, sectors, DXY, BTC, yields), FRED liquidity series, earnings surprise history, SEC 8-",
+  "pushed_at": "2026-10-18T19:44:29Z"
+ },
+ {
+  "repo": "star23/Day1Global-Skills",
+  "stars": 1063,
+  "category": "claude-skill-or-plugin",
+  "why": "Popular finance skill pack. us-market-sentiment (NAAIM, institutional allocation, retail flows, forward P/E, hedge fund leverage) and macro-liquidity (Fed net liquidity, SOFR, MOVE, yen carry) are rea",
+  "pushed_at": "2026-08-18"
+ },
+ {
+  "repo": "LLMQuant/awesome-trading-agents",
+  "stars": 990,
+  "category": "other",
+  "why": "Curated list of LLM trading agents, MCP servers and agent skills for research, strategy and execution. A good seed for later discovery rounds.",
+  "pushed_at": "2026-08-13T03:30:06Z"
+ },
+ {
+  "repo": "pipiku915/FinMem-LLM-StockTrading",
+  "stars": 971,
+  "category": "research-paper-code",
+  "why": "Code for the FinMem paper (arXiv 2311.13743, AAAI symposium): an LLM trading agent with layered memory (short/mid/long-term, with decay and importance scores) and a designed character/risk profile. In",
+  "pushed_at": "2024-08-18T01:58:13Z"
+ },
+ {
+  "repo": "Kulaxyz/self-learning-skills",
+  "stars": 969,
+  "category": "claude-skill-or-plugin",
+  "why": "A meta-skill that teaches Claude Code to spot a hard-won 'golden path' (including what failed) and save it as a new skills/<name>/SKILL.md that loads automatically next session. A pattern for turning ",
+  "pushed_at": "2026-09-14T17:06:52Z"
+ },
+ {
+  "repo": "komako-workshop/digital-oracle",
+  "stars": 910,
+  "category": "claude-skill-or-plugin",
+  "why": "Agent skill (Claude Code, OpenClaw, Cursor) that answers macro questions with structured probability estimates and a reasoning chain, using only market prices from 13 free, keyless sources. Sources in",
+  "pushed_at": "2026-07-26"
+ },
+ {
+  "repo": "KylinMountain/TradingAgents-AShare",
+  "stars": 893,
+  "category": "llm-multi-agent-trader",
+  "why": "A 15-agent A-share system with a claim-driven debate: bull and bear claims get IDs, and focus and unresolved claim IDs are tracked across rounds (see bull_researcher.py). That is a concrete way to mak",
+  "pushed_at": "2026-10-30"
+ },
+ {
+  "repo": "Open-Finance-Lab/AgenticTrading",
+  "stars": 891,
+  "category": "research-paper-code",
+  "why": "Agentic Trading Lab, built alongside a systematic survey of agentic trading research. It turns trading ideas into traceable experiments: prototype agents, backtests, inspection of reasoning and decisi",
+  "pushed_at": "2026-11-05T16:14:17Z"
+ },
+ {
+  "repo": "dragon1086/prism-insight",
+  "stars": 795,
+  "category": "llm-multi-agent-trader",
+  "why": "Closest live equivalent to our bot: 13+ agents write a stock report (technicals, flows, financials, industry, news, market), then score, portfolio and re-entry gates decide KR/US buys. Its trading jou",
+  "pushed_at": "2026-11-09T08:39:09Z"
+ },
+ {
+  "repo": "quant-sentiment-ai/claude-equity-research",
+  "stars": 754,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code plugin (/plugin marketplace add) that writes structured equity research using web search. Its output template fits our trading-desk deep dive: probability-weighted bull/base/bear scenarios",
+  "pushed_at": "2026-11-08T11:20:27Z"
+ },
+ {
+  "repo": "wshobson/maverick-mcp",
+  "stars": 721,
+  "category": "mcp-server",
+  "why": "Local stock-market MCP server using Yahoo Finance with no API key for its 38 core tools: quotes, history, fundamentals, RSI/MACD, support/resistance, screens, portfolio tracking with a trade journal, ",
+  "pushed_at": "2026-11-06T16:03:25Z"
+ },
+ {
+  "repo": "MingyuJ666/Stockagent",
+  "stars": 717,
+  "category": "research-paper-code",
+  "why": "StockAgent (ACM TIST): an LLM multi-agent market simulator with initial, trading, post-trading and special-event phases, used to study how macro, policy, earnings and global events affect trading. Use",
+  "pushed_at": "2026-06-16T21:41:15Z"
+ },
+ {
+  "repo": "FinStep-AI/ContestTrade",
+  "stars": 680,
+  "category": "llm-multi-agent-trader",
+  "why": "Two-stage internal-contest multi-agent system. Data agents turn news, filings and flows into text factors and an internal contest keeps the best. Research agents, each with a configurable 'trading bel",
+  "pushed_at": "2025-12-22T10:00:06Z"
+ },
+ {
+  "repo": "ryanfrigo/kalshi-ai-trading-bot",
+  "stars": 650,
+  "category": "claude-skill-or-plugin",
+  "why": "Prediction markets, but its 'honest edge' layer is what we need for scoring our probability forecasts: Brier score, log-loss, edge versus market price, and a forward-only guard. It refuses to claim ed",
+  "pushed_at": "2026-11-09T04:20:33Z"
+ },
+ {
+  "repo": "AlphaGBM/investment-masters",
+  "stars": 637,
+  "category": "claude-skill-or-plugin",
+  "why": "One SKILL.md with 15 fund managers' methodologies (Buffett, Druckenmiller, Lynch, Dalio, Marks...) extracted from primary sources, covering selection, sizing, risk and exit rules, not role-play. It se",
+  "pushed_at": "2026-10-06T13:30:35Z"
+ },
+ {
+  "repo": "jackson-video-resources/claude-tradingview-mcp-trading",
+  "stars": 617,
+  "category": "llm-single-agent-trader",
+  "why": "A one-shot Claude Code prompt that reads rules.json, pulls TradingView data, checks a daily trade cap and max trade size, and runs an all-conditions safety check before any order. It writes trades.csv",
+  "pushed_at": "2026-05-15T10:30:57Z"
+ },
+ {
+  "repo": "TauricResearch/Trading-R1",
+  "stars": 607,
+  "category": "research-paper-code",
+  "why": "Follow-up from the TradingAgents authors (Tauric): a terminal for financial research and analysis that can run on Anthropic, OpenAI, Gemini or the Tauric model. Its report and research structure show ",
+  "pushed_at": "2026-11-09T01:53:02Z"
+ },
+ {
+  "repo": "etrobot/open-alpha-arena",
+  "stars": 601,
+  "category": "llm-single-agent-trader",
+  "why": "The most-starred non-excluded open reproduction of nof1 Alpha Arena: LLM paper trading (crypto via ccxt and Hyperliquid) with factor calculations and SQLite-logged decisions. Useful mainly as a refere",
+  "pushed_at": "2026-08-03T07:52:38Z"
+ },
+ {
+  "repo": "agiprolabs/claude-trading-skills",
+  "stars": 516,
+  "category": "claude-skill-or-plugin",
+  "why": "68 Agent Skills covering backtesting (vectorbt, Backtrader, walk-forward validation), portfolio and risk (position sizing, Kelly, risk management) and stats/ML. Also prediction-market-live-ops: eviden",
+  "pushed_at": "2026-09-03"
+ },
+ {
+  "repo": "Miasyster/QuantGPT",
+  "stars": 507,
+  "category": "mcp-server",
+  "why": "Alpha factory driven by Claude (Code or Desktop) through 15 MCP tools: run_backtest, score_factor, diagnose_factor, run_anti_overfit (4 tests), run_rolling_validation (walk-forward) and others. The ag",
+  "pushed_at": "2026-11-01T01:35:24Z"
+ },
+ {
+  "repo": "jason8745/llm-agent-trader",
+  "stars": 498,
+  "category": "llm-single-agent-trader",
+  "why": "Stock backtesting system that streams an LLM's decisions bar by bar over history, combining technicals and a risk module. Backtest logs go to SQLite, with a 'daily feedback' API and backtest analysis.",
+  "pushed_at": "2025-12-04T15:51:32Z"
+ },
+ {
+  "repo": "lzwme/finance-quant-skills",
+  "stars": 477,
+  "category": "claude-skill-or-plugin",
+  "why": "Actively maintained Chinese repository of Agent Skills for financial quant trading, mainly A-shares. Skill-format prompts and workflows that load directly into Claude Code. Worth mining for skill stru",
+  "pushed_at": "2026-11-09T06:40:39Z"
+ },
+ {
+  "repo": "galleonlabs/hypergrok-trading-desk",
+  "stars": 450,
+  "category": "claude-skill-or-plugin",
+  "why": "7 role profiles and 17 skills: desk lead, analysts, risk manager, execution trader and trade reviewer. Includes a desk-post-trade-review skill and a ticket process where nothing executes without risk ",
+  "pushed_at": "2026-11-04"
+ },
+ {
+  "repo": "DulyHao/AlphaForge",
+  "stars": 444,
+  "category": "research-paper-code",
+  "why": "AAAI 2025 official code: mines formulaic factors, then recombines them dynamically, picking and reweighting factors each period by their recent IC. The timing-aware weighting suits our learned-weight ",
+  "pushed_at": "2024-09-01T07:50:47Z"
+ },
+ {
+  "repo": "ZhuLinsen/alphasift",
+  "stars": 432,
+  "category": "data-tool",
+  "why": "Full-market discovery for agents. Deterministic L1 filters and factor scores come from auditable YAML strategies and need no API key. An LLM re-rank of the shortlist is optional. It adds a risk overla",
+  "pushed_at": "2026-11-04T14:38:57Z"
+ },
+ {
+  "repo": "RndmVariableQ/AlphaAgent",
+  "stars": 431,
+  "category": "quant-framework",
+  "why": "Factor research framework from the AlphaAgent paper: factors as DSL expressions, a FactorZoo evaluator with IC, turnover and quantile reports, and optional LLM factor mining through AgentScope. A cons",
+  "pushed_at": "2026-07-03T11:55:06Z"
+ },
+ {
+  "repo": "xang1234/stock-screener",
+  "stars": 417,
+  "category": "mcp-server",
+  "why": "Its stockscreen-mcp needs no API key: claude mcp add stockscreen -- uvx stockscreen-mcp. It offers Minervini/CANSLIM screens, RS ratings, a market-health/exposure regime overlay for sizing, breadth (T",
+  "pushed_at": "2026-11-09"
+ },
+ {
+  "repo": "0xethanq/astra-quant-agent",
+  "stars": 413,
+  "category": "llm-multi-agent-trader",
+  "why": "Chinese crypto system: multi-LLM committee analysis (macro, technical, microstructure) plus deterministic Python risk control, starting in paper mode and failing closed, with a chain-of-thought decisi",
+  "pushed_at": "2026-10-03T20:02:58Z"
+ },
+ {
+  "repo": "staskh/trading_skills",
+  "stars": 406,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude-powered advisor built as Claude Code / Desktop skills: bullish scanners, fundamentals, technicals, Greeks, correlation matrices, risk metrics, earnings dates and PDF reports, with optional IBKR",
+  "pushed_at": "2026-11-08T13:57:51Z"
+ },
+ {
+  "repo": "massive-com/mcp_massive",
+  "stars": 401,
+  "category": "mcp-server",
+  "why": "Official MCP server from Massive (formerly Polygon.io): stocks, options, forex, crypto, indicators and SEC filings. Needs a Massive key (there is a free tier). It is the upgrade path if Yahoo's chart ",
+  "pushed_at": "2026-11-03T21:19:07Z"
+ },
+ {
+  "repo": "ivebotunac/PrimoAgent",
+  "stars": 388,
+  "category": "llm-multi-agent-trader",
+  "why": "LangGraph 4-agent pipeline (data, technicals, news intelligence, portfolio manager) for daily signals and next-day predictions. Notable for turning news into 7 quantified NLP features before the PM se",
+  "pushed_at": "2026-01-12T08:32:57Z"
+ },
+ {
+  "repo": "stefanoamorelli/sec-edgar-mcp",
+  "stars": 386,
+  "category": "mcp-server",
+  "why": "The most-starred SEC EDGAR MCP: 10-K/10-Q/8-K, XBRL financials and insider (Form 4) data, with no paid key. It could replace our data.py browse-edgar scraping. Related: bxxd/mcp-edgar-ux (4 stars) ret",
+  "pushed_at": "2026-11-01T10:09:28Z"
+ },
+ {
+  "repo": "liangdabiao/Claude-Code-Stock-Deep-Research-Agent",
+  "stars": 378,
+  "category": "claude-skill-or-plugin",
+  "why": "Chinese-authored Claude Code deep-research system: an 8-phase stock due-diligence framework, up to 28 parallel research subagents using only WebSearch and WebFetch, balanced bull and bear cases, expli",
+  "pushed_at": "2026-03-07T16:48:07Z"
+ },
+ {
+  "repo": "Alex2Yang97/yahoo-finance-mcp",
+  "stars": 368,
+  "category": "mcp-server",
+  "why": "A full-featured Yahoo Finance MCP: price history, company info, financial statements, option chains, holders and news, no key. Matches our current Yahoo data source, so Claude can pull news and fundam",
+  "pushed_at": "2026-09-19T13:00:47Z"
+ },
+ {
+  "repo": "ferdousbhai/investor-agent",
+  "stars": 348,
+  "category": "mcp-server",
+  "why": "Small research MCP with a hosted remote endpoint that needs no auth (claude mcp add --transport http). Tools: NASDAQ earnings calendar, CNN Fear&Greed, market movers, options sorted by open interest, ",
+  "pushed_at": "2026-10-09T13:58:27Z"
+ },
+ {
+  "repo": "guangxiangdebizi/TradingAgents-MCPmode",
+  "stars": 340,
+  "category": "llm-multi-agent-trader",
+  "why": "Chinese TradingAgents variant where 15 agents get data through MCP tools (US, A-shares, HK): 7 analysts in parallel (adds company-overview, shareholder and product analysts), configurable investment a",
+  "pushed_at": "2025-11-22T07:04:36Z"
+ },
+ {
+  "repo": "BichengWang/RL-pricing",
+  "stars": 339,
+  "category": "research-paper-code",
+  "why": "A reproducibility lab that re-tests published trading-AI claims under one pre-registered protocol: next-open fills, fees, at least 5 seeds, survivorship-free data, and verdicts decided by fixed rules.",
+  "pushed_at": "2026-11-08T21:12:00Z"
+ },
+ {
+  "repo": "Oft3r/agentic-trading-desk",
+  "stars": 333,
+  "category": "claude-skill-or-plugin",
+  "why": "Its SKILL.md mandate rests on one rule: the AI fetches data, stdlib Python scripts do the deterministic scoring (three-pillar scorecard plus a macro pillar), and the user approves. It also has a Claud",
+  "pushed_at": "2026-10-19T17:25:07Z"
+ },
+ {
+  "repo": "Blave-TW/blave-agent",
+  "stars": 333,
+  "category": "quant-framework",
+  "why": "Quant workspace where Claude Code or Codex turns an idea into a backtest and then into live or paper trading. Its backtests flag overfitting by default with an MCPT p-value, a parameter-plateau check ",
+  "pushed_at": "2026-11-09T09:57:56Z"
+ },
+ {
+  "repo": "benstaf/FinRL_DeepSeek",
+  "stars": 332,
+  "category": "research-paper-code",
+  "why": "FinRL-DeepSeek (arXiv:2502.07393), now the basis of FinRL Contest 2025 task 1. LLM-derived per-stock risk scores modulate trading actions (CPPO). Finding: the LLM risk overlay helped in bear markets a",
+  "pushed_at": "2025-04-08"
+ },
+ {
+  "repo": "zubair-trabzada/ai-trading-claude",
+  "stars": 323,
+  "category": "claude-skill-or-plugin",
+  "why": "Native to Claude Code with no API keys: 16 skills and 5 parallel subagents (technical, fundamental, sentiment, risk, thesis) produce a composite 0-100 Trade Score with Strong Buy to Avoid ratings and ",
+  "pushed_at": "2026-04-07T20:54:21Z"
+ },
+ {
+  "repo": "edinetdb/dexter-jp",
+  "stars": 317,
+  "category": "llm-single-agent-trader",
+  "why": "Japanese variant: fork of virattt/dexter fully reworked for Japanese stocks on EDINET DB and J-Quants. It plans its own research, crosses data sources, checks its own work and writes reports, with a k",
+  "pushed_at": "2026-10-08T23:11:37Z"
+ },
+ {
+  "repo": "HKUSTDial/DeepFund",
+  "stars": 303,
+  "category": "llm-multi-agent-trader",
+  "why": "NeurIPS 2025 live-arena fund benchmark. src/llm/prompt.py has short, reusable role prompts: fundamental, technical, insider, news, macro and policy analysts, each returning a Bullish/Bearish/Neutral s",
+  "pushed_at": "2026-03-18T03:43:42Z"
+ },
+ {
+  "repo": "YizhiSong/FriesTrader",
+  "stars": 301,
+  "category": "claude-skill-or-plugin",
+  "why": "Closest match to how our bot runs. Two scheduled Claude Code sessions per weekday: PHASE_A_TASK.md screens stocks and writes a thesis with order tools hard-blocked, and PHASE_B_TASK.md re-verifies, en",
+  "pushed_at": "2026-11-07T06:39:56Z"
+ },
+ {
+  "repo": "ymj8903668-droid/trading-review-wiki",
+  "stars": 293,
+  "category": "other",
+  "why": "LLM-driven trading-review knowledge base and CLI. A daily-loop makes pre-market predictions and validates them after the close. A Judgments ledger (judgments.jsonl) records thesis, expectation, lesson",
+  "pushed_at": "2026-08-31T02:24:54Z"
+ },
+ {
+  "repo": "HKUSTDial/DeepEar",
+  "stars": 291,
+  "category": "llm-multi-agent-trader",
+  "why": "From the DeepFund (NeurIPS'25) lab, and usable as an agent skill. Multiple agents (trend spotter, financial analyst, report writer) turn news and public opinion into investment logic chains. It tracks",
+  "pushed_at": "2026-08-22T14:09:29Z"
+ },
+ {
+  "repo": "huygiatrng/AlpacaTradingAgent",
+  "stars": 284,
+  "category": "llm-multi-agent-trader",
+  "why": "TradingAgents fork for US stocks on Alpaca, with paper/live execution, portfolio tracking and a 5-agent pipeline, documented in ARCHITECTURE.md. Shows how the TradingAgents role graph connects to a re",
+  "pushed_at": "2026-10-27T05:33:04Z"
+ },
+ {
+  "repo": "byteseek/Mira",
+  "stars": 284,
+  "category": "claude-skill-or-plugin",
+  "why": "An agent-native investment research system with CLAUDE.md and AGENTS.md entry points and operating contracts. Every thesis must state its supporting evidence, when it is valid, what would disproves it",
+  "pushed_at": "2026-09-08T01:45:10Z"
+ },
+ {
+  "repo": "ALAGENT-HKU/x2strategy",
+  "stars": 283,
+  "category": "research-paper-code",
+  "why": "Agent Skill (/x2strategy) that turns a paper or idea into a structured strategy spec (indicators, signal logic, execution, risk controls). It then generates AST-validated Backtrader code, runs the bac",
+  "pushed_at": "2026-06-12T12:05:38Z"
+ },
+ {
+  "repo": "yennanliu/InvestSkill",
+  "stars": 281,
+  "category": "claude-skill-or-plugin",
+  "why": "34 prompt-only US-stock analysis frameworks with no runtime or API keys, so they drop straight into Claude Code. They include thesis-tracker, trade-postmortem and learning-coach skills (good for our j",
+  "pushed_at": "2026-10-24"
+ },
+ {
+  "repo": "BlackmodeN/trading-agents-java",
+  "stars": 281,
+  "category": "llm-multi-agent-trader",
+  "why": "Chinese Spring AI multi-agent framework. Relevant for its learning loop: two layers of vector memory (situational market snapshots and post-hoc lesson memories), recalled with a query built from today",
+  "pushed_at": "2026-07-29T14:53:59Z"
+ },
+ {
+  "repo": "Tom-roujiang/Awesome-LLM-Quantitative-Trading-Papers",
+  "stars": 260,
+  "category": "other",
+  "why": "Curated, actively updated index of LLM quant-trading papers with code links: QuantAgent (now QuantHarness), RD-Agent, Alpha-R1, ContestTrade, AlphaQuanter, TradeTrap, QuantCode-Bench, RETuning, Qwen-D",
+  "pushed_at": "2026-07-24T19:59:06Z"
+ },
+ {
+  "repo": "BlockRunAI/awesome-finance-mcp",
+  "stars": 259,
+  "category": "other",
+  "why": "A curated list of finance MCP servers and AI skills, split into stock data providers, trading execution, financial intelligence and workflow skills. The best single hub for finding further market and ",
+  "pushed_at": "2026-09-05"
+ },
+ {
+  "repo": "OpenTradeOSS/OpenTrade",
+  "stars": 248,
+  "category": "claude-skill-or-plugin",
+  "why": "Open-source trading harness for Claude Code / Codex agents. Agents schedule themselves on timers or events through background scripts, and several agents can share a portfolio. Guardrails: manual or a",
+  "pushed_at": "2026-10-26T03:54:28Z"
+ },
+ {
+  "repo": "EthanXiang777/circuit-framework",
+  "stars": 244,
+  "category": "llm-multi-agent-trader",
+  "why": "TradingAgents fork that adds a deterministic risk gate after the Portfolio Manager, which approves or rejects before paper execution in SQLite. The flow is analysts, then bull/bear, research manager, ",
+  "pushed_at": "2026-07-16T16:57:57Z"
+ },
+ {
+  "repo": "daniel3303/Equibles",
+  "stars": 243,
+  "category": "mcp-server",
+  "why": "A self-hosted, Docker-based financial data MCP that scrapes and stores SEC filings and XBRL, 13F holdings, insider and congressional trades, FINRA/SEC short data, FRED, CFTC/CBOE positioning, governme",
+  "pushed_at": "2026-11-09T06:53:17Z"
+ },
+ {
+  "repo": "code-rabi/interactive-brokers-mcp",
+  "stars": 228,
+  "category": "mcp-server",
+  "why": "The most-starred Interactive Brokers MCP (TypeScript): account, positions, market data and orders against IBKR paper or live. The option to use if we need a real broker with an IBKR paper account. Pyt",
+  "pushed_at": "2026-07-21T06:36:57Z"
+ },
+ {
+  "repo": "alphavantage/alpha_vantage_mcp",
+  "stars": 226,
+  "category": "mcp-server",
+  "why": "Official Alpha Vantage MCP: stocks, forex, crypto, technical indicators, fundamentals and news sentiment. The free key is a cheap second source to cross-check Yahoo prices and get pre-computed news se",
+  "pushed_at": "2026-10-03T00:09:33Z"
+ },
+ {
+  "repo": "JoelLewis/finance_skills",
+  "stars": 223,
+  "category": "claude-skill-or-plugin",
+  "why": "91 Claude Code skills across 7 plugins, including a core math plugin (TWR/MWR, statistics, bootstrapping) and wealth-management risk measurement (volatility estimators, drawdown analysis, historical, ",
+  "pushed_at": "2026-07-18T14:50:29Z"
+ },
+ {
+  "repo": "OnePunchMonk/AgentQuant",
+  "stars": 220,
+  "category": "quant-framework",
+  "why": "A strategy-research harness that is explicit about failure. Its ReAct loop is: analyze, hypothesize, backtest, reflect, store, improve. It keeps cross-session SQLite memory of strategies already teste",
+  "pushed_at": "2026-11-03T14:07:22Z"
+ },
+ {
+  "repo": "Yijia-Xiao/FinanceHarness",
+  "stars": 215,
+  "category": "research-paper-code",
+  "why": "New autonomous financial deep-research harness from the TradingAgents author (arXiv 2607.27853). SKILL.md files compose tools into workflows without code. Tool outputs chain by reference (prev:<call_i",
+  "pushed_at": "2026-08-22T13:09:37Z"
+ },
+ {
+  "repo": "ZhuLinsen/alphaevo",
+  "stars": 214,
+  "category": "quant-framework",
+  "why": "Self-evolving strategy research agent. A readable YAML strategy goes through backtest, failure diagnosis, one controlled mutation and a retest, and each change is accepted only after the retest, with ",
+  "pushed_at": "2026-07-03T12:30:52Z"
+ },
+ {
+  "repo": "narumiruna/yfinance-mcp",
+  "stars": 208,
+  "category": "mcp-server",
+  "why": "Free yfinance MCP that needs no API key (PyPI yfmcp), and the most complete free data MCP I found for our stack. It adds things our 8 signals lack: analyst estimate/EPS-revision trends, upgrades/downg",
+  "pushed_at": "2026-11-08T15:13:22Z"
+ },
+ {
+  "repo": "flash131307/multi-agent-investment",
+  "stars": 207,
+  "category": "llm-multi-agent-trader",
+  "why": "Three agents (ReAct technical, a FinBERT sentiment funnel, plan-and-solve fundamental with hybrid RAG over 10-Ks) feed a deterministic math Decision Hub, so no LLM sits in the decision. It degrades gr",
+  "pushed_at": "2026-03-26T18:10:44Z"
+ },
+ {
+  "repo": "ChenYXxxx/stockbench",
+  "stars": 186,
+  "category": "research-paper-code",
+  "why": "StockBench (arXiv 2510.02209): a benchmark of multi-month trading on the top 20 Dow stocks using post-2024 data, so the models cannot have memorized it. Tickers are anonymized as STOCK_A and so on to ",
+  "pushed_at": "2025-10-28T08:14:26Z"
+ },
+ {
+  "repo": "gta0804/MASS",
+  "stars": 181,
+  "category": "research-paper-code",
+  "why": "Official code for MASS (arXiv 2505.10278): scales the number of simulated investor agents and uses how much they disagree to build portfolio weights, optimising how the agents are distributed. An exam",
+  "pushed_at": "2026-02-09T01:37:14Z"
+ },
+ {
+  "repo": "SilvioBaratto/optimizer",
+  "stars": 177,
+  "category": "quant-framework",
+  "why": "'LLM agents decide, skfolio optimizes, you approve.' The portopt-core library is pure numpy/pandas/skfolio with sklearn-style composable transformers and no DB or LLM needed, so we could reuse it dire",
+  "pushed_at": "2026-11-07T13:23:14Z"
+ },
+ {
+  "repo": "koa-fin/sep",
+  "stars": 171,
+  "category": "research-paper-code",
+  "why": "Code for SEP (WWW'24): Summarize-Explain-Predict. The LLM writes an explanation for each stock call, critiques the wrong ones by itself, and the improved explanations are used to fine-tune it. The sel",
+  "pushed_at": "2024-05-16T10:46:32Z"
+ },
+ {
+  "repo": "JingHao-Leon/dsh-alpha-desk",
+  "stars": 168,
+  "category": "claude-skill-or-plugin",
+  "why": "Skill pack for an agent harness (deepseek-harness) that turns sessions into a research desk. It combines an ai-hedge-fund backtest, a risk-gate that refuses all live orders and credential access at th",
+  "pushed_at": "2026-09-23T06:57:57Z"
+ },
+ {
+  "repo": "ulab-uiuc/live-trade-bench",
+  "stars": 167,
+  "category": "research-paper-code",
+  "why": "LiveTradeBench (arXiv 2511.03628): live, forward-only evaluation of LLM portfolio agents on US stocks and Polymarket. The stock agent prompt (live_trade_bench/agents/stock_agent.py) is a compact whole",
+  "pushed_at": "2026-02-17T18:32:07Z"
+ },
+ {
+  "repo": "FeiCoder/BreadFree-Simu",
+  "stars": 166,
+  "category": "quant-framework",
+  "why": "Chinese event-driven daily backtester where an LLM investment committee (Analyst, Risk Manager, Fund Manager on LangGraph) is one pluggable strategy alongside rotation, double-MA and a buy-and-hold be",
+  "pushed_at": "2026-01-27T03:05:14Z"
+ },
+ {
+  "repo": "Xtra-Computing/CryptoTrade",
+  "stars": 166,
+  "category": "research-paper-code",
+  "why": "EMNLP 2024 reflective LLM trader. It combines on-chain and news analysts with a reflection agent that reviews how recent trades turned out before each new decision, in a zero-shot daily loop. Its prom",
+  "pushed_at": "2024-12-01T03:24:16Z"
+ },
+ {
+  "repo": "alpacahq/alpaca-skills",
+  "stars": 165,
+  "category": "claude-skill-or-plugin",
+  "why": "Official SKILL.md agent skills for Alpaca's Trading and Broker APIs, with shared guardrails and reporting standards so agent runs give consistent results. They work with paper keys and the Alpaca CLI.",
+  "pushed_at": "2026-11-06T12:46:07Z"
+ },
+ {
+  "repo": "waylonli/FINSABER",
+  "stars": 153,
+  "category": "research-paper-code",
+  "why": "KDD 2026 oral, 'Can LLM-based investing strategies beat the market in the long run?'. Its finding is that FinMem, FinAgent and similar strategies stop beating the market once tested over many years wi",
+  "pushed_at": "2026-09-17T18:13:51Z"
+ },
+ {
+  "repo": "imbenrabi/Financial-Modeling-Prep-MCP-Server",
+  "stars": 149,
+  "category": "mcp-server",
+  "why": "267 Financial Modeling Prep tools in 24 toolsets, with a Dynamic mode that starts with 5 meta-tools and loads toolsets on demand. That design keeps Claude's context small in scheduled sessions. Needs ",
+  "pushed_at": "2026-11-05T20:42:00Z"
+ },
+ {
+  "repo": "MTMQuantAI/Agent-Trading-Arena",
+  "stars": 147,
+  "category": "research-paper-code",
+  "why": "Code for two papers: Agent Trading Arena (EMNLP 2025 Findings) and DecoupledMarket (ICML 2026). Finding: LLM agents handle raw numbers poorly. DecoupledMarket separates LLM planning from numerical com",
+  "pushed_at": "2026-06-09"
+ },
+ {
+  "repo": "PatrickSUDO/fadacai-portfolio",
+  "stars": 145,
+  "category": "claude-skill-or-plugin",
+  "why": "Closest match to our journal-and-lessons loop. It is a Claude Code skills workspace (zh-TW) built so that LLM opinions get scored. It keeps 4 self-verifying ledgers (thesis_ledger, ev_ledger with Brie",
+  "pushed_at": "2026-11-06T18:46:14Z"
+ },
+ {
+  "repo": "CamusGIT/EvoQuant",
+  "stars": 144,
+  "category": "other",
+  "why": "Self-evolving quant research agent: it turns research reports into a structured knowledge wiki, ideates 'anchor-first' (keep at least 70% of a known method, innovate at most 30%), ranks ideas in an EL",
+  "pushed_at": "2026-09-02"
+ },
+ {
+  "repo": "mamawai/wtfibought",
+  "stars": 143,
+  "category": "llm-single-agent-trader",
+  "why": "A live arena where BYOK LLM traders decide at each candle close and write a daily review. It publishes the full reasoning, entry theses and their revisions, invalidation conditions, and an experience ",
+  "pushed_at": "2026-11-09"
+ },
+ {
+  "repo": "qrak/LLM_trader",
+  "stars": 141,
+  "category": "llm-single-agent-trader",
+  "why": "Paper LLM trader with a public ledger. It stores closed-trade experiences, semantic rules, rejected signals and post-mortems in a vector store, and each prompt carries only the 3 nearest past trades, ",
+  "pushed_at": "2026-11-09T05:17:34Z"
+ },
+ {
+  "repo": "rcontesti/IB_MCP",
+  "stars": 141,
+  "category": "mcp-server",
+  "why": "IBKR MCP built on the Client Portal Web API (REST/JSON), with a clear comparison of TWS versus the Web API for agent use. A second IBKR option; less active since October 2025.",
+  "pushed_at": "2025-10-23T19:49:51Z"
+ },
+ {
+  "repo": "longsizhuo/openInvest",
+  "stars": 139,
+  "category": "llm-multi-agent-trader",
+  "why": "Investment-committee engine built to plug into Claude Code. Committee agents are isolated and challenge each other, and every verdict leaves an audit trail. Backtests are lookahead-protected with LLM ",
+  "pushed_at": "2026-11-09T09:42:06Z"
+ },
+ {
+  "repo": "jackson-video-resources/paperclip-zero-human-trading-firm",
+  "stars": 137,
+  "category": "claude-skill-or-plugin",
+  "why": "A one-shot Claude Code prompt that sets up a 6-agent firm on the user's Claude subscription with no API key: CEO, nightly Research, a Backtest agent that logs every result forever as institutional mem",
+  "pushed_at": "2026-04-21T12:43:00Z"
+ },
+ {
+  "repo": "brainbytes-dev/everything-claude-trading",
+  "stars": 135,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code plugin with 18 agent role prompts (Quant Strategist, Risk Manager, Backtesting Engineer, Portfolio Optimizer, Compliance Monitor, Performance Analyst and more), 82 domain skills and 20 sla",
+  "pushed_at": "2026-03-14"
+ },
+ {
+  "repo": "paperswithbacktest/pwb-alphaevolve",
+  "stars": 132,
+  "category": "research-paper-code",
+  "why": "Applies DeepMind's AlphaEvolve idea to trading: evolutionary LLM prompts mutate seed strategy code, backtest it with Backtrader, and keep a live hall of fame. It requires an OpenAI o3 key, so for us i",
+  "pushed_at": "2025-06-04"
+ },
+ {
+  "repo": "stefanoamorelli/fred-mcp-server",
+  "stars": 131,
+  "category": "mcp-server",
+  "why": "An open-source MCP for FRED (Federal Reserve Economic Data). Useful for a macro-regime input (yield curve, credit spreads, unemployment) to the risk manager or as a ninth signal. Free FRED key.",
+  "pushed_at": "2026-08-22T18:34:49Z"
+ },
+ {
+  "repo": "Agentic-Analyst/stock-analyst",
+  "stars": 130,
+  "category": "llm-single-agent-trader",
+  "why": "'Code owns every number': a deterministic calculator sets the rating and target. A validator checks every figure and requires 95% or more of material sentences to cite run evidence. Tool results and h",
+  "pushed_at": "2026-10-18T08:47:56Z"
+ },
+ {
+  "repo": "minihellboy/factorminer",
+  "stars": 128,
+  "category": "research-paper-code",
+  "why": "Self-evolving agent that discovers symbolic alpha factors with LLM-guided search. It evaluates them reproducibly and keeps a transferable research memory of lineage, metrics and admission decisions. R",
+  "pushed_at": "2026-11-02T05:45:07Z"
+ },
+ {
+  "repo": "FareedKhan-dev/multi-agent-trading-system",
+  "stars": 121,
+  "category": "llm-multi-agent-trader",
+  "why": "A long, step-by-step notebook re-implementation of the TradingAgents 'deep thinking' pipeline: analysts, then bull/bear plus research manager, then trader, then risky/safe/neutral risk team, then a bi",
+  "pushed_at": "2025-09-04T10:49:11Z"
+ },
+ {
+  "repo": "JakeNesler/OpenProphet",
+  "stars": 116,
+  "category": "llm-single-agent-trader",
+  "why": "Claude (via OpenCode) runs on a heartbeat loop with 45+ MCP tools against Alpaca paper trading, so it is close to our scheduled-session design. Reusable patterns: MCP-level permission checks before ev",
+  "pushed_at": "2026-11-09T06:49:57Z"
+ },
+ {
+  "repo": "xiongcp/stock-skill",
+  "stars": 114,
+  "category": "claude-skill-or-plugin",
+  "why": "Agent skill for Claude Code and Codex (A-shares, HK, US) built on 'the LLM never guesses prices': all levels come from deterministic Python on real OHLCV data. Triple-barrier risk plans (entry, stop, ",
+  "pushed_at": "2026-11-02T09:03:38Z"
+ },
+ {
+  "repo": "upstash/botstreet",
+  "stars": 112,
+  "category": "llm-single-agent-trader",
+  "why": "Closest match to our setup. Claude Code (Opus 4.6) is the portfolio manager inside a scheduled box, driven by a SKILL.md 'trade' procedure: update prices, review the portfolio, research, trade, snapsh",
+  "pushed_at": "2026-04-16"
+ },
+ {
+  "repo": "heranliu/AlphaResearchOS",
+  "stars": 112,
+  "category": "quant-framework",
+  "why": "An agentic signal-research loop that runs on an authenticated Codex CLI, no API key needed, the same pattern as headless Claude Code. The loop is hypothesis, then features and model, then development ",
+  "pushed_at": "2026-10-09T14:43:14Z"
+ },
+ {
+  "repo": "lzinga/us-gov-open-data-mcp",
+  "stars": 112,
+  "category": "mcp-server",
+  "why": "40+ US government APIs (FRED, Treasury, Congress, FEC, lobbying, and more), over 20 of them keyless. Discovery mode exposes 4 tools instead of 350, results are cached to disk, and every answer lists i",
+  "pushed_at": "2026-11-02"
+ },
+ {
+  "repo": "simonro/Trading-Journal-AI",
+  "stars": 110,
+  "category": "other",
+  "why": "Local SQLite trading journal. Plain tested code computes round-trips, expectancy, profit factor, MFE/MAE and exit efficiency, and Claude only coaches by grading the diary on process. Useful metric set",
+  "pushed_at": "2026-11-08T15:10:21Z"
+ },
+ {
+  "repo": "howdymary/autopredict",
+  "stars": 110,
+  "category": "quant-framework",
+  "why": "Small framework for self-improving prediction agents. It has proper scoring rules, calibration summaries, and a self_improvement module (mutation, held-out promotion, archive, frontier tracking). Defa",
+  "pushed_at": "2026-07-15T00:55:13Z"
+ },
+ {
+  "repo": "FinStep-AI/Alpha-R1",
+  "stars": 106,
+  "category": "research-paper-code",
+  "why": "2025-26 paper code from the ContestTrade team. An LLM reads a market-memory summary plus a plain-language description of each Alpha101 factor (how it works, when it works, when it fails, its qlib back",
+  "pushed_at": "2026-09-09T12:54:59Z"
+ },
+ {
+  "repo": "NVIDIA-AI-Blueprints/quantitative-signal-discovery-agent",
+  "stars": 105,
+  "category": "other",
+  "why": "Reference workflow for LLM signal discovery on S&P 500 price and volume data from yfinance. It loops: generate an idea, write the code, measure Rank IC, accept if the IC clears a threshold, otherwise ",
+  "pushed_at": "2026-11-09T07:10:50Z"
+ },
+ {
+  "repo": "btopn/OpenInsider-MCP",
+  "stars": 104,
+  "category": "mcp-server",
+  "why": "16 free-data tools: OpenInsider Form 4 trades, SEC EDGAR events (8-K, late filings, 13D activists, S-3/424B5 dilution), FINRA/SEC short interest, daily short volume and failures-to-deliver, and Yahoo ",
+  "pushed_at": "2026-08-07T15:13:27Z"
+ },
+ {
+  "repo": "arimanyus/warrenduffer",
+  "stars": 103,
+  "category": "llm-single-agent-trader",
+  "why": "Indian intraday stocks, but the division of labour matches ours: the model ranks names and decides take-profit, while code sizes each trade from the risk-per-trade budget and stop distance and places ",
+  "pushed_at": "2026-09-23T05:00:33Z"
+ },
+ {
+  "repo": "hugoguerrap/crypto-claude-desk",
+  "stars": 102,
+  "category": "claude-skill-or-plugin",
+  "why": "A Claude Code plugin that builds a 6-agent trading desk purely from markdown agent files and MCP servers, with no LangGraph/CrewAI and no SDK. Crypto-focused, but it is exactly our runtime model (Clau",
+  "pushed_at": "2026-08-23T18:17:05Z"
+ },
+ {
+  "repo": "cplj/axiocairn-mcp",
+  "stars": 101,
+  "category": "mcp-server",
+  "why": "Hosted portfolio-risk MCP (OAuth) whose tool designs are worth copying. check_backtest_discipline reports declared trial counts and multiple-testing limits; check_idea turns an idea into a falsifiable",
+  "pushed_at": "2026-11-08T01:04:27Z"
+ },
+ {
+  "repo": "yanziqing25/Tragent",
+  "stars": 100,
+  "category": "llm-multi-agent-trader",
+  "why": "US-equity strategy research with a Research Agent plus a Critic Agent that can accept, reject or send back for one revision. All data, backtests, costs and metrics are computed in Python, and the mode",
+  "pushed_at": "2026-10-28T13:11:18Z"
+ },
+ {
+  "repo": "ischencheng/Attention-Agent",
+  "stars": 99,
+  "category": "research-paper-code",
+  "why": "Inspectable reset/step research environment for long-horizon LLM agents. Evidence is time-gated, theses persist, forecasts are scored later, and paper positions are reward-scored on net return at a fi",
+  "pushed_at": "2026-10-29T07:57:07Z"
+ },
+ {
+  "repo": "chase-manning/ai-hedge-fund",
+  "stars": 97,
+  "category": "llm-single-agent-trader",
+  "why": "Small gem, nearly identical philosophy to ours: 'Claude proposes, code disposes'. Claude outputs target weights, probabilities, stops and theses, and a deterministic risk gate owns every limit and ord",
+  "pushed_at": "2026-10-17T21:57:53Z"
+ },
+ {
+  "repo": "forecastingresearch/forecastbench",
+  "stars": 94,
+  "category": "other",
+  "why": "ICLR 2025 contamination-free benchmark of LLM forecasting accuracy, with human comparison groups and leaderboards updated nightly. Its question-resolution and scoring pipeline is a model for grading t",
+  "pushed_at": "2026-11-09T09:07:53Z"
+ },
+ {
+  "repo": "renee-jia/trading-bot",
+  "stars": 93,
+  "category": "quant-framework",
+  "why": "Close analogue of our quant core: technical, trend, macro, sentiment and alpha agents combine into one 0-100 conviction score that sizes an Alpaca paper portfolio. Point-in-time backtest with T+1 exec",
+  "pushed_at": "2026-10-07T18:00:06Z"
+ },
+ {
+  "repo": "0xArchiveIO/0xarchive-quant",
+  "stars": 93,
+  "category": "claude-skill-or-plugin",
+  "why": "A Claude Code plugin skill with a strict way to judge a strategy. A trial ledger records every backtest the agent runs, so the deflated Sharpe counts all attempts. The final months are a sealed holdou",
+  "pushed_at": "2026-11-08T15:13:39Z"
+ },
+ {
+  "repo": "hanlulong/openecon-data",
+  "stars": 92,
+  "category": "data-tool",
+  "why": "Python MCP server covering 330K economic indicators from FRED, World Bank, IMF, Eurostat and 7 more sources. A single source of macro-regime inputs (rates, inflation, liquidity) for the risk overlay a",
+  "pushed_at": "2026-11-08T20:24:53Z"
+ },
+ {
+  "repo": "ferdousbhai/tasty-agent",
+  "stars": 89,
+  "category": "mcp-server",
+  "why": "An actively maintained broker MCP for tastytrade (not the excluded official one). Its safety patterns are worth copying: it refuses an order if the broker's dry run returns any warning, reports an unk",
+  "pushed_at": "2026-10-04"
+ },
+ {
+  "repo": "twelvedata/mcp",
+  "stars": 86,
+  "category": "mcp-server",
+  "why": "Official Twelve Data MCP. The hosted connector signs in with OAuth so no key is pasted; it can also run locally with an API key. Real-time and historical prices plus indicators: a backup price source ",
+  "pushed_at": "2026-10-01T17:11:29Z"
+ },
+ {
+  "repo": "vikd1000/investment-council",
+  "stars": 84,
+  "category": "claude-skill-or-plugin",
+  "why": "A Claude Code-native council that rates each ticker through 21 legendary-investor personas. Six sequential steps each write a plain-text file before the next starts, so a human can inspect or edit mid",
+  "pushed_at": "2026-08-10T15:03:39Z"
+ },
+ {
+  "repo": "Yanlewen/TradeTrap",
+  "stars": 83,
+  "category": "research-paper-code",
+  "why": "Reliability and faithfulness stress tests for LLM trading agents: indirect prompt injection through fabricated news, MCP or tool-data hijacking, memory poisoning that makes the agent learn wrong lesso",
+  "pushed_at": "2025-11-27T09:04:06Z"
+ },
+ {
+  "repo": "austin-starks/Public-Portfolio-Challenge",
+  "stars": 82,
+  "category": "llm-multi-agent-trader",
+  "why": "Open runbook that AI agents (Claude, Codex, Grok) execute on a real $25K book, with every gate, engine bug, dead end and failure logged and committed to the repo. It is currently trailing SPY by about",
+  "pushed_at": "2026-11-02"
+ },
+ {
+  "repo": "horizon-llm/AlphaQuanter",
+  "stars": 81,
+  "category": "research-paper-code",
+  "why": "ACL 2026 Findings paper. A single tool-orchestrated agent trained with RL beats multi-agent TradingAgents-style frameworks, which the authors say produce inconsistent signals, and it finds prompt-only",
+  "pushed_at": "2026-10-24"
+ },
+ {
+  "repo": "erikmaday/unusual-whales-mcp",
+  "stars": 78,
+  "category": "mcp-server",
+  "why": "Actively maintained Unusual Whales MCP: options flow, dark pool, congress trades and more. Similar alternative data to Quiver, possibly as signal or context for Claude's veto. Needs a paid UW_API_KEY.",
+  "pushed_at": "2026-11-06T16:39:00Z"
+ },
+ {
+  "repo": "Trade-With-Claude/cbt-framework",
+  "stars": 78,
+  "category": "quant-framework",
+  "why": "Claude Code backtesting framework installed via npx: 21 slash commands and 4 agents, including /cbt:optimize (walk-forward analysis), /cbt:compare (automatic experiment tracking across versions) and /",
+  "pushed_at": "2026-02-20T12:16:41Z"
+ },
+ {
+  "repo": "DVampire/FinAgent",
+  "stars": 77,
+  "category": "research-paper-code",
+  "why": "Official code for FinAgent (KDD'24, Zhang et al.), a multimodal trading agent with tools. It has dual-level reflection (low-level on market moves, high-level on its own past decisions), varied memory ",
+  "pushed_at": "2024-08-31T18:13:57Z"
+ },
+ {
+  "repo": "immortalhowwl/gptheist",
+  "stars": 76,
+  "category": "llm-multi-agent-trader",
+  "why": "'Ten agents pass one market decision forward. Any one of them can kill it.' A veto chain: the criteria are locked before any analysis, technical, social, data and sizing checks follow, an append-only ",
+  "pushed_at": "2026-09-08T12:19:12Z"
+ },
+ {
+  "repo": "alex-jb/orallexa-ai-trading-agent",
+  "stars": 73,
+  "category": "llm-multi-agent-trader",
+  "why": "Bull/Bear/Judge debate on Claude Opus. 8-source signal fusion whose weights adapt automatically to each source's accuracy, like our learned ensemble weights. A FinPos-style Risk Sizer keeps direction ",
+  "pushed_at": "2026-10-29T18:01:08Z"
+ },
+ {
+  "repo": "HimanshuMohanty-Git24/RakshaQuant",
+  "stars": 72,
+  "category": "llm-single-agent-trader",
+  "why": "Exactly our veto-only design, run as a controlled experiment. AI can only veto, never size or add, and any AI failure leaves the deterministic decision in place. Every BUY gets a counterfactual trade,",
+  "pushed_at": "2026-11-06T00:16:18Z"
+ },
+ {
+  "repo": "The-FinAI/FinCon",
+  "stars": 72,
+  "category": "research-paper-code",
+  "why": "FinCon (arXiv:2407.06567): manager-analyst multi-agent hierarchy with a risk-control component and 'conceptual verbal reinforcement' that updates the agents' beliefs from outcomes, a self-improving le",
+  "pushed_at": "2026-10-08T12:01:34Z"
+ },
+ {
+  "repo": "jkoelker/schwab-mcp",
+  "stars": 68,
+  "category": "mcp-server",
+  "why": "Schwab broker MCP that is read-only by default; trading tools are gated behind a Discord human-approval workflow. If the bot ever goes beyond paper money, this is a concrete pattern for routing every ",
+  "pushed_at": "2026-11-04T15:58:03Z"
+ },
+ {
+  "repo": "SilentFleetKK/riskguard",
+  "stars": 68,
+  "category": "other",
+  "why": "A Python risk layer with no core dependencies, built to sit between signals and execution: per-position caps, a drawdown circuit breaker, Kelly or volatility-based sizing, a live kill-switch sentinel,",
+  "pushed_at": "2026-07-10T05:17:44Z"
+ },
+ {
+  "repo": "Benboerba620/daily-watchlist",
+  "stars": 66,
+  "category": "claude-skill-or-plugin",
+  "why": "A Claude Code watchlist workflow: /dw-today fetches prices (keyless Stooq fallback), news and earnings and writes a structured daily report. It has a built-in Hypothesis Tracker: /ht-new creates hypot",
+  "pushed_at": "2026-04-29T03:16:59Z"
+ },
+ {
+  "repo": "zhound420/swarm-trader",
+  "stars": 64,
+  "category": "llm-multi-agent-trader",
+  "why": "Extended virattt/ai-hedge-fund fork: 20 analysts (13 investor personas plus 7 quant/data agents), swing and intraday modes, code-enforced risk management, free data (SEC EDGAR plus yfinance in place o",
+  "pushed_at": "2026-03-22T22:28:59Z"
+ },
+ {
+  "repo": "cyecho-io/A-Daily-TradingAgents",
+  "stars": 64,
+  "category": "llm-multi-agent-trader",
+  "why": "Lightweight A-share TradingAgents derivative with the same split as ours: machine scoring first (entry_score for candidates; holding_score mapped to HOLD/OBSERVE/REDUCE_ALERT/EXIT), then a multi-agent",
+  "pushed_at": "2026-04-19T09:17:54Z"
+ },
+ {
+  "repo": "tradermonty/finviz-mcp-server",
+  "stars": 62,
+  "category": "mcp-server",
+  "why": "Finviz MCP from the author of the already-known claude-trading-skills. It offers earnings, volume-surge, trend and dividend-growth screeners, price position versus the 20/50/200-day SMAs, sector perfo",
+  "pushed_at": "2026-05-10T18:02:48Z"
+ },
+ {
+  "repo": "GouveRoger12/milan-capital",
+  "stars": 59,
+  "category": "other",
+  "why": "WARNING, DO NOT USE OR DOWNLOAD. Malware-lure repo: a strong-sounding README (multi-agent equity, pre-registered hypotheses) wrapped around a 'Windows Desktop Client' download banner. The shallow clon",
+  "pushed_at": "2026-11-09T05:15:52Z"
+ },
+ {
+  "repo": "l3lackcurtains/trading-ops",
+  "stars": 58,
+  "category": "claude-skill-or-plugin",
+  "why": "Systematic trading workspace inside Claude Code. /scan TICKER returns a dated, framework-aligned verdict that always ends in a verb (LONG/SHORT/WAIT/SKIP) with a price ladder and an entry/stop/target ",
+  "pushed_at": "2026-05-02T16:32:39Z"
+ },
+ {
+  "repo": "wanshuiyin/ARIS-Anything",
+  "stars": 58,
+  "category": "claude-skill-or-plugin",
+  "why": "Takes the ARIS 'auto research in sleep' Claude Code skill loop (the main repo has about 10k stars) beyond academic research, investment included. The loop is plan, draft, adversarial review by a diffe",
+  "pushed_at": "2026-11-06T04:07:11Z"
+ },
+ {
+  "repo": "mirror29/inalpha",
+  "stars": 53,
+  "category": "llm-multi-agent-trader",
+  "why": "A quant agent framework under engineering governance. Agents rank factors by time-series Rank IC to pick the ones working now, which is relevant to our learned ensemble weights, and factors are tracke",
+  "pushed_at": "2026-11-06T09:49:59Z"
+ },
+ {
+  "repo": "ProjectDXAI/continuous-record-llm-trading-agents",
+  "stars": 51,
+  "category": "research-paper-code",
+  "why": "Paper (arXiv:2609.05663) on six months of LLM trading agents in production. Findings: the operating layer drives behaviour more than strategy text, LLM sizing ignores volatility, and a fixed 2%/4% bra",
+  "pushed_at": "2026-09-10T13:55:41Z"
+ },
+ {
+  "repo": "mrhustlex/TradingSpy-TradingAgentService",
+  "stars": 51,
+  "category": "other",
+  "why": "Local TradingAgents-based research workstation with 'loop engineering': an agent writes Backtrader strategies, validates them, sweeps parameters and iterates until it beats buy-and-hold or a saved bas",
+  "pushed_at": "2026-08-21T13:26:15Z"
+ },
+ {
+  "repo": "kbhujbal/AlphaAnalyst-open-source-autonomous-equity-research-agent",
+  "stars": 51,
+  "category": "llm-multi-agent-trader",
+  "why": "US equity research memo from SEC EDGAR, transcripts and news. Its rule 'the LLM is a writer, not a knower' fits our news and context step: numbers come only from APIs, a pure-Python Decimal DCF and co",
+  "pushed_at": "2026-04-29T07:52:33Z"
+ },
+ {
+  "repo": "HimanshuJ16/Algo-Trading-Skills",
+  "stars": 50,
+  "category": "claude-skill-or-plugin",
+  "why": "501 agentskills.io SKILL.md files, each with a Python reference implementation and unit tests (20k total). Relevant ones: lookahead-bias-elimination, look-ahead in universe selection, survivorship-bia",
+  "pushed_at": "2026-09-14"
+ },
+ {
+  "repo": "tradermonty/hermes-trading-research-agent-work-package",
+  "stars": 49,
+  "category": "claude-skill-or-plugin",
+  "why": "Turns claude-trading-skills into an always-on research, journaling and risk-review profile with scheduled routines (such as /pre-market-routine), timezone semantics and paper/read-only brokerage. It h",
+  "pushed_at": "2026-06-05T18:30:11Z"
+ },
+ {
+  "repo": "45ck/llm-quant",
+  "stars": 48,
+  "category": "llm-single-agent-trader",
+  "why": "Claude acts as portfolio manager over a $100k paper book. Indicators and HMM regime detection go into a structured prompt, Claude returns JSON decisions, and 14 automated pre-trade limits plus CVaR ch",
+  "pushed_at": "2026-11-06T22:08:39Z"
+ },
+ {
+  "repo": "BijectiveLabs/bitra",
+  "stars": 47,
+  "category": "llm-single-agent-trader",
+  "why": "'Agents propose, the system decides': code computes every figure, applies limits and sizes trades. A typed judge reads the day's headlines and can only HOLD an entry on an adverse event, the same veto",
+  "pushed_at": "2026-11-08T09:56:03Z"
+ },
+ {
+  "repo": "Stepuuu/portfolio-daily-tracker",
+  "stars": 47,
+  "category": "other",
+  "why": "Self-hosted portfolio journal plus agent-driven stock research that works with an existing Claude Code login, no API key. Matches our journal-and-lessons design: a confirmed transaction ledger, a per-",
+  "pushed_at": "2026-10-16T11:25:10Z"
+ },
+ {
+  "repo": "BichengWang/financial-agent",
+  "stars": 47,
+  "category": "quant-framework",
+  "why": "Systematic ETF trading that has to 'earn its way to capital'. Backtests fill at the next bar with costs. Strategies must pass a promotion gate (OOS, Deflated Sharpe, CSCV/PBO, bootstrap, stress) befor",
+  "pushed_at": "2026-11-07T22:30:28Z"
+ },
+ {
+  "repo": "IvanWng97/TradingAgents-Telegram",
+  "stars": 47,
+  "category": "other",
+  "why": "Production-style wrapper around TradingAgents: watchlist, parallel analyses with a concurrency cap, and a same-day cache so one ticker costs one LLM run. It streams per-step progress with cancel, sche",
+  "pushed_at": "2026-08-16T12:33:08Z"
+ },
+ {
+  "repo": "MarvekG/BestAITrader",
+  "stars": 45,
+  "category": "llm-multi-agent-trader",
+  "why": "Inspired by TradingAgents-CN and built around long-term memory and review after the fact. It keeps one living Markdown memory doc per stock, with an index kept in the prompt, full text read on demand,",
+  "pushed_at": "2026-09-03"
+ },
+ {
+  "repo": "LuxAlgo/market-trackers",
+  "stars": 44,
+  "category": "data-tool",
+  "why": "Small but strong fit: a free, keyless (SEC contact email only) pipeline of 18 primary-source datasets: congress trades, insider filings, 13F, FINRA short-sale volume, government contracts, lobbying. E",
+  "pushed_at": "2026-11-02T05:24:09Z"
+ },
+ {
+  "repo": "HephaestLab/TraderHarness",
+  "stars": 42,
+  "category": "quant-framework",
+  "why": "Leakage-resistant backtest environment for LLM trading agents. Point-in-time masking on every data source, date and company anonymization so the model cannot recognise the period, a single controlled ",
+  "pushed_at": "2026-08-22T17:06:47Z"
+ },
+ {
+  "repo": "ml4t/skills",
+  "stars": 41,
+  "category": "claude-skill-or-plugin",
+  "why": "61 skills from 'Machine Learning for Algorithmic Trading' (3rd ed.). Each teaches a WRONG/CORRECT pattern for leakage, look-ahead, broken cross-validation, unrealistic costs, overfit backtests and uns",
+  "pushed_at": "2026-11-08T13:59:34Z"
+ },
+ {
+  "repo": "quantskills/skill-backtest-overfit",
+  "stars": 41,
+  "category": "claude-skill-or-plugin",
+  "why": "Agent skill that computes Deflated Sharpe Ratio, PBO via CSCV, Harvey-Liu haircut and MinTRL from the selected strategy's returns plus a matrix of all trials, and returns PASS/FAIL. Use it as a statis",
+  "pushed_at": "2026-11-05"
+ },
+ {
+  "repo": "harrypapadakis/StockSim",
+  "stars": 40,
+  "category": "research-paper-code",
+  "why": "StockSim (arXiv:2507.09255) mixes LLM agents (market, news and fundamental analysts) with algorithmic traders. It has a historical backtest mode with slippage, latency and market impact, full conversa",
+  "pushed_at": "2025-07-15"
+ },
+ {
+  "repo": "tastytrade/tastytrade-mcp",
+  "stars": 37,
+  "category": "mcp-server",
+  "why": "Official tastytrade MCP: quotes, positions, balances, and an order flow gated behind a dry run. A broker built-in example of order preview before execution, the same pattern as our veto/shrink-only po",
+  "pushed_at": "2026-11-05T16:31:02Z"
+ },
+ {
+  "repo": "kingabzpro/BetterTradingAgents",
+  "stars": 36,
+  "category": "llm-multi-agent-trader",
+  "why": "Leaner TradingAgents re-implementation: 6 parallel analysts (regime, technicals, fundamentals, news, sentiment, forecast), a bull/bear debate with a neutral judge, and a risk-gated BUY/HOLD/SELL call ",
+  "pushed_at": "2026-11-07T20:44:13Z"
+ },
+ {
+  "repo": "aabrole/claude-trading-desk",
+  "stars": 36,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code plugin built around honest testing. Every strategy runs three arms on the same candidates: rules (take every signal), gated (hand-written if-filters, the control) and a decision-model filt",
+  "pushed_at": "2026-09-27"
+ },
+ {
+  "repo": "felis33/INVESTOR-BENCH",
+  "stars": 35,
+  "category": "research-paper-code",
+  "why": "ACL 2025 benchmark of single-agent LLM trading (stocks, crypto, ETFs) from the FinMem/FinCon group. It uses a Qdrant memory store and Guardrails to force structured output, and its paper sets out desi",
+  "pushed_at": "2025-09-13T03:49:38Z"
+ },
+ {
+  "repo": "gael55x/LayeredMemoryTrader",
+  "stars": 35,
+  "category": "llm-multi-agent-trader",
+  "why": "Implements the TradingGPT paper: agents for short, mid and long horizons with layered memory buffers, a FAISS semantic memory of news and reflections, a debate, and stored reflections. Training and te",
+  "pushed_at": "2026-10-07T06:32:31Z"
+ },
+ {
+  "repo": "PkLavc/Autotrader",
+  "stars": 35,
+  "category": "quant-framework",
+  "why": "Same execution model as our time machine: decide on the session close, fill at the next session's open, with costs and a state audit. Its correctness rules can be copied directly: no retroactive fills",
+  "pushed_at": "2026-11-09T10:26:24Z"
+ },
+ {
+  "repo": "Shadowell/Alpha",
+  "stars": 35,
+  "category": "llm-single-agent-trader",
+  "why": "Chinese A-share self-evolving screening system. A three-pool candidate funnel with promotion/demotion rules is paired with Kronos K-line forecasts and a Hermes Agent loop (observe, think, validate, ev",
+  "pushed_at": "2026-11-02T12:58:09Z"
+ },
+ {
+  "repo": "ulab-uiuc/coinjure",
+  "stars": 35,
+  "category": "other",
+  "why": "From the LiveTradeBench lab (UIUC). A trading-agent harness run entirely from the CLI, where an LLM agent (demoed with Claude Code) runs the whole lifecycle: discover, build strategy, backtest at scal",
+  "pushed_at": "2026-05-05T16:31:57Z"
+ },
+ {
+  "repo": "simonguo/evidenceloom",
+  "stars": 33,
+  "category": "llm-multi-agent-trader",
+  "why": "Local-first desktop app built on an embedded TradingAgents-compatible core. Each run saves the exact sanitized inputs, the provider calls actually made, full-precision data and citation IDs. Report ve",
+  "pushed_at": "2026-11-04T15:54:27Z"
+ },
+ {
+  "repo": "alfred1994/alpha-pilot",
+  "stars": 32,
+  "category": "llm-single-agent-trader",
+  "why": "Self-healing AI paper-trading loop (A-shares, plus US ETFs and BTC): pre-market warm-up, intraday scan and paper execution, stop-loss sweeps, post-close review, LLM lesson extraction with dedup (revie",
+  "pushed_at": "2026-11-09T05:30:40Z"
+ },
+ {
+  "repo": "mphinance/alpha-skills",
+  "stars": 32,
+  "category": "claude-skill-or-plugin",
+  "why": "Companion Claude/Gemini skills to momentum-mcp: backtesting playbooks, edge research, regime detection and strategy design. These are skill prompts Claude can reuse directly in scheduled sessions.",
+  "pushed_at": "2026-10-26T23:53:09Z"
+ },
+ {
+  "repo": "AoleiC/ai-mock-trade",
+  "stars": 32,
+  "category": "claude-skill-or-plugin",
+  "why": "Chinese A-share agent package for Claude Code, OpenCode and Codex, paper accounts only. Code (not the LLM) runs a 5-state market-phase state machine that picks which playbook is allowed each day. It k",
+  "pushed_at": "2026-11-07T02:24:29Z"
+ },
+ {
+  "repo": "pradeepsiddappa/indian-trading-agent",
+  "stars": 32,
+  "category": "llm-multi-agent-trader",
+  "why": "Active market-localized TradingAgents fork (NSE/BSE) that adds features we lack. A Daily Trading Verdict combines all filters into one TRADE / SELECTIVE / STAND DOWN call for the day. A recommendation",
+  "pushed_at": "2026-10-24T11:05:01Z"
+ },
+ {
+  "repo": "davidalmeida90/glassbench",
+  "stars": 31,
+  "category": "other",
+  "why": "Runs TradingAgents, AI Hedge Fund and Vibe-Trading unmodified through adapters on the same stock and date. Every run goes into a SQLite DB (rating, entry, stop, target, tokens, cost, flags); it ships ",
+  "pushed_at": "2026-10-28"
+ },
+ {
+  "repo": "mphinance/momentum-mcp",
+  "stars": 31,
+  "category": "mcp-server",
+  "why": "Broker-free quant-analysis MCP (101 tools) with many credential-free scan_ tools: detect_macro_regime, analyze_breadth, detect_bubble_risk, get_market_environment, SEC EDGAR, and daily institutional E",
+  "pushed_at": "2026-10-21T18:02:02Z"
+ },
+ {
+  "repo": "sbauwow/schwagent",
+  "stars": 29,
+  "category": "llm-multi-agent-trader",
+  "why": "The same split as ours: quant strategies scan the watchlist and an LLM overlay reviews the signals, drawing on a library of 23 curated analysis methods (reusable as prompts). Backtests are checked wit",
+  "pushed_at": "2026-09-25T00:44:13Z"
+ },
+ {
+  "repo": "El-Bach/claude-trader",
+  "stars": 27,
+  "category": "llm-multi-agent-trader",
+  "why": "14 role-specialized Claude agents on an MT5 demo account. A STRATEGIST does a daily top-down view and keeps persistent memory (strategist_memory.json), and entry agents scan every 15 minutes. A MANAGE",
+  "pushed_at": "2026-04-06T08:52:14Z"
+ },
+ {
+  "repo": "joansongjr/investor-harness",
+  "stars": 27,
+  "category": "claude-skill-or-plugin",
+  "why": "About 34 investment-research skills for Claude Code, Codex and OpenCode that target the usual AI failures: invented data (graded evidence levels, data before rendering), forgetting (a 'Librarian' memo",
+  "pushed_at": "2026-09-06T14:51:59Z"
+ },
+ {
+  "repo": "kevmyung/swing-trading-agent",
+  "stars": 26,
+  "category": "llm-multi-agent-trader",
+  "why": "Same pipeline shape as ours: a quant engine screens the S&P 500 (RSI/MACD/ATR/ADX z-scores, regime detection), a research agent reads news and earnings, and a PM agent decides with a written entry/exi",
+  "pushed_at": "2026-05-15T16:16:15Z"
+ },
+ {
+  "repo": "myc0576/SmartMoney-Cub",
+  "stars": 26,
+  "category": "other",
+  "why": "Local-first, agent-agnostic trading journal and review harness. It is read-only over markets and writable only to the journal. It captures runs with explicit decision time (after-close mode), freezes ",
+  "pushed_at": "2026-11-02T03:29:47Z"
+ },
+ {
+  "repo": "PredictionMarketTrader/openthomas",
+  "stars": 25,
+  "category": "llm-single-agent-trader",
+  "why": "Weather prediction markets, not stocks, but its principle is the same as ours: 'the model proposes, the risk engine disposes'. The LLM forecast is the median of N independent estimates, held within ±0",
+  "pushed_at": "2026-09-12T14:20:18Z"
+ },
+ {
+  "repo": "merjua14/ai-momentum-trader",
+  "stars": 25,
+  "category": "llm-single-agent-trader",
+  "why": "Runs Claude through the Claude Code CLI with no API key, the same constraint we have. Claude only names one pick (ticker, direction, instrument, conviction) and can web-search catalysts. Deterministic",
+  "pushed_at": "2026-07-10T21:02:33Z"
+ },
+ {
+  "repo": "VictorVVedtion/trading-skills",
+  "stars": 24,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code SKILL.md pack: a pre-trade-gate skill and a tilt-detector skill (revenge trading, FOMO after 20%+ moves, panic selling without thesis invalidation, with an escalation ladder), plus 8 'mast",
+  "pushed_at": "2026-04-07T04:52:13Z"
+ },
+ {
+  "repo": "danishashko/yahoo-finance-mcp",
+  "stars": 24,
+  "category": "mcp-server",
+  "why": "Free Yahoo Finance MCP with no key and 18 read-only tools. Covers quotes, OHLCV, financials, analyst ratings and targets, news, options chains, insider and institutional ownership, and an earnings cal",
+  "pushed_at": "2026-11-07"
+ },
+ {
+  "repo": "KCNyu/clawock",
+  "stars": 23,
+  "category": "claude-skill-or-plugin",
+  "why": "'AI argues, code settles' for Claude Code, Codex or dsh: the agent writes a buy/sell/wait plan with both cases and the prices that would change the call. Code then settles each call in a ledger the pl",
+  "pushed_at": "2026-11-09T09:00:17Z"
+ },
+ {
+  "repo": "Hi-Zgc/PersonalTradingAgents",
+  "stars": 23,
+  "category": "llm-multi-agent-trader",
+  "why": "Chinese TradingAgents rework for personal A-share investing that starts from current holdings: multi-source data, multi-agent debate, an LLM-Wiki knowledge base storing trade logs, rationale and perso",
+  "pushed_at": "2026-07-01T02:56:05Z"
+ },
+ {
+  "repo": "naplesblue/riskbound",
+  "stars": 23,
+  "category": "quant-framework",
+  "why": "Position-sizing rules (volatility target plus 200-day SMA half-size) that print an 'evidence boundary' block with every output, saying which claims were pre-registered and tested and which are unteste",
+  "pushed_at": "2026-11-07"
+ },
+ {
+  "repo": "iAmGiG/OptionsCommander",
+  "stars": 23,
+  "category": "other",
+  "why": "Alpaca paper platform (formerly 'Reflective Hybrid Head Multi-Agent System'). Scheduled routines manage stops and keep daily records, with human-in-the-loop orders. Most useful for its honest, issue-t",
+  "pushed_at": "2026-11-07T16:32:32Z"
+ },
+ {
+  "repo": "grahammccain/chart-library-mcp",
+  "stars": 23,
+  "category": "mcp-server",
+  "why": "Free remote MCP with no authentication (chartlibrary.io/mcp) and five read-only tools. market_state returns a symbol's completed-session state with historical-analog outcome ranges and sample sizes, a",
+  "pushed_at": "2026-09-10"
+ },
+ {
+  "repo": "Skopaq-AI/skopaqtrader",
+  "stars": 22,
+  "category": "llm-multi-agent-trader",
+  "why": "TradingAgents fork for Indian equities. A Claude Code MCP server with 18 tools and slash commands runs the 15-agent pipeline on Claude's own reasoning at no extra LLM cost. It also has a post-trade re",
+  "pushed_at": "2026-10-02"
+ },
+ {
+  "repo": "sonhany/xuanji",
+  "stars": 22,
+  "category": "quant-framework",
+  "why": "A cautionary design for China A-shares. The project retired its autonomous AI control plane in August 2026. AI is now a read-only shadow that returns a DecisionProposal with every execution and strate",
+  "pushed_at": "2026-11-02T15:41:34Z"
+ },
+ {
+  "repo": "finbrain-lab-hkustgz/AlphaForgeBench",
+  "stars": 21,
+  "category": "research-paper-code",
+  "why": "KDD'26 benchmark. LLMs write factor/strategy code, which is extracted, run in a sandbox (import whitelist, restricted builtins), backtested on real daily bars 2021-2026 (AAPL/MSFT/NVDA/TSLA/GOOGL plus",
+  "pushed_at": "2026-06-26"
+ },
+ {
+  "repo": "Codehagen/hodget",
+  "stars": 21,
+  "category": "llm-multi-agent-trader",
+  "why": "Open-source AI hedge fund with one-way, inspectable stages. LLM analysts and quant models each return a signal in -1..+1 with written reasoning, a portfolio layer blends them into target weights, then",
+  "pushed_at": "2026-07-27T12:45:57Z"
+ },
+ {
+  "repo": "shaohk/TradingAgents-CN-SKILL",
+  "stars": 20,
+  "category": "claude-skill-or-plugin",
+  "why": "Rebuilds the TradingAgents-CN flow as a pure Claude Code Agent-tool skill with 13 subagents: 7 parallel analysts (technical, news, market, fundamental, sentiment, China, social), a bull/bear debate, t",
+  "pushed_at": "2026-07-10T13:56:11Z"
+ },
+ {
+  "repo": "Hellek1/ib-mcp",
+  "stars": 19,
+  "category": "mcp-server",
+  "why": "Lightweight, strictly read-only Interactive Brokers MCP (ib_async + FastMCP): contracts, historical bars, fundamentals, news, portfolio and account. A safer read-only alternative to the excluded code-",
+  "pushed_at": "2026-10-19T18:57:52Z"
+ },
+ {
+  "repo": "AshJha0/agentic-trader",
+  "stars": 17,
+  "category": "llm-multi-agent-trader",
+  "why": "TradingAgents-style desk for equities and FX (analysts, bull/bear, trader, risk team, PM) with a rules-based incumbent. Every LLM variant is scored against that incumbent on the same states, and so fa",
+  "pushed_at": "2026-11-09T09:21:35Z"
+ },
+ {
+  "repo": "general-liquidity/gordon",
+  "stars": 17,
+  "category": "llm-single-agent-trader",
+  "why": "Agent harness for crypto, equities, options and futures. 'The model proposes, the harness disposes': a deny-first harness decides whether an agent-issued exposure increase may proceed. It has strict a",
+  "pushed_at": "2026-09-08T10:14:07Z"
+ },
+ {
+  "repo": "xsunsim/AgentStockBenchmarkResults",
+  "stars": 17,
+  "category": "research-paper-code",
+  "why": "A live daily arena where models, including Claude Sonnet 4.6, Haiku 4.5 and Opus, rank the next day's S&P 500 winners and losers. Strategy logic is frozen in code days before outcomes (companion repo ",
+  "pushed_at": "2026-09-22"
+ },
+ {
+  "repo": "Erinqi/tradingagents-codex-native",
+  "stars": 15,
+  "category": "claude-skill-or-plugin",
+  "why": "Codex-native TradingAgents plugin with no external model keys and only Python stdlib helpers; the design carries over to Claude Code. Key ideas: a cutoff-date mode that excludes information after the ",
+  "pushed_at": "2026-07-12"
+ },
+ {
+  "repo": "jiwoomap/TradingAgents-Dashboard",
+  "stars": 15,
+  "category": "llm-multi-agent-trader",
+  "why": "TradingAgents fork that adds persistent Markdown memory (Obsidian-compatible) retrieved on future runs, so agents learn from past wins and mistakes. Also adds a fact checker that actually requests new",
+  "pushed_at": "2026-03-02"
+ },
+ {
+  "repo": "youngseongshin/thesis-investment-os",
+  "stars": 15,
+  "category": "other",
+  "why": "An accountability layer for investment agents, runnable offline with no keys (Python, SQLite, markdown vault). Core loop: register prediction, wait without rewriting the thesis, grade process and outc",
+  "pushed_at": "2026-09-11T04:37:07Z"
+ },
+ {
+  "repo": "kjpou1/forexfactory-mcp",
+  "stars": 15,
+  "category": "mcp-server",
+  "why": "Small gem: exposes the ForexFactory economic calendar as MCP tools. Useful for a macro-event gate (FOMC, CPI, NFP days) that cuts position size or blocks new entries in pre-market sessions.",
+  "pushed_at": "2026-04-27T03:01:24Z"
+ },
+ {
+  "repo": "lucemia/trading-agents-plugin",
+  "stars": 14,
+  "category": "claude-skill-or-plugin",
+  "why": "The original Claude Code slash-command port of TradingAgents (credited by others), using 7 subagents and yfinance with no LLM API cost. Its risk analyst stress-tests both the bull and bear cases for c",
+  "pushed_at": "2026-10-25"
+ },
+ {
+  "repo": "pedrobraiti/agentic-trading-mcp",
+  "stars": 14,
+  "category": "mcp-server",
+  "why": "Valet, the 'hands' of the Vizier stack: two MCP servers (Interactive Brokers with fractional dollar orders, and crypto via CCXT) over one shared safety core. Paper by default, live only by explicit op",
+  "pushed_at": "2026-10-12T23:36:14Z"
+ },
+ {
+  "repo": "yebof/quant-agent",
+  "stars": 14,
+  "category": "llm-multi-agent-trader",
+  "why": "Closest match to our bot. It trades US equities on Alpaca paper with 8 daily agents. An evening analyst (config/prompts/evening_analyst.md, 566 lines) grades every trade on two axes, correct/premature",
+  "pushed_at": "2026-10-23T10:46:50Z"
+ },
+ {
+  "repo": "smetaninatv/the-bull-claude-trading-routine",
+  "stars": 14,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Routines (scheduled Claude Code skills) for swing and intraday US-equity trading via IBKR. Human-in-the-loop: orders are only proposed, except raising a protective stop, which is automatic beca",
+  "pushed_at": "2026-10-20T18:32:00Z"
+ },
+ {
+  "repo": "gonewx/TradingAgents",
+  "stars": 13,
+  "category": "claude-skill-or-plugin",
+  "why": "Early Chinese Claude Code port of TradingAgents: 13 subagent definitions (analysts, bull/bear, research manager, trader, risk/PM, safe/risky/neutral), 6 slash commands (/trade-analyze, /market-scan, /",
+  "pushed_at": "2025-08-19T09:04:34Z"
+ },
+ {
+  "repo": "dbbbbm/kimi-stock-agent",
+  "stars": 12,
+  "category": "llm-single-agent-trader",
+  "why": "Claude Code (plus Kimi) public AI trading diary with no real money. It has /analysis, /operate, /update, /daily_archieve and /weekly_archieve commands; scheduler.py runs /operate on a schedule and whe",
+  "pushed_at": "2026-05-27"
+ },
+ {
+  "repo": "rollingSirius/TradeGit",
+  "stars": 12,
+  "category": "claude-skill-or-plugin",
+  "why": "A trade-journal skill for Claude and Codex that stores the reason for each trade, the stop and target, confidence, emotion and a strategy tag as first-class fields, and asks when the reason is missing",
+  "pushed_at": "2026-07-28T10:44:14Z"
+ },
+ {
+  "repo": "bmigette/BA2TradePlatform",
+  "stars": 12,
+  "category": "llm-multi-agent-trader",
+  "why": "Python platform that runs TradingAgents (plus deterministic scorers) as 'experts' against Alpaca and TastyTrade accounts. Enter/exit actions come from ruleset triggers (position, signal, targets, mark",
+  "pushed_at": "2026-11-09T07:26:06Z"
+ },
+ {
+  "repo": "osauer/canary",
+  "stars": 11,
+  "category": "mcp-server",
+  "why": "A local risk desk for IBKR: a daily brief and 20 discipline checks against limits you set. 'Canary Edge' shows what the price did 1, 5 and 20 sessions after your past trades, which is the same forward",
+  "pushed_at": "2026-11-07T16:19:14Z"
+ },
+ {
+  "repo": "Bader-Aloqily/claude-code-stock-picker",
+  "stars": 11,
+  "category": "claude-skill-or-plugin",
+  "why": "Small gem built for Claude Code: a /us-picks slash command, 10 Claude agents and a memory skill score US stocks weekly on a 100-point conviction model. It grades itself against a chance baseline and a",
+  "pushed_at": "2026-10-19T08:02:01Z"
+ },
+ {
+  "repo": "7thDrag0n/AutoEvolve",
+  "stars": 11,
+  "category": "other",
+  "why": "Self-improvement loop on top of FreqTrade: watch metrics every 60s (win rate, PF, Sharpe, drawdown, loss streaks), and when a trigger fires the LLM analyses and rewrites the strategy, deploys it, moni",
+  "pushed_at": "2026-03-20T21:31:30Z"
+ },
+ {
+  "repo": "AutoResearch-Factory/AgonAlpha",
+  "stars": 11,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code plugin with a paper (arXiv 2608.11250). An alpha-proposer subagent and an adversarial reviewer subagent work in turn: the reviewer re-runs the evaluation and assigns the verified fitness. ",
+  "pushed_at": "2026-10-11T18:45:56Z"
+ },
+ {
+  "repo": "rahulmkarthik/AlphaCouncil",
+  "stars": 10,
+  "category": "llm-multi-agent-trader",
+  "why": "Same architecture as ours: an LLM investment committee used as a risk overlay that validates and filters algorithmic signals, not one that generates trades. A Technician classifies regime with a volat",
+  "pushed_at": "2025-12-11T19:53:44Z"
+ },
+ {
+  "repo": "FarzamHejaziK/claude-investment-assistant",
+  "stars": 9,
+  "category": "claude-skill-or-plugin",
+  "why": "A Claude Code workspace template. Strategies are markdown files with a YAML header, and /investment:daily pulls the Alpaca portfolio read-only, checks the rules, and writes a dated memo to journal/<to",
+  "pushed_at": "2026-05-20T15:33:25Z"
+ },
+ {
+  "repo": "The-FinAI/Agent_Market_Arena",
+  "stars": 9,
+  "category": "research-paper-code",
+  "why": "Agent Market Arena (arXiv:2510.11695), from the FinMem/FinCon group: a lifelong, real-time stock and crypto benchmark. The testbed pipeline is get_daily_news, then get_daily_action, then get_return, w",
+  "pushed_at": "2026-10-08"
+ },
+ {
+  "repo": "jinxiy1104/MockTrader_MCP",
+  "stars": 9,
+  "category": "mcp-server",
+  "why": "An MCP sandbox for evaluating AI trading agents. It simulates fills with fees and slippage and enforces rules (max position, max drawdown, daily loss, leverage, no naked shorts). Strict replay backtes",
+  "pushed_at": "2026-06-01"
+ },
+ {
+  "repo": "UncertaintyDeterminesYou4ndMe/flintrade",
+  "stars": 8,
+  "category": "llm-single-agent-trader",
+  "why": "US-equity paper trader: 'LLM proposes, deterministic code disposes'. The risk gate includes a no-revenge cooldown, halt checks and risk-based sizing. 'Dreaming' memory keeps at most 20 lessons with co",
+  "pushed_at": "2026-09-02T08:41:05Z"
+ },
+ {
+  "repo": "pedrobraiti/vizier-trading-skill",
+  "stars": 8,
+  "category": "claude-skill-or-plugin",
+  "why": "A Claude Code skill that researches, decides, remembers theses between sessions and journals trades. It covers US stocks/ETFs and is paper/shadow-first. Each position is tagged core or tactical so ant",
+  "pushed_at": "2026-10-12T23:36:16Z"
+ },
+ {
+  "repo": "malda231125/TradingAgents-KR",
+  "stars": 8,
+  "category": "llm-multi-agent-trader",
+  "why": "Korean TradingAgents fork whose whole point is a self-improvement loop. Each call is saved to decisions/YYYY-MM-DD/<ticker>.json, checked the next trading day, and graded hit/miss/partial in retrospec",
+  "pushed_at": "2026-07-05"
+ },
+ {
+  "repo": "ParadooxAI/TradeLens",
+  "stars": 8,
+  "category": "research-paper-code",
+  "why": "EMNLP'26 Findings code, 'Can Agentic Trading Systems Pay for Their Own Intelligence?'. It rebuilds trading trajectories from traces and measures LLM profit against inference and turnover cost ('agenti",
+  "pushed_at": "2026-09-01T10:04:33Z"
+ },
+ {
+  "repo": "simonro/ai-research-desk",
+  "stars": 8,
+  "category": "llm-multi-agent-trader",
+  "why": "Runs TradingAgents- and ai-hedge-fund-style teams through the user's Claude plan via the `claude` CLI, with no API key, which is our exact constraint. A desk manager compares the teams' calls and they",
+  "pushed_at": "2026-11-09T06:45:51Z"
+ },
+ {
+  "repo": "HenryLinyy/hedge-fund-committee",
+  "stars": 8,
+  "category": "claude-skill-or-plugin",
+  "why": "Skill that runs a 13-role investment committee inside one Claude conversation, no API. It rates data sufficiency (x/10), records confidence 1-10 per debate round, has a moderator track new and invalid",
+  "pushed_at": "2026-06-28T10:03:30Z"
+ },
+ {
+  "repo": "benstaf/lookaheadbench",
+  "stars": 8,
+  "category": "research-paper-code",
+  "why": "Look-Ahead-Bench (arXiv:2601.13770) measures alpha decay of LLM trading agents between memorized periods and genuinely unseen ones. Larger standard models generalize worse because of memorized priors.",
+  "pushed_at": "2026-02-06"
+ },
+ {
+  "repo": "kohoj/finstack",
+  "stars": 8,
+  "category": "claude-skill-or-plugin",
+  "why": "Codex plugin with 9 markdown skills (sense, research, judge, act, cascade, track, reflect, screen, review). The core idea is a shadow portfolio: a disciplined copy that follows every plan exactly. /tr",
+  "pushed_at": "2026-10-14T20:13:34Z"
+ },
+ {
+  "repo": "Caesar-ZZh/cosmos",
+  "stars": 7,
+  "category": "llm-multi-agent-trader",
+  "why": "A-share multi-agent system (NASDX, built on FinGenius) with a rigorous decision-evaluation layer. Decision records are frozen and scored out of sample over T+1 to T+20. It reports confidence calibrati",
+  "pushed_at": "2026-11-03"
+ },
+ {
+  "repo": "pedrobraiti/market-research-mcp",
+  "stars": 7,
+  "category": "mcp-server",
+  "why": "Scout, the 'senses' of the Vizier stack: 62 tools that need no API key, covering stocks, ETFs, crypto, SEC filings, FRED macro and options. It is stateless and returns data, not verdicts, and has a li",
+  "pushed_at": "2026-10-12T23:36:13Z"
+ },
+ {
+  "repo": "bettyguo/agent-backtest-lab",
+  "stars": 7,
+  "category": "other",
+  "why": "Statistical-audit harness for LLM trading agents. It has a look-ahead leakage firewall, point-in-time data access, net-of-cost walk-forward, multiple-testing correction (DSR/PSR/SPA), calibration and ",
+  "pushed_at": "2026-06-11T13:55:35Z"
+ },
+ {
+  "repo": "zhangsensen/backtest-analysis-skill",
+  "stars": 7,
+  "category": "claude-skill-or-plugin",
+  "why": "SKILL.md plus an input profiler that turns backtest artifacts (summary ledgers, trade ledgers, daily PnL, A/B packs) into a fixed promote, watch or reject memo. Coverage of return, risk, stability and",
+  "pushed_at": "2026-03-23"
+ },
+ {
+  "repo": "MangroveTechnologies/mangrove-agent",
+  "stars": 7,
+  "category": "mcp-server",
+  "why": "Small, but its whole pitch is 'guardrails for trading agents': a local MCP server and plugin that applies risk management to every order (circuit breakers, risk-based sizing, cooldowns), runs a paper ",
+  "pushed_at": "2026-11-07T20:04:42Z"
+ },
+ {
+  "repo": "aahl/ai-trading",
+  "stars": 6,
+  "category": "llm-single-agent-trader",
+  "why": "Runs Claude Code on a schedule through GitHub Actions, with MCP tools for market data, OKX demo-account orders, notifications, and a hook that saves trade results and updates the README. The trade log",
+  "pushed_at": "2026-10-31"
+ },
+ {
+  "repo": "Shali12/ASTP-Autonomous-Swing-Trading-Pipeline-",
+  "stars": 6,
+  "category": "llm-single-agent-trader",
+  "why": "AI-agent pipeline that screens the S&P 500, Nasdaq 100 and S&P 400 daily and logs confirmed signals to a SignalTracker. It tracks T+2/T+5/T+10 outcomes (694 signals, win rate and profit factor by setu",
+  "pushed_at": "2026-08-28T16:54:12Z"
+ },
+ {
+  "repo": "alidaftar1/robinhood-agent",
+  "stars": 6,
+  "category": "llm-single-agent-trader",
+  "why": "Claude Sonnet decides only inside a deterministic shortlist: an SEC-quality percentile gate plus a 12-1 momentum rank. Insider buys, analyst upgrades, news and earnings history are shown as context on",
+  "pushed_at": "2026-11-06"
+ },
+ {
+  "repo": "cruisekkk/trading-ledger",
+  "stars": 5,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude skill journal that makes you state thesis, stop and plan at entry. On review day it asks three questions of each closed trade: did the thesis play out, was the plan followed, which trades were ",
+  "pushed_at": "2026-07-07T08:33:23Z"
+ },
+ {
+  "repo": "lucemia/investment-autoresearch",
+  "stars": 5,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code plugin: buy-and-hold baseline, then hypotheses seeded into verified_insights.md, then 4-10 parallel agents each testing one idea in an isolated git worktree, then a scoreboard where winner",
+  "pushed_at": "2026-05-02"
+ },
+ {
+  "repo": "ScottDongKhang/Ascent_Capital",
+  "stars": 5,
+  "category": "llm-multi-agent-trader",
+  "why": "Best match to our design. Alpaca paper trading against SPY, with four quant sleeves plus a Claude 'AI PM'. The PM writes a sealed pre-thesis before it sees the quant output, and it has to earn capital",
+  "pushed_at": "2026-08-27T06:31:31Z"
+ },
+ {
+  "repo": "AskElira/newswave",
+  "stars": 4,
+  "category": "llm-single-agent-trader",
+  "why": "Calls the local `claude` CLI with no API key, only to classify news catalysts; deterministic Python makes every trade decision. Setups that fail a filter are tracked as shadow signals to measure what ",
+  "pushed_at": "2026-10-01T12:23:40Z"
+ },
+ {
+  "repo": "rozwer/Qlib-with-Claudex",
+  "stars": 4,
+  "category": "claude-skill-or-plugin",
+  "why": "Small gem. It inverts RD-Agent so that Claude Code drives Qlib and RD-Agent as tools, with no OpenAI API needed. .claude/skills and subagent definitions (Planner for hypotheses, Codex/Coder for factor",
+  "pushed_at": "2026-03-08T07:43:48Z"
+ },
+ {
+  "repo": "lxcong/TradingFlow",
+  "stars": 4,
+  "category": "claude-skill-or-plugin",
+  "why": "The full TradingAgents pipeline as one Claude Code dynamic-workflow script (tradingflow.workflow.js): parallel() for the 4 analysts and the 3 risk reviewers, sequential bull/bear loops, agent({schema}",
+  "pushed_at": "2026-06-02T08:02:17Z"
+ },
+ {
+  "repo": "ilasek/trading-autoresearch",
+  "stars": 4,
+  "category": "quant-framework",
+  "why": "Karpathy-style autoresearch for strategies, run by Claude via CLAUDE.md and program.md. The loop is: hypothesize, write a strategy, backtest under a frozen CI-locked engine (next-close fills, costs, T",
+  "pushed_at": "2026-11-09"
+ },
+ {
+  "repo": "ThesisInstitute/thesis",
+  "stars": 4,
+  "category": "claude-skill-or-plugin",
+  "why": "'Brier' forecasting harness with a Claude Code MCP setup and a local CLI (no LLM or key). It records decisions with KPIs, options, explicit forecasts, confidence intervals and resolution rules, then t",
+  "pushed_at": "2026-11-09"
+ },
+ {
+  "repo": "effective-p/FinAgent",
+  "stars": 4,
+  "category": "research-paper-code",
+  "why": "Reimplementation of FinAgent (arXiv:2402.18485, a multimodal foundation agent for trading), not an official repo. It covers the market-intelligence module, low- and high-level reflection, memory-based",
+  "pushed_at": "2026-06-06"
+ },
+ {
+  "repo": "2033121/astock-trading-agents",
+  "stars": 4,
+  "category": "llm-multi-agent-trader",
+  "why": "A careful TradingAgents re-implementation in LangGraph with 15 roles (analysts, bull/bear, 3-way risk, PM, memory). The reflection loop settles past predictions against real returns on trading days an",
+  "pushed_at": "2026-10-03T21:50:28Z"
+ },
+ {
+  "repo": "joshua-jingu-lee/ante",
+  "stars": 4,
+  "category": "quant-framework",
+  "why": "Korean, Python 3.13 'AI-native trading engine'. The AI agent is the front office that proposes strategies; Ante is the back office and safety gate (static validation, backtest, owner approval, bot, mo",
+  "pushed_at": "2026-10-31T07:07:30Z"
+ },
+ {
+  "repo": "valuein/valuein",
+  "stars": 4,
+  "category": "data-tool",
+  "why": "Point-in-time, survivorship-free SEC fundamentals back to 1993, delisted companies included. Every fact carries filing_date, accepted_at and a fact_id. Available as a Python SDK, Parquet via DuckDB, a",
+  "pushed_at": "2026-11-09"
+ },
+ {
+  "repo": "bxxd/mcp-edgar-ux",
+  "stars": 4,
+  "category": "mcp-server",
+  "why": "A context-efficient EDGAR MCP. It saves filings to disk and returns file paths, so Claude Code reads only the lines it needs with Read/Grep (a 10-K is about 241K tokens, a path about 50). The right pa",
+  "pushed_at": "2026-11-07"
+ },
+ {
+  "repo": "alan-d-smith/synthetix-alpha",
+  "stars": 4,
+  "category": "llm-multi-agent-trader",
+  "why": "'LLM agents research, a deterministic runtime trades': the model never sees a broker key. Research agents edit declarative strategy specs, never code. Out-of-sample checks use an unseen underlying and",
+  "pushed_at": "2026-09-04"
+ },
+ {
+  "repo": "aslcai/OpenPM-Bench",
+  "stars": 4,
+  "category": "research-paper-code",
+  "why": "OpenPM (2026) is an auditable, point-in-time benchmark for LLM portfolio-manager agents on the S&P 500. It uses historical index membership for each date, a ts_available timestamp on every feature, he",
+  "pushed_at": "2026-06-24T08:27:50Z"
+ },
+ {
+  "repo": "Aroesler1/Alpha-Factor-Mining-Framework",
+  "stars": 4,
+  "category": "research-paper-code",
+  "why": "Careful study of evolutionary alpha mining driven by Claude, on CRSP S&P 500 data from 2000 to 2025. It uses point-in-time membership and purged labels, and runs controls that share every gate (geneti",
+  "pushed_at": "2026-10-24T04:31:15Z"
+ },
+ {
+  "repo": "flysheep-ai/NoAlpha",
+  "stars": 3,
+  "category": "other",
+  "why": "Leakage-resistant evaluation for LLM trading agents on US and A-share equities. It enforces point-in-time discipline, runs leakage self-tests, and attributes what the LLM actually contributed. Its dem",
+  "pushed_at": "2026-10-29T11:53:03Z"
+ },
+ {
+  "repo": "Handshakeworm/TradeHive-TradingAgents",
+  "stars": 3,
+  "category": "llm-multi-agent-trader",
+  "why": "A TradingAgents fork built on 'hard discipline in code + soft judgment by LLM', the same split as our quant engine plus Claude veto. Its NVDA 6-month backtest uses T+1 open execution: +43.9% with -3.2",
+  "pushed_at": "2026-05-26T01:55:18Z"
+ },
+ {
+  "repo": "apeabody007/Quant-toolkit",
+  "stars": 3,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude plugin taken from a real-money bot with 483 settled trades. Skills: calibration-audit (does '70%' come true 70% of the time), EMOS/Platt bias correction, pnl-attribution, drawdown-monitor (warn",
+  "pushed_at": "2026-09-15"
+ },
+ {
+  "repo": "zjzJoez/trading-agent",
+  "stars": 3,
+  "category": "llm-multi-agent-trader",
+  "why": "Claude Code driven paper trader for US stocks and options (Moomoo paper, SEC EDGAR, self-learning RAG, zero monthly cost). Core principle: 'LLMs can reason; only deterministic code takes risk', with r",
+  "pushed_at": "2026-09-29"
+ },
+ {
+  "repo": "TLSRUF/ai-trader-team",
+  "stars": 3,
+  "category": "claude-skill-or-plugin",
+  "why": "Korean Claude Code framework in 3 layers: skills, then parallel persona subagents (trend/macro/risk/flow), then deterministic tools. tools/trading_rigor.py (stdlib Decimal) does position size, R:R, po",
+  "pushed_at": "2026-11-03T06:06:48Z"
+ },
+ {
+  "repo": "tycoon2323/investment-committee",
+  "stars": 3,
+  "category": "claude-skill-or-plugin",
+  "why": "Pure Claude Code: one CIO SKILL.md plus 10 subagent .md files and a stdlib calc.py, no frameworks. A devil's-advocate agent runs a pre-mortem, and a data-verifier agent can block a decision. All memor",
+  "pushed_at": "2026-10-30T22:35:45Z"
+ },
+ {
+  "repo": "trycoin-ai/agentrisk",
+  "stars": 3,
+  "category": "mcp-server",
+  "why": "'Your agent proposes, your policy decides.' A deterministic, fail-closed risk gate whose policy is plain YAML. Three MCP tools: analyze_portfolio_risk, check_trade_risk (PASS/WARN/BLOCK with a reason)",
+  "pushed_at": "2026-09-28"
+ },
+ {
+  "repo": "openpitkit/officer",
+  "stars": 3,
+  "category": "mcp-server",
+  "why": "A self-hosted pre-trade risk engine with stdio MCP. It checks every order against hard limits (order size, order rate, profit and loss) before sending it to a broker connection. A hard-limits layer be",
+  "pushed_at": "2026-11-08"
+ },
+ {
+  "repo": "az9713/self-improving-trading-agent",
+  "stars": 2,
+  "category": "llm-single-agent-trader",
+  "why": "Small gem with a structure very close to ours: an S&P 500 weekly rebalance scored by signal plugins (top 20). A separate agent skill (Reviewer) reads the ledger, checks a memory of past experiments, a",
+  "pushed_at": "2026-05-26T04:32:35Z"
+ },
+ {
+  "repo": "jkspeaks/deterministic-trader",
+  "stars": 2,
+  "category": "llm-single-agent-trader",
+  "why": "Small gem. A scheduled Claude session is only 'the hands'; a deterministic Python core makes every buy, size and exit decision and fails closed. Stored cycle inputs are replayed nightly against rule v",
+  "pushed_at": "2026-10-16T20:35:38Z"
+ },
+ {
+  "repo": "yaorenliang/trading-agents-skill",
+  "stars": 2,
+  "category": "claude-skill-or-plugin",
+  "why": "TradingAgents rewritten as a SKILL.md with no dependencies, close to our trading-desk skill. It forces a 5-tier rating (no 'wait and see' answers) and a written 'why not' reason. Its reflection step c",
+  "pushed_at": "2026-11-04"
+ },
+ {
+  "repo": "cuteyuchen/TradingAgents-HoldingsSkill",
+  "stars": 2,
+  "category": "claude-skill-or-plugin",
+  "why": "Holdings-level TradingAgents skill for A-shares and ETFs that combines ideas from TradingAgents, astock and AShare. Reusable guardrails: if key quotes are missing it gives observations only and no tra",
+  "pushed_at": "2026-10-13"
+ },
+ {
+  "repo": "samchatterley/investor-bot",
+  "stars": 2,
+  "category": "research-paper-code",
+  "why": "A pre-registered study asking whether LLM contextual judgement adds predictive value over a deterministic US-equity signal engine. The hypothesis and analysis plan are frozen before data collection, a",
+  "pushed_at": "2026-07-27T08:10:48Z"
+ },
+ {
+  "repo": "kensongan-prog/trading-advisor",
+  "stars": 2,
+  "category": "llm-single-agent-trader",
+  "why": "A Claude Code project driven by a written risk doctrine in AGENTS.md: a 12-gate doctrine check, R-multiples, heat math, and halts around event windows (FOMC, CPI, earnings). It journals each idea from",
+  "pushed_at": "2026-08-25T10:23:22Z"
+ },
+ {
+  "repo": "Toomi16011601/tradeoff",
+  "stars": 2,
+  "category": "other",
+  "why": "A local Python CLI and MCP evidence tool for trading-agent developers. It records agent intent, matches execution and fills, flags missing costs, and compares declared strategy versions. Its future-da",
+  "pushed_at": "2026-11-06T21:07:57Z"
+ },
+ {
+  "repo": "kirosli00tuff/AiTrader",
+  "stars": 2,
+  "category": "llm-multi-agent-trader",
+  "why": "Architecturally close to ours: a multi-LLM consensus, a rule-based factor, a DNN advisory and a smart-money factor feed one weighted ensemble. Every order then passes a deterministic Layer-1 RiskGate ",
+  "pushed_at": "2026-11-07T22:28:03Z"
+ },
+ {
+  "repo": "rgg81/crypto-trade-claude-code",
+  "stars": 2,
+  "category": "claude-skill-or-plugin",
+  "why": "Operation TEMPEST: a TradingAgents-style desk built entirely as one Claude Code SKILL.md orchestrator. Roles are scout, 4 analysts, bull vs bear, research manager judge, trader and a reflector that re",
+  "pushed_at": "2026-08-06"
+ },
+ {
+  "repo": "KairosPan/gravit-agent",
+  "stars": 2,
+  "category": "llm-single-agent-trader",
+  "why": "Small gem: each strategy gets a directory with a status.yaml lifecycle (idea, researching, validated, paper, retired), a THESIS.md with a Falsification section (metric, threshold, window), a journal.m",
+  "pushed_at": "2026-11-09"
+ },
+ {
+  "repo": "Ashwin-Iyer1/GPTvsGeminiTrader",
+  "stars": 2,
+  "category": "other",
+  "why": "Small methodology gem for judging LLM stock picks fairly. Selections are frozen at decisionAt and fill at the next observation's close with entry fees and slippage. An equal-weight full-universe basel",
+  "pushed_at": "2026-10-16T12:57:39Z"
+ },
+ {
+  "repo": "truongdatdev/junto",
+  "stars": 2,
+  "category": "mcp-server",
+  "why": "Local-first MCP investment committee for Claude Code with no API keys. Five fixed-rule views (quality, valuation, growth, risk, technicals) score the same cited evidence. Backtests signal at the close",
+  "pushed_at": "2026-10-22T03:05:59Z"
+ },
+ {
+  "repo": "satyamdas03/alpaca-trading-agent",
+  "stars": 2,
+  "category": "llm-single-agent-trader",
+  "why": "Same runtime model as ours. Scheduled stateless Claude Code sessions (pre-market, open, midday, close, weekly) read memory files, research through the Alpaca MCP plus WebSearch, decide, execute, then ",
+  "pushed_at": "2026-11-06"
+ },
+ {
+  "repo": "talocode/tradia",
+  "stars": 2,
+  "category": "other",
+  "why": "A trading OS (CLI + SDK) with structured proposals that include invalidation criteria, a risk engine with revenge-trading detection, journals with lessons and discipline scores, and R-multiple / expec",
+  "pushed_at": "2026-07-15"
+ },
+ {
+  "repo": "unitz007/aegis",
+  "stars": 2,
+  "category": "other",
+  "why": "A trade-execution safety harness (Go): a gateway with symbol allowlist, server-side sizing, a dealing-rules clamp, idempotency, session gating, an in-memory paper broker and an MCP place_trade tool th",
+  "pushed_at": "2026-11-03"
+ },
+ {
+  "repo": "wildsurfer/cnn-fear-and-greed-parse",
+  "stars": 2,
+  "category": "mcp-server",
+  "why": "A Go library, CLI and MCP server for CNN's Fear & Greed Index: current score, rating and about a year of daily history. A free sentiment input that could be tested as a regime/sizing signal in the tim",
+  "pushed_at": "2026-09-07"
+ },
+ {
+  "repo": "pradnyaw25/ai-portfolio-manager",
+  "stars": 1,
+  "category": "llm-multi-agent-trader",
+  "why": "Tiny but highly relevant (Glasshouse Fund). Bull/bear/risk debate in which the PM must explicitly answer the bear case, a deterministic risk engine, and a grounding check that blocks unsupported claim",
+  "pushed_at": "2026-11-08T20:39:14Z"
+ },
+ {
+  "repo": "highwatermark/apex",
+  "stars": 1,
+  "category": "llm-single-agent-trader",
+  "why": "Claude is the decision-maker in cron-woken sessions: premarket, trading, monitor, postmarket and a 17:00 'evolution' session. Hard limits are enforced in the tool layer, not the prompt. Separate Trade",
+  "pushed_at": "2026-06-18T21:20:30Z"
+ },
+ {
+  "repo": "Kiyo5hi/quanterback",
+  "stars": 1,
+  "category": "llm-multi-agent-trader",
+  "why": "Alpaca paper-trading harness in TradingAgents style: fundamental, technical and sentiment agents plus a risk manager. A CompositeRiskGate (sanity check, relative vs buy-and-hold, walk-forward out-of-s",
+  "pushed_at": "2026-06-29"
+ },
+ {
+  "repo": "jinicoding/samsung-stock-agent",
+  "stars": 1,
+  "category": "llm-single-agent-trader",
+  "why": "Self-evolving Korean stock analyst (based on yoyo-evolve). Claude periodically reads its own code, plans an improvement in SESSION_PLAN.md, writes tests first, implements, checks that protected files ",
+  "pushed_at": "2026-04-21"
+ },
+ {
+  "repo": "jsconiers/quiver-quant-mcp",
+  "stars": 1,
+  "category": "mcp-server",
+  "why": "A FastMCP server for Quiver Quantitative with 16 tools. It documents which feeds are open without a token (live congress trades for all members, congress trades by ticker, the live Form 4 insider feed",
+  "pushed_at": "2026-06-19T20:37:04Z"
+ },
+ {
+  "repo": "Harvard-AI-and-Robotics-Lab/TradingAgent",
+  "stars": 1,
+  "category": "llm-multi-agent-trader",
+  "why": "Official code for TrustTrade (arXiv 2603.22567), built on TradingAgents. Several independent agents analyze each information domain, and a credibility scorer keeps only corroborated claims (selective ",
+  "pushed_at": "2026-10-05T01:09:42Z"
+ },
+ {
+  "repo": "dylanmccavitt/agentic-trader",
+  "stars": 1,
+  "category": "llm-single-agent-trader",
+  "why": "A reference harness for our setup: a scheduled headless `claude -p` session runs TRADER.md. The model never chooses trades: scripts/decide.py makes the decision, and Claude only orchestrates and write",
+  "pushed_at": "2026-06-13T01:57:21Z"
+ },
+ {
+  "repo": "Hydr0neFN/trader",
+  "stars": 1,
+  "category": "llm-multi-agent-trader",
+  "why": "A retired multi-LLM Alpaca paper bot with an honest post-mortem. A Gemini/DeepSeek analyst feeds a Claude risk gate that vetoes unsafe trades and runs Sonnet on the Claude Pro plan via the Agent SDK. ",
+  "pushed_at": "2026-10-10T16:55:23Z"
+ },
+ {
+  "repo": "joesaiagent/claude-portfolio",
+  "stars": 1,
+  "category": "llm-single-agent-trader",
+  "why": "Claude plus Alpaca paper trading with deterministic Python scoring. One batched Claude Haiku call per day reads candidate headlines and may only apply a bounded score tilt of ±6. Sizing is determinist",
+  "pushed_at": "2026-11-06T21:42:41Z"
+ },
+ {
+  "repo": "fafawlf/thesis-agent",
+  "stars": 1,
+  "category": "llm-multi-agent-trader",
+  "why": "Claude-based. Motto: 'LLMs reason, math decides.' Three Claude analysts plus a bull/bear debate feed a deterministic Decision Hub (decision_hub.py) that blends signals about 85% quant framework and 15",
+  "pushed_at": "2026-04-04T23:05:50Z"
+ },
+ {
+  "repo": "christianjohnston-ai/claude-paper-trading",
+  "stars": 1,
+  "category": "claude-skill-or-plugin",
+  "why": "Small gem with the same loop as ours. A daily /paper-morning Claude Code command settles prior orders, refreshes end-of-day data, runs audited research skills and briefs Claude. Claude proposes BUY/SE",
+  "pushed_at": "2026-10-27"
+ },
+ {
+  "repo": "y0n1n1/financial-skills",
+  "stars": 1,
+  "category": "claude-skill-or-plugin",
+  "why": "'Financial Gauntlet': 3 Claude Code skills backed by 19 Python quant tools (287 tests), designed to disprove a thesis. Steps include regime, analogues with a mandatory anti-analogue, base rates, ACH, ",
+  "pushed_at": "2026-10-06"
+ },
+ {
+  "repo": "dabeille/jerome",
+  "stars": 1,
+  "category": "llm-single-agent-trader",
+  "why": "Small gem with almost our exact architecture: quant signals plus an LLM veto layer that is 'never the primary signal'. I read bot/signals/llm_analyst.py: cheap deterministic vetoes run first (earnings",
+  "pushed_at": "2026-08-23"
+ },
+ {
+  "repo": "KelvinYou/ai-stock-analysis",
+  "stars": 1,
+  "category": "llm-multi-agent-trader",
+  "why": "US-equity TradingAgents-style pipeline on the Claude Agent SDK: 4 analysts, adversarial bull/bear, research-manager ruling, and a briefing with deterministic entry/stop/target levels. It also has a pr",
+  "pushed_at": "2026-11-09T09:54:29Z"
+ },
+ {
+  "repo": "RaviRanjan0812/tradingagents-reproduction",
+  "stars": 1,
+  "category": "research-paper-code",
+  "why": "From-scratch reproduction of the TradingAgents paper (11 agents, point-in-time data layer, resumable backtester, unit-tested portfolio simulator) across 2024 bull and 2022 bear regimes on AAPL and JPM",
+  "pushed_at": "2026-05-23T18:41:05Z"
+ },
+ {
+  "repo": "alphacat0/tesuta-stock-judge",
+  "stars": 1,
+  "category": "claude-skill-or-plugin",
+  "why": "Japanese Claude Code/Codex skill (one SKILL.md is the single source of truth) that applies a famous trader's published principles as a judging lens. Risk first: a stop must be defined before entry, th",
+  "pushed_at": "2026-06-27T08:00:25Z"
+ },
+ {
+  "repo": "botjockie-lab/lookahead-detector",
+  "stars": 1,
+  "category": "claude-skill-or-plugin",
+  "why": "A single model-agnostic SKILL.md for proving lookahead bias in backtests. It has a 12-point static timing audit (fill vs decision time, same-bar signal-then-execute, rolling windows, resample labels).",
+  "pushed_at": "2026-10-25T09:00:30Z"
+ },
+ {
+  "repo": "reddygopalkrishna/tradingkit-skills",
+  "stars": 1,
+  "category": "claude-skill-or-plugin",
+  "why": "Agent Skills pack with no API keys needed, where every number comes from deterministic, tested Python. It includes a market-regime skill that scales exposure, a trade planner (ATR and structure stops,",
+  "pushed_at": "2026-11-08T07:40:36Z"
+ },
+ {
+  "repo": "johnamcruz/futures-trading-harness",
+  "stars": 1,
+  "category": "llm-single-agent-trader",
+  "why": "Runs on Claude Code with no external LLM key. Its skills are plain Markdown, the model reads facts that code computes and checks, and orders go only through a fail-closed order gate (hook + MCP gatewa",
+  "pushed_at": "2026-11-09"
+ },
+ {
+  "repo": "chiefsmurph/alpaca-ai-agents-hackathon",
+  "stars": 1,
+  "category": "llm-single-agent-trader",
+  "why": "Open reference for the execution and risk layer of an LLM-in-the-loop agent on Alpaca paper. It has a bounded AI-overlay veto/resize clamp with fail-open passthrough (our Claude PM veto/shrink rule) a",
+  "pushed_at": "2026-09-27"
+ },
+ {
+  "repo": "mphinance/awesome-broker-mcp",
+  "stars": 1,
+  "category": "other",
+  "why": "A directory of 66 brokers, each checked at the source: official vs community MCP, read-only vs trading, whether paper mode exists. A second pass tried to refute the first and corrected 11 of 19 entrie",
+  "pushed_at": "2026-10-12"
+ },
+ {
+  "repo": "naga-k/mock-rh-mcp",
+  "stars": 1,
+  "category": "mcp-server",
+  "why": "A Python paper-broker MCP backed by yfinance. It mirrors the real Robinhood MCP tool surface: review_equity_order before place_equity_order, ref_id idempotency, limit orders filled lazily, cash accoun",
+  "pushed_at": "2026-06-07"
+ },
+ {
+  "repo": "cloudQuant/backtrader-mcp",
+  "stars": 1,
+  "category": "mcp-server",
+  "why": "A local-first MCP for reproducible backtests: content-addressed immutable datasets, typed private strategy drafts, reviewed and bounded subprocess runs, idempotency and durable reports. Offline and ba",
+  "pushed_at": "2026-09-20"
+ },
+ {
+  "repo": "srivardhanjalan/trading-desk",
+  "stars": 1,
+  "category": "claude-skill-or-plugin",
+  "why": "A Claude Code plugin that wires 4 MCPs (FMP, Alpaca, TradingView analysis, optional TradingView Desktop). Commands: analyze a ticker (score, BUY, position size, R/R), an Alpaca paper portfolio dashboa",
+  "pushed_at": "2026-05-29"
+ },
+ {
+  "repo": "Yijiu37/Adaptive-FinMem-LLM-StockTrading",
+  "stars": 1,
+  "category": "research-paper-code",
+  "why": "FinMem successor that adds three small mechanisms. Regime-Gated Retrieval changes how memories are weighted in bull, bear, range and high-volatility regimes. Feedback becomes a continuous risk-adjuste",
+  "pushed_at": "2026-09-28T16:05:01Z"
+ },
+ {
+  "repo": "caius72/berkshire",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Closest match to our design. It is a Claude Code plugin that runs TradingAgents roles as Claude subagents with no external LLM key. It keeps a decision log, and a settle step has a 'reflector' agent w",
+  "pushed_at": "2026-09-28"
+ },
+ {
+  "repo": "0-Captain/trading-analysis-skill",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Pure Claude Code skill: 12 TradingAgents roles run as subagents with no API key. Each role's adapted upstream prompt sits in its own references/<role>.md file. Subagents write their reports to disk an",
+  "pushed_at": "2026-06-10"
+ },
+ {
+  "repo": "namikos/claude-tradingagents",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code plugin port of TradingAgents plus virattt/ai-hedge-fund. Four parallel analysts and 13 investor-persona subagents feed a bull/bear debate (max 2 rounds), then a trader and a risk manager b",
+  "pushed_at": "2026-04-19"
+ },
+ {
+  "repo": "chenhab03/multiagent-stock-research",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code /analyze command inspired by TradingAgents: 13 analysis modules and a 3-round bull/bear debate (opening, rebuttal, closing) judged by a PM agent. Its self post-mortem reads past reports on",
+  "pushed_at": "2026-04-23"
+ },
+ {
+  "repo": "PYJ0915/Stock_agent",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "Korean paper-trading agent with a 4-stage Claude pipeline: screening, deep analysis, cross-examination, final decision. Practical ideas: skip re-analysis of the same (ticker, report_date) so decisions",
+  "pushed_at": "2026-07-30"
+ },
+ {
+  "repo": "Roisters/trading-agents-claude",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Runs the real TradingAgents engine (analysts, bull/bear, fact checker, research manager, trader, 3-way risk debate, PM with a 5-level rating) as a Claude Code plugin. Every model call goes through 'cl",
+  "pushed_at": "2026-10-31T17:15:50Z"
+ },
+ {
+  "repo": "fangdididi/backtest-autopsy",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "An agent skill that audits a backtest in 8 ordered layers: a claim card written before results, data lineage, timeline, a lag test that replays positions with 0/1/2/5 periods of delay to expose look-a",
+  "pushed_at": "2026-10-21T21:15:01Z"
+ },
+ {
+  "repo": "deBilla/project-10x-trader",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "Documents what it learned the hard way: the LLM-driven intraday bot lost about 50%, while deterministic daily trend-following backtested at PF 2.82 and Sharpe 2.41. The LLM was demoted to a news risk ",
+  "pushed_at": "2026-09-13T05:33:01Z"
+ },
+ {
+  "repo": "ivanprague90/claude-trader",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "A scheduled Claude paper trader, structurally close to ours. Each of four daily wake-ups is a fresh process that calls a headless 'claude -p' with a fixed JSON schema and no tools. A code 'cage' dispo",
+  "pushed_at": "2026-11-03T08:42:29Z"
+ },
+ {
+  "repo": "frizille/trading-performance-and-risk",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "A source-agnostic Claude skill with a stdlib risk_metrics.py. It turns a daily NAV history and a trade log into two deliberately separate panels: a NAV panel (TWR, vol, Sharpe, Sortino, Calmar, MaxDD)",
+  "pushed_at": "2026-08-31T17:33:03Z"
+ },
+ {
+  "repo": "intoApex/tas-guard",
+  "stars": 0,
+  "category": "mcp-server",
+  "why": "Small but on target: a zero-dependency proxy (about 4,600 lines of JavaScript) that sits between any AI client and Alpaca, CCXT or any trading MCP. It enforces per-order and daily caps, symbol allowli",
+  "pushed_at": "2026-11-04T05:49:45Z"
+ },
+ {
+  "repo": "liquid-public/coinvest-mcp",
+  "stars": 0,
+  "category": "mcp-server",
+  "why": "The Liquid Co-Invest MCP our README mentions for execution and paper trading. It is a thin proxy that loads the tool catalog live from the Liquid backend: market data, balances, portfolio analytics, o",
+  "pushed_at": "2026-07-08T01:04:20Z"
+ },
+ {
+  "repo": "liuyime2/autopoiesis",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "Small gem, nearly a mirror of our design. Each strategy's rule decides first, and the LLM may override it only with a stated reason; both actions are journaled so the model's contribution is measured ",
+  "pushed_at": "2026-11-08T04:48:40Z"
+ },
+ {
+  "repo": "jtfernandezi/stocks-investment-agent",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "A $60k paper fund on 100 US stocks with a headless Claude Code weekly self-audit (automation/weekly_audit_prompt.md). The auditor gets read-only DB and broker access and may only open PRs, which a hum",
+  "pushed_at": "2026-09-23T17:33:30Z"
+ },
+ {
+  "repo": "m-np/RobinhoodTrader",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "Claude is the decision brain on scheduled cycles. A thesis journal gates what it can buy: no written hypothesis means no buy, and a thesis marked 'broken' is a hard block and acts as the human's veto.",
+  "pushed_at": "2026-07-04T04:10:21Z"
+ },
+ {
+  "repo": "rajib2k5/llm-lookahead-probe",
+  "stars": 0,
+  "category": "other",
+  "why": "Measures how much an LLM agent's backtest is inflated by memorized history. Each decision runs twice, masked and unmasked, and it reports the performance gap with bootstrap confidence intervals before",
+  "pushed_at": "2026-11-03T16:58:04Z"
+ },
+ {
+  "repo": "Pangqiang-Gary/tradingagents-blind-eval",
+  "stars": 0,
+  "category": "other",
+  "why": "A forward-only blind-evaluation harness around unmodified TradingAgents. It freezes the candidate universe before the event, validates analysis cutoffs, isolates memory per ticker, seals predictions w",
+  "pushed_at": "2026-08-22T16:42:12Z"
+ },
+ {
+  "repo": "Reformatic-ai/repete-bot",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "A paper-only swing agent that decides once per day on daily bars, writes its reasoning for every decision, and holds itself to pre-registered pass marks it cannot move after seeing the data. Going liv",
+  "pushed_at": "2026-11-04T20:19:03Z"
+ },
+ {
+  "repo": "udayjain2102/agentic-paper-trading",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "Paper-trades rule-based strategies and an LLM agent side by side, one day at a time, on real US prices. Each forward record has an explicit cost and fill basis and is scored with Sharpe, drawdown, pro",
+  "pushed_at": "2026-11-06T18:40:11Z"
+ },
+ {
+  "repo": "saifkn1ai/wasptrader",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Runs TradingAgents with no LLM API key, the same constraint we have. wasp_pull.py dumps the output of all 14 TradingAgents data tools to a file. Claude Code then plays every role by hand using the fra",
+  "pushed_at": "2026-06-22T23:26:16Z"
+ },
+ {
+  "repo": "UnbelievableT/topxai-equity-research",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code plugin whose ledger.py is an append-only call ledger. Each call has a claim, a falsifier, a horizon and a benchmark. A call is settled hit, miss or too_early (too_early allowed only before",
+  "pushed_at": "2026-11-07T03:52:42Z"
+ },
+ {
+  "repo": "AhSirJoe/agentic-investing-stack",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude agents that run a bull/bear/PM debate on numbers locked and date-stamped beforehand from SEC XBRL and price APIs. The PM sets scenario probabilities, computes expected value, applies 3 hard gat",
+  "pushed_at": "2026-11-04T02:46:59Z"
+ },
+ {
+  "repo": "Kantamaniprakash/trading-agents-lab",
+  "stars": 0,
+  "category": "research-paper-code",
+  "why": "Faithful TradingAgents reproduction plus a rigorous test harness. An --anonymize mode shows the model TICKER-X and 'Day T', and v2 also rebases prices to an index of 100, so the model cannot recognize",
+  "pushed_at": "2026-10-07T17:27:20Z"
+ },
+ {
+  "repo": "ShousenZHANG/trading-copilot",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Claude Code and Codex research copilot with an MCP server and a shared local operation journal (SQLite). Strict free-data contract: unknown tickers are refused, a single source or conflicting prices g",
+  "pushed_at": "2026-10-05T11:24:25Z"
+ },
+ {
+  "repo": "yangchiehkang/PortfolioResearchCockpit",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "Built on TradingAgents v0.3.1 with a personal_portfolio layer. All AI output must pass local risk rules and five gates (data quality, forward review, signal validity, market-intel risk gate). Adds wal",
+  "pushed_at": "2026-08-06T04:16:44Z"
+ },
+ {
+  "repo": "xzliuxz/Trading-agents-extension",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "Small add-ons for TradingAgents: pit_guard.py (point-in-time look-ahead guard), fact_checker.py (citation enforcement for numeric claims), report_auditor.py, a macro regime detector (yield curve, cred",
+  "pushed_at": "2026-07-09T07:40:33Z"
+ },
+ {
+  "repo": "krish-shahh/quorum",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Closest match to our design that I found. It runs only through Claude Code, with no LLM API key: subagents, skills, hooks and MCP. Deterministic YAML strategies propose trades and Claude acts as pod P",
+  "pushed_at": "2026-08-21"
+ },
+ {
+  "repo": "Gussyy/claude-autotrade",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "An LLM-free MCP server where Claude Code is the brain: it spawns subagents for a 4-specialist debate, with no OpenAI or DeepSeek key needed. Forensic hard gates (Piotroski, Beneish, Altman) can veto t",
+  "pushed_at": "2026-07-18"
+ },
+ {
+  "repo": "nikosmitsopoulos/trading-routine",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "US-equity paper trader run purely by scheduled Claude Code routines, no API key: a daily defense, research and execute pass, a close summary with journal lessons, and a Friday weekly review that grade",
+  "pushed_at": "2026-05-15"
+ },
+ {
+  "repo": "alexlarcheveque/bull-trading-routine",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "Five Claude Code cron routines (pre-market, open, midday, end of day, weekly review). It adds a pre-flight guardrail script that runs inside the routine and refuses to call the order endpoint when cap",
+  "pushed_at": "2026-08-27"
+ },
+ {
+  "repo": "Mach-Chan/trading-panel",
+  "stars": 0,
+  "category": "claude-skill-or-plugin",
+  "why": "Fits our no-API-key setup best. proxy/claude_proxy.py (~300 lines) wraps local `claude -p` as an OpenAI-compatible endpoint, so the unmodified upstream TradingAgents runs on a Claude subscription. It ",
+  "pushed_at": "2026-08-17T15:35:10Z"
+ },
+ {
+  "repo": "YutaroSugaya/stock-bot",
+  "stars": 0,
+  "category": "other",
+  "why": "Japanese-equities Go bot whose README is a design lesson. A test (isolation_test.go) fails if the order path ever imports LLM output, and the LLM only writes a pre-open go/no-go note. Stops sit on the",
+  "pushed_at": "2026-10-09T06:41:19Z"
+ },
+ {
+  "repo": "keerhee/ai-native-hedge-fund",
+  "stars": 0,
+  "category": "research-paper-code",
+  "why": "Korean case study plus a Claude Code implementation proposal for an LLM multi-agent hedge fund on a Korean point-in-time DB. Principle: agents research, code reviews, humans approve. It warns that bac",
+  "pushed_at": "2026-11-07T13:24:49Z"
+ },
+ {
+  "repo": "katsushi2441/TradingAgents-JP",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "Independent Japanese-equity TradingAgents implementation (no upstream code): 4 specialists (technical, valuation, news, Japan macro), bull/bear debate, aggressive/neutral/conservative risk committee a",
+  "pushed_at": "2026-07-31T04:18:26Z"
+ },
+ {
+  "repo": "ajtgjmdjp/japan-trading-agents",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "Archived Japanese variant (the author points to jfinqa as the successor). 9 agents get real government and exchange data through the author's MCP servers (EDINET filings, TDNet disclosures, e-Stat mac",
+  "pushed_at": "2026-03-02T17:50:08Z"
+ },
+ {
+  "repo": "Saivikaskillamsetty/tradingdesk",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "Small gem built on Claude Code subagents over MCP, with no external LLM key. It has 10 narrow agents including a `risk` agent with veto. Its rule is that agents never compute or recall numbers; every ",
+  "pushed_at": "2026-08-16T15:23:01Z"
+ },
+ {
+  "repo": "fjordskii/sidecar",
+  "stars": 0,
+  "category": "llm-single-agent-trader",
+  "why": "A scheduled agent loop and nothing more: mandate (LOOP_PROMPT.md) + journal (JOURNAL.md, whose latest entry is the current thesis) + cron or Claude Routines. bot/precheck.py evaluates every mechanical",
+  "pushed_at": "2026-09-08T13:56:20Z"
+ },
+ {
+  "repo": "GirishVerm/ai-hedge-fund",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "Paper fund run by Claude Code agents (.claude/agents: risk, quant, macro, news, fundamental, market-watch) on Alpaca paper. Deterministic-first: a zero-LLM Python market_monitor.py runs every cycle an",
+  "pushed_at": "2026-06-12T02:51:10Z"
+ },
+ {
+  "repo": "rakeshchada/portfolio-autopsy",
+  "stars": 0,
+  "category": "research-paper-code",
+  "why": "Research findings that matter for our lessons loop. (1) Reflection under time-gated, no-future information HURT quality while ungated reflection 'helped', which is a hindsight trap. (2) Episodic memor",
+  "pushed_at": "2026-05-05T21:00:44Z"
+ },
+ {
+  "repo": "highwatermark/cortexcore",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "Claude Agent SDK options-flow agent whose principle is 'the model plans and scores; deterministic code decides', and nothing in the prompt can override it. It has a 14-check non-overridable safety gat",
+  "pushed_at": "2026-08-22T18:48:31Z"
+ },
+ {
+  "repo": "highwatermark/reward_hacking_research",
+  "stars": 0,
+  "category": "research-paper-code",
+  "why": "A documented reward hack by a self-optimizing LLM trading-research agent, with a paper, the git trajectory and re-runnable ablations. About 98% of the score came from one gating if-statement. The poli",
+  "pushed_at": "2026-08-22T16:13:14Z"
+ },
+ {
+  "repo": "kurarensu777-sys/ralph-for-hedge-fund",
+  "stars": 0,
+  "category": "other",
+  "why": "Operating system for a fund run by Claude Code agents. Each agent has a write-scope roster enforced by a commit guard. A self-improving loop captures lessons as library chapters ('Read when:' triggers",
+  "pushed_at": "2026-10-11T23:22:22Z"
+ },
+ {
+  "repo": "NatBrian/auto-research-finance",
+  "stars": 0,
+  "category": "llm-multi-agent-trader",
+  "why": "Built natively on Claude Code with no external LLM key: skills (.claude/skills/*.md) define roles and a markdown state bus (session/*.md) carries state. Includes tradingagents-cc, a re-implementation ",
+  "pushed_at": "2026-04-09T14:55:01Z"
+ },
+ {
+  "repo": "dsjwong/stockagent-backtester",
+  "stars": 0,
+  "category": "research-paper-code",
+  "why": "Replays the StockAgent paper's LLM trader on real US large-caps from 2019 to 2026 with no look-ahead, next-open fills and 10+5 bps costs, against equal-weight, trend and momentum baselines. It runs ea",
+  "pushed_at": "2026-11-07T02:05:36Z"
+ },
+ {
+  "repo": "colinalexander/procedural-drift-in-financial-agents",
+  "stars": 0,
+  "category": "research-paper-code",
+  "why": "Stanford CS329A research scaffold on 'procedural drift': agents running the same finance monitoring task on a repeated schedule quietly behave differently from run to run. It compares a prompt-only ag",
+  "pushed_at": "2026-08-21T21:32:47Z"
+ },
+ {
+  "repo": "jeonnoin-alt/finance-ai-lookahead-leakage",
+  "stars": 0,
+  "category": "research-paper-code",
+  "why": "Controlled experiment on look-ahead leakage in an LLM trading agent with Reflection and ReAct. One model's training window covers the backtest period, a control model has an earlier cutoff, and a seco",
+  "pushed_at": "2026-06-17T11:39:05Z"
+ }
+]

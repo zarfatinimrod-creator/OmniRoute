@@ -1,0 +1,20 @@
+{
+  "profile": "crypto_base",
+  "value": 0.2938,
+  "n": 236,
+  "config_change_needed": true,
+  "overrides": {
+    "risk.dd_halve": -1.0
+  },
+  "n_seeded": 145,
+  "n_prior": 145,
+  "n_sweep": 91,
+  "sr_std_pp": 0.018435,
+  "daily_series": "base@50, phase 0 daily excess returns",
+  "window": [
+    "2018-01-02",
+    "2026-11-10"
+  ],
+  "computed_at": "2026-11-11T16:26:47+00:00",
+  "report": "/home/user/OmniRoute/ai-trader/research/2026-11-11-crypto-sweep.md"
+}

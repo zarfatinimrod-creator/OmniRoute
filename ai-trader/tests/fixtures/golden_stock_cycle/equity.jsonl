@@ -1,0 +1,6 @@
+{"date": "2021-07-13", "logged_at": "2026-01-01T00:00:48+00:00", "equity": 100000.0, "shadow_equity": 100000.0, "cash": 100000.0, "gross": 0.0, "bench_price": 141.86934762366056, "market_open": false, "decided": true}
+{"date": "2021-07-14", "logged_at": "2026-01-01T00:02:01+00:00", "equity": 99696.74, "shadow_equity": 99696.74, "cash": 2685.12, "gross": 0.9731, "bench_price": 143.1900068618143, "market_open": false, "decided": true}
+{"date": "2021-07-15", "logged_at": "2026-01-01T00:03:02+00:00", "equity": 100013.3, "shadow_equity": 100013.3, "cash": 2685.49, "gross": 0.9731, "bench_price": 144.74494462314485, "market_open": false, "decided": true}
+{"date": "2021-07-16", "logged_at": "2026-01-01T00:04:03+00:00", "equity": 100112.47, "shadow_equity": 100112.47, "cash": 2685.86, "gross": 0.9732, "bench_price": 147.41829131376565, "market_open": false, "decided": true}
+{"date": "2021-07-19", "logged_at": "2026-01-01T00:05:04+00:00", "equity": 100001.91, "shadow_equity": 100001.91, "cash": 2686.22, "gross": 0.9731, "bench_price": 150.2813015362185, "market_open": false, "decided": true}
+{"date": "2021-07-20", "logged_at": "2026-01-01T00:06:18+00:00", "equity": 100043.07, "shadow_equity": 100043.07, "cash": 9440.12, "gross": 0.9056, "bench_price": 148.85195261295127, "market_open": false, "decided": true}

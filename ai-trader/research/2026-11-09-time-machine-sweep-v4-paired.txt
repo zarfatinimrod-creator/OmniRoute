@@ -1,0 +1,20 @@
+                                 variant  phases  sharpe_med  sharpe_min  sharpe_max wins_vs_base  d_sharpe_med  cagr_med  maxdd_med  calmar_med  turnover_med  psr_med
+                                    base     5.0       0.402       0.283       0.504            -         0.000    0.0723    -0.1152       0.614         14.72    0.882
+             prior weights (no learning)     5.0       0.402       0.283       0.504          0/5         0.000    0.0723    -0.1152       0.614         14.72    0.882
+                             costs 15bps     5.0       0.187       0.053       0.377          0/5        -0.187    0.0492    -0.1226       0.400         14.86    0.710
+                             costs 30bps     5.0      -0.236      -0.470       0.052          0/5        -0.638    0.0085    -0.1313       0.066         14.05    0.240
+                         daily rebalance     1.0       0.418       0.418       0.418          0/1        -0.077    0.0755    -0.1234       0.612         18.59    0.890
+                       monthly rebalance     5.0       0.401       0.301       0.477          2/5        -0.018    0.0687    -0.1047       0.674         11.31    0.881
+                          target vol 10%     5.0       0.388       0.237       0.480          0/5        -0.015    0.0671    -0.1054       0.637         12.70    0.873
+                          target vol 16%     5.0       0.339       0.125       0.436          0/5        -0.106    0.0684    -0.1320       0.533         16.83    0.842
+                        no regime filter     5.0       0.226       0.141       0.327          0/5        -0.207    0.0526    -0.1315       0.393         14.89    0.748
+                   no VIX defensive mode     5.0       0.389       0.101       0.427          0/5        -0.077    0.0733    -0.1208       0.606         15.52    0.874
+                         8 positions max     5.0       0.432       0.201       0.534          2/5        -0.037    0.0773    -0.1109       0.707         17.73    0.899
+ETF-only universe (no survivorship bias)     5.0       0.368       0.257       0.379          1/5        -0.091    0.0589    -0.0770       0.751         13.01    0.861
+                            SPY buy&hold     NaN       0.594         NaN         NaN          NaN           NaN    0.1378    -0.3372       0.409           NaN    0.960
+                   Equal-weight universe     NaN       0.812         NaN         NaN          NaN           NaN    0.1853    -0.3287       0.564           NaN    0.991
+               DSR of base (N=59 trials)     NaN         NaN         NaN         NaN          NaN           NaN       NaN        NaN         NaN           NaN    0.565
+
+real	10m8.244s
+user	36m47.761s
+sys	0m6.318s

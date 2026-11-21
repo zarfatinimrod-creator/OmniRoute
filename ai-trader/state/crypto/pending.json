@@ -1,0 +1,39 @@
+{
+  "decision_date": "2026-11-20",
+  "status": "executed",
+  "rebalance": false,
+  "exits_only": true,
+  "targets": {},
+  "targets_raw": {},
+  "stopped_shadow": [],
+  "shadow_hold": {},
+  "stopped": [],
+  "overrides": [],
+  "earnings_blackout": {},
+  "preview_at_close": [],
+  "new_entries": [],
+  "logged_at": "2026-11-21T00:13:45+00:00",
+  "exec_ts": "2026-11-21T01:00:00+00:00",
+  "decision_close": {
+    "BTC-USD": 58868.48828125
+  },
+  "hourly_rebuild": {
+    "bar": "2026-11-20",
+    "source": "yahoo_1h",
+    "hours": 24,
+    "inserted": true,
+    "symbols": {
+      "BTC-USD": {
+        "open": 61906.8984375,
+        "high": 62541.98046875,
+        "low": 57680.1015625,
+        "close": 58868.48828125,
+        "volume": 27741073408.0
+      }
+    }
+  },
+  "executed_on": "2026-11-21",
+  "fills": [],
+  "fill_source": "none",
+  "fill_ts": "2026-11-21T01:00:00+00:00"
+}

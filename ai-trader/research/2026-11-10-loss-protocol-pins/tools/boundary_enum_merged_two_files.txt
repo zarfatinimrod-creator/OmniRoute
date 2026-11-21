@@ -1,0 +1,35 @@
+tests 159 | boundaries 3 | runs 6657 | most clock reads in one test 30675 | (test, boundary) pairs that fail somewhere: 14
+   positions sampled, not all tried, for 2 tests with more than 240 clock reads: ['OneEngine.test_the_lock_is_free_again_when_the_engine_ends', 'SaidWhateverHappens.test_a_run_that_ends_in_market_hours_does_not_wait_for_a_trial_answer']
+   CatchUpStop.test_a_breach_waits_for_a_live_quote_and_is_then_sold
+      UTC midnight (19:00 New York): fails at 3 of 10 positions (after read 3 .. 5): -          'stop_price': 97.0}}
+   CatchUpStop.test_a_close_under_the_stop_with_no_low_under_it_is_still_a_breach_not_a_crash
+      UTC midnight (19:00 New York): fails at 1 of 8 positions (after read 3): -          'stop_price': 97.0}}
+   CatchUpStop.test_a_mark_left_on_an_earlier_day_does_not_sell_when_the_mode_is_switched_later
+      UTC midnight (19:00 New York): fails at 6 of 11 positions (after read 4 .. 9): -          'stop_price': 97.0}}
+   CatchUpStop.test_a_mark_of_an_earlier_day_does_not_switch_the_look_off
+      UTC midnight (19:00 New York): fails at 2 of 6 positions (after read 3 .. 4): ?          ^
+   CatchUpStop.test_it_never_buys
+      UTC midnight (19:00 New York): fails at 1 of 8 positions (after read 3): + ['SELL']
+   CatchUpStop.test_one_low_under_the_stop_is_not_enough_but_two_are
+      UTC midnight (19:00 New York): fails at 1 of 9 positions (after read 4): -          'stop_price': 97.0}}
+   CatchUpStop.test_the_default_only_tells_the_owner_and_keeps_the_normal_stop
+      UTC midnight (19:00 New York): fails at 1 of 9 positions (after read 3): AssertionError: 2 != 1
+   CatchUpStop.test_the_minute_the_last_look_fell_in_is_read_too
+      UTC midnight (19:00 New York): fails at 1 of 8 positions (after read 3): -          'stop_price': 97.0}}
+   CatchUpStop.test_the_mu_case_a_bar_that_closed_under_the_stop_sells_at_the_first_live_quote
+      UTC midnight (19:00 New York): fails at 1 of 8 positions (after read 3): -          'stop_price': 97.0}}
+   CatchUpStop.test_too_few_of_the_minutes_are_bars_nobody_sells_on
+      UTC midnight (19:00 New York): fails at 1 of 9 positions (after read 4): -          'stop_price': 97.0}}
+   CatchUpStop.test_two_lone_prints_in_two_stretches_are_two_prints
+      UTC midnight (19:00 New York): fails at 1 of 9 positions (after read 4): -          'stop_price': 97.0}}
+   OnTrial.test_a_name_stopped_out_today_is_bought_back_and_it_is_on_record
+      New York midnight (Tue->Wed): fails at 4 of 15 positions (after read 3 .. 6): AssertionError: ('stop_cooldown', 'would_refuse') not found in [('', 'bought'), ('second_check', 'passed')]
+   SaidWhateverHappens.test_the_heartbeat_stamp_is_the_oldest_look_among_the_names_still_held
+      New York midnight (Tue->Wed): fails at 1 of 8 positions (after read 2): TypeError: fromisoformat: argument must be str
+   StopCooldown.test_a_name_stopped_out_today_is_not_bought_back_today
+      New York midnight (Tue->Wed): fails at 6 of 21 positions (after read 2 .. 7): -          'stop_price': 97.097}}
+tests 54 | boundaries 3 | runs 1260 | most clock reads in one test 35 | (test, boundary) pairs that fail somewhere: 0
+
+real	1m44.283s
+user	1m10.644s
+sys	0m10.011s

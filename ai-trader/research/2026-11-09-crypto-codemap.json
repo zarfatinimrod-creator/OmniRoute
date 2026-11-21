@@ -1,0 +1,1230 @@
+[
+ {
+  "interfaces": [
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker.__init__",
+    "signature": "__init__(self, cash: float, slippage_bps: float = 5.0, commission_per_share: float = 0.0, state: dict | None = None) -> None",
+    "lines": "12-15",
+    "notes": "Stores self.slippage = bps/1e4 and self.commission. New state = {cash, positions, peak_equity, blocked}. Positional callers pass state as the 4th arg (cycle.py:175 main, cycle.py:178 shadow, news_live.py:158 news book; backtest.py:45 passes 3 args). So any new params (fee_bps, qty_step) must be keyword args appended AFTER state. Keep them as instance attributes, never in self.state, so stock portfolio.json stays the same."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker._price / equity / weights",
+    "signature": "_price(self, sym, prices) -> float; equity(self, prices: dict) -> float; weights(self, prices: dict) -> dict[str, float]",
+    "lines": "26-35",
+    "notes": "_price falls back to positions[sym]['last_price'] when the price is missing or NaN. equity = cash + sum(qty*px). weights is {} when eq <= 0."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker.mark",
+    "signature": "mark(self, prices: dict, date: str, cash_yield_annual: float = 0.0, trading_days: int = 252) -> float",
+    "lines": "38-52",
+    "notes": "ALREADY takes trading_days (line 41: cash *= (1+y)**(1/trading_days), only when cash > 0 and y is truthy). Updates last_price and peak_close for held symbols with a finite price, sets peak_equity = max(old, eq) and last_mark = date, and drops blocked entries with until <= date. No caller passes trading_days today: backtest.py:62, cycle.py:247, cycle.py:248."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker.apply_corporate_actions",
+    "signature": "apply_corporate_actions(self, actions: dict, upto: str, withholding: float = 0.25) -> list[str]",
+    "lines": "54-80",
+    "notes": "Floors split quantities to whole shares (line 65), and line 77 writes pos['ca_applied_through'] on EVERY held position even when there are no actions. Called unconditionally at cycle.py:323-324. For crypto it must be skipped by the market.corporate_actions flag, or crypto positions gain that key and get whole-unit split logic."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker.maybe_reset_peak",
+    "signature": "maybe_reset_peak(self, regime: str, date: str, days_required: int = 20, dd_halve: float = -0.10, dd_flat: float = -0.20) -> bool",
+    "lines": "82-97",
+    "notes": "Runs only while state['dd_state'] == 'flat'; otherwise it pops riskon_streak and returns False. The streak counts +1 when regime.startswith('risk_on'), else it resets to 0. At >= days_required: eq = cash + sum(qty*last_price), and line 93 sets peak_equity = eq / (1 + (dd_halve + dd_flat) / 2). It also resets the streak and appends date to peak_resets. Callers: backtest.py:65 and cycle.py:245, both pass r.get('dd_reentry_days', 20), r['dd_halve'], r['dd_flat'] positionally."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker.peak_ratio",
+    "signature": "peak_ratio(self, prices: dict) -> float",
+    "lines": "99-100",
+    "notes": "equity / max(peak_equity, 1e-9). strategy.build_targets gets this as equity_peak_ratio, and the breaker reads dd = ratio - 1 (strategy.py:171-177): flat if dd <= dd_flat, elif dd <= dd_halve then halved."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker.rebalance",
+    "signature": "rebalance(self, targets: dict[str, float], prices: dict, date: str, band: float = 0.02, min_trade_value: float = 500.0, stopped: list | None = None, cooldown_until: str | None = None, exits_only: bool = False, force: set | None = None) -> list[dict]",
+    "lines": "103-157",
+    "notes": "Order building, lines 121-137: symbols = sorted(current | targets); skip when the price is missing or NaN (124-126). exiting = tw == 0 and cw > 0. exits_only skips when tw >= cw. forced = s in force and tw < cw. Skip when abs(tw-cw) < band unless exiting or forced; skip when abs(delta) < min_trade_value unless exiting. Execution sorts by delta, sells first (138). SELL: qty = held if exiting else min(held, math.floor(-delta_val/px)) (141); reason stop/exit/trim; sets blocked[s] = cooldown_until for stopped symbols. BUY: buy_px = px*(1+slip); qty = math.floor(min(delta_val, cash)/(buy_px + commission)) (150-151); reason add/entry. Returns the fill dicts. Callers: backtest.py:58, cycle.py:210 (main, with force), cycle.py:213 (shadow), cycle.py:271 (preview on a deepcopy)."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker._fill",
+    "signature": "_fill(self, sym: str, qty: int, px: float, date: str) -> dict",
+    "lines": "159-186",
+    "notes": "fill_px = px*(1+slip) for a buy, px*(1-slip) for a sell. cost = qty*fill_px + abs(qty)*commission, and cash -= cost. A buy averages into avg_cost or creates {qty, avg_cost: fill_px, entry_date, peak_close: px, last_price: px}. A sell sets realized = (fill_px - avg_cost)*(-qty), adds qty, and deletes the position when qty <= 0 (line 176). Returns {date, symbol, side, qty: abs(qty), price: round(fill_px,4), value: round(abs(qty)*fill_px,2), realized_pnl: round(realized,2)}. news_live.py:207 and :218 also call _fill directly, so it is shared with the news book."
+   },
+   {
+    "file": "aitrader/backtest.py",
+    "symbol": "_px",
+    "signature": "_px(row: pd.Series) -> dict",
+    "lines": "24-25",
+    "notes": "Returns {sym: float} for notna values > 0."
+   },
+   {
+    "file": "aitrader/backtest.py",
+    "symbol": "run",
+    "signature": "run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode: str = 'learned', rebalance_every: int | None = None, signals: dict | None = None, aux: dict | None = None, phase: int = 0) -> dict",
+    "lines": "28-93",
+    "notes": "Learned weights (38-40) read journal 'placebo.json' gate_z95 from journal.STATE and call walk_forward_weights; otherwise the priors. Broker at line 45: PaperBroker(starting_cash, slippage_bps, commission_per_share). The loop, lines 50-75:\n- fill the previous pending at {**close, **open} of bar d, with cooldown = dates[i + stop_cooldown_days] (bar-indexed, line 57);\n- mark at the close (62);\n- maybe_reset_peak(prev_regime) AFTER the mark (65); live does it BEFORE the mark (cycle.py:245 vs 247);\n- build_targets;\n- changed = regime or dd_state change;\n- set dd_state; new pending when on_cycle ((i+phase) % every == 0), changed, or flat; otherwise exits-only for stops.\nResult (77-93): summary() on strategy, SPY-labelled benchmark (key 'benchmark_spy') and equal-weight, plus n_trades, final_weights, final_positions, _equity (Series), _fills."
+   },
+   {
+    "file": "aitrader/backtest.py",
+    "symbol": "_G",
+    "signature": "_G: dict = {}",
+    "lines": "96",
+    "notes": "Module global, filled by sweep() before the fork: panel, cfg, start, end, signals. _job reads it."
+   },
+   {
+    "file": "aitrader/backtest.py",
+    "symbol": "_variants",
+    "signature": "_variants(cfg: dict) -> list[tuple[str, dict, str, int]]",
+    "lines": "99-114",
+    "notes": "12 stock variants as (name, override, weights_mode, every). Overrides are applied as per-section dict.update. '_etf' is the only special key. Variants include 'costs 15/30bps' (slippage), 'no VIX defensive mode', 'ETF-only universe' and 'prior weights (no learning)', all stock-specific."
+   },
+   {
+    "file": "aitrader/backtest.py",
+    "symbol": "_job",
+    "signature": "_job(args: tuple[name, override, mode, every, phase]) -> dict",
+    "lines": "117-135",
+    "notes": "Deepcopies _G['cfg']. '_etf' restricts the panel columns AND sets signals=None so they are recomputed (121-126). Other sections get c[sec].update(kv), which is shallow and cannot remove universe keys. It calls run(panel, c, _G['start'], _G['end'], mode, every, signals=signals, aux=precompute_aux(panel, c), phase=phase) and returns {variant, phase, trades, **strategy}. Only for name == 'base' and phase == 0 does it add _daily (an undated list of pct_change) and _bench with hard-coded 'SPY buy&hold'."
+   },
+   {
+    "file": "aitrader/backtest.py",
+    "symbol": "sweep",
+    "signature": "sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: int = 4) -> pd.DataFrame",
+    "lines": "138-176",
+    "notes": "ProcessPoolExecutor is imported LOCALLY (141), so tests cannot patch it at module level. Phases come from base_every = cfg rebalance_every_days (147). Each variant is paired with the variant literally named 'base' at phase k % base_every (152-156). Summary rows hold the medians, wins_vs_base and d_sharpe_med, then the two benchmark rows. DSR (167-175):\n- n_prev = sum(len(rows)) over trials.jsonl records that have 'rows';\n- srs = per-variant median sharpe / sqrt(252);\n- rf_d uses 1/252;\n- dsr(base phase-0 daily - rf_d, n_prev + len(srs), srs.std());\n- the whole block sits in a broad except that prints 'DSR unavailable'."
+   },
+   {
+    "file": "aitrader/metrics.py",
+    "symbol": "TD",
+    "signature": "TD = 252",
+    "lines": "10",
+    "notes": "Read at call time inside summary(). Patching metrics.TD changes summary, but would NOT change a default argument bound at def time."
+   },
+   {
+    "file": "aitrader/metrics.py",
+    "symbol": "psr",
+    "signature": "psr(daily: pd.Series, sr_benchmark: float = 0.0) -> float",
+    "lines": "35-45",
+    "notes": "Per-period SR, skew/kurtosis aware. NaN if n < 30 or std == 0. No annualisation, so it needs no change for periods_per_year."
+   },
+   {
+    "file": "aitrader/metrics.py",
+    "symbol": "dsr",
+    "signature": "dsr(daily: pd.Series, n_trials: int, sr_trials_std: float) -> float",
+    "lines": "48-57",
+    "notes": "PSR against sr0 = std * ((1-emc)*ppf(1-1/N) + emc*ppf(1-1/(N e))). sr_trials_std is in per-period units."
+   },
+   {
+    "file": "aitrader/metrics.py",
+    "symbol": "summary",
+    "signature": "summary(equity: pd.Series, turnover: pd.Series | None = None, rf_annual: float = 0.0) -> dict",
+    "lines": "60-92",
+    "notes": "TD is used at line 67 (years), 69 (vol), 70 (daily rf), 71 (sharpe) and 72 (sortino down). Returns {} if fewer than 2 returns. turnover_annual is present only when the turnover series is non-empty. The only caller is backtest.py:84-86."
+   }
+  ],
+  "changes": [
+   {
+    "spec_ref": "3.3 PaperBroker cost keys (costs.qty_step, costs.fee_bps); same costs in main/shadow/backtest",
+    "file_lines": "broker.py:12-15; backtest.py:45; cycle.py:175, cycle.py:178",
+    "change": "Append keyword params after state: `fee_bps: float = 0.0, qty_step: float = 1`. Set self.fee = fee_bps/1e4 and self.step = qty_step, plus a decimals count for rounding, e.g. 6 for 1e-6. Construction sites pass `fee_bps=c.get('fee_bps', 0), qty_step=c.get('qty_step', 1)`. news_live.py:158 is left alone; it is stock-only and gets the defaults.",
+    "stock_impact": "None. These are instance attributes, not state keys, and the defaults reproduce today's numbers.",
+    "test": "Existing: test_core.Broker.* and test_cycle (shared constructor path). New: a fractional broker with fees, where cash is never negative, fees appear in realized P&L, and dust is removed."
+   },
+   {
+    "spec_ref": "3.3 qty = floor_to_step(min(delta,cash) / (px*(1+slip)*(1+fee) + commission)); cash never negative",
+    "file_lines": "broker.py:150-151 (buy); broker.py:141 (trim sell)",
+    "change": "Add a helper `_floor(x)`. It returns `math.floor(x)` when `self.step == 1`, which keeps an int. Otherwise it returns `round(math.floor(x / self.step) * self.step, decimals)`.\n- Buy: `qty = self._floor(min(delta_val, self.cash) / (px * (1 + self.slippage) * (1 + self.fee) + self.commission))`. Keep the left-to-right order: (px*(1+slip))*(1.0) is exact, so stocks are bit-identical.\n- Add a guard: if `qty * unit_cost > min(delta_val, cash)`, subtract one step. Rounding to 6 dp can push the cost an ulp over the cash.\n- Trim: `min(held, self._floor(-delta_val / px))`.",
+    "stock_impact": "Bit-identical only if step == 1 keeps math.floor and returns an int. A float 1.0 path would write '49.0' into portfolio.json and trades.jsonl, which are hash-chained, and break the goldens.",
+    "test": "Existing: test_core.test_round_trip_accounting asserts qty == 49 and the exact cash; test_never_spends_more_cash_than_it_has. New: crypto qty with step 1e-6, cash >= 0 after max buys, and an asserted qty precision."
+   },
+   {
+    "spec_ref": "3.3 Fees charged to cash and realized P&L, running fees_paid; dust removal",
+    "file_lines": "broker.py:159-186 (_fill: cost 162, realized 174, dust 176, return dict 178-186)",
+    "change": "`fee = abs(qty) * fill_px * self.fee`. Then `if self.fee:` do all of: cost += fee; state['fees_paid'] = state.get('fees_paid', 0.0) + fee; realized -= fee on a sell, and realized = -fee on a buy (or fold the buy fee into avg_cost; the spec must choose, see mismatches); add 'fee': round(fee, 2) to the fill dict.\n- When step != 1: `pos['qty'] = round(pos['qty'] + qty, decimals)` on both buy and sell.\n- Delete the position when `pos['qty'] <= 0 or (self.step != 1 and pos['qty'] < self.step)`.\n- Fill dict 'qty': round(abs(qty), decimals) for fractional books.",
+    "stock_impact": "None, provided every new key (fees_paid, the fill's fee) is written only when fee > 0. An unconditional fees_paid: 0.0 changes portfolio.json, and a 'fee' key changes the hashed trades.jsonl records.",
+    "test": "Existing: test_core.Broker, test_news_rules (the news book uses _fill: 5% sizing and the -3% stop), test_review_fixes.ExitsOnly. New: realized P&L equals gross minus fees over a round trip, fees_paid accumulates, and a sell leaving < 1e-6 deletes the position."
+   },
+   {
+    "spec_ref": "3.3 periods_per_year into broker.mark",
+    "file_lines": "broker.py:38 (no change needed); call sites backtest.py:62, cycle.py:247, cycle.py:248",
+    "change": "mark already takes trading_days. Pass `trading_days=cfg.get('market', {}).get('periods_per_year', 252)` at the three call sites.",
+    "stock_impact": "None: 252 is the same as the default.",
+    "test": "Existing: test_core.test_cash_yield_and_peak and test_critic_fixes.DrawdownReentry both rely on the default. New (optional): the yield over 365 marks at ppy 365 equals the annual rate."
+   },
+   {
+    "spec_ref": "3.3 risk.dd_reentry_ref (default (dd_halve+dd_flat)/2; crypto -0.25)",
+    "file_lines": "broker.py:82 (signature), broker.py:93; callers backtest.py:65, cycle.py:245",
+    "change": "Add a param `ref: float | None = None`. At line 93: `ref = (dd_halve + dd_flat) / 2 if ref is None else ref` and `st['peak_equity'] = eq / (1 + ref)`. Callers pass `r.get('dd_reentry_ref')`.",
+    "stock_impact": "Bit-identical: same expression and same float ops when the key is absent.",
+    "test": "Existing: test_critic_fixes.DrawdownReentry.test_reentry_at_half_scale_after_risk_on_streak, which uses positional (20, -0.10, -0.20). New: crypto_base (dd_halve -1.0, dd_flat -0.5, ref -0.25) resumes at peak_ratio 0.75, which reads 'normal', and trades in the backtest after dd_reentry_days risk-on bars. Also the candidate at ref -0.25 (see mismatch on the boundary)."
+   },
+   {
+    "spec_ref": "4 stale symbol frozen: neither bought nor sold, held keeps weight (broker.py:128-137)",
+    "file_lines": "broker.py:103-114 (signature), broker.py:123-126 (loop guard); callers cycle.py:210, 213, 271",
+    "change": "Add `frozen: set | None = None` as the last param of rebalance, and `if frozen and s in frozen: continue` next to the price check at line 124. The decision side, in cycle (not my file), must also keep the frozen held name at its current weight in targets_raw and carry the set in pending. Write the pending key only when it is non-empty.",
+    "stock_impact": "This is the one intended stock change. It is a no-op when frozen is None or empty, so the goldens hold as long as the golden live-cycle script never makes a symbol stale.",
+    "test": "New: a held stale coin with target 0 is not sold, and an unheld stale name with target > 0 is not bought. Existing rebalance tests are unaffected (default None)."
+   },
+   {
+    "spec_ref": "3.3 costs.exec_delay_bps (backtest-only, crypto 10)",
+    "file_lines": "backtest.py:45",
+    "change": "`PaperBroker(cash, cfg['costs']['slippage_bps'] + cfg['costs'].get('exec_delay_bps', 0), cfg['costs']['commission_per_share'], fee_bps=..., qty_step=...)`. Slippage is already applied against the trader on both sides (buy up, sell down), so folding the delay in there matches 'signed by trade side'. The live brokers in cycle do NOT add it.",
+    "stock_impact": "None: 5 + 0 == 5, so the same 5/1e4.",
+    "test": "Existing: test_core.TimeMachine. New: a crypto backtest fill price equals open*(1+(slip+delay)/1e4) on a buy."
+   },
+   {
+    "spec_ref": "3.3 learning.enabled checked in backtest.run",
+    "file_lines": "backtest.py:38",
+    "change": "`if weights_mode == 'learned' and cfg.get('learning', {}).get('enabled', True):` otherwise use the priors. This also avoids reading placebo.json from the crypto STATE.",
+    "stock_impact": "None: the default is True.",
+    "test": "New: crypto cfg with weights_mode 'learned' gives wmap == priors on every date. Existing: test_core.TimeMachine uses 'prior'."
+   },
+   {
+    "spec_ref": "3.3 periods_per_year in metrics.py:10 and backtest.py:170-171",
+    "file_lines": "metrics.py:60 (signature), 67, 69, 70, 71, 72; backtest.py:84-86, 170, 171",
+    "change": "`summary(equity, turnover=None, rf_annual=0.0, periods_per_year: int = TD)`. Replace TD with periods_per_year on lines 67-72. In run, pass `ppy = cfg.get('market', {}).get('periods_per_year', 252)` to all three summary calls (84-86). In sweep, use `srs = ... / (ppy ** 0.5)` and `rf_d = (1+rf)**(1/ppy) - 1`. Leave the module constant TD in place.",
+    "stock_impact": "None: the default 252 gives identical floats.",
+    "test": "No direct metrics tests exist; summary is covered only through test_core.TimeMachine (assertIn 'sharpe'). New: summary on a synthetic 365-bar series with ppy 365 gives years == 1.0 and sharpe = mean/std*sqrt(365)."
+   },
+   {
+    "spec_ref": "3.3 book-aware benchmark labels",
+    "file_lines": "backtest.py:79-85 (res key 'benchmark_spy'), backtest.py:134 ('SPY buy&hold')",
+    "change": "Keep the 'benchmark_spy' key for stocks so the JSON stays identical. Build the _bench label as f\"{bench} buy&hold\" only when bench != 'SPY', or from a market label key.",
+    "stock_impact": "None if the label is unchanged for SPY.",
+    "test": "New: crypto sweep rows include 'BTC-USD buy&hold'."
+   },
+   {
+    "spec_ref": "7 Sweep: profiles crypto_base (base) vs crypto, 7 phases, 50/100 bp, halves, LOO ablations (no ETH, no ATR stop, no -25% step), BTC+XRP control, missed-night run",
+    "file_lines": "backtest.py:96-176 (_G, _variants, _job, sweep)",
+    "change": "Generalise through the existing '_'-prefixed override convention, so the stock path is untouched.\n- _G gains 'cfgs' (profile name -> merged cfg). _job deepcopies `_G['cfgs'][ov.get('_profile')]` when '_profile' is present, else `_G['cfg']`.\n- '_universe' (list or dict) REPLACES c['universe'] and restricts both the panel AND the signals columns, like '_etf' does. dict.update cannot remove ETH.\n- '_start' / '_end' set the halves.\n- '_lag' feeds a new run(..., exec_lag: int = 1) for the missed-night run.\n- '_pair' names the variant to pair with. Line 152-156 pairs with `pair.get(name, 'base')`.\n- Return a dated `_daily` Series for every job whose variant has '_keep_daily', for the bootstrap.\n- Add `_crypto_variants(base_every)`: base@50, cand@50, base@100 ({'costs': {'fee_bps': 100}}), cand@100 (pair base@100), base/cand for each half (paired), cand-noETH ('_universe': ['BTC-USD']), cand-noATR ({'risk': {'atr_stop_mult': 0}}), cand-noHalve ({'risk': {'dd_halve': -1.0}}, inheriting dd_reentry_ref -0.25), BTC+XRP ('_universe': {'BTC-USD': ..., 'XRP-USD': ...}), cand-lag.\n- sweep(..., variants=None): `variants or _variants(cfg)`. Pass rule rows: rule 1 from wins_vs_base >= 6/7; rule 3 from maxdd_med; rule 4 from d_sharpe_med of the 100bp and half pairs.",
+    "stock_impact": "None when the stock path calls _variants(cfg) with no '_' keys and the default pairing is 'base'. The stock sweep is not in the goldens anyway.",
+    "test": "No existing tests cover sweep, _job or _variants. New: call _job in-process with _G populated; crypto_base never holds ETH; a variant with '_universe' drops ETH from the signals too; pairing uses '_pair'. Sweep forks through the locally imported ProcessPoolExecutor, so either move the import to module level or add workers=0 for an in-process map."
+   },
+   {
+    "spec_ref": "7 Pass rule 2: block-bootstrap P(Sharpe_cand - Sharpe_base > 0) >= 0.95 on phase-averaged daily returns, 30-day blocks, 2000 resamples, seed 0",
+    "file_lines": "metrics.py (new function after dsr, ~line 58); used from backtest.sweep",
+    "change": "`block_bootstrap_p(base: pd.Series, cand: pd.Series, block: int = 30, n_boot: int = 2000, seed: int = 0, periods_per_year: int = 365) -> float`. It is a verbatim port of research/2026-11-09-crypto-replays/power.py:93-101: `rng = np.random.default_rng(seed); starts = rng.integers(0, n - L, n // L + 1)`; concatenate the blocks, truncate to n, take Sharpe per column, and return the mean of (diff > 0). The input is the per-date mean of the 7 phases' daily returns for each profile, concat-aligned with dropna. That is why _daily must be dated.",
+    "stock_impact": "None; this is a new function.",
+    "test": "New: a deterministic result with seed 0 on a synthetic pair; identical series give P near 0.5 or below; a cand = base + 0.001/day series gives P near 1."
+   },
+   {
+    "spec_ref": "7 DSR: N = seeded trials (145 in state/crypto/trials.jsonl) + this sweep's rows; DSR of the shipped profile",
+    "file_lines": "backtest.py:167-175; __main__.py:116-118 (trials logging)",
+    "change": "\n- n_prev: `sum(t.get('n_trials', len(t['rows'])) for t in journal.read('trials.jsonl') if 'rows' in t)`. Old stock records have no 'n_trials', so the count is unchanged.\n- The crypto sweep log in __main__ writes 'n_trials' = number of job rows (variants x phases), the same unit as the seed (e.g. 2 profiles x 7 phases = 14).\n- For crypto, compute the DSR on the daily returns of the profile the pass rule ships, not always base phase 0. sr_trials_std should include the seeded rows' Sharpes, converted to per-period with that file's annualisation.\n- journal.read uses STATE, so under use_book('crypto') it reads state/crypto/trials.jsonl. trials.jsonl is not in journal.CHAINED, so the seed is a plain append.",
+    "stock_impact": "None for stocks if 'n_trials' is optional and the stock branch keeps len(srs).",
+    "test": "New: a seeded trials.jsonl in a tmp STATE with rows totalling 145 gives a DSR label 'N=145+k'. Existing: none."
+   },
+   {
+    "spec_ref": "7 missed-night robustness run, execution at t+1",
+    "file_lines": "backtest.py:28-29 (signature), 46, 53-61, 71-75",
+    "change": "Add `exec_lag: int = 1`. Store pending with due = i + exec_lag - 1 bars after the decision, and fill on the first bar whose index is >= due. Default 1 keeps the current behaviour: fill at the next bar. The definition is still open (see mismatches).",
+    "stock_impact": "None: the default is 1.",
+    "test": "New: with exec_lag=2, the first fill date is 2 bars after the first decision."
+   }
+  ],
+  "test_patch_points": [
+   "journal.STATE: every TempState test swaps it (test_cycle:15, test_audit_fixes:27, test_critic_fixes:20, test_news_rules:15, plus the subprocess at test_audit_fixes:155). backtest.run reads journal 'placebo.json' (line 39) and sweep reads 'trials.jsonl' (line 169) through it. Golden (a) must pin STATE to a temp dir or use weights_mode='prior', else the curve depends on the real state/placebo.json.",
+   "journal.now_utc: freeze it for golden (b). logged_at sits inside every hashed record, and __main__ sweep logging uses it too.",
+   "backtest._G: a module dict. Tests can populate {'panel','cfg','start','end','signals'} (plus new 'cfgs') and call backtest._job(args) in-process, with no pool.",
+   "backtest.ProcessPoolExecutor: NOT patchable today, because it is imported inside sweep() at line 141. Move it to module level or add an in-process path (workers=0) so sweep is testable without forking.",
+   "Module-level imported names in backtest that tests can patch: compute_all, precompute_aux, build_targets, walk_forward_weights, summary, PaperBroker, journal.",
+   "metrics.TD: read at call time by summary(). A new `periods_per_year: int = TD` default is bound at def time, so patching metrics.TD later will not change the default.",
+   "cycle module names tests patch (test_cycle.py:19-31): load_config, load_market, market_status, earnings_on, _overlays_once_per_day, _market_opened, _bar_is_final (patched as a ONE-arg lambda), official_opens. Also cycle.notify.send (test_audit_fixes:109) and report.ROOT (test_cycle:34-35). Broker call sites in cycle (175, 178, 210, 213, 245, 247-248, 271, 323-324) run under these patches.",
+   "news_live.live_price, news_live.market_open_now, news_live.official_opens, news_live.notify.send (test_audit_fixes:362-428, test_news_rules:18-19): the news book uses PaperBroker._fill directly. Any _fill change must keep its default-fee, step-1 behaviour.",
+   "Existing coverage of my files:\n- broker: test_core.Broker (3 tests: exact qty 49 and cash after slippage, no overspend, mark with yield); test_critic_fixes.DrawdownReentry (maybe_reset_peak positional args, halved-band assertion), LiveCooldown, SplitOnFillDay, ReduceOnlyInvariant.test_forced_shrink_trades_inside_the_band; test_review_fixes.CorporateActions (3), ExitsOnly; test_cycle.test_decide_then_fill_at_next_open_and_idempotent and test_one_minute_open_beats_daily_open (fill price = open*(1+slip)).\n- backtest: only test_core.TimeMachine.test_backtest_runs_and_executes_next_day (run, weights_mode='prior').\n- metrics: no direct tests. sweep, _job, _variants, psr, dsr: no tests at all.",
+   "tests/test_core.py:16 loads config.json raw as CFG (not via load_config). Once config.json gains 'books' and 'market', cfg_for() copies them. New code should use cfg.get('market', {}).get(...) defaults so older synthetic configs (and the replay scripts) keep working."
+  ],
+  "spec_mismatches": [
+   "Candidate dd_reentry_ref -0.25 equals the candidate dd_halve -0.25, so the peak reset lands exactly on the halving boundary. In a 10k-sample float check it read 'halved' every time. The stock design puts the reset mid-band (-0.15 between -0.10 and -0.20) so a small move cannot flip it. In the candidate the first up-day after re-entry flips halved->normal, and backtest.py:68 / cycle.py:253 treat that dd_state change as risk_changed and force an extra rebalance, costing 50 bp. The default formula would give -0.375 for the candidate. The -0.25 is needed only for crypto_base (dd_halve -1.0). Decide whether the candidate should use -0.25 deliberately, or the default.",
+   "broker.mark already has trading_days (broker.py:38). The spec's 'periods_per_year into broker.mark' is really a change at the call sites (backtest.py:62, cycle.py:247-248), not inside mark.",
+   "qty floor with qty_step: with step 1 the code must keep math.floor (an int). A float step (1.0) writes '49.0' into portfolio.json and the hash-chained trades.jsonl, which breaks 'stocks keep integer quantities, JSON unchanged'. With step 1e-6, floor(x/step)*step needs rounding (to 6 dp) plus a cost guard, or the cash can go an ulp negative.",
+   "'Fees are charged to cash and to realized P&L' does not say how BUY fills are treated: realized_pnl is 0.0 on buys today. Options: (a) BUY realized_pnl = -fee and avg_cost = fill price; (b) the fee folded into avg_cost. Option (b) changes pnl_pct in cycle.py:374, dashboard.py:73 and report.py:48. Pick one.",
+   "'fees_paid' and any per-fill 'fee' key must be written only when fee_bps > 0. The spec does not say so, but unconditional keys would change stock portfolio.json and the hashed trades.jsonl, and break the step-0 goldens.",
+   "Sweep architecture does not fit the section 7 runs as written.\n- sweep() takes one cfg plus overrides and pairs every variant with the variant literally named 'base' at phase k % base_every (backtest.py:152-156).\n- start and end are global (_G); _daily is kept only for base phase 0 as an undated list; DSR is computed only for base.\n- Section 7 needs two different profile configs, universe REPLACEMENT (_job's dict.update cannot remove ETH for 'no ETH'), per-variant windows (halves), per-variant pairing (cand@100bp vs base@100bp, half vs half), dated daily returns of all 7 phases of both profiles (phase-averaged bootstrap), and the DSR of the SHIPPED profile.\n- The spec does not mention any of this sweep rework.",
+   "'one missed-night robustness run, with execution at t+1': backtest.run already fills at the t+1 open (00:00 UTC open of D+1, plus exec_delay). It needs a definition: (a) every decision fills one bar later (t+2 open, an exec_lag param); or (b) one decision is skipped, and the idempotent live cycle then decides on the latest final bar, not D.",
+   "Pass rule 2 says 'on the phase-averaged daily returns ... as in replays/power.py', but power.py:89-101 bootstraps PHASE-0 returns only. Reuse its resampling loop (default_rng(0), integers(0, n-L, n//L+1), L=30, 2000 draws) on phase-averaged series.",
+   "DSR trial units are inconsistent.\n- The seed counts per-phase runs (2 profiles x 7 phases = 14; 8 x 3 x 4 = 96).\n- backtest.py:173 adds len(srs), the number of VARIANTS (medians).\n- n_prev (line 169) counts EVERY logged row, including benchmark rows and the DSR row itself. The real state/trials.jsonl records contain 'SPY buy&hold', 'Equal-weight universe' and 'DSR of base (N=..)' inside 'rows'.\nThe spec should fix the unit for the crypto 'this sweep's rows'.",
+   "The seed doc (research/2026-11-09-crypto-dsr-seed.md) says the cross-trial Sharpe spread uses the seeded rows that have a Sharpe. The code's sr_trials_std uses only this sweep's per-variant medians (backtest.py:170, 173). Seeded Sharpes are annualised (power.py uses sqrt(365)) and must be converted to per-period before mixing.",
+   "The BTC+XRP hindsight control contradicts the load-time assert in 3.1 (universe exactly {BTC, ETH} or {BTC}). It also needs XRP-USD in the panel, but __main__.py:113-114 loads load_market(cfg, '10y') from the active cfg's universe only. The sweep needs a union panel {BTC, ETH, XRP} and both profile configs (load_config(book)). Build the control as an in-sweep override that does not pass through the book assert.",
+   "'Each profile's panel is limited to its own universe (combine() scores every panel column)': combine scores every SIGNALS column (strategy.py:19). sweep computes _G['signals'] once on the full panel (backtest.py:143). The panel restriction alone excludes ETH through the px/vol 'ok' mask (strategy.py:111), but the signals dict should be restricted too, as '_etf' does by setting signals=None (backtest.py:126). The shared signals also assume both profiles use the same signal params (trend 50/200).",
+   "Ablation rule 'any component whose removal does not lower the median Sharpe is dropped' is ambiguous: compare sharpe_med(ablated) vs sharpe_med(candidate), or d_sharpe_med paired vs the candidate? Dropping two components at once creates an untested combination that needs a new run, which also adds trials to N.",
+   "apply_corporate_actions (broker.py:54-80) writes 'ca_applied_through' on every held position on every run (line 77) and floors split quantities to whole units (line 65). The spec gates corporate actions by market flag, but the change point is cycle.py:322-324, which calls it unconditionally. Without the gate, crypto positions gain the key.",
+   "Ordering differs between live and backtest. maybe_reset_peak runs BEFORE the mark live (cycle.py:245 then 247) and AFTER it in the backtest (backtest.py:62 then 65), so the reset eq uses different last_price values. After a flat breaker the crypto positions are empty, so the effect there is nil, but 'same regime/state in main, shadow, proposal and backtest' tests should not assume identical peak_equity on the reset bar.",
+   "Section 3.3 cites 'broker.py:128-137' for the stale-symbol sell path. The sell decision there comes from tw == 0 (line 128). rebalance itself already skips NaN prices at execution (124-126), so the freeze must be applied at decision time (targets) and/or through a new rebalance(frozen=...) param. Setting the fill-time price to NaN alone would not express 'held keeps its weight' in the preview or the shadow book."
+  ]
+ },
+ {
+  "interfaces": [
+   {
+    "file": "aitrader/strategy.py",
+    "symbol": "ETF_SECTORS",
+    "signature": "ETF_SECTORS = {\"Index\", \"SectorETF\", \"Bonds\", \"Gold\"}",
+    "lines": "10",
+    "notes": "Module constant. Read at strategy.py:142 (ETF cap). Also imported by name in cycle.py:260 (`from .strategy import ETF_SECTORS`, earnings blackout at 262/267). Keep the name when the list moves to config, or cycle.py breaks. Duplicates elsewhere: news_live.py:34 ETF, dashboard.py:21 ETF, backtest.py:122 literal tuple."
+   },
+   {
+    "file": "aitrader/strategy.py",
+    "symbol": "combine",
+    "signature": "combine(signals: dict[str, pd.DataFrame], weights: dict[str, float], date) -> pd.Series",
+    "lines": "13-29",
+    "notes": "Weighted mean score per panel column on `date`. Skips names missing from `signals` or with w <= 0, so zero priors cost nothing. score = num/den, so it does not care what the priors sum to. Sets NaN where available weight < 0.5 * total (line 28). Scores EVERY column of the signal frames, i.e. every panel column; there is no universe filter. Called from build_targets:97 and cycle.py:284 (record_predictions)."
+   },
+   {
+    "file": "aitrader/strategy.py",
+    "symbol": "_cap_weights",
+    "signature": "_cap_weights(w: pd.Series, caps: pd.Series, sectors: pd.Series, sector_cap: float, iters: int = 20) -> pd.Series",
+    "lines": "32-52",
+    "notes": "Water-filling to per-name and per-sector caps. Covered by test_core.Portfolio.test_caps_respected (tests/test_core.py:101-107)."
+   },
+   {
+    "file": "aitrader/strategy.py",
+    "symbol": "precompute_aux",
+    "signature": "precompute_aux(panel: dict, cfg: dict) -> dict",
+    "lines": "55-68",
+    "notes": "Returns {vol: realized_vol(close, risk.vol_lookback_days), vol_long: realized_vol(close, risk.get('lowvol_exclude_lookback', 252)), atr: atr(high, low, close, risk.atr_days), rets: returns(close)}, plus bench_sma = close[bench].rolling(regime_sma_days, min_periods=regime_sma_days).mean() only when the benchmark (cfg.get('benchmark','SPY')) is a panel column (line 66-67). Backward-looking only. Spec change point for aux['regime']."
+   },
+   {
+    "file": "aitrader/strategy.py",
+    "symbol": "build_targets",
+    "signature": "build_targets(date, panel: dict, signals: dict[str, pd.DataFrame], weights: dict[str, float], cfg: dict, equity_peak_ratio: float, held: dict, blocked: set | None = None, aux: dict | None = None) -> tuple[dict[str, float], dict]",
+    "lines": "71-196",
+    "notes": "Order: aux default (96) -> score = combine().dropna() (97) -> ATR trailing stop over `held` (100-107: stop = peak_close - atr_stop_mult*ATR; atr_stop_mult=0 makes stop = peak, so every dip fires) -> rank and keep/new hysteresis (111-125) -> lowvol filter with hard-coded `len(vl) >= 10` (118-121) -> diag base (127-134) -> NO-PICKS EARLY RETURN (135-137): diag gets regime 'n/a' and gross 0.0 only, with no dd_state and no drawdown -> inverse-vol weights (139-140) -> caps (141-144) -> vol target cov * TRADING_DAYS (147-150) -> offset regime inline from aux['bench_sma'] and px[bench], fails closed to 'risk_off(no-data)' (152-159) -> VIX defensive, active when risk.defensive_vix_pct is truthy and (panel['vix'] or panel['_require_vix']) (162-168) -> drawdown breaker dd_flat then dd_halve (171-177) -> scale and re-cap with no redistribution (180-183). The picks path returns diag keys date, n_scored, n_eligible, stopped, top_scores, bottom_scores, regime, drawdown, dd_state, ex_ante_vol_unscaled, scale, gross, targets. diag goes into decisions.jsonl (hashed, golden), so stock key set and order must not change."
+   },
+   {
+    "file": "aitrader/signals.py",
+    "symbol": "TRADING_DAYS",
+    "signature": "TRADING_DAYS = 252",
+    "lines": "13",
+    "notes": "Used in realized_vol (29), tsmom (44), and imported into strategy.py:8 for cov (148)."
+   },
+   {
+    "file": "aitrader/signals.py",
+    "symbol": "realized_vol / returns / atr / _xs_z",
+    "signature": "returns(close) -> DataFrame; realized_vol(close: DataFrame, days: int = 60) -> DataFrame; atr(high, low, close, days: int = 14) -> DataFrame; _xs_z(df, clip: float = 3.0) -> DataFrame",
+    "lines": "16-36",
+    "notes": "realized_vol = pct_change rolling std (min_periods=int(days*0.7)) * sqrt(252). Checked every use against the spec's claim that 252 is scale-invariant: tsmom horizon_vol = vol*sqrt((L-s)/252) = sd*sqrt(L-s), so it cancels; lowvol goes through _xs_z, invariant; strategy aux['vol'] is used only as gt(0) (111) and in inverse-vol normalisation (139-140); vol_long only in a quantile (121). The claim holds. _xs_z on a 1-column panel gives NaN (std ddof=1); on 2 columns z = +/-0.707."
+   },
+   {
+    "file": "aitrader/signals.py",
+    "symbol": "signal functions",
+    "signature": "tsmom(p, lookback=252, skip=21); xsmom(p, lookback=252, skip=21); trend(p, fast=50, slow=200); reversal(p, lookback=5); lowvol(p, lookback=60); high52(p, lookback=252); breakout(p, lookback=55); rsi2(p, period=2, trend_sma=200) -> DataFrame",
+    "lines": "39-100",
+    "notes": "Crypto params (tsmom 365/30, trend 50/200, breakout 80) map 1:1 onto kwargs. tsmom needs `lookback` bars (shift) and realized_vol min_periods int(0.7*lookback); trend needs `slow`; breakout needs `lookback`."
+   },
+   {
+    "file": "aitrader/signals.py",
+    "symbol": "REGISTRY / compute_all",
+    "signature": "REGISTRY: dict[str, callable] (tsmom, xsmom, trend, reversal, lowvol, high52, breakout, rsi2); compute_all(panel: dict, cfg: dict) -> dict[str, pd.DataFrame]",
+    "lines": "103-121",
+    "notes": "The only reader of the `signals` config: params = cfg.get('signals', {}).get(name, {}) (119). A signal missing from a replaced `signals` block silently falls back to the function defaults. All 8 are always computed, whatever their weight; output is float64 clipped to [-1, 1]. REGISTRY is what the load-time prior assert should compare against (stock priors name all 8 and sum to exactly 1.0, checked)."
+   },
+   {
+    "file": "aitrader/learn.py",
+    "symbol": "forward_excess / _row_spearman / ic_table",
+    "signature": "forward_excess(close: DataFrame, horizon: int) -> DataFrame; _row_spearman(a: np.ndarray, b: np.ndarray, min_n: int = 10) -> float; ic_table(signals: dict[str, DataFrame], close: DataFrame, horizon: int) -> DataFrame",
+    "lines": "15-40",
+    "notes": "ic_table calls _row_spearman with the default min_n=10 (line 39); that default is the hard-coded 10-name minimum. With 1-2 coins every IC is NaN, so signal_stats returns an empty frame and update_weights returns `current` unchanged."
+   },
+   {
+    "file": "aitrader/learn.py",
+    "symbol": "signal_stats / shrunk_z",
+    "signature": "signal_stats(ic: DataFrame, asof_pos: int, horizon: int, half_life: float) -> DataFrame; shrunk_z(row, L: dict) -> float",
+    "lines": "43-80",
+    "notes": "signal_stats returns an empty DataFrame when nothing has matured or all rows are NaN (48-50). shrunk_z reads L['ic_sd_floor'], L['tau'], L['z_cap']."
+   },
+   {
+    "file": "aitrader/learn.py",
+    "symbol": "update_weights",
+    "signature": "update_weights(current: dict, prior: dict, stats: pd.DataFrame, cfg: dict, gate: float | None = None) -> tuple[dict, dict]",
+    "lines": "83-112",
+    "notes": "Reads cfg['learning'] keys min_n_eff, eta, weight_floor, weight_cap, max_step. Returns (dict(current), note) when stats.empty (87-88). band = (max(floor, 0.5p), min(cap, 2p)) (103) clips even 'prior' targets: a prior above weight_cap 0.35 (crypto tsmom 0.385) would be pulled down with no evidence if learning ever ran with non-empty stats."
+   },
+   {
+    "file": "aitrader/learn.py",
+    "symbol": "placebo_gate / walk_forward_weights",
+    "signature": "placebo_gate(signals: dict, close: DataFrame, cfg: dict, k: int = 100, seed: int = 7) -> dict; walk_forward_weights(signals, close, prior, cfg, dates, every: int | None = None, gate: float | None = None) -> dict",
+    "lines": "115-149",
+    "notes": "walk_forward_weights is called by backtest.run:40 (weights_mode 'learned') and cycle._learn:44 (bootstrap). Both callers read the gate from journal.load_json('placebo.json') under journal.STATE. placebo_gate is only reached through the CLI `placebo` command (__main__.py:196-207), which is not on the --book crypto list."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_learn",
+    "signature": "_learn(signals, close, cfg, ds: str) -> dict",
+    "lines": "37-57",
+    "notes": "Reads cfg['prior_weights'] and cfg['learning'] (update_every_days, primary_horizon_days, ic_half_life_days). Bootstraps walk-forward when weights.json is missing. Always saves weights.json (56) and appends learning.jsonl on bootstrap or update. The spec's learning.enabled check goes here."
+   },
+   {
+    "file": "aitrader/backtest.py",
+    "symbol": "run / _job / sweep",
+    "signature": "run(panel: dict, cfg: dict, start: str, end: str | None = None, weights_mode: str = 'learned', rebalance_every: int | None = None, signals: dict | None = None, aux: dict | None = None, phase: int = 0) -> dict; _job(args) -> dict; sweep(panel: dict, cfg: dict, start: str, end: str | None = None, workers: int = 4) -> pd.DataFrame",
+    "lines": "28-93, 117-135, 138-176",
+    "notes": "run reads prior_weights (37), the learned/prior switch (38-42) and risk keys (36, 44, 57-58, 65). It calls maybe_reset_peak(..., r['dd_halve'], r['dd_flat']) at 65. sweep computes signals ONCE from the base cfg (143) and _job reuses them (120) except in the _etf variant, which slices the panel and universe and sets signals=None (121-126). That slice is the precedent for per-profile panels."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "load_config / load_market",
+    "signature": "load_config() -> dict; load_market(cfg: dict, rng: str = '10y', max_age_hours: float = 6.0) -> dict",
+    "lines": "236-237, 253-262",
+    "notes": "load_config is raw json.loads today, with no merge or asserts. load_market sets panel['_require_vix'] = True unconditionally (256), which turns on strategy.py:163 for any book with a truthy risk.defensive_vix_pct. The backtest CLI also uses load_market(cfg, '10y') (__main__.py:114)."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "maybe_reset_peak",
+    "signature": "maybe_reset_peak(self, regime: str, date: str, days_required: int = 20, dd_halve: float = -0.10, dd_flat: float = -0.20) -> bool",
+    "lines": "82-97",
+    "notes": "Line 93 is the re-entry reference, peak = eq / (1 + (dd_halve + dd_flat)/2). Pops riskon_streak whenever state dd_state != 'flat' (86-88). Counts the streak with regime.startswith('risk_on'). Callers: backtest.py:65 and cycle.py:245."
+   }
+  ],
+  "changes": [
+   {
+    "spec_ref": "3.3 periods_per_year (strategy.py:148)",
+    "file_lines": "aitrader/strategy.py:148",
+    "change": "cov = rets.cov().values * cfg.get(\"market\", {}).get(\"periods_per_year\", TRADING_DAYS). Read it from cfg, because build_targets has no calendar object. Leave the signals.py:29 annualisation alone: the spec's scale-invariance claim checks out (see interfaces).",
+    "stock_impact": "None. Stock market.periods_per_year = 252 (int) multiplies exactly as TRADING_DAYS does, so the output is bitwise identical.",
+    "test": "New: same panel and cfg with ppy 365 vs 252 -> diag ex_ante_vol_unscaled ratio == sqrt(365/252) (~1.2035) and gross smaller when the vol target binds. Existing: test_core.test_gross_never_exceeds_max, test_review_fixes.test_scale_up_never_breaches_caps."
+   },
+   {
+    "spec_ref": "3.3 atr_stop_mult = 0 means no stop",
+    "file_lines": "aitrader/strategy.py:103-107",
+    "change": "Line 103: `for sym, pos in (held.items() if r[\"atr_stop_mult\"] > 0 else ()):`. Today 0 gives stop = peak_close, so every close below the peak fires.",
+    "stock_impact": "None (atr_stop_mult 3.0).",
+    "test": "New: held={'BTC-USD': {'peak_close': px*1.05}} -> stopped == [] with mult 0, and == ['BTC-USD'] with mult 3 and a tiny ATR. No existing test passes a non-empty `held` to build_targets; the stop path is only exercised, not asserted, in test_cycle's second decision."
+   },
+   {
+    "spec_ref": "3.3 risk.max_position_pct_by_symbol",
+    "file_lines": "aitrader/strategy.py:141-142",
+    "change": "by_sym = r.get(\"max_position_pct_by_symbol\", {}); caps = pd.Series({s: by_sym.get(s, r[\"max_etf_position_pct\"] if secs[s] in etf else r[\"max_position_pct\"]) for s in w.index}). The same caps feed the post-scale clip at line 180, so no second edit is needed.",
+    "stock_impact": "None (key absent, so the default expression applies).",
+    "test": "New: crypto cfg with target_vol 5.0 -> ETH-USD <= 0.6 and BTC-USD <= 1.0 on several dates. Existing regression: test_review_fixes.RiskCaps.test_scale_up_never_breaches_caps."
+   },
+   {
+    "spec_ref": "3.3 Regime: risk.regime_band_mode 'hysteresis', computed in precompute_aux, read before the no-picks return",
+    "file_lines": "aitrader/strategy.py:55-68 (new helper + line after 67); 96-98; 135-137; 152-159",
+    "change": "Add the helper `_hysteresis_regime(px: pd.Series, sma: pd.Series, band: float) -> pd.Series`, a causal loop ported from research/2026-11-09-crypto-replays/power.py:27-35. It returns object values 'risk_on' / 'risk_off' / 'risk_off(no-data)'. The first valid bar is on if c >= m*(1-band); after that it goes off below m*(1-band) and back on only above m*(1+band); a NaN close or NaN SMA gives 'risk_off(no-data)' and the state carries over. precompute_aux after line 67: `if r.get(\"regime_band_mode\", \"offset\") == \"hysteresis\": aux[\"regime\"] = _hysteresis_regime(close[bench], aux[\"bench_sma\"], r.get(\"regime_band_pct\", 0.0))`. build_targets after line 98: `hyst = r.get(\"regime_band_mode\", \"offset\") == \"hysteresis\"`; `regime0 = (aux[\"regime\"].get(date, \"risk_off(no-data)\") if \"regime\" in aux else \"risk_off(no-data)\") if hyst else None`. Line 136: `\"regime\": regime0 if hyst else \"n/a\"`. Lines 152-159: `if hyst: regime = regime0; if regime != \"risk_on\": scale *= r[\"risk_off_gross_mult\"]`, else the existing offset block verbatim. Note that aux=None calls (test_drawdown_breaker_goes_flat) go through precompute_aux, so they still work.",
+    "stock_impact": "None if the 'always filled' gate is the mode (or a market flag that is false for stocks). Stocks keep 'n/a' on no-picks days, which cycle.py:253 risk_changed and the golden output depend on.",
+    "test": "New: switch counts on a synthetic sine-around-SMA series (offset rule vs hysteresis); initial state; NaN close -> no-data; no-picks diag regime filled under hysteresis and 'n/a' under offset (stock regression); look-ahead: aux['regime'] at t equal on full vs truncated panel; main and shadow share aux in cycle._decide:237, so a single equality check covers both. Existing: test_review_fixes.test_regime_fails_closed_without_benchmark (offset path)."
+   },
+   {
+    "spec_ref": "3.3 drawdown re-entry 'in both profiles' (spec gap, see mismatches)",
+    "file_lines": "aitrader/strategy.py:135-137 and 170-177",
+    "change": "Under the same gate as the regime (hysteresis/crypto): compute dd = equity_peak_ratio - 1 and dd_state (flat/halved/normal) BEFORE the no-picks return, and put 'drawdown' and 'dd_state' into the no-picks diag. Otherwise cycle.py:281 and backtest.py:69 store dd_state None, and broker.maybe_reset_peak:86-88 drops a 'flat' streak.",
+    "stock_impact": "None (gated; the stock no-picks diag keeps exactly date..bottom_scores, regime 'n/a', gross).",
+    "test": "New: equity_peak_ratio 0.45 with all scores below min_score -> diag dd_state 'flat'. Backtest re-entry: after dd_reentry_days risk-on decisions the book trades again, crypto and crypto_base, including no-picks days in between."
+   },
+   {
+    "spec_ref": "3.3 group/ETF lists moved to config (strategy.py:10)",
+    "file_lines": "aitrader/strategy.py:10, 142",
+    "change": "Keep `ETF_SECTORS` as the fallback constant (cycle.py:260 imports it). At line 141: `etf = set(cfg.get(\"market\", {}).get(\"etf_groups\", ETF_SECTORS))` and use `secs[s] in etf` at 142. The key name is not given in the spec; `market.etf_groups` is a proposal. Crypto should set [] explicitly, since market merges key by key.",
+    "stock_impact": "None (same four groups).",
+    "test": "Existing: test_review_fixes.RiskCaps.test_scale_up_never_breaches_caps (SPY 'Index' gets the 0.2 cap)."
+   },
+   {
+    "spec_ref": "3.3 10-name minimums to config (strategy.py:120, learn.py:21)",
+    "file_lines": "aitrader/strategy.py:120; aitrader/learn.py:21, 32-39, 125, 129, 140; aitrader/cycle.py:50",
+    "change": "strategy:120 `if len(vl) >= r.get(\"lowvol_exclude_min_names\", 10):`. learn: `ic_table(signals, close, horizon: int, min_n: int = 10)`, passing min_n to _row_spearman at line 39. Pass `L.get(\"ic_min_names\", 10)` from placebo_gate (125, 129), walk_forward_weights (140) and cycle._learn (cycle.py:50). Key names are proposals, the spec does not name them. For crypto both branches are unreachable (lowvol_exclude_top_pct 0, learning off), so this is rule-5 hygiene only.",
+    "stock_impact": "None (defaults 10).",
+    "test": "Existing: test_core.NoLookahead.test_learning_uses_only_matured_outcomes (ic_table, signal_stats)."
+   },
+   {
+    "spec_ref": "3.3 learning.enabled (checked in backtest.run and cycle._learn)",
+    "file_lines": "aitrader/backtest.py:38; aitrader/cycle.py:37-39",
+    "change": "backtest:38 `if weights_mode == \"learned\" and cfg[\"learning\"].get(\"enabled\", True):` (else wmap = prior). cycle._learn first statement: `if not cfg[\"learning\"].get(\"enabled\", True): return dict(cfg[\"prior_weights\"])`, which writes no weights.json and no learning.jsonl. cycle.py:241/338 and dashboard.py:203 already fall back to cfg['prior_weights'] when weights.json is missing.",
+    "stock_impact": "None (default True).",
+    "test": "New: crypto backtest res['final_weights'] == prior; after a crypto run_cycle in tmp STATE there is no weights.json/learning.jsonl. Existing: test_cycle (bootstrap path through walk_forward_weights)."
+   },
+   {
+    "spec_ref": "3.3 each profile's panel limited to its own universe; crypto_base never holds ETH",
+    "file_lines": "aitrader/backtest.py:117-130, 143 (primary); optional guard aitrader/strategy.py:97",
+    "change": "In the sweep job, slice the panel to list(c['universe']) per profile and recompute signals (signals=None), as the _etf variant does at 121-126. Optional one-line guard in build_targets after 97: `score = score[score.index.isin(list(sectors_map))]`. Panel-level slicing is still needed, because backtest.run:81 (equal-weight benchmark) and the cross-sectional signals use every column.",
+    "stock_impact": "None. Live load_market fetches only universe symbols; tests set universe = panel columns (test_core.cfg_for); test_regime_fails_closed drops SPY from the panel, so the panel is a subset of the universe.",
+    "test": "New: crypto_base cfg on a BTC+ETH panel -> no 'ETH-USD' in any target or in final_positions."
+   },
+   {
+    "spec_ref": "3.1 assert priors name every registered signal and sum to 1",
+    "file_lines": "aitrader/data.py:236-237 (load_config) using aitrader/signals.py:103-112 REGISTRY",
+    "change": "assert set(cfg['prior_weights']) == set(REGISTRY) and abs(sum(...) - 1) < tol. Importing signals from data.py is cycle-free (signals imports only numpy/pandas). Note: crypto 0.385/0.308/0.308 sums to 1.001 (see mismatches).",
+    "stock_impact": "None (8 names, sum == 1.0 exactly, checked).",
+    "test": "New: merge-rule asserts for stocks, crypto and crypto_base; a missing name or bad sum raises."
+   },
+   {
+    "spec_ref": "3.3 Grading horizons 7/30/90 calendar days",
+    "file_lines": "aitrader/cycle.py:286 reads cfg['learning']['horizons_days']; aitrader/journal.py:312-314 counts horizon in bars",
+    "change": "The books.crypto (and crypto_base) learning block must set horizons_days [7, 30, 90]. learning merges key by key, so it would otherwise inherit [5, 20, 60]. On the UTC daily calendar, bars equal calendar days, so the journal needs no change for the horizon unit.",
+    "stock_impact": "None.",
+    "test": "New: crypto record_predictions writes horizons 7/30/90; graded on absolute return (journal change, outside these files)."
+   },
+   {
+    "spec_ref": "3.3 market.vix flag; crypto risk block lists every key",
+    "file_lines": "aitrader/strategy.py:162-168 (condition); gate in aitrader/data.py:253-262 (load_market sets _require_vix at 256)",
+    "change": "Gate the VIX fetch and `_require_vix` in load_market on cfg['market']['vix']. strategy.py:163 is then false for crypto with no edit. Belt and braces: give books.crypto.risk an explicit defensive_vix_pct 0, because the spec's key list omits it and key-by-key merge inherits 0.8.",
+    "stock_impact": "None (vix true).",
+    "test": "New: crypto panel via a load_market stub -> 'defensive' never in diag['regime'], weekends included. Existing: test_critic_fixes.VixFailClosed, test_review_fixes.test_missing_vix_today_is_defensive."
+   },
+   {
+    "spec_ref": "3.3 risk.dd_reentry_ref; dd_halve -1.0 = no halving",
+    "file_lines": "strategy.py:171-177 (no change); callers aitrader/backtest.py:65, aitrader/cycle.py:245 -> broker.py:93",
+    "change": "No strategy edit: dd_flat is tested first (173), and dd <= -1.0 can never hold at 175, so dd_halve -1.0 already means 'no halving'. The two callers must pass r.get('dd_reentry_ref', (r['dd_halve'] + r['dd_flat'])/2) into maybe_reset_peak, which uses it at line 93.",
+    "stock_impact": "None (default = current midpoint -0.15).",
+    "test": "See the re-entry test above (both profiles)."
+   },
+   {
+    "spec_ref": "4 stale symbol freeze (stock + crypto); cites strategy.py:115",
+    "file_lines": "aitrader/cycle.py:250-258 (after build_targets); strategy.py unchanged",
+    "change": "build_targets cannot do this: it does not know current weights. In cycle._decide after line 250: for each frozen symbol, a held one gets targets_raw[s] = m.weights(px)[s] and a non-held one is popped. Remove frozen symbols from diag['stopped'] / `stopped` and from sdiag stopped_shadow, because the stop check at strategy.py:103-107 runs on the partial bar. Replacing one target can move gross by (current - computed) for that name.",
+    "stock_impact": "The one intended stock change. No effect when nothing is stale, so golden (b) still matches if its stub reports no stale symbols.",
+    "test": "New: a held stale symbol is not sold on a rebalance day and is not stopped."
+   },
+   {
+    "spec_ref": "2.1 / 7 step 0 golden byte-identity",
+    "file_lines": "aitrader/strategy.py:127-195 (diag dict)",
+    "change": "Any new diag field, such as the dashboard regime gauge (bench px, SMA, line distance, hysteresis state), must be added only under the crypto/hysteresis gate. diag goes into decisions.jsonl, which is hash-chained and compared byte for byte.",
+    "stock_impact": "Must be none.",
+    "test": "Golden (b) scripted live-cycle run."
+   }
+  ],
+  "test_patch_points": [
+   "No test patches any name in strategy.py, signals.py or learn.py; tests import and call them directly: test_core.py:11-14 (backtest, learn, compute_all, _cap_weights, build_targets, precompute_aux), test_review_fixes.py:9-10, test_critic_fixes.py:11-12.",
+   "tests/test_core.py:16 CFG = json.loads(config.json): the raw file, not load_config(). Once 'books' and the stock 'market' block are added, CFG carries them, so strategy must read market keys from the cfg passed in (with .get defaults). cfg_for(panel) at test_core.py:33-36 deep-copies CFG and replaces the universe.",
+   "tests/test_core.py:19-30 synthetic_panel(n_days=700, n_syms=30, seed=0) uses pd.bdate_range with columns SPY, S00..; crypto tests need a calendar-day variant (pd.date_range freq='D') with BTC-USD/ETH-USD columns and a merged crypto cfg.",
+   "Existing coverage, strategy: test_core.NoLookahead.test_targets_ignore_the_future (63-74), Portfolio.test_caps_respected (101-107), test_gross_never_exceeds_max (109-116), test_drawdown_breaker_goes_flat (118-124, aux=None path); test_review_fixes.RiskCaps.test_scale_up_never_breaches_caps (60-70), test_regime_fails_closed_without_benchmark (72-78), test_missing_vix_today_is_defensive (80-87); test_critic_fixes.VixFailClosed (101-107). Signals: test_core.test_signals_ignore_the_future (40-48). Learn: test_core.test_learning_uses_only_matured_outcomes (50-61).",
+   "Coverage gaps: no build_targets test passes a non-empty `held`, so the stop and keep logic (strategy.py:100-115) is never asserted. regime_band_pct (offset band) is never asserted. update_weights, shrunk_z, placebo_gate and walk_forward_weights have no direct unit test: walk_forward runs only through cycle._learn's bootstrap in test_cycle, and test_core.TimeMachine uses weights_mode='prior'.",
+   "cycle names patched by tests (keep them module-level): test_cycle.py:19-31 load_config (zero-arg lambda), load_market, market_status, earnings_on, _overlays_once_per_day, _market_opened, _bar_is_final, official_opens; journal.STATE (test_cycle:15, test_audit_fixes:27, test_critic_fixes:20, test_news_rules:15, plus the subprocess at test_audit_fixes:155); report.ROOT (test_cycle:34-35); cycle.load_market and cycle.notify.send (test_audit_fixes:106-110).",
+   "research/2026-11-09-crypto-replays/nopicks.py:16 patches backtest.build_targets (backtest imports it by name at backtest.py:21). power.py:64-65 and ablate.py:16 inject hysteresis by overwriting aux['bench_sma'] with 1e-9/1e18. They set no regime_band_mode, so they stay on the offset path and keep working after the change.",
+   "Golden (a), the stock backtest equity curve: backtest.run in 'learned' mode reads journal.load_json('placebo.json') under journal.STATE (backtest.py:39). Pin journal.STATE to a tmp dir (or use weights_mode='prior'), or the golden depends on the real state/placebo.json. cycle._learn reads the same file (cycle.py:44, 52).",
+   "Look-ahead tests for crypto: reuse the pattern of test_core.py:63-74 (compute_all + precompute_aux on the full vs the .loc[:d] panel) and add an aux['regime'] equality check. Use the same history start in both, because the first valid SMA bar fixes the initial hysteresis state."
+  ],
+  "spec_mismatches": [
+   "Crypto priors 0.385 + 0.308 + 0.308 = 1.001 (computed), so the section 3.1 'sum to 1' assert fails unless tol >= 1e-3. The exact renormalised values are 5/13, 4/13, 4/13; use 0.3846/0.3077/0.3077 (sum 1.0000). combine() does not care what the priors sum to (num/den), so only the assert is affected.",
+   "Section 2.1 says 'regime always filled' is gated to crypto by its market flags, but none of the five named flags (vix, earnings_blackout, overlays, corporate_actions, news_engine) covers it, and section 3.3 says build_targets 'always fills diag[\"regime\"]'. The stock 'n/a' on no-picks days (strategy.py:136) feeds cycle.py:253 risk_changed and golden (b), so it must stay. A named gate is needed: regime_band_mode == 'hysteresis' (no new key) or a new market key.",
+   "The hysteresis initial state and NaN handling are not specified. The replay (power.py:27-35) starts 'on' if close >= SMA*(1-band) at the first valid SMA bar, keeps the state through NaN, and is fail-OPEN on a NaN close (the state is kept). The engine today fails closed on a NaN benchmark (strategy.py:157-158 -> 'risk_off(no-data)'). The spec should say: a NaN close or SMA gives 'risk_off(no-data)' for that bar, and the state carries over.",
+   "No-picks diag also lacks dd_state and drawdown (strategy.py:135-137). cycle.py:281 and backtest.py:69 then store dd_state None, and broker.maybe_reset_peak (broker.py:86-88) drops riskon_streak, so a 'flat' book loses its flat state on any no-picks day. cycle.py:294-295 also emits a 'normal -> None' drawdown event, and cycle.py:253 counts it as a risk change. The crypto candidate (min_score 0.15) will have many no-picks days in bear markets: re-entry streaks reset and night-alert spam follows. The spec's re-entry test 'in both profiles' may fail for the candidate unless dd_state is filled on the no-picks path under the crypto gate.",
+   "'The crypto risk block lists every key it uses' omits keys the code actually reads: defensive_vix_pct and defensive_gross_mult (strategy.py:163-168, live whenever the panel has _require_vix, which data.load_market:256 sets unconditionally; the backtest CLI uses load_market at __main__.py:114), max_etf_position_pct (strategy.py:142), lowvol_exclude_lookback (strategy.py:62), earnings_blackout_days and earnings_max_position_pct (cycle.py:259, 265). dd_reentry_ref and the new min-names keys are also outside the backtick list. Key-by-key merge inherits the stock values silently; at least set defensive_vix_pct 0 explicitly or gate load_market on market.vix.",
+   "'ETH signals need 365 bars, so ETH contributes from late 2018' is not what the code does. combine() needs only half the prior weight (strategy.py:26-28), and trend + breakout = 0.616 > 0.5, so ETH is scored and can be bought from about bar 200 (around 2018-05-27; Yahoo ETH-USD starts 2017-11-09) on trend and breakout alone, before tsmom exists. This is consistent with band_check.txt (ETH from 2018-06-01).",
+   "backtest.sweep computes signals once from the base cfg (backtest.py:143) and _job reuses them for every variant (backtest.py:120), except the _etf variant. crypto and crypto_base have different panels and possibly different `signals` blocks (replaced, not merged), so signals must be recomputed per profile. If the crypto_base block omits `signals`, it inherits the stock params (tsmom 252/21, breakout 55); harmless only because trend is its sole non-zero weight and trend params are the same.",
+   "periods_per_year is put on the calendar interface (3.2) and into strategy.py:148 (3.3), but build_targets receives only cfg, not a calendar. Use one source, cfg['market']['periods_per_year'], and have the calendar read the same key.",
+   "The spec does not name the config keys for the ETF/group list or the two 10-name minimums (strategy.py:120, learn.py:21). Proposals: market.etf_groups, risk.lowvol_exclude_min_names, learning.ic_min_names. For crypto both minimums are unreachable (lowvol_exclude_top_pct 0, learning off).",
+   "The replays do not use the spec profiles: power.py uses priors 0.35/0.35/0.30 (spec 0.385/0.308/0.308), breakout lookback 55 (spec 80; power.py sets only tsmom), base exit_score -1.0 (spec -1.01), stop off via atr_stop_mult 1e9 (spec 0 plus a code change), base breaker off (-0.99/-0.999) where the spec has a -50% catastrophe step (ablate2 covers it), and a vol target of 0.30/1.2035 in place of periods_per_year. The spec already calls the replays design inputs, but the sweep will not reproduce their numbers.",
+   "learning.weight_cap 0.35 (inherited) is below the crypto tsmom prior 0.385. If learning ever runs with non-empty stats (for example the min-names key lowered for crypto), update_weights' band (learn.py:103-104) clips tsmom below its prior with no evidence. This is moot while learning.enabled is false, and with 1-2 coins the ICs are NaN anyway (stats empty -> weights unchanged).",
+   "Hysteresis state depends on the history start, because the initial state is set at the first valid SMA bar. The backtest CLI loads load_market(cfg, '10y') (__main__.py:114) while live uses period1=0 (section 4). For 'the same regime on the same date in main, shadow, proposal and backtest', both must load the same history start, or the test must compare on one panel."
+  ]
+ },
+ {
+  "interfaces": [
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "ROOT, STATE",
+    "signature": "ROOT: Path = Path(__file__).resolve().parent.parent; STATE: Path = ROOT / \"state\"",
+    "lines": "19-20",
+    "notes": "Module global. Every test with temp state swaps it (test_cycle.py:14-15/40, test_audit_fixes.py:26-30 and the subprocess at :155, test_critic_fixes.py:19-23, test_news_rules.py:14-15/25). All callers read it through journal._path at call time (no module imports STATE by value; grep shows no `from .journal import`), so use_book can reassign it."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "_path",
+    "signature": "_path(name: str) -> Path",
+    "lines": "23-25",
+    "notes": "Calls STATE.mkdir(exist_ok=True) with no parents=True, then returns STATE/name. read, load_json, verify_chain etc. all go through it, so even reads create the dir."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "now_utc",
+    "signature": "now_utc() -> str",
+    "lines": "28-29",
+    "notes": "ISO string with seconds and +00:00. It ends up in logged_at inside every hashed record. Journal calls it as a module global (record_predictions at :231), so patching journal.now_utc freezes all callers. This is the golden (b) patch point."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "CHAINED / NEWS_CHAINED / MAIN_CHAINED",
+    "signature": "set[str]",
+    "lines": "32-35",
+    "notes": "verify (__main__.py:156) iterates CHAINED. cycle.py:301 checks MAIN_CHAINED."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "_calendar / calendar_covers / session_hours",
+    "signature": "_calendar() -> dict; calendar_covers(day) -> bool; session_hours(day) -> tuple[tuple[int,int],tuple[int,int]] | None",
+    "lines": "38-58",
+    "notes": "Reads ROOT/config.json['calendar'] raw, not through load_config, so `calendar` must stay top-level. NYSE only: weekends, holidays and uncovered years return None."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "append / verify_chain / broken_chains",
+    "signature": "append(name: str, record: dict) -> None; verify_chain(name: str) -> tuple[bool, int]; broken_chains(names=None) -> list[str]",
+    "lines": "116-138, 141-168, 288-290",
+    "notes": "Hash chain per file under the current STATE, so a crypto STATE gets its own chains with no code change."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "read / write_all / load_json / save_json",
+    "signature": "read(name) -> list[dict]; write_all(name, records) -> None; load_json(name, default=None); save_json(name, obj) -> None",
+    "lines": "182-213",
+    "notes": "save_json writes atomically (tmp then replace), indent=2, ensure_ascii=False, trailing newline. There is no delete helper today."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "record_predictions",
+    "signature": "record_predictions(date: str, score: pd.Series, components: dict[str, pd.Series], prices: dict, bench_px: float, horizons: list[int], held: list[str], top_n: int = 10, source: str = \"quant\") -> int",
+    "lines": "216-238",
+    "notes": "Logs once per (date, symbol, horizon, source). Horizons come from cfg['learning']['horizons_days'] via cycle.py:286, so crypto 7/30/90 is a config change only."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "_ny_time / _next_bar / _entry_bar",
+    "signature": "_ny_time(stamp) -> pd.Timestamp | None; _next_bar(idx, after, inclusive: bool) -> (Timestamp|None, int|None); _entry_bar(p: dict, idx: pd.DatetimeIndex) -> (Timestamp|None, int|None)",
+    "lines": "241-249, 252-254, 257-285",
+    "notes": "Entry rule for non-quant calls. Hard-wired to New York time and the NYSE session_hours."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "evaluate_predictions",
+    "signature": "evaluate_predictions(close: pd.DataFrame, bench: str, preds_name: str = \"predictions.jsonl\", grades_name: str = \"grades.jsonl\") -> dict",
+    "lines": "293-333",
+    "notes": "Quant calls are graded from the decision-date bar (:301-307), others through _entry_bar (:309). Lines :316 (bench must be in close), :321-322 (b0, b_end) and :325-327 (ret, bret, excess) compute excess against the benchmark. Each grade is appended as {key, graded_at, eval_date, ret, bench_ret, excess, hit}. Returns scorecard(read(preds_name), grades_name). The horizon counts bars (idx[pos+h]), so on a 7-day crypto index it counts calendar days."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "scorecard",
+    "signature": "scorecard(preds: list[dict] | None = None, grades_name: str = \"grades.jsonl\") -> dict",
+    "lines": "336-357",
+    "notes": "Returns {open, evaluated, '<src>_h<h>': {n, hit_rate, avg_excess_up_calls, [brier, n_prob]}}. dashboard.py:196 parses the keys with rsplit('_h')."
+   },
+   {
+    "file": "aitrader/journal.py",
+    "symbol": "context",
+    "signature": "context(symbol: str, n: int = 5) -> dict",
+    "lines": "360-376",
+    "notes": "Reads lessons from _path('lessons.md') = STATE/lessons.md, without an encoding argument. Under a crypto STATE today that would be state/crypto/lessons.md. desk.brief embeds the result (desk.py:78)."
+   },
+   {
+    "file": "aitrader/__main__.py",
+    "symbol": "_today_market_date",
+    "signature": "_today_market_date() -> str",
+    "lines": "32-38",
+    "notes": "First non-empty of proposal.json.decision_date, then pending.json.decision_date, then latest.json.date, then today's UTC date. Used by predict (:135), veto/shrink (:142) and desk (:221)."
+   },
+   {
+    "file": "aitrader/__main__.py",
+    "symbol": "main",
+    "signature": "main(argv=None) -> int",
+    "lines": "41-250",
+    "notes": "Parsers at :42-91 (cycle 44-47, status 48, scorecard 49, backtest 50-53, predict 54-59, context 60-61, verify 62, news-live 63-65, news-score 66-68, news-status 69, dashboard 70, placebo 71-72, brief 73-74, desk 75-81, veto 82-84, shrink 85-88, news 89-90). Dispatch at :93-249. The cycle halt (:99) and broken verify (:162) call sys.exit(1). The only existing test is the subprocess test_audit_fixes.py:152-159 (runpy, after setting journal.STATE)."
+   },
+   {
+    "file": "aitrader/report.py",
+    "symbol": "write_daily_report",
+    "signature": "write_daily_report(s: dict) -> Path",
+    "lines": "22-92",
+    "notes": "Path is ROOT/'reports'/f\"{s['date']}.md\" (:89), parent created with mkdir(exist_ok=True) and no parents (:90). Called only from cycle.py:388-390. Hard-coded 'SPY' at :30 and :34. Quiver line at :79-80. ROOT (:7) is patched by test_cycle.py:34-35/43."
+   },
+   {
+    "file": "aitrader/report.py",
+    "symbol": "_fills / _pct",
+    "signature": "_fills(rows: list[dict]) -> str; _pct(x) -> str",
+    "lines": "12-19",
+    "notes": "Prints raw f['qty']. Fractional crypto qty floored through float math could print noise like 0.30000000000000004."
+   },
+   {
+    "file": "aitrader/dashboard.py",
+    "symbol": "_regime_he",
+    "signature": "_regime_he(reg: str | None) -> str",
+    "lines": "27-31",
+    "notes": "risk_off is hard-coded as 'מגמה שלילית (חצי חשיפה)'. Called at :129."
+   },
+   {
+    "file": "aitrader/dashboard.py",
+    "symbol": "_px",
+    "signature": "_px(sym: str) -> tuple[float | None, float | None]",
+    "lines": "52-58",
+    "notes": "Network call (data._chart 5d/1d). It is the offline patch point for dashboard tests."
+   },
+   {
+    "file": "aitrader/dashboard.py",
+    "symbol": "_book_rows",
+    "signature": "_book_rows(state: dict | None, t: str, sectors: dict, prices: dict) -> tuple[list[dict], float, float]",
+    "lines": "61-78",
+    "notes": "Generic over the tag t, so it can be reused as is for 'cpos'."
+   },
+   {
+    "file": "aitrader/dashboard.py",
+    "symbol": "build",
+    "signature": "build() -> list[dict]",
+    "lines": "81-273",
+    "notes": "cfg = load_config() at :82. State reads at :86-90. kpi row at :119-135, orders :138-145, desk :148-154, eq :156-170, trades :172-178, news :181-186, scores :189-200, weights :203-210, bt :213-221, blackout :224-226, rules :229-245, slots :246-253, health :254-265. Lessons come from ROOT/'state'/'lessons.md' at :266, bypassing journal.STATE. ETF set at :21. There are no tests."
+   },
+   {
+    "file": "aitrader/dashboard.py",
+    "symbol": "write",
+    "signature": "write() -> Path",
+    "lines": "276-281",
+    "notes": "Writes ROOT/.cache/dashboard/snapshot.json, one file holding all rows."
+   },
+   {
+    "file": "aitrader/notify.py",
+    "symbol": "send",
+    "signature": "send(title: str, body: str, cfg: dict, priority: str = \"default\") -> list[str]",
+    "lines": "14-38",
+    "notes": "Reads cfg['alerts'] env-var names, posts to ntfy and/or telegram, always prints 'ALERT:', and returns the channels that answered ok. Tests replace it with lambdas taking (title, body, cfg, prio=\"default\") (test_audit_fixes.py:109, :428), so the positional signature must stay. It does not import journal today."
+   },
+   {
+    "file": "aitrader/desk.py",
+    "symbol": "brief / RATING_TO_ACTION",
+    "signature": "brief(symbol: str) -> dict; RATING_TO_ACTION: dict[str, tuple|None]",
+    "lines": "36-82, 21",
+    "notes": "Already uses bench = cfg.get('benchmark','SPY') (:45). The output key is named vs_spy_3m (:61). It uses sqrt(252) (:62) and calls journal.context(sym) (:78). Stock-only, with no tests."
+   },
+   {
+    "file": "aitrader/data.py (not mine, the switch target)",
+    "symbol": "load_config",
+    "signature": "load_config() -> dict",
+    "lines": "data.py:236-237",
+    "notes": "Returns raw config.json. Spec §3.1 needs load_config(book: str | None = None), where None means journal.BOOK. data.py does not import journal today; adding the import creates no cycle, since journal imports only stdlib and pandas. Callers: cycle.py:300 (tests patch cycle.load_config with a zero-arg lambda), dashboard.py:82, desk.py:38, news_live.py:353."
+   },
+   {
+    "file": "aitrader/cycle.py (not mine, call sites)",
+    "symbol": "journal/notify/report call sites",
+    "signature": "run_cycle(execute=True, force_rebalance=False, max_age_hours=0.1, propose=False) -> dict",
+    "lines": "cycle.py:278, 280, 300-306, 343-346, 353, 366, 388-393",
+    "notes": "proposal save :278, pending save :280, halt notify (urgent) :305, evaluate_predictions :343/:346, equity append :353, summary baselines key spy_since_start :366, write_daily_report(summary) :390, event notify :393."
+   }
+  ],
+  "changes": [
+   {
+    "spec_ref": "§3.1 one switch, journal.use_book",
+    "file_lines": "aitrader/journal.py:10-20 (imports + globals), new function after :25",
+    "change": "Add `from contextlib import contextmanager` and the globals `BOOK = \"stocks\"` and `_BASE: Path | None = None`. Add `@contextmanager def use_book(book: str = \"stocks\")`. It asserts book in {\"stocks\",\"crypto\"} and saves cap = STATE and prev = (BOOK, _BASE). If book == BOOK, it only yields; this covers the nested crypto no-op from §8. Entering crypto from stocks sets `_BASE = STATE; STATE = STATE / \"crypto\"; BOOK = \"crypto\"`. Entering stocks from crypto sets `STATE = _BASE; BOOK = \"stocks\"`. A finally block restores STATE = cap and (BOOK, _BASE) = prev. Optionally change :24 to mkdir(parents=True, exist_ok=True).",
+    "stock_impact": "None. use_book('stocks') at top level never assigns STATE. parents=True is a no-op when state/ exists.",
+    "test": "New test: with journal.STATE = tmp, `with use_book('crypto')` writes land in tmp/crypto. A nested use_book('crypto') still uses tmp/crypto. STATE == tmp after a normal exit and after an exception. use_book('stocks') inside crypto goes back to tmp."
+   },
+   {
+    "spec_ref": "§8 lessons from the captured STATE",
+    "file_lines": "aitrader/journal.py:365-375",
+    "change": "Add `def lessons_path() -> Path: return (_BASE or STATE) / \"lessons.md\"` (no mkdir). In context(), replace `lessons_path = _path(\"lessons.md\")` with `lessons_path = lessons_path()`, renaming the local variable so it does not shadow the function.",
+    "stock_impact": "None. Outside crypto, _BASE is None, so the path is STATE/lessons.md as today.",
+    "test": "Write tmp/lessons.md containing a 'BTC-USD' line. Under use_book('crypto'), context('btc-usd')['lessons'] returns it, and tmp/crypto/lessons.md is never created."
+   },
+   {
+    "spec_ref": "§8 lessons (dashboard), suite never touches real state/",
+    "file_lines": "aitrader/dashboard.py:266",
+    "change": "Replace `lp = ROOT / \"state\" / \"lessons.md\"` with `lp = journal.lessons_path()`.",
+    "stock_impact": "None in production, because journal.STATE == ROOT/'state'.",
+    "test": "Dashboard test with journal.STATE = tmp and dashboard._px stubbed. Lesson rows come from tmp/lessons.md."
+   },
+   {
+    "spec_ref": "§3.3 grading: crypto calls on absolute return",
+    "file_lines": "aitrader/journal.py:293, :316, :321-322",
+    "change": "Add a keyword argument `absolute: bool = False` to evaluate_predictions. At :316, use `if sym not in close or (not absolute and bench not in close): continue`. At :321-322, when absolute, set b0 = b_end = 1.0 so bret = 0 and excess = ret. The grade record keeps the same keys, with bench_ret 0.0. The caller at cycle.py:343 passes absolute from a crypto market flag. The spec names no key; suggested: market.grade_absolute.",
+    "stock_impact": "None. The default is False, so the code path and the grades.jsonl bytes are unchanged.",
+    "test": "Crypto quant 'up' call where the coin falls 5% and the bench (BTC) falls 10%. Expect excess -0.05 and hit False. The existing grading tests (test_audit_fixes PreOpenCallGradedFromSessionClose, CalendarEdges, UniqueNewsKeys; test_critic_fixes ForwardOnlyGrading, OutOfHoursCall) must stay green."
+   },
+   {
+    "spec_ref": "§3.3 grading horizons in calendar days; §3.2 UtcDailyCalendar",
+    "file_lines": "aitrader/journal.py:241-249, :257-285, :309",
+    "change": "Generalise `_ny_time(stamp)` to `_local_time(stamp, tz=\"America/New_York\")` and `_entry_bar(p, idx)` to `_entry_bar(p, idx, tz=\"America/New_York\", hours=session_hours)`. evaluate_predictions forwards both, from a keyword argument such as `calendar=None` with .tz and .session_hours(day). For the UTC calendar, use tz='UTC' and hours = lambda d: ((0,0),(24,0)). With those values, the existing branches already give the right UTC rule: a call with a live price uses the logged price and counts the horizon from that UTC day, and a call without one waits for that day's close. Horizons 7/30/90 need no code change, because the crypto index has a bar for every day.",
+    "stock_impact": "None. The defaults reproduce today's NYSE behaviour.",
+    "test": "Crypto Claude call logged Saturday 10:00 UTC. With a price: the entry is the logged price, and eval_date = Saturday + h bars. Without a price: the entry is Saturday's close. Today's NYSE rule would wrongly push both to Sunday's close."
+   },
+   {
+    "spec_ref": "§3.3 proposal.json deleted when a decision is saved (crypto-gated)",
+    "file_lines": "aitrader/journal.py (new helper after :213); call site cycle.py:280 (not mine)",
+    "change": "Add `def remove(name: str) -> None: _path(name).unlink(missing_ok=True)`. cycle._decide calls journal.remove('proposal.json') right after saving pending.json, only when the crypto market flag is set. The spec names no flag.",
+    "stock_impact": "None (gated).",
+    "test": "A crypto decision leaves no proposal.json, and _today_market_date then returns pending.decision_date. test_cycle.test_propose_changes_no_state stays as is."
+   },
+   {
+    "spec_ref": "§3.1 CLI --book",
+    "file_lines": "aitrader/__main__.py:41-91 (parsers), :91-93 (dispatch split), :1-20 (usage docstring)",
+    "change": "Add two parent parsers. `bk` has `--book` with choices ['stocks','crypto'] and default 'stocks'. `so` has `--book` with choices ['stocks'] and default 'stocks', so crypto is refused. Pass parents=[bk] to cycle (:44), status (:48), scorecard (:49), backtest (:50), predict (:54), context (:60), verify (:62), veto (:82), shrink (:85) and the new summary. Pass parents=[so] to news-live (:63), news-score (:66), news-status (:69), brief (:73), desk (:75) and news (:89). Leave dashboard (:70) and placebo (:71) without the flag, so argparse rejects `--book` as an unrecognized argument. After `a = ap.parse_args(argv)`, use `with journal.use_book(getattr(a, \"book\", \"stocks\")): return _run(a)`, and turn lines :93-250 into `def _run(a) -> int:` with their indentation unchanged (a small diff). sys.exit inside still unwinds the with block. Update the usage docstring.",
+    "stock_impact": "None. Default 'stocks' makes use_book a no-op, and the output is unchanged. The subprocess test (test_audit_fixes.py:152) still works because use_book reads journal.STATE at entry.",
+    "test": "main(['status','--book','crypto']) prints tmp/crypto/latest.json. main(['desk','X','Buy','--prob','.6','--thesis','t','--invalidation','i','--book','crypto']) raises SystemExit with code 2. main(['dashboard','--book','crypto']) raises SystemExit 2. test_verify_exits_nonzero stays green."
+   },
+   {
+    "spec_ref": "§6.1 summary command",
+    "file_lines": "aitrader/__main__.py new subparser after :90 and a new elif in _run; helpers in aitrader/notify.py",
+    "change": "Add `summary` (parents=[bk]) with `--ack` (store_true). Dispatch calls a notify helper, e.g. `summary_text(cfg) -> tuple[str, bool]`. It reads journal 'alert_queue.json', puts urgent items first and then sorts by queued_at. It adds check lines: journal.broken_chains(journal.MAIN_CHAINED), expected decision_date vs pending.json, latest.json as_of_utc age, and 'no proven edge' while DSR < 0.95. It prints the text and returns 1 while any queued item has priority 'urgent'. With --ack it calls `ack_queue()`, which saves an empty queue (or only the items newer than the printed cutoff, see mismatches).",
+    "stock_impact": "New command only. For stocks the queue is always empty.",
+    "test": "Queue one 'urgent' and one 'default' item under tmp/crypto. summary prints the urgent item first and exits 1. summary --ack empties alert_queue.json, and a second summary exits 0."
+   },
+   {
+    "spec_ref": "§6.2 quiet hours queue",
+    "file_lines": "aitrader/notify.py:7-16 (imports + start of send)",
+    "change": "Add imports (datetime, timezone, ZoneInfo, `from . import journal`) and `def _now() -> datetime: return datetime.now(timezone.utc)` as the clock patch point. Add `_quiet(qh, now) -> bool`: if not qh, False. Otherwise t = now.astimezone(ZoneInfo(qh['tz'])).strftime('%H:%M'), and quiet = (t >= from or t < to) when from > to (window wraps midnight), else from <= t < to. In send, right after `a = cfg.get(\"alerts\", {})` (:16): if _quiet(a.get('quiet_hours'), _now()), append {title, body, priority, queued_at: journal.now_utc()} to journal.load_json('alert_queue.json', []), save it, print 'QUEUED (quiet hours)', and return ['queued']. That lands in state/crypto/alert_queue.json under use_book. Urgent messages are queued too (owner decision 2).",
+    "stock_impact": "None. The stock cfg has no alerts.quiet_hours, so the path is identical.",
+    "test": "Patch notify._now to 23:22 Asia/Jerusalem and notify.requests.post to a recorder, with mock.patch.dict(os.environ, AITRADER_NTFY_TOPIC='t'). Crypto cfg: returns ['queued'], post is not called, the queue has 1 item. Stock cfg: post is called (spec test 'stock still sends at 23:22'). Check the boundaries 07:59 (quiet) and 08:00 (send)."
+   },
+   {
+    "spec_ref": "§3.3 reports under market.report_dir",
+    "file_lines": "aitrader/report.py:22, :89-90; caller cycle.py:390",
+    "change": "Change the signature to `write_daily_report(s: dict, cfg: dict | None = None) -> Path`. Set `path = ROOT / ((cfg or {}).get(\"market\") or {}).get(\"report_dir\", \"reports\") / f\"{s['date']}.md\"` and use `path.parent.mkdir(parents=True, exist_ok=True)`. cycle.py:390 passes cfg. The path stays ROOT-relative, so the rep.ROOT patch keeps working.",
+    "stock_impact": "None. The stock market.report_dir is 'reports', giving the same path and content.",
+    "test": "A crypto cycle with rep.ROOT = tmp writes tmp/reports/crypto/<date>.md. test_cycle (tmp/reports/<date>.md) is unchanged."
+   },
+   {
+    "spec_ref": "§3.3 book-aware benchmark labels (report)",
+    "file_lines": "aitrader/report.py:30, :34, :46, :79",
+    "change": "Set bench = (cfg or {}).get('benchmark','SPY'). Line :30 becomes `מחיר אחרון {bench}` and line :34 becomes `{bench} {_pct(...['spy_since_start'])}`. Keep the summary key spy_since_start (cycle.py:366) so latest.json stays byte-identical. Gate :79 as `elif ov.get(\"congress_buy\") is None and ((cfg or {}).get(\"market\") or {}).get(\"overlays\", True)`; otherwise crypto reports say 'Quiver לא מחובר'. Optional: header :46 'מניה' becomes book-aware. Fractional qty display (:19, :48) should get qty already rounded to the qty_step decimals by the broker.",
+    "stock_impact": "None. bench == 'SPY' and overlays is True, so the strings are identical.",
+    "test": "The crypto report contains 'BTC-USD' and not 'Quiver'. The golden stock report is byte-identical."
+   },
+   {
+    "spec_ref": "§8 dashboard builds both books (ckpi, cpos, corder, ctrade, ceq, cregime)",
+    "file_lines": "aitrader/dashboard.py:138-145, :172-178, :273",
+    "change": "Keep the stock body of build() unchanged. Extract the order loop (:139-145) into `_order_rows(pending, t)` and call it with 'order'. Optionally extract the trade loop the same way. Before `return rows` (:273), add `rows += _crypto_rows()`. `_crypto_rows()` returns [] when journal.STATE/'crypto'/'portfolio.json' is missing, so no dir is created before go-live. Otherwise it runs `with journal.use_book(\"crypto\"):`: cfg = load_config(), which gives the merged crypto config through journal.BOOK. It emits ckpi (equity, shadow, BTC buy-and-hold from start_prices[bench], fees_paid, next decision time, cash/gross, dd_state, 'no proven edge' until DSR >= 0.95), cpos via `_book_rows(port, 'cpos', ...)`, corder via `_order_rows(pending, 'corder')`, ctrade from crypto trades.jsonl, ceq from crypto equity.jsonl (quant/shadow/btc), and cregime (see mismatches for its inputs).",
+    "stock_impact": "Stock rows are identical in content and order. Crypto rows are appended at the end.",
+    "test": "tmp STATE with crypto/portfolio.json, pending.json and equity.jsonl; stub dashboard._px. Row tags include the six c* tags. The stock rows equal a build() without the crypto dir. journal.STATE == tmp afterwards."
+   },
+   {
+    "spec_ref": "§3.3 dashboard risk-off label book-aware (crypto risk-off = cash)",
+    "file_lines": "aitrader/dashboard.py:27-31",
+    "change": "`_regime_he(reg, off_mult: float = 0.5)`: the risk_off label is 'מגמה שלילית (מזומן)' when off_mult == 0, else 'מגמה שלילית (חצי חשיפה)'. Crypto ckpi passes cfg['risk']['risk_off_gross_mult']. The stock call at :129 is unchanged.",
+    "stock_impact": "None (default argument).",
+    "test": "_regime_he('risk_off', 0.0) contains 'מזומן'. _regime_he('risk_off') returns the current string."
+   },
+   {
+    "spec_ref": "§3.3 book-aware labels in desk.py; §3.1 desk stock-only",
+    "file_lines": "aitrader/desk.py (none)",
+    "change": "Recommend no change. desk refuses --book crypto (parents=[so]). bench already comes from cfg (:45). Renaming vs_spy_3m (:61) would change the stock brief output read by the trading-desk agents.",
+    "stock_impact": "None.",
+    "test": "None needed. The CLI refusal is covered by the --book test."
+   },
+   {
+    "spec_ref": "§3.1 --book on predict; §3.3 absolute grading",
+    "file_lines": "aitrader/__main__.py:57, :59, :125-139",
+    "change": "For crypto, is_open comes from the book's calendar (UtcDailyCalendar.is_open(now) is always True) instead of market_status(bench) at :130-133. Keep the try/market_status path for stocks. The --horizon default 20 (:57) is not one of 7/30/90: take the default from config (e.g. market.default_call_horizon: stocks 20, crypto 30), per rule 5. The --prob help (:59) means P(return > 0) for crypto.",
+    "stock_impact": "None when the book is stocks.",
+    "test": "main(['predict','BTC-USD','up','--book','crypto']) with live_prices stubbed writes to tmp/crypto/predictions.jsonl with entry 'live'."
+   },
+   {
+    "spec_ref": "§4 history period1=0; §7 sweep",
+    "file_lines": "aitrader/__main__.py:113-120 (backtest), :203 (placebo, stock-only)",
+    "change": "Replace the hard-coded `load_market(cfg, \"10y\")` (:114) with a range from the book (or let load_market pick it from cfg['market']). `if a.sweep` (:115) must branch to a crypto sweep function, because backtest.sweep runs the stock variant list. The trials append (:118) already lands in state/crypto/trials.jsonl under use_book, which matches the §7 seed location.",
+    "stock_impact": "None when the book is stocks.",
+    "test": "Covered by the sweep work (not my files)."
+   },
+   {
+    "spec_ref": "§3.1 verify --book crypto",
+    "file_lines": "aitrader/__main__.py:156",
+    "change": "Optional: iterate journal.MAIN_CHAINED for crypto (news_* chains do not exist there). Keep CHAINED for stocks so the output is byte-identical.",
+    "stock_impact": "None.",
+    "test": "A broken tmp/crypto/trades.jsonl makes main(['verify','--book','crypto']) exit 1, while tmp stock chains stay OK."
+   },
+   {
+    "spec_ref": "§3.1 test: the whole suite writes nothing under the real state/",
+    "file_lines": "tests/ (new)",
+    "change": "Today no test writes to the real state/. Non-TempState tests (test_core, test_review_fixes, parts of test_critic_fixes) never call journal. Guard with a module that snapshots {path: st_mtime_ns} of ROOT/'state' (rglob) at import and asserts it is unchanged in tearDownModule, or run the suite in a subprocess and compare.",
+    "stock_impact": "None.",
+    "test": "Itself."
+   }
+  ],
+  "test_patch_points": [
+   "journal.STATE: every temp-state test swaps it (test_cycle.py:14-15,40; test_audit_fixes.py:26-30 and the subprocess string at :155; test_critic_fixes.py:19-23; test_news_rules.py:14-15,25). use_book must read it at entry, never at import time.",
+   "journal.BOOK / journal._BASE (new): tests should enter use_book() rather than patch these directly.",
+   "journal.now_utc: freeze it for golden (b). logged_at is hashed into every chained record and is also written by record_predictions (:231).",
+   "aitrader.report.ROOT (test_cycle.py:34-35,43): the report path must stay ROOT-relative, including market.report_dir.",
+   "cycle.load_config, load_market, market_status, earnings_on, _overlays_once_per_day, _market_opened, _bar_is_final, official_opens (test_cycle.py:19-31). load_config is patched as a zero-arg lambda, so cycle must keep calling load_config() with no arguments.",
+   "cycle.notify.send and news_live.notify.send are replaced by lambdas taking (title, body, cfg, prio=\"default\") (test_audit_fixes.py:109, :428). Keep send's positional signature. test_cycle_halts_without_trading asserts sent == ['urgent'].",
+   "notify._now (new clock for quiet hours), notify.requests.post (no network), and os.environ['AITRADER_NTFY_TOPIC'] via unittest.mock.patch.dict.",
+   "dashboard._px (or dashboard._chart) keeps dashboard tests offline. No dashboard tests exist today.",
+   "cycle.corporate_actions is NOT stubbed in test_cycle. It reads the real .cache/SPY_events.json (40 real SPY dividends since 2016-12), so a held synthetic SPY could be credited machine-dependent dividends. Golden (b) must stub it.",
+   "test_cycle does not stub notify.send. If AITRADER_NTFY_TOPIC is set in the trader session's env (spec: configured 2026-11-09; it is unset in this sandbox), the suite posts real ntfy pushes on every decide. Golden and new crypto cycle tests must stub cycle.notify.send.",
+   "backtest.run(weights_mode='learned') reads journal placebo.json (backtest.py:39). Golden (a) must run under a tmp STATE or with weights_mode='prior' (test_core TimeMachine uses prior).",
+   "test_cycle.test_propose_changes_no_state asserts that the new files are exactly {'proposal.json','earnings.json'}. It guards that no 'crypto' dir or alert_queue appears in stock runs.",
+   "test_core.CFG is loaded raw from config.json (test_core.py:16) and cfg_for deep-copies it. The stock `market` block must therefore be explicit in config.json and equal to the code's .get() defaults. Crypto tests need the merged cfg from data.load_config('crypto') or a helper.",
+   "test_audit_fixes.CalendarEdges.test_calendar_is_extended_before_it_runs_out depends on the date, and journal._calendar reads raw config.json['calendar']. Keep `calendar` at the top level of config.json."
+  ],
+  "spec_mismatches": [
+   "§3.1 use_book: 'For stocks it leaves STATE as is' leaves STATE pointing at .../crypto if use_book('stocks') is entered inside a crypto context. Define it as restoring the captured base (journal._BASE). The CLI wraps every command and the dashboard switches books, so this case will happen.",
+   "§3.2 interface vs grading: journal._entry_bar (journal.py:257-285) grades every non-quant call (claude/desk/overlay) with NYSE session_hours and New York time. A crypto Saturday call is treated as a closed day, and weekday calls use 09:30-16:00 NY on UTC bars. The calendar interface needs a tz plus a session-window method (UTC: (0,0)-(24,0)) that evaluate_predictions can take. No config key is named for absolute grading either.",
+   "§2.1/§3.3 'gated to the crypto book by its market flags': the listed flags (vix, earnings_blackout, overlays, corporate_actions, news_engine) cover none of these: regime always filled, one equity mark per bar, deleting proposal.json, absolute grading. Each needs a named market key; the spec names only report_dir and intraday_alert_pct.",
+   "Golden byte-identity vs new keys: any key added on the stock path changes portfolio.json, trades.jsonl, pending.json or decisions.jsonl and fails golden (b). Examples: fees_paid in broker state, a 'fee' field in fills, new diag keys for the regime gauge, 'fill source' logging. The spec says only 'stocks keep integer quantities, so their JSON is unchanged'. These keys must be written only when fee_bps > 0 or under a crypto flag.",
+   "§3.3 desk.py: 'benchmark labels are book-aware in ... desk.py' contradicts 'desk.py is stock-only in v1' and the CLI refusal of desk/brief. desk.brief already uses cfg['benchmark'] (desk.py:45). Its key vs_spy_3m (:61) is read by the trading-desk agents, and renaming it changes the stock output. Recommend zero change to desk.py.",
+   "§6.1 delivery: summary only prints, and the prompt says 'deliver with notify.send', but no CLI calls notify.send with arbitrary text and prints the channels. Either summary should send and print the channels, or add `--send`. The return value of notify.send while queued is also unspecified. If it returns [], a reader applying 'ntfy not among channels → PushNotification' would push at night. Recommend ['queued'].",
+   "§6.1 summary exit code: 'exits non-zero while any urgent item is queued' does not say whether its own checks (broken verify, missing expected decision_date, stale latest.json) count as urgent. 'Expected decision_date' needs a calendar method (e.g. last_final_bar(now)) that is not in the §3.2 interface. The latest.json max age has no config key (rule 5).",
+   "§6.1 --ack clears the whole queue, so an item queued between the summary print and the ack would be lost unseen. The risk is low at 08:03, which is outside quiet hours. Safer: ack only items with queued_at <= the newest item the summary printed.",
+   "§8 regime gauge: 'distance to the go-to-cash line and the current hysteresis state' needs SMA200 and the band lines. §3.3 says nothing is persisted, and pending/latest hold only the regime string. Without a crypto-gated diag key set (e.g. regime_px, regime_sma read from the last crypto decisions.jsonl record), the dashboard would refetch 200+ bars.",
+   "§2/§8 'no proven edge until DSR >= 0.95': no source is named for the shipped profile's DSR. backtest.sweep writes only a 'DSR of base (N=..)' row (backtest.py:166-172), and in crypto the shipped profile may be the candidate. The summary and dashboard need a stored value (e.g. state/crypto/dsr.json or a labelled sweep row).",
+   "§7 'otherwise crypto_base ships': the live state book is 'crypto', but books.crypto is the candidate. Nothing says how --book crypto runs crypto_base's settings: copy the block into books.crypto, or a market.profile key. use_book should accept only stocks/crypto; crypto_base is a config profile (a load_config argument), never a state dir.",
+   "§3.1 load-time assert 'crypto universe is exactly {BTC-USD, ETH-USD}' vs the §7 BTC+XRP hindsight control, which also sets max_position_pct_by_symbol XRP 0.6. The control cannot be a book loaded through load_config unless the assert is scoped to books.crypto/crypto_base.",
+   "§3.1 'backtest --book crypto': the existing backtest.sweep (backtest.py:99-176) runs the stock variant list (ETF-only, VIX, learned weights) on one cfg. The §7 sweep is a different function, so __main__.py:115-118 must branch. __main__.py:114 hard-codes '10y', while §4 asks for period1=0.",
+   "§7 step 0: 'the network is stubbed as tests/test_cycle.py:19-31 does', but those lines do not freeze journal.now_utc, do not stub notify.send, and do not stub cycle.corporate_actions (which reads the real .cache/SPY_events.json). Golden (b) needs all three.",
+   "§8 'each lesson names its book': dashboard.py:268-272 parses lessons.md by position ('- date | obs | evidence | confidence | change', with parts[3] as the confidence fallback), so a new column would shift it. Put the book tag inside the observation (e.g. 'crypto: ...') and treat untagged legacy lines as stocks. journal.context's recent_lessons_any (:375) returns the last 3 lines from any book.",
+   "§3.1 'load_config() with no argument returns the active book's merged config': load_config lives in data.py:236, not in journal. data must read journal.BOOK; it does not import journal today, and the import is cycle-free. journal._calendar (:38-42) reads raw config.json['calendar'], so `calendar` must stay top-level.",
+   "§3.3 report labels: in a crypto report, report.py:79-80 would print 'Quiver: לא מחובר' because crypto overlays.json is absent. It needs gating on market.overlays, which the spec does not list. Minor: 'משקלות האותות (נלמדים)' is inaccurate when learning is off.",
+   "§3.1 verify --book crypto iterates journal.CHAINED (__main__.py:156), so it prints the 4 news_* chains as 'OK (0 records)'. Harmless; MAIN_CHAINED would be cleaner, with CHAINED kept for stocks.",
+   "§6.2 the queue location depends on the active STATE. notify.send called with a crypto cfg outside use_book queues into the stock dir. This is fine only because every crypto entry point goes through the CLI wrapper; a direct python -c delivery script must also enter use_book('crypto').",
+   "§3.1 '--book crypto on predict': the --horizon default of 20 (__main__.py:57) is not one of the crypto horizons 7/30/90, and the --prob help says 'beats SPY'. The default horizon should be a config value (rule 5)."
+  ]
+ },
+ {
+  "interfaces": [
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_px",
+    "signature": "_px(row: pd.Series) -> dict",
+    "lines": "33-34",
+    "notes": "Returns {symbol: float} and drops NaN and values <= 0. Every price dict goes through it (decision close, last row, daily open fallback)."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_learn",
+    "signature": "_learn(signals, close, cfg, ds: str) -> dict",
+    "lines": "37-57",
+    "notes": "Loads weights.json. On first run it bootstraps walk_forward_weights over close.index[300:]. Otherwise it updates at most once per decision date, every learning.update_every_days bars. It writes weights.json and learning.jsonl and has no enabled flag today."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_open_cutoff_utc",
+    "signature": "_open_cutoff_utc(day) -> str",
+    "lines": "65-68",
+    "notes": "09:30 New York on `day` as a UTC ISO string 'YYYY-MM-DDTHH:MM:SS+00:00'. Callers: L201 (fill day) and L270 (dec + BDay(1), which ignores holidays). test_critic_fixes.py:28 calls it directly and expects '2026-11-10T14:30'."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_check_reduce_only",
+    "signature": "_check_reduce_only(raw: dict, final: dict) -> None",
+    "lines": "71-76",
+    "notes": "Raises RuntimeError if a name is added or a weight enlarged by more than 1e-12. Tested directly in test_critic_fixes ReduceOnlyInvariant."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_apply_overrides",
+    "signature": "_apply_overrides(targets: dict, held: dict, ds: str, cutoff_utc: str | None = None) -> tuple[dict, list]",
+    "lines": "79-104",
+    "notes": "Reads overrides.json from STATE and acts only if its date == ds. Vetoes apply to non-held names only; size_mult is clamped to 0..1. The cutoff test is a LEXICOGRAPHIC string compare `ts <= cutoff_utc` (L87), so any crypto exec_ts cutoff must use the exact journal.now_utc() format."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_eval_close",
+    "signature": "_eval_close(close: pd.DataFrame, preds_name: str = 'predictions.jsonl', grades_name: str = 'grades.jsonl') -> pd.DataFrame",
+    "lines": "107-113",
+    "notes": "Adds closes for open-prediction symbols outside the universe via fetch_panel(names, '1y', 6.0) (network)."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_overlays_once_per_day",
+    "signature": "_overlays_once_per_day(cfg: dict, ds: str, bench: str) -> dict",
+    "lines": "116-139",
+    "notes": "Stock-only overlays (OpenInsider, Quiver). Network. Writes overlays.json. Called at L287 when persist=True."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_earnings_blackout",
+    "signature": "_earnings_blackout(ds: str, days: int) -> dict[str, str]",
+    "lines": "142-164",
+    "notes": "Calls earnings_on(day) for day -1..days. On any None (outage) it sets out['*'], which blocks every non-ETF new entry at L261-262 and does not cache. Otherwise it writes earnings.json."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_bar_is_final",
+    "signature": "_bar_is_final(d: pd.Timestamp) -> bool",
+    "lines": "167-169",
+    "notes": "Uses datetime.now(NY): d before today, or today at or after 16:05 NY. It does not look at cache freshness. The only caller is L311. Tests replace it with a ONE-arg lambda (test_cycle.py:31), so the call site must stay `_bar_is_final(last)`."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_brokers",
+    "signature": "_brokers(cfg: dict, prices: dict, ds: str) -> tuple[PaperBroker, PaperBroker]",
+    "lines": "172-179",
+    "notes": "Builds main and shadow as PaperBroker(starting_cash, costs.slippage_bps, costs.commission_per_share, state). On the first run main.state gets created/last_mark=None/start_prices. This is the only live place PaperBroker costs are wired, so fee_bps and qty_step go here."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_market_opened",
+    "signature": "_market_opened(d: pd.Timestamp) -> bool",
+    "lines": "182-184",
+    "notes": "datetime.now(NY) at or after 09:31 on d. Only caller is L195. Tests replace it with a one-arg lambda (test_cycle.py:30)."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_execute_pending",
+    "signature": "_execute_pending(panel, cfg, main, shadow, events) -> list[dict]",
+    "lines": "187-225",
+    "notes": "Acts only if pending.json status=='pending'. d_exec = first panel bar after decision_date, gated by _market_opened (L194-197). Overrides are recomputed from targets_raw with cutoff _open_cutoff_utc(d_exec) unless exits_only (L200-201). Fill prices: opx = close < daily open < official_opens 1-minute (L203-204); open_source={one_minute, daily_fallback} (L205). Cooldown = d_exec + BDay(stop_cooldown_days) (L207). Main and shadow rebalance (L210-213), then saves portfolio, shadow, trades.jsonl with fill:'open', and pending status=executed (L217-222). Returns main fills."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "_decide",
+    "signature": "_decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, persist: bool, events) -> dict",
+    "lines": "228-296",
+    "notes": "Order of steps: slice every .loc-able panel value to :dec (L232; non-.loc values pass through, so new panel metadata must be a plain dict, never a Series); compute_all and precompute_aux (L236-237); _learn or saved/prior weights (L238-241); maybe_reset_peak (L245); mark main and shadow (L247-248, persist only); build_targets (L250); due = force or days_since >= rebalance_every_days or regime/dd_state change or flat (L251-254); off-cycle exits_only holds current weights minus stopped (L256-258); earnings blackout and cap (L259-268); shadow targets (L269); overrides with cutoff dec+BDay(1) (L270); preview rebalance at close (L271). Returns decision {decision_date, status, rebalance, exits_only, targets, targets_raw, stopped_shadow, shadow_hold, stopped, overrides, earnings_blackout, preview_at_close, new_entries, diag, weights, logged_at}. persist=False saves proposal.json. persist=True saves pending.json (minus diag and weights), sets state regime and dd_state (L281), appends decisions.jsonl {date, logged_at, due_rebalance, weights, diag, overrides, earnings_blackout, preview}, records predictions, runs overlays, and emits events."
+   },
+   {
+    "file": "aitrader/cycle.py",
+    "symbol": "run_cycle",
+    "signature": "run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours: float = 0.1, propose: bool = False) -> dict",
+    "lines": "299-396",
+    "notes": "Steps: cfg = load_config() (zero-arg); chain check on MAIN_CHAINED, which halts with notify urgent and returns {halted, executed, decided_now, events} (L301-306); panel = load_market(cfg, '10y', max_age_hours) with positional args (L308); dec_bar = last if _bar_is_final(last) else index[-2] (L311); mkt = market_status(bench) (L312-315); prices_last from the last row (L317); _brokers on dec_bar prices (L318); corporate actions (L321-324); propose returns _decide(persist=False) (L325-326); execute, then decide if pending.decision_date != dec_bar, then execute again (L332-337); grade quant and news (L343-348); equity.jsonl EVERY run with date = last.date() and prices_last (L350-355); summary (L359-376); intraday -6% alert only when mkt.is_open (L378-386); latest.json and report (L387-390); notify (L391-393). Returns the summary dict."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "_chart",
+    "signature": "_chart(sym: str, rng: str, interval: str) -> dict",
+    "lines": "52-57",
+    "notes": "GETs CHART_URL with params {range, interval, events:'div,splits'} and returns chart.result[0], else RuntimeError. There is no period1/period2 mode and no dataGranularity check. Also used by market_status, live_prices, official_opens, dashboard.py:16 and news_live.py:31."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "_bars_from_chart",
+    "signature": "_bars_from_chart(res: dict) -> pd.DataFrame",
+    "lines": "60-82",
+    "notes": "Index = timestamps converted to meta.exchangeTimezoneName (default America/New_York), normalized and made naive. Duplicates keep the last; rows with NaN close are dropped. open/high/low are scaled by adjclose/close, close = adjclose. For crypto (tz UTC, adjclose == close) the ratio is 1, so D+1's partial row is kept with its open."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "fetch_daily",
+    "signature": "fetch_daily(sym: str, rng: str = '5y', max_age_hours: float = 6.0) -> pd.DataFrame",
+    "lines": "98-116",
+    "notes": "Cache file CACHE/'{sym with ^ replaced by _}_{rng}.csv' (L101). It returns the cache if mtime is younger than max_age_hours (L102-103). On fetch failure it returns the STALE cache with a print (L106-110): this is the source of the latent partial-bar bug, because nothing downstream knows the data is old. Atomic write tmp.replace keeps mtime = write time (L112-114). Also writes {sym}_events.json, whose name is not range-specific."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "fetch_panel",
+    "signature": "fetch_panel(symbols: list[str], rng: str = '5y', max_age_hours: float = 6.0) -> dict[str, pd.DataFrame]",
+    "lines": "128-154",
+    "notes": "Runs 8 threads. Failed or empty symbols are only printed and are absent from the columns (L141-146). Returns {open, high, low, close, volume}. A row is kept if at least max(1, int(0.5*n)) closes exist (L151), so with 2 coins a D+1 row present for BTC only is kept with ETH NaN."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "market_status",
+    "signature": "market_status(sym: str = 'SPY') -> dict",
+    "lines": "157-170",
+    "notes": "Network (Yahoo 1d/5m meta). Returns {is_open, regular_start_utc, regular_end_utc, last_trade_utc, price}. Feeds equity.jsonl market_open and the intraday alert gate."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "load_config",
+    "signature": "load_config() -> dict",
+    "lines": "236-237",
+    "notes": "Raw json.loads(config.json). It knows nothing about books. Imported at module load by cycle (L24), desk, dashboard, news_live and __main__. journal._calendar (journal.py:38-42) reads config.json separately."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "load_market",
+    "signature": "load_market(cfg: dict, rng: str = '10y', max_age_hours: float = 6.0) -> dict",
+    "lines": "253-263",
+    "notes": "fetch_panel(list(cfg['universe']), rng, age), then ALWAYS sets panel['_require_vix']=True and tries ^VIX, reindexed with ffill and masked after VIX's last bar. On a 7-day crypto index every weekend would go defensive(no-vix). Also used by the CLI backtest (__main__.py:114, 203)."
+   },
+   {
+    "file": "aitrader/data.py",
+    "symbol": "official_opens",
+    "signature": "official_opens(symbols: list[str], day) -> dict[str, float]",
+    "lines": "266-287",
+    "notes": "Open of the 09:30 NY 1-minute bar from _chart(sym, '5d', '1m'). Symbols without it are omitted, and the caller falls back to the daily open. Also imported by news_live.py:31 and patched there by test_audit_fixes.py:361-373."
+   },
+   {
+    "file": "aitrader/broker.py",
+    "symbol": "PaperBroker (called by cycle)",
+    "signature": "__init__(cash, slippage_bps=5.0, commission_per_share=0.0, state=None); mark(prices, date, cash_yield_annual=0.0, trading_days=252) -> float; maybe_reset_peak(regime, date, days_required=20, dd_halve=-0.10, dd_flat=-0.20) -> bool; rebalance(targets, prices, date, band=0.02, min_trade_value=500.0, stopped=None, cooldown_until=None, exits_only=False, force=None) -> list[dict]",
+    "lines": "12, 38-52, 82-97, 103-157",
+    "notes": "mark ALREADY has trading_days (L38); only cycle.py:247-248 and backtest need to pass periods_per_year. The reset peak is eq/(1+(dd_halve+dd_flat)/2) (L93). rebalance SKIPS any symbol with no price in `prices` (L124-126): no buy, no sell. That is the simplest way to freeze a stale symbol at fill time."
+   },
+   {
+    "file": "aitrader/strategy.py",
+    "symbol": "build_targets (consumed by cycle)",
+    "signature": "build_targets(date, panel, signals, weights, cfg, equity_peak_ratio, held, blocked=None, aux=None) -> tuple[dict, dict]",
+    "lines": "71-196",
+    "notes": "With no picks it returns early at L135-137 with diag regime='n/a' and NO dd_state key. cycle.py:281 then stores dd_state=None, cycle.py:253 sees risk_changed, and maybe_reset_peak pops riskon_streak."
+   },
+   {
+    "file": "aitrader/notify.py",
+    "symbol": "send",
+    "signature": "send(title: str, body: str, cfg: dict, priority: str = 'default') -> list[str]",
+    "lines": "14-38",
+    "notes": "Posts to ntfy and telegram when the env vars are set, always prints, and returns the delivered channels. There is no quiet-hours logic. Called by cycle at L305 (urgent halt) and L393 (events)."
+   }
+  ],
+  "changes": [
+   {
+    "spec_ref": "3.1 load_config() returns the active book's merged config, plus merge rules and asserts",
+    "file_lines": "aitrader/data.py:236-237",
+    "change": "Make it load_config(book: str | None = None) -> dict. raw = json.loads(config.json); book = book or journal's active book (set by use_book; default 'stocks'). If the book is stocks, return raw exactly as today. Otherwise: deepcopy raw; REPLACE universe/prior_weights/signals/benchmark; merge risk/costs/learning/market/alerts (and account, see mismatches) as {**raw[k], **blk[k]}; then assert the universe set and that the priors name every compute_all REGISTRY key and sum to 1 within a tolerance. data may import journal (journal imports nothing from the package).",
+    "stock_impact": "None if the stocks branch returns the raw dict unchanged.",
+    "test": "Covered indirectly by test_audit_fixes.BrokenChainFailsClosed.test_cycle_halts_without_trading (unstubbed real load_config). test_cycle stubs cycle.load_config with a zero-arg lambda, so call sites must stay zero-arg. New: merge-rule asserts, crypto vs crypto_base universe, and a test that a crypto_base panel never holds ETH."
+   },
+   {
+    "spec_ref": "4 History: period1=0&period2=now, assert dataGranularity=='1d'",
+    "file_lines": "aitrader/data.py:52-57 (_chart), 253-255 (load_market)",
+    "change": "In _chart: if rng == 'all', params = {period1: 0, period2: int(time.time()), interval, events}; after reading res, raise RuntimeError if res['meta'].get('dataGranularity') != interval. In load_market: rng = cfg.get('market', {}).get('history', rng) before fetch_panel. The crypto block sets history 'all', so the cache file is BTC-USD_all.csv. Optionally assert meta.exchangeTimezoneName == 'UTC' for crypto so _bars_from_chart dates are UTC days.",
+    "stock_impact": "None: the 'all' token and history key exist only in the crypto block, and run_cycle/CLI still pass '10y'.",
+    "test": "New unit test that patches data._get_json and asserts the params and the granularity raise. No existing coverage of data.py."
+   },
+   {
+    "spec_ref": "4 Partial bars from a stale cache (cache file mtime)",
+    "file_lines": "aitrader/data.py:101 (path), new helper after 116; data.py:253-263 (load_market)",
+    "change": "Extract _cache_path(sym, rng) from L101 and add cache_mtime(sym, rng) -> float | None (None if no file; reads module global CACHE at call time). In load_market, set panel['_fetched_at'] = {s: cache_mtime(s, rng) for s in panel['close'].columns}. It must be a plain dict: cycle.py:232 slices any value with .loc, so a Series indexed by symbol would break.",
+    "stock_impact": "Adds one non-frame key to the production panel. _decide (L232), compute_all, build_targets and backtest (L123) pass dicts through, so outputs are unchanged.",
+    "test": "test_cycle.test_production_shaped_panel_does_not_crash already guards non-frame panel keys; add '_fetched_at' to it. New: patch data.CACHE to a tmp dir and set mtimes with os.utime."
+   },
+   {
+    "spec_ref": "4 Bar final only if fetched after bar end + 5 min (both books); stale benchmark skips; crypto: any stale universe symbol skips the run",
+    "file_lines": "aitrader/cycle.py:311 (replace the dec_bar line), early return before L317",
+    "change": "fa = panel.get('_fetched_at'). fresh(s, bar) = fa is None or (fa.get(s) or 0) >= bar_end_epoch(bar) + 300, where bar_end is 16:00 NY on bar (keeps today's 16:05 rule) for NYSE and bar+1 day 00:00 UTC for utc_daily. final = _bar_is_final(last) and fresh(bench, last), keeping the shim call one-arg. dec_bar as today. stale = sorted(s for s in cfg['universe'] if not fresh(s, dec_bar)); a symbol absent from fa counts as stale. Crypto: if stale, return {'skipped': msg, 'executed': [], 'decided_now': False, 'events': [msg]} before _brokers (exit 0; a later run retries). Stocks: bench in stale means no _decide this run; other stale symbols are passed to _decide as frozen.",
+    "stock_impact": "The one intended stock change. It is active only when '_fetched_at' is present, so golden (b) with a stubbed panel stays byte-identical. Ceiling: stub panels without metadata skip the rule (fail-open), so production must always set it.",
+    "test": "New: both books, mtime before and after bar_end+5min; crypto stale gives a skip with no state written; stock stale bench gives decided_now False."
+   },
+   {
+    "spec_ref": "4 Stale symbol frozen: neither bought nor sold, a held one keeps its weight",
+    "file_lines": "aitrader/cycle.py:228 (signature), after L232, after L258, L273-276, L282-283; _execute_pending L204/210/213",
+    "change": "_decide(..., frozen=()). After the L232 slice, copy the OHLCV frames and set .loc[dec, frozen] = NaN, so the symbol is not scored, not stopped and not marked (px drops NaN). After L258: for s in frozen, targets_raw.pop(s, None), and if s is held, targets_raw[s] = m.weights(px)[s]. Add 'frozen' to the decision, pending and decisions record ONLY when non-empty. In _execute_pending, drop frozen names from the price dict given to main.rebalance and shadow.rebalance (broker.py:124-126 then skips them).",
+    "stock_impact": "None unless a symbol is stale; the key is only added when non-empty.",
+    "test": "New: a held stale symbol is not sold on a rebalance day. Ceiling: the pinned weight plus build_targets' gross can exceed max_gross; cash still caps buys (broker.py:151)."
+   },
+   {
+    "spec_ref": "4 Revised last close: close_D = open of the D+1 row, applied once right after loading; no D+1 row means no decision; log both values; alert above revised_close_alert_bps",
+    "file_lines": "aitrader/cycle.py between L311 and L312 (before L317-318 and the propose branch), L334, _decide decision dict L273-276 and L282-283",
+    "change": "Crypto only, when market.close_source == 'next_open': nxt = close.index[close.index > dec_bar]. If there is no nxt or panel['open'].loc[nxt[0], universe] has a NaN, set no_decision. Otherwise record close_check = {s: {'yahoo_close', 'next_open'}}, copy close and set close.loc[dec_bar, universe] = the D+1 opens, which feeds start_prices, mark, decide and propose. With close_source 'yahoo', still log both values but do not substitute. At L334 add 'and not no_decision'. Put 'close_check' in the decision and decisions.jsonl (crypto-only key). Each crypto run: compare the latest decisions.jsonl close_check with the current close at that date; if the gap in bps exceeds market.revised_close_alert_bps, add an event, deduped by date.",
+    "stock_impact": "None (gated).",
+    "test": "New: both branches; a missing D+1 row gives no decision; idempotent re-run (the test stub returns the same panel object, so copy before writing)."
+   },
+   {
+    "spec_ref": "3.2 and 6.1 exec_ts = max(01:00 UTC, next full hour after the decision is logged); override cutoff = exec_ts",
+    "file_lines": "aitrader/cycle.py:270, 273-276; _execute_pending L201",
+    "change": "Crypto: logged = journal.now_utc(), computed once and reused as logged_at. exec_ts = max(D+1 01:00Z, floor_hour(logged) + 1h), formatted exactly as now_utc() ('...+00:00'). Store it in the decision only for crypto. Cutoff at L270 and L201 = exec_ts instead of _open_cutoff_utc(...).",
+    "stock_impact": "None; the NYSE branch keeps _open_cutoff_utc.",
+    "test": "New: exec_ts at 00:12, 03:05 and 01:00:00 decisions; an override logged after exec_ts is ignored (mirror test_critic_fixes.OverrideCutoff)."
+   },
+   {
+    "spec_ref": "6.1 Fill at the 1h open at exec_ts, else the 1m bar at exec_ts, else keep pending and fill at the next available hourly open; never the daily open; log the source",
+    "file_lines": "aitrader/cycle.py:194-197, 203-205, 207, 220; new data.hourly_opens",
+    "change": "Crypto branch. Gate: journal.now_utc() >= pending['exec_ts'], else return []; d_exec = the exec_ts UTC date. got = hourly_opens(sorted(names), exec_ts), returning {sym: (price, source)}: the 1h bar with ts == exec_ts and non-null open, else the 1m bar at exec_ts, else the first later 1h bar with non-null open; 'missing' means no row or a null open, and volume is ignored. If any name lacks a price, return [] and keep pending. opx = prices; pending['open_source'] = per-symbol source; cool = d_exec + n calendar days; trades.jsonl 'fill' = that symbol's source instead of 'open'. Import hourly_opens into the cycle namespace so tests can patch it.",
+    "stock_impact": "None (branch); the NYSE path keeps the name lookups _market_opened/official_opens.",
+    "test": "New: each chain step, volume-0 bars accepted, the daily open never used, the source logged."
+   },
+   {
+    "spec_ref": "3.3 PaperBroker costs.qty_step and costs.fee_bps; same costs for main, shadow and backtest",
+    "file_lines": "aitrader/cycle.py:175, 178 (_brokers)",
+    "change": "Pass fee_bps=c.get('fee_bps', 0) and qty_step=c.get('qty_step', 1) as keyword args to both PaperBroker calls.",
+    "stock_impact": "None only if the stock qty_step is the INT 1, so floor(x/step)*step stays an int and portfolio.json keeps '49', not '49.0'.",
+    "test": "test_core.Broker covers integer accounting; new fractional and fee tests."
+   },
+   {
+    "spec_ref": "3.3 periods_per_year into broker.mark",
+    "file_lines": "aitrader/cycle.py:247-248",
+    "change": "Pass trading_days=cfg.get('market', {}).get('periods_per_year', 252) to both mark calls. The parameter already exists at broker.py:38.",
+    "stock_impact": "None (252).",
+    "test": "test_core.Broker.test_cash_yield_and_peak."
+   },
+   {
+    "spec_ref": "3.3 risk.dd_reentry_ref (broker.py:93)",
+    "file_lines": "aitrader/cycle.py:245",
+    "change": "Add r.get('dd_reentry_ref') as a new optional maybe_reset_peak argument (None keeps the midpoint formula).",
+    "stock_impact": "None (key absent or None).",
+    "test": "test_critic_fixes.DrawdownReentry calls with positional (20, -0.10, -0.20), so the new param must come last and be optional. New: -50% step then re-entry for both profiles."
+   },
+   {
+    "spec_ref": "3.3 learning.enabled checked in cycle._learn",
+    "file_lines": "aitrader/cycle.py:37-39",
+    "change": "First line of _learn: if not cfg['learning'].get('enabled', True), return cfg['prior_weights'] (writes no weights.json or learning.jsonl). L238-241 and L338 already fall back to the priors.",
+    "stock_impact": "None.",
+    "test": "New: crypto run writes no weights.json."
+   },
+   {
+    "spec_ref": "3.3 Per-book feature flags vix, earnings_blackout, overlays, corporate_actions, news_engine",
+    "file_lines": "data.py:256-262 (vix); cycle.py:259 (earnings), 287 (overlays), 321-324 (corporate actions), 344-348 (news grading)",
+    "change": "Wrap each in `if cfg.get('market', {}).get(flag, True)`: no _require_vix/VIX fetch; bo = {}; skip overlays; acts = {} so ca_notes is []; skip news grading.",
+    "stock_impact": "None (all True in the explicit stock market block).",
+    "test": "test_cycle.test_propose_changes_no_state shows the pattern: a crypto twin should create only {'proposal.json'} (no earnings.json). test_critic_fixes.VixFailClosed covers the VIX marker."
+   },
+   {
+    "spec_ref": "3.2 is_open(now) for crypto",
+    "file_lines": "aitrader/cycle.py:312-315",
+    "change": "Crypto: mkt = {'is_open': True} with no network. Stocks keep market_status(bench), which tests patch.",
+    "stock_impact": "None if NYSE keeps Yahoo market_status (see mismatches).",
+    "test": "New."
+   },
+   {
+    "spec_ref": "3.3 Equity log (crypto): one mark per decision bar D, written at decision time",
+    "file_lines": "aitrader/cycle.py:350-355 (also L339)",
+    "change": "Crypto: append equity.jsonl only when decided_now, with date=str(dec_bar.date()), and equity/shadow/gross/bench_price from _px(close.loc[dec_bar]) (the substituted close_D the decision marked at). The second _execute_pending at L337 cannot fill in the same run because exec_ts is always in the future. Stocks unchanged.",
+    "stock_impact": "None (gated).",
+    "test": "New: three runs on one day give one row."
+   },
+   {
+    "spec_ref": "3.3 Intraday alert number to config",
+    "file_lines": "aitrader/cycle.py:382",
+    "change": "m <= -cfg.get('market', {}).get('intraday_alert_pct', 0.06)",
+    "stock_impact": "None (-0.06 == -(0.06)).",
+    "test": "No existing coverage: test_cycle stubs market_status as is_open False, so L378-386 never runs in tests. Add one."
+   },
+   {
+    "spec_ref": "3.3 proposal.json deleted when a decision is saved (crypto-gated)",
+    "file_lines": "aitrader/cycle.py:280",
+    "change": "After saving pending.json, under a crypto flag, unlink STATE/'proposal.json' (journal._path('proposal.json').unlink(missing_ok=True) or a journal helper). It matters because __main__._today_market_date reads proposal.json first.",
+    "stock_impact": "None (gated).",
+    "test": "New."
+   },
+   {
+    "spec_ref": "3.3 Grading: crypto calls on absolute return",
+    "file_lines": "aitrader/cycle.py:343",
+    "change": "Pass an absolute or no-bench mode to journal.evaluate_predictions for crypto. This needs a journal change: journal.py:316-317 skips when bench is not in close, and L320-321 subtract the bench return.",
+    "stock_impact": "None (default).",
+    "test": "New. Existing grading tests: test_audit_fixes PreOpenCallGradedFromSessionClose, CalendarEdges, UniqueNewsKeys; test_critic_fixes ForwardOnlyGrading, OutOfHoursCall."
+   },
+   {
+    "spec_ref": "3.3 Reports under market.report_dir",
+    "file_lines": "aitrader/cycle.py:390",
+    "change": "write_daily_report(summary, cfg.get('market', {}).get('report_dir', 'reports')), resolved under report.ROOT (tests patch rep.ROOT=tmp) and created with parents=True.",
+    "stock_impact": "None (default 'reports').",
+    "test": "New: report written under tmp/reports/crypto."
+   },
+   {
+    "spec_ref": "6.2 Quiet hours queue (crypto only)",
+    "file_lines": "aitrader/cycle.py:305, 393 (or notify.send itself)",
+    "change": "If cfg['alerts'].get('quiet_hours') and the local time in its tz is inside from..to, save the message to journal STATE 'alert_queue.json' (the crypto STATE under use_book) and return ['queued']. Urgent messages are queued too. Use a patchable clock.",
+    "stock_impact": "None (no quiet_hours key).",
+    "test": "test_audit_fixes.test_cycle_halts_without_trading patches cycle.notify.send and expects ['urgent'], so it must keep working. New: the stock book still sends at 23:22; crypto queues at 23:22."
+   },
+   {
+    "spec_ref": "4 Live sanity guard vs Coinbase",
+    "file_lines": "aitrader/cycle.py after L258 (_decide), plus new data.coinbase_close",
+    "change": "Crypto: cb = {s: coinbase_close(s, ds)}, Coinbase public candles at granularity 86400, returning None on failure. Any None: add a warning event and proceed. Any |close_D/cb - 1| > market.coinbase_guard_pct: cur = m.weights(px); targets_raw = {s: min(w, cur[s]) for s, w in targets_raw.items() if s in cur}. This keeps regime-off sells and stops but allows no entries or adds. Record the guard in the decision. Import coinbase_close into cycle so tests can patch it.",
+    "stock_impact": "None.",
+    "test": "New: a breach allows exits only (a regime-off sell still happens); unreachable means proceed with a warning."
+   },
+   {
+    "spec_ref": "6.1 robustness (not in spec): do not overwrite an unfilled crypto pending",
+    "file_lines": "aitrader/cycle.py:334 / 280",
+    "change": "Crypto: if pending.status is still 'pending' when a newer dec_bar arrives, do not overwrite it silently. Either skip the decision with an urgent event, or log the old one as superseded in decisions.jsonl.",
+    "stock_impact": "Unreachable for stocks.",
+    "test": "New: the hourly bar is missing until the next 00:12."
+   }
+  ],
+  "test_patch_points": [
+   "Patched in tests today, so call sites must keep these exact module-level names and arities: cycle.load_config() (zero args); cycle.load_market(cfg, rng, age) (positional, returns a panel with no _fetched_at); cycle.market_status(sym='SPY'); cycle.earnings_on(day); cycle._overlays_once_per_day(cfg, ds, bench); cycle._market_opened(d) (1 arg); cycle._bar_is_final(d) (1 arg); cycle.official_opens(syms, day). All of these are in test_cycle.py:19-31.",
+   "cycle.notify.send(title, body, cfg, prio) is patched on the notify module object (test_audit_fixes.py:107-113). Any quiet-hours wrapper must still call notify.send for non-quiet sends.",
+   "journal.STATE is swapped in test_cycle, test_audit_fixes (TempState plus the verify subprocess at L152-159), test_critic_fixes and test_news_rules. report.ROOT is swapped in test_cycle.py:32-35 and 41-43.",
+   "Called directly by tests: cycle._open_cutoff_utc('2026-11-10') must keep returning '2026-11-10T14:30...' outside any book (test_critic_fixes.py:28); cycle._apply_overrides (test_critic_fixes OverrideCutoff); cycle._check_reduce_only (ReduceOnlyInvariant).",
+   "news_live patch points that must survive any move of official_opens: news_live.official_opens, news_live.live_price, news_live.market_open_now, news_live.NewsTrader.step, news_live.notify.send (test_audit_fixes.py:361-434; test_news_rules.py:17-19).",
+   "Important for shims: _execute_pending must keep looking up `official_opens` in cycle globals, or test_cycle.test_one_minute_open_beats_daily_open fails and the suite makes network calls. Calling NyseCalendar.bar_is_final or market_opened directly would bypass the patches silently; that only passes today because the synthetic dates (2020-2021) are in the past.",
+   "New patch points to add: journal.now_utc (freeze for golden (b) and use as the single crypto clock for exec_ts, the fill gate and bar_is_final); cycle.hourly_opens; cycle.coinbase_close; cycle.corporate_actions (golden hermeticity, see mismatches); data.CACHE (point at tmp for the cache-mtime tests); panel['_fetched_at'] injected through the stubbed load_market.",
+   "Existing tests by area: decide/fill/idempotency and hash chains: test_cycle.test_decide_then_fill_at_next_open_and_idempotent. 1-minute open precedence: test_one_minute_open_beats_daily_open. Non-frame panel keys: test_production_shaped_panel_does_not_crash. Propose writes only proposal.json and earnings.json: test_propose_changes_no_state. Reduce-only: test_overrides_only_reduce plus test_critic_fixes OverrideCutoff/ReduceOnlyInvariant. Fail-closed chain: test_audit_fixes BrokenChainFailsClosed. Broker: test_core.Broker, test_critic_fixes DrawdownReentry/LiveCooldown/SplitOnFillDay, test_review_fixes CorporateActions/ExitsOnly. VIX: test_critic_fixes.VixFailClosed, test_review_fixes.test_missing_vix_today_is_defensive.",
+   "NO coverage today: everything in data.py (fetch_daily, fetch_panel, the cache, load_market, official_opens, market_status, earnings_on); the real bodies of _bar_is_final and _market_opened; equity.jsonl content; the intraday alert block cycle.py:378-386 (is_open is stubbed False); _earnings_blackout outage handling."
+  ],
+  "spec_mismatches": [
+   "Calendar interface vs the NYSE code. The stock exec day comes from the panel's next bar plus _market_opened (cycle.py:194-197), not from exec_time(decision_logged_at). Stock fill prices need the daily panel fallback (cycle.py:204), which fill_prices(names, exec_ts) does not receive. The crypto exec_time also needs the decision date D (to anchor 01:00 on D+1), not only logged_at. is_open(now) for NYSE would replace Yahoo market_status (cycle.py:313), which changes equity.jsonl market_open and the intraday-alert gate. Recommendation: keep the NYSE path on the existing shims and code, and branch to the UTC calendar only for crypto.",
+   "Moving official_opens 'verbatim' into market.py breaks news_live.py:31 (`from .data import ... official_opens`) and the news_live.official_opens patch in test_audit_fixes.py:361-373. Keep it in data.py, or re-export it.",
+   "Step 0 (b) says journal.now_utc is frozen 'as tests/test_cycle.py:19-31 does'. It is not: test_cycle freezes no clock. test_cycle also does not stub notify.send, so it sends a real ntfy push whenever AITRADER_NTFY_TOPIC is set (the spec says it was configured 2026-11-09). It does not stub cycle.corporate_actions either, and that reads the real .cache/SPY_events.json (40 real SPY dividends, 2016-2026), so a held synthetic SPY can be credited real dividends: not hermetic. The golden runner must stub all three, plus report.ROOT.",
+   "The crypto priors 0.385 / 0.308 / 0.308 sum to 1.001, so the load-time assert 'priors sum to 1' fails unless it allows a tolerance of 1e-3 or more. Use 0.384 / 0.308 / 0.308, or exact fractions.",
+   "The merge rule leaves out `account`. Stocks have cash_yield_annual 0.035, while crypto needs 0 (owner assumption) and its own starting_cash. `account` must merge key by key (or be listed), or crypto inherits a 3.5% yield.",
+   "'Regime always filled' is not enough. strategy.py:135-137 also leaves out dd_state on no-pick days, so cycle.py:281 stores dd_state=None, cycle.py:253 flags risk_changed, and broker.maybe_reset_peak (broker.py:86-88) pops riskon_streak. The spec's -50% re-entry test fails for the candidate profile (min_score 0.15) whenever no coin is eligible. Fill dd_state too, gated to crypto.",
+   "Section 2.1 says regime-always, equity-per-bar and proposal deletion are gated 'by its market flags', but section 3.3 names only vix/earnings_blackout/overlays/corporate_actions/news_engine. Flag names are missing for: regime-always, equity-per-bar, delete-proposal, absolute grading, stale-skips-run, close_source (next_open|yahoo), coinbase guard, calendar type, and history range.",
+   "'A stale benchmark skips the run': for stocks, skipping the whole run would also stop fills, marks, grading and intraday alerts. The minimal fix that matches today's not-final path is to treat `last` as not final (dec_bar = index[-2]). Recommend that for stocks and an early return for crypto only. The return shape of a skipped run is also unspecified.",
+   "Coinbase guard 'exits only' does not match cycle's exits_only mode. cycle.py:256-258 holds current weights and only drops stopped names, so regime-off sells would NOT run, contradicting 'regime-off still runs'. A clamp is needed (targets <= current weight, drop non-held). It is also unspecified whether a breach on one coin restricts the whole book or only that coin.",
+   "The fill chain does not say what to do when one coin has an hourly open and the other does not (fill partially, or keep all pending). The broker needs prices for every held name to compute weights. Recommend all-or-nothing.",
+   "A still-pending crypto order can be lost. cycle.py:280 overwrites pending.json at the next decision; if hourly data stays missing until the next 00:12 run, the previous orders vanish without a record. Stocks cannot reach this state. The spec needs a rule.",
+   "exec_ts edges: 'next full hour after' a decision logged at exactly 01:00:00 (strictly after gives 02:00). The exec_ts string must use journal.now_utc()'s exact ISO format, because _apply_overrides compares cutoffs as strings (cycle.py:87).",
+   "dd_reentry_ref -0.25 equals the candidate's dd_halve -0.25. The reset lands exactly on the halved boundary (strategy.py:175 `dd <= dd_halve`), so float rounding of eq/(1-0.25) decides halved vs normal, and any small gain flips it to normal. The stock midpoint avoids this on purpose (broker.py:92 comment).",
+   "The cache-mtime rule does not cover a universe symbol that failed with no cache: it is simply absent from the panel columns (data.py:141-146). Crypto must count 'absent' as stale. Stock 'freeze' should also cover it, or a held absent symbol can still be sold at the fill via official_opens.",
+   "Outside my files but on the cycle's path. journal.context (journal.py:363) reads lessons via _path, which is the ACTIVE STATE, so under use_book('crypto') it reads crypto/lessons.md, not the captured stock STATE that section 8 asks for. journal._entry_bar (journal.py:257-287) grades non-quant calls on NYSE session hours, so crypto 'predict --book crypto' calls would be mis-anchored; the spec only covers absolute grading of quant calls. report.py:90 mkdir has no parents=True, so reports/crypto fails when reports/ is absent.",
+   "The ETF_SECTORS consumer list (strategy.py:10, news_live.py:34, dashboard.py:21, backtest.py:122) leaves out cycle.py:260-267 (earnings-blackout ETF exemption and cap).",
+   "broker.mark already accepts trading_days (broker.py:38). 'periods_per_year goes into broker.mark' only needs the call sites (cycle.py:247-248, backtest) to pass it.",
+   "latest.json's baseline key is 'spy_since_start' (cycle.py:364); for crypto it would hold BTC buy-and-hold. The spec makes labels book-aware in report and dashboard, but this key name would stay misleading unless a crypto-only key is added.",
+   "The qty_step default must be the int 1 (not 1.0) for stocks, or floor(x/step)*step turns quantities into floats and portfolio.json, trades.jsonl and the golden files change.",
+   "Minor: cycle.ROOT (cycle.py:29) is unused; test_cycle saves it but never patches it. The stock bar_end for the mtime rule should stay at 16:00 NY + 5 min even on 13:00 early-close days, to match _bar_is_final (cycle.py:169) and keep stocks unchanged."
+  ]
+ }
+]

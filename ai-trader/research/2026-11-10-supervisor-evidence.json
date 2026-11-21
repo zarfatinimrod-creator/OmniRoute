@@ -1,0 +1,429 @@
+{
+ "_about": "Evidence behind the tags of 2026-11-10-supervisor-design.md (rev 2). Built 2026-11-10 by the reviser from the research result, the doc pages and read-only tool calls. It holds no topic value, no account id and no session id.",
+ "baseline_B": {
+  "read_by": "the reviser, read-only git and the GitHub API, 2026-11-10 20:30-21:00 UTC",
+  "local_checkout_head": "dc09f40a (wave 3: 9 commits on base 0215537a, not pushed)",
+  "status": "ahead 9, behind 18 of origin/ccr-120121ba-vsvwlj as fetched at about 21:00 UTC (d7316d2c)",
+  "branch_tip": "d7316d2c, 2026-11-10 20:40:24 UTC (a state commit)",
+  "engine_code_on_the_branch": "as pushed in e6a82895 (2026-11-10 19:42:13 UTC); git diff 6656aba9..d7316d2c touches only BUILD_CLAIMS.md, CLAUDE.md and three state files, so every file:line in the spec reads the same at 6656aba9 (the commit the reviewers read) and at d7316d2c",
+  "one_builder_rule": "e869b734, 2026-11-10 20:28:22 UTC: adds ai-trader/BUILD_CLAIMS.md and the 'One builder at a time' rule in ai-trader/CLAUDE.md",
+  "open_build_claim": "2026-11-10 20:40 UTC, main session: news_live.py, __main__.py, backtest.py, metrics.py, report.py, crypto_sweep.py, config.json, tests/test_news_*.py and others - bringing wave 3 on top of e6a82895",
+  "diff_local_vs_branch": "37 files, news_live.py 1,077 changed lines (git diff --stat HEAD origin/ccr-120121ba-vsvwlj -- ai-trader, read at 6656aba9)"
+ },
+ "lens_L": {
+  "key": "supervisor",
+  "result": {
+   "summary": "The main finding is measured, not theoretical: in the trader cloud session the news engine died three times today (2026-11-10), each time 236-296 seconds after the turn that started it ended (it lived 5.0-5.5 minutes), because a cloud VM \"pauses after a few minutes without activity\" (Claude docs) and a paused VM keeps its files but not its processes; nohup and setsid did not help. From the 14:30 UTC open to 15:11:54 UTC the engine was up 21.8 of 41.9 minutes (52.0%). While it was down from 14:18:50 to 14:38:38 UTC, MU traded through its stop of 708.97 (one-minute lows 707.92, 702.36, 703.69 and 708.75 between 14:31 and 14:35 UTC; the 14:32 bar closed at 704.35) and was not sold, so the owner's \"sell at -3%, no exceptions\" rule was skipped by an outage; a sale near 704.35 would have lost about $160, and only by luck MU is back above the 730.90 entry (732-738 at 15:13-15:21 UTC). One thing kept the VM awake: the engine relaunched at 14:54:00 UTC as a harness-tracked background command was still alive at 15:38:10 UTC (44 minutes, across idle gaps of 13.0 and 25.5 minutes; one launch only), but the documented cap is 2 hours per command, so it should be stopped near 16:54 UTC unless the limit is raised with the BASH_MAX_TIMEOUT_MS environment variable. A restart \"within one second\" is real for a process on a machine that is itself alive: in a scratch drill a kill -9 was followed by the replacement's first heartbeat in 337-449 ms (median 404 ms, n=6), a hang was caught 2.18 s after heartbeats stopped (2 s threshold), and a crash loop was stopped after 6 starts. A restarted engine could check a stop 0.73 s after process start if stops were checked first; as coded it polls 74 feeds and scores first, at least 2.33 s plus scoring. What cannot be done in a second is bringing back a paused or reclaimed VM: each scheduled task runs at most hourly, the two watchdogs are 30 minutes apart, firing was 37-393 s late (n=7) and a turn took 25-144 s, so the worst case is about 39 minutes, and it is unbounded if the trader session is stuck or the weekly model limit is hit (the trader session already shows \"allowed_warning\" on its 7-day window, reset 2026-11-15 06:00 UTC). The supervisor should be four layers: an engine that can be supervised (stop check first, exit codes, one-instance lock), a tiny Python parent that restarts with back-off and a crash-loop limit and writes an uptime log, health checks with heartbeats for feeds, quotes, scorer, chains and slots, and outside checks. The outside checks are a dead-man's switch on ntfy (a scheduled message pushed back at every heartbeat, delivered by ntfy when pings stop; free tier 250 messages a day) and a second watcher session. Every unattended job must live outside the main chat: since it became limited to the owner's trusted devices a self-reminder there failed with ACCESS_DENIED, and all 8 enabled trader tasks are already bound to other sessions. An LLM turn must not be the process supervisor: each watchdog wake of the trader session costs $0.24-$0.80 of usage at list prices (343k-token context), and that session runs claude-opus-5-5 although the standing order is Fable 5.2. Hosting, in order: fix the cloud setup first ($0); the owner's PC is free but the engine does not import on Windows as written (fcntl) and nothing runs after a reboot until he signs in; a VPS at $4.00-€5.49 a month is the only host built to be always on but needs his account, payment and Claude token; GitHub Actions is wrong for the live engine (5-minute cron, runs delayed or dropped, 6-hour job cap, and the repository is a public fork). The alert \"last run SUCCEEDED\" on a scheduled task means only that the wake was delivered (finished 10-20 ms after firing), so today nothing detects a slot that fired and failed.",
+   "options": [
+    {
+     "name": "Failure map: 15 parts that can stop, with detection, speed and restart or containment (the supervisor's checklist)",
+     "what_it_gives": "1) Engine process dies (crash, kill, out of memory). Detect: the parent's wait on the child, under 0.1 s. Restart: 0.34-0.45 s. Today: an LLM watchdog, up to about 39 min. 2) Engine hangs or a step runs long (one scorer call may block 90 s per batch of 12, and stops are checked last in step()). Detect: heartbeat older than a threshold (120 s). Restart: SIGTERM, 5 s, SIGKILL, new child. Contain: stop loop on its own timer, off the scorer path. 3) Cloud VM pauses when idle or is reclaimed (the cause of today's 3 deaths). The in-VM supervisor dies with it. Detect: only from outside, by the dead-man alert (6-9 min) or the next watchdog task. Prevent: run the supervisor as a harness-tracked background command. Restart: next scheduled turn. A pause keeps files; a reclaim keeps only what was pushed to git. 4) Background-command time limit in cloud sessions (30 min default, 2 h maximum): the harness stops the engine and wakes the session. Today's engine should be stopped near 16:54 UTC. Fix: raise BASH_MAX_TIMEOUT_MS, or relaunch on the stop notice. 5) Headline feed slow or dead (Yahoo RSS): a failed fetch returns an empty list silently, which looks like 'no news'. Detect each poll (20 s): feeds answering out of 74, age of the newest headline, latency_s; alert after 3 bad polls. Contain: no buys happen; stops are unaffected. 6) Stale or missing quote: already there (buys blocked on a quote older than 3 min; urgent alert after 300 s blind on a held name). Gap: no second quote source, so the stop cannot act while blind. 7) Scorer CLI (claude -p) fails, times out or hits the usage limit: today it returns nothing and prints one line; the headlines are marked seen and lost (147 on 2026-11-09). Detect: journal every failure with its reason; alert after 3 failed batches. Contain: stops-only mode keeps running; retry while the headline is still fresh. 8) Scheduled slot late, missing or failed. Detect: one receipt line per slot (state/slots.jsonl) checked against expected times by the watcher. Restart: fire the task again (30 fires an hour per task); the cycle is idempotent. 9) Trader session blocked (permission prompt, long desk turn, compaction at 784k tokens; 343k used now): later scheduled messages wait behind it. Detect: stale receipts and heartbeat seen from the watcher session. Contain: push to the owner; the in-VM supervisor keeps the engine alive meanwhile. 10) Broken hash chain: found every 300 s by the engine and at every cycle; fail-closed halt and urgent alert exist. The supervisor must NOT restart it, but ChainBroken exits with code 0, the same as end of day, so it needs its own exit code. Stops are not checked while halted. Prevention: one writer per chained file; journal.append has no lock, so two engines would fork the chain; a file lock must replace today's pgrep check. 11) Git push conflicts between sessions. Detect: non-zero exit. Contain: one save script (commit own files, pull --rebase, push, 5 tries, under a lock), one writer per file family, run every 5 min so a reclaim loses at most 5 min of state (today up to 30). 12) Engine running old code after a pull. Detect: the heartbeat carries the git revision the engine started with. Restart: controlled restart between steps. 13) Dashboard (hourly LLM slot). Detect: the page compares its own 'updated at' stamp with the clock and turns red after 90 min in market hours; slot receipt. Restart: re-fire the slot. 14) Alert channel: a failed ntfy post is not retried (except the blind-stop alert); crypto alerts wait in quiet hours 23:00-08:00 Israel by the owner's choice. Detect: the dead-man covers 'the engine cannot speak'; failed sends go to an outbox and are retried; second path is the Claude app push from LLM turns. 15) Model usage limit: every scheduled turn and the scorer stop together. Detect: scorer errors, missing receipts, the session record. Contain: only code that needs no model turn keeps running (stops, supervisor). It cannot be restarted before the limit resets.",
+     "measured_or_documented": "Measured today: 3 engine deaths 236-296 s after turn end (trader session transcript, heartbeat values 13:19:18, 14:18:50, 14:43:41 UTC against turn ends 13:14:22, 14:14:54, 14:39:30). Measured: 74 of 74 feeds answered, one full poll 1.60 s, newest headline 109 s old, one quote 0.40 s (read-only timing script, 15:17 UTC). Measured: at 14:13:13 UTC 'git pull --rebase' refused on a dirty tree with git's own hint 'Please commit or stash them' (stash is banned). Measured: the 15:38 UTC pull changed news_live.py while the engine started at 14:54 kept running the earlier code. Measured: scheduled-task last_run shows fired_at and finished_at 10-20 ms apart with status SUCCEEDED (list_triggers), and the tool text says it records only that the wake was delivered. Measured: trader session rate_limit_info = seven_day, allowed_warning, resetsAt 1794722400 (2026-11-15 06:00 UTC); context 343k of 1M tokens, auto-compact at 784k. Code facts: score_batch timeout 90 s, batch_max 12, check_stops is the last call in step(), ChainBroken ends run() with a normal exit, fetch_headlines returns [] on any error, journal.append has no lock (aitrader/news_live.py, aitrader/journal.py). Documented: background commands in cloud sessions get 30 minutes or up to 2 hours (Claude tools reference); ntfy.sh daily message limit 250.",
+     "cost": "$0",
+     "effort": "About half a day to turn the list into checks and tests; the items that touch risk rules go through the rule-4 gate.",
+     "owner_must_do": "nothing",
+     "risks": "A check that has never caught a fault in a drill is not trusted (basic law 2, item 5). The list is as complete as one day of evidence allows; the cause of the 2026-11-09 17:26 UTC death was not verified (it is consistent with an idle pause).",
+     "recommendation": "do-first"
+    },
+    {
+     "name": "Layer 0: make the engine supervisable (stop check first, exit codes, one-instance lock, journaled failures, blind-window stop replay)",
+     "what_it_gives": "The stop check runs first in every step and on its own timer, so a slow scorer or feed cannot blind it, and after any restart it runs before anything else. Distinct exit codes: 0 = end of day, 3 = fail-closed halt (broken chain, never restarted), anything else = crash (restarted). A file lock held for the life of the process makes a second engine impossible. The heartbeat carries pid, phase, step time and the git revision. Scorer failures, dropped headlines and feed health are journaled instead of printed. Blind-window replay: on start, if a name is held and the last heartbeat is old, read the one-minute bars since then; if the low crossed the stop, sell at the current live quote and report it.",
+     "measured_or_documented": "Measured (read-only timing in this container, 2026-11-10 15:17 UTC): import 0.32 s, book load 0.00 s, chain check of the 4 news journals 0.01 s, one poll of 74 feeds 1.60 s, one MU quote 0.40 s; so 0.73 s from process start to a stop check if stops go first, against at least 2.33 s plus scoring as coded. Measured: MU one-minute lows of 707.92, 702.36, 703.69 and 708.75 at 14:31-14:35 UTC against the stop 708.9732 while the engine was down 14:18:50-14:38:38 UTC; no sale (Yahoo chart MU 1d/1m, fetched 15:13:46 and 15:21:52 UTC).",
+     "cost": "$0",
+     "effort": "1-2 days with tests and the rule-4 gate (time machine does not apply to the news rule; quant-critic and unit tests do).",
+     "owner_must_do": "Decide one rule: after an outage, if the price crossed the stop while the engine was blind, should it sell at the next live quote? (It only reduces risk.) Decide also whether a broken journal chain may still sell held names.",
+     "risks": "A replay sale fills below the stop when the price gapped (that is what a stop costs). Yahoo one-minute bars can be late or missing. These changes touch risk code, so they need the gate before they land.",
+     "recommendation": "do-first"
+    },
+    {
+     "name": "Layer 1: in-VM process supervisor (a tiny Python parent, launched as a harness-tracked background command)",
+     "what_it_gives": "About 100 lines of standard-library Python. It starts the engine as its child and restarts it at once if it had run 60 s or more, otherwise with back-off 1, 2, 4, 8, 16, 32, 60 s. Crash-loop limit: 5 restarts in 10 minutes, then it stops, sends an urgent alert and exits with code 75 (which wakes the session). Hang: heartbeat older than 120 s, then SIGTERM, 5 s, SIGKILL. It honours the exit codes of layer 0, writes state/uptime.jsonl (start, exit, hang, restart, tripped, and a mark every 60 s so a VM pause shows as a gap), runs the state save script every 5 minutes, and on every restart tells the owner what stopped, from when to when, and which positions were unprotected with the low against the stop in that window. A Python parent rather than a shell loop because back-off, crash-loop limit, hang detection and the JSON log live in one file that also runs on a PC or a VPS (on a VPS systemd replaces it).",
+     "measured_or_documented": "Measured (scratch drill with a dummy child that imports pandas and requests, 2026-11-10 15:16 UTC): kill -9 to first heartbeat of the replacement 337-449 ms, median 404 ms, n=6; hang detected 2.18 s after heartbeats stopped at a 2 s threshold, new child 0.01 s later; crash loop: 6 starts, back-offs 0.5, 1, 2, 4, 8 s, tripped with exit 75 after 20.5 s; exit code 3 was not restarted. Measured: nohup (twice) and setsid nohup with disown (once) did not survive; the engine launched at 14:54:00 UTC with run_in_background and timeout 7,200,000 ms was alive at 15:11:56 and 15:38:10 UTC (pid 664, heartbeat 15:38:01), and the session worker stayed up between turns (780,740 ms and 1,529,783 ms idle). Documented: cloud background commands get 30 minutes or up to 2 hours; 'Set BASH_MAX_TIMEOUT_MS above 7200000 to raise the 2-hour maximum'.",
+     "cost": "$0 cash. Usage falls: today's 16 watchdog wakes a day cost $0.24-$0.80 each at list prices and most become unnecessary.",
+     "effort": "1 day including the drill on a copy of the state.",
+     "owner_must_do": "Approve one environment variable on an approval card (BASH_MAX_TIMEOUT_MS, for example 32400000 = 9 hours).",
+     "risks": "Keep-awake rests on one launch observed for 44 minutes; the feature is a research preview and may change. The supervisor dies with the VM, so it never replaces the outside layer. It becomes a single point of failure, so it must stay tiny, tested and drilled. The prototype is a research file and has not passed the gate.",
+     "recommendation": "do-first"
+    },
+    {
+     "name": "Layer 3a: dead-man's switch on ntfy (an alert when the pings STOP)",
+     "what_it_gives": "The supervisor re-publishes one scheduled message with a fixed id every 3 minutes with a 6-minute delay. While pings arrive nothing is shown. When they stop, ntfy.sh itself delivers 'news engine silent for 6+ minutes, stops are not being checked' to the owner's phone. At the end of the day the supervisor cancels it. It still works when the thing that died is the VM, the trader session, the scheduler or the model limit. One more ping per daily job (quant open and close, crypto decide and fill) with a longer delay.",
+     "measured_or_documented": "Documented (docs.ntfy.sh/publish, seen 2026-11-10): the docs carry this exact pattern as a 'dead man's switch' example (curl -H 'In: 5m' ... ntfy.sh/mytopic/heartbeat-check); 'the minimum delay you can set is 10 seconds and the maximum delay is 3 days'; a scheduled message is replaced by publishing with the same sequence id and cancelled with DELETE /topic/sequence_id; 'On ntfy.sh, the daily message limit is 250'; messages cached 12 hours. The ntfy status page listed no incidents from Oct 27 to Nov 10, 2026 and shows no uptime figure. Not drilled by me: this research was not allowed to publish anything.",
+     "cost": "$0. A 3-minute cadence over a 7.5-hour day is 150 pings, under 250. If the limit is hit: $5 a month (2,500 a day).",
+     "effort": "2-3 hours plus a drill (stop the pings on purpose and time the alert).",
+     "owner_must_do": "nothing (the ntfy app and topic already exist; AITRADER_NTFY_TOPIC is set in the environment). Pay $5 a month only if the free limit turns out too small.",
+     "risks": "Detection is 6-9 minutes, not seconds, and it tells him without restarting anything. Unverified: whether replaced messages count against the 250 a day, and whether the limit is shared with other users behind the cloud proxy's address (a 429 would silence alerts). The topic name works like a password and the repository is a public fork, so it must never be committed.",
+     "recommendation": "do"
+    },
+    {
+     "name": "Layer 3b: watcher in a second cloud session, plus slot receipts",
+     "what_it_gives": "A separate session with two hourly tasks at minutes 22 and 52, so that together with the trader's 07 and 37 something checks every 15 minutes. Each run reads the heartbeat signal the supervisor publishes outward and the slot receipts on the branch; if either is stale it fires the trader's watchdog task at once and pushes one Hebrew line to the owner. It must not be the main chat (scheduled tasks can no longer wake it) and not the trader session (it cannot watch itself). Standing rule: never attach the owner's computer to the trader or watcher session, because that limits a session to his trusted devices for good.",
+     "measured_or_documented": "Documented: 'Expressions that run more often than once per hour are rejected'; 100 scheduled runs an hour per account; 30 manual or API fires an hour per task; runs on the hour 'can start several minutes late' (Claude scheduled-tasks docs, seen 2026-11-10). Measured firing delay today: 393, 355, 39, 66, 37, 285, 39 s (n=7); the minute-07 task was 285-393 s late three times out of three. Measured: all 8 enabled trader tasks are bound to the trader session or the crypto session, none to the main chat (list_triggers 15:07 UTC); the day-one audit log records a self-reminder to the main chat failing with ACCESS_DENIED. From the 2026-11-09 build log: fresh sessions per run could not push (403), so the watcher only reads, fires and notifies. Unverified: whether a child session gets the tools to read another session's status.",
+     "cost": "$0 cash. Usage per run not measured (the trader session's wakes cost $0.24-$0.80 because of its 343k-token context; a small watcher should cost less).",
+     "effort": "Half a day.",
+     "owner_must_do": "nothing beyond approving the creation prompts if they appear.",
+     "risks": "It shares the same account limit and the same platform as the thing it watches, so it is not independent of a platform outage or the usage limit; only the ntfy dead-man is. It adds LLM wakes. Scheduled tasks are a research preview.",
+     "recommendation": "do"
+    },
+    {
+     "name": "Uptime log, dashboard row and fault drills",
+     "what_it_gives": "uptime.jsonl gives a daily uptime percentage of session minutes and a list of gaps with the positions that were unprotected. The dashboard gets one row: uptime today, age of the last heartbeat, restarts, feeds answering, scorer failures, age of the data. A weekly drill, with no open position or on a copy: kill the engine, freeze the heartbeat, feed a stale quote, break a chain on a copy, block the alert channel, skip a slot. Each detector must fire and the result is logged.",
+     "measured_or_documented": "Measured, and the first entry of the log: down 13:19:18-14:13:22 UTC (54.1 min, before the open), 14:18:50-14:38:38 (19.8 min, across the open, MU stop crossed and not sold), 14:43:41-14:55:09 (11.5 min); uptime 52.0% of the first 41.9 session minutes. On 2026-11-09 the equity log shows one gap of 959 s (17:23:00-17:38:59 UTC) against a median spacing of 309 s (state/news_equity.jsonl).",
+     "cost": "$0",
+     "effort": "Half a day, then about 30 minutes a week for the drill.",
+     "owner_must_do": "nothing",
+     "risks": "None material. Without the drills the other layers are untested promises.",
+     "recommendation": "do"
+    },
+    {
+     "name": "Hosting 1: stay in Claude cloud sessions, with layers 0 to 3",
+     "what_it_gives": "No new account; the scorer and the LLM slots already live here. Restart delay: a crashed process under 1 s; an idle pause is prevented while the tracked command runs; a VM lost anyway waits for the next scheduled turn, worst case 30 min spacing + 393 s firing delay + 144 s turn = about 39 min (about 24 min with four staggered tasks); a model limit or a blocked session has no bound. What survives: files on a pause, only pushed git state on a reclaim, the conversation always.",
+     "measured_or_documented": "Documented: 'after a few minutes without activity, a session's VM pauses with its files saved, and a paused VM can later be reclaimed'; background work is not restored after a reclaim; 4 vCPUs, 16 GB RAM, 30 GB disk; 'no separate charge for the cloud VM' (Claude docs, seen 2026-11-10). Measured in this VM: 4 CPUs, 16,086 MB. Measured: turns of the trader session took 25-144 s and cost $0.24-$0.80 at list prices ($2.23 for the first cold one); session total $11.81 from 2026-11-09 10:58 UTC to 2026-11-10 15:38 UTC. The four documentation pages the task named (session.resources, environment.setup_script, environment.dependencies, remote_control.setup) hold handling instructions only and no lifetime numbers.",
+     "cost": "$0 a month in cash; it draws on the subscription's weekly limit.",
+     "effort": "Included in layers 0 to 3 (about 3-4 days in total).",
+     "owner_must_do": "Approve the environment variable. Switch the trader session to the model he ordered (it runs claude-opus-5-5; his standing order is Fable 5.2) with /model in that session.",
+     "risks": "Research preview, no uptime promise. Everything sits on one account's weekly limit (trader session at 'allowed_warning', reset 2026-11-15 06:00 UTC). Keep-awake seen on one launch only. One session carries news, quant, crypto and dashboard, so one stuck turn delays all four.",
+     "recommendation": "do-first"
+    },
+    {
+     "name": "Hosting 2: the owner's Windows PC (engine and supervisor as a native local process, a local Claude session for the LLM parts)",
+     "what_it_gives": "No idle pause and no background time limit, on a machine that already runs four Claude sessions around the clock under a 60-second watchdog. Restart delay: a crash under 1 s with the same supervisor (Windows Task Scheduler alone restarts no faster than every 1 minute); after a Windows reboot nothing runs until he signs in, which has no bound. What survives: everything on disk.",
+     "measured_or_documented": "Code fact: aitrader/news_live.py line 16 imports fcntl, and Python documents fcntl as 'Availability: Unix, not WASI', so the engine does not start on native Windows as written. Documented: ZoneInfo needs the tzdata package where the system has no time-zone database, 'notably Windows'; requirements.txt does not list it. Measured: engine import peaks at 73 MB of memory. Documented: 'A local session ... has no time limit on background commands'; Remote Control server mode exits after roughly 10 minutes without network; Task Scheduler restart interval 'minimum time allowed is 1 minute'. From the other project's rules: 15.6 GB RAM, at most one heavy app, watchdog restarts after 2 misses with at most 4 restarts an hour, and 'after a Windows reboot nothing runs until someone signs in'.",
+     "cost": "$0 (electricity aside)",
+     "effort": "1-2 days: port the file lock, add tzdata, a launcher and a watchdog entry, a state push path, a drill.",
+     "owner_must_do": "Agree to run it on his PC, keep the PC on, and sign in to Windows after every reboot.",
+     "risks": "The reboot gap is unbounded and he is mostly away from the PC. Home power and internet. Memory shared with Unity and Blender; the data disk is USB. Two projects on one machine. It must be a native local process: a cloud session attached to the PC becomes device-bound and cannot be woken by scheduled tasks.",
+     "recommendation": "later"
+    },
+    {
+     "name": "Hosting 3: a small always-on VPS with systemd",
+     "what_it_gives": "The only option built to be always on: systemd restarts the engine after a crash and at boot with nobody signed in, can kill a hung service, and there is no idle pause or 2-hour cap. Restart delay: about 1 s for a crash; a host reboot about 1-2 minutes (not measured). What survives: the disk.",
+     "measured_or_documented": "Documented: systemd RestartSec 'Defaults to 100ms', Restart=always, WatchdogSec puts a silent service in a failed state. Prices seen 2026-11-10: Hetzner CPX02 (1 vCPU, 1 GB, 20 GB) €5.49 a month excluding VAT, with the page showing 'currently unavailable' on its create buttons; DigitalOcean $4.00 a month (1 vCPU, 512 MiB) and $6.00 (1 GiB). Documented: 'claude setup-token' gives a one-year token tied to the subscription for scripts. Provider uptime: unverified.",
+     "cost": "About $4-7 a month.",
+     "effort": "1 day to set up, then patching.",
+     "owner_must_do": "Open the account and pay himself. Generate the Claude token himself and put it on the server (never in chat).",
+     "risks": "A server to patch and secure, with a long-lived token on someone else's machine. Scoring still draws on the same weekly limit. More than a paper book that needs about 7.5 hours a day requires today.",
+     "recommendation": "later"
+    },
+    {
+     "name": "Hosting 4: GitHub Actions cron",
+     "what_it_gives": "Not a host for the live engine. It could later carry the deterministic daily jobs (quant open and close, crypto decide and fill: plain Python that tolerates delay), which would free them from the model limit, as the 2026-11-09 research already proposed. That depends on moving ai-trader to its own private repository (backlog item 14).",
+     "measured_or_documented": "Documented (GitHub docs, seen 2026-11-10): 'The shortest interval you can run scheduled workflows is once every 5 minutes'; the schedule 'can be delayed during periods of high loads' and 'some queued jobs may be dropped'; schedules run only on the default branch; 'Each job in a workflow can run for up to 6 hours'; GitHub Free includes $12 of compute a month and Linux costs $0.006 a minute (about 2,000 minutes, my arithmetic). Measured: the repository is a public fork (visibility public, default branch release/v3.8.51, state on branch ccr-120121ba-vsvwlj) with 26 workflow files of the parent project.",
+     "cost": "$0 for the daily jobs inside the included amount. A 6.5-hour engine every trading day in a private repository would be about 8,190 minutes, about $49 a month before the $12.",
+     "effort": "1-2 days after the move to a private repository.",
+     "owner_must_do": "Create the private repository and add the secrets himself.",
+     "risks": "Best-effort timing; the 6-hour cap is shorter than a trading day with pre-market; runs can stop silently when the included amount is used up; today the bot's state is in a public repository.",
+     "recommendation": "skip"
+    },
+    {
+     "name": "healthchecks.io as a second dead-man's switch (optional)",
+     "what_it_gives": "One check per job with history and a 'down' alert by email, SMS, phone call or Pushover when a ping is late. Useful once there are more than two or three jobs to watch.",
+     "measured_or_documented": "Documented (healthchecks.io, seen 2026-11-10): Hobbyist plan $0 with 20 checks and 100 log entries per check; period and grace 'Minimum: 60 (one minute)' each. An ntfy integration is listed on ntfy's side but I could not confirm it on healthchecks.io pages (unverified).",
+     "cost": "$0",
+     "effort": "2 hours.",
+     "owner_must_do": "Sign up himself and place the ping addresses in the environment.",
+     "risks": "One more account; a ping address is a secret.",
+     "recommendation": "later"
+    },
+    {
+     "name": "Keep today's design: LLM watchdog turns every 30 minutes as the only supervisor",
+     "what_it_gives": "Nothing new. It is what ran today.",
+     "measured_or_documented": "Measured today: 52.0% engine uptime in the first 41.9 session minutes, one stop crossed and not sold, $0.24-$0.80 of usage per wake, and a watchdog that was 285-393 s late three times.",
+     "cost": "$0 cash; about 16 wakes a day of usage.",
+     "effort": "none",
+     "owner_must_do": "nothing",
+     "risks": "The stop on a held news position is unprotected for most of each half hour unless something else keeps the VM awake.",
+     "recommendation": "skip"
+    }
+   ],
+   "honest_limits": [
+    "'Restart within one second' is true only for a process on a machine that is itself alive (337-449 ms in the drill). A paused or reclaimed cloud VM, a rebooted PC or a dead server cannot be brought back in a second; in Claude cloud the outside restart path is 15-30 minutes of task spacing plus a measured 37-393 s firing delay plus a 25-144 s turn.",
+    "A dead-man's switch cannot be faster than its heartbeat period plus its delay: on free ntfy about 6-9 minutes in practice (250 messages a day), on healthchecks.io at least 60 s period plus 60 s grace. It tells the owner; it restarts nothing.",
+    "The keep-awake result rests on one launch watched for 44 minutes (14:54:00 to 15:38:10 UTC). The documented cap is 2 hours per command, the feature is a research preview with no uptime promise, and the idle pause is documented only as 'a few minutes' (236-296 s is my measurement, n=3).",
+    "The news stop is polled (every 20 s plus scoring time) on Yahoo quotes and fills are paper. A hundredth of a second is not possible here; today's real exposure was 19.8 minutes blind across the open.",
+    "If the weekly model limit is hit, every scheduled turn and the scorer stop until the reset (2026-11-15 06:00 UTC for the trader session's window). I can see the status 'allowed_warning' but not the percentage used.",
+    "The dollar figures per wake are list-price equivalents of subscription usage reported by the session, not bills.",
+    "Nothing was drilled on the live system: the supervisor drill used a dummy child in a scratch folder, no test message was published to ntfy, and the prototype has not passed the project's gate.",
+    "Unverified: the cause of the 2026-11-09 17:26 UTC death; whether git push works from a background child process; whether ntfy counts replaced messages or shares the daily limit across users behind the cloud proxy; the healthchecks.io ntfy integration; whether pandas installs tzdata on Windows; VPS and ntfy uptime; the cost of a small watcher session; whether a child session can read another session's status.",
+    "That MU would have been sold by a running engine is an inference: the price stayed under the stop for more than a minute (the 14:32 UTC bar closed at 704.35), so a 20-second poll would almost certainly have seen it, but no engine was running to prove it.",
+    "The four documentation pages the task named contain only instructions for handling a problem; the lifetime facts come from the public Claude Code docs and from today's transcript."
+   ],
+   "sources": [
+    "Trader session transcript, read with list_events on session_<id left out>, 2026-11-10 13:13-15:38 UTC: heartbeat values, engine pids 409/522/664, launch commands (nohup; setsid nohup; run_in_background with timeout 7200000), turn durations, per-turn cost, process_turn_index and process_wall_ms_between_turns",
+    "get_session on session_<id left out>, 2026-11-10 ~15:08 UTC: model claude-opus-5-5, context 340,870 of 1,000,000 tokens, auto-compact threshold 784,000, rate_limit_info seven_day / allowed_warning / resetsAt 1794722400",
+    "list_triggers and get_trigger, 2026-11-10 15:07-15:11 UTC: 8 enabled AI Trader tasks, their schedules, bindings, fired_at and finished_at times",
+    "list_sessions, 2026-11-10 ~15:07 UTC: main chat in REQUIRES_ACTION; four 'bridge' sessions of the owner's PC updated at 15:00 UTC",
+    "get_environment, 2026-11-10: environment 'Default', network unrestricted, variable name AITRADER_NTFY_TOPIC, no setup script",
+    "Yahoo chart MU range 1d interval 1m through aitrader.data._chart, fetched 2026-11-10 15:13:46 and 15:21:52 UTC; output in /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/research2/supervisor/mu_check_output.txt",
+    "Supervisor drill (prototype and results): /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/research2/supervisor/drill/supervise.py, /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/research2/supervisor/drill/drill.py, /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/research2/supervisor/drill/drill_output.txt (run 2026-11-10 ~15:16 UTC)",
+    "Engine cold-start timing, read-only: /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/research2/supervisor/engine_timing.py and /tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/research2/supervisor/engine_timing_output.txt (run 2026-11-10 15:17 UTC)",
+    "Container facts by command, 2026-11-10 15:10 UTC: PID 1 'process_api --firecracker-init', nproc 4, 16,086 MB, uptime 59 min; no cron or supervisord; tmux, setsid, flock present",
+    "gh api repos/zarfatinimrod-creator/OmniRoute, 2026-11-10: private false, visibility public, fork true, default_branch release/v3.8.51; commits on ccr-120121ba-vsvwlj at 15:28-15:30 UTC; remote state/backlog.md items 26-32 and logs/2026-11-10-day-one-audit.md (ACCESS_DENIED on a self-reminder to the main chat)",
+    "/home/user/OmniRoute/ai-trader/aitrader/news_live.py (run loop, step order, score_batch timeout 90 s, fcntl import at line 16, ChainBroken handling), /home/user/OmniRoute/ai-trader/aitrader/journal.py (append without a lock, broken_chains), /home/user/OmniRoute/ai-trader/aitrader/notify.py (no retry on a failed ntfy post, quiet-hours queue), /home/user/OmniRoute/ai-trader/aitrader/cycle.py (halt on a broken chain)",
+    "/home/user/OmniRoute/ai-trader/state/lessons.md, /home/user/OmniRoute/ai-trader/state/backlog.md, /home/user/OmniRoute/ai-trader/state/news_equity.jsonl, /home/user/OmniRoute/ai-trader/state/news_book.json, /home/user/OmniRoute/ai-trader/logs/2026-11-09-crypto-build.md, /home/user/OmniRoute/ai-trader/logs/2026-11-09-build-session.md, /home/user/OmniRoute/ai-trader/research/2026-11-09-methods-ops-context.md",
+    "/home/user/age-of-blood/CLAUDE.md and /home/user/age-of-blood/AGENTS.md (PC watchdog numbers, 15.6 GB RAM, sign-in after reboot)",
+    "https://code.claude.com/docs/en/cloud-environments (seen 2026-11-10): idle pause, reclaim, 4 vCPU / 16 GB / 30 GB, time limits, SessionStart hooks",
+    "https://code.claude.com/docs/en/claude-code-on-the-web (seen 2026-11-10): 'Environment expired', background work not restored, no separate charge for the VM",
+    "https://code.claude.com/docs/en/routines (seen 2026-11-10): hourly minimum, 100 scheduled runs an hour, 30 fires an hour per task, on-the-hour delay, run statuses, usage limit behaviour, research preview",
+    "https://code.claude.com/docs/en/tools-reference (seen 2026-11-10): background command limit 30 minutes / 2 hours in cloud sessions, BASH_DEFAULT_TIMEOUT_MS and BASH_MAX_TIMEOUT_MS, no limit in local sessions",
+    "https://code.claude.com/docs/en/remote-control (seen 2026-11-10): local process must keep running, server mode exits after roughly 10 minutes offline, Trusted Devices",
+    "https://code.claude.com/docs/en/authentication (seen 2026-11-10): claude setup-token, one-year token",
+    "Session documentation tool pages session.resources, environment.setup_script, environment.dependencies, remote_control.setup (read 2026-11-10; no lifetime numbers) and the scheduled-task tool descriptions (hourly minimum, runs between 9 AM and noon Eastern can be delayed, a device-bound session)",
+    "https://docs.ntfy.sh/publish/ (seen 2026-11-10): scheduled delivery, dead man's switch example, 10 s to 3 days, DELETE by sequence id, 250 messages a day on ntfy.sh, 12-hour cache; https://ntfy.sh/ (plans $5 / $10 / $20); https://ntfy.statuspage.io/ (no incidents Oct 27 - Nov 10, 2026)",
+    "https://healthchecks.io/pricing/, https://healthchecks.io/docs/api/, https://healthchecks.io/docs/configuring_notifications/ (seen 2026-11-10); https://docs.ntfy.sh/integrations/ (via search, for the ntfy integration claim)",
+    "https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows, https://docs.github.com/en/actions/reference/limits, https://docs.github.com/en/billing/concepts/product-billing/github-actions (seen 2026-11-10)",
+    "https://www.hetzner.com/cloud/regular-performance/ and https://www.digitalocean.com/pricing/droplets (seen 2026-11-10)",
+    "https://man7.org/linux/man-pages/man5/systemd.service.5.html, https://learn.microsoft.com/en-us/windows/win32/taskschd/tasksettings-restartinterval, https://docs.python.org/3/library/fcntl.html, https://docs.python.org/3/library/zoneinfo.html (seen 2026-11-10)"
+   ]
+  }
+ },
+ "verifier_V": {
+  "checks": [
+   {
+    "claim": "Today's outage (sub-projects 1 and the honest answer): the engine was up 52.0% of the session (21.8 of the first 41.9 minutes); the longest time a held stop went unchecked was 19.8 minutes (14:18:50-14:38:38 UTC); MU traded through its 708.97 stop and was not sold, and 'only by luck' is back above the 730.90 entry; MU is still held, so the owner's answer to question 1 decides what happens to MU now; the news book has 1 trade.",
+    "verdict": "wrong",
+    "evidence": "The outage itself is real: gaps between score rows in state/news_scores.jsonl on 2026-11-10 are 13:19:05-14:13:49, 14:18:17-14:38:19 and 14:43:27-14:54:21 UTC, and Yahoo one-minute bars for MU (fetched 16:36 UTC, https://query1.finance.yahoo.com/v8/finance/chart/MU?range=1d&interval=1m) show lows of 707.92, 702.36, 703.69 and 708.75 at 14:31, 14:32, 14:33 and 14:35 UTC against the stop 708.9732, with the 14:32 bar closing at 704.35. A sale there would have lost 6 x (730.90 - 704.35) = $159. But the rest is out of date. The same bars show MU under the stop again at 15:55-16:00 UTC (lows 707.16-708.71), and the remote branch's journal (gh api, ai-trader/state/news_trades.jsonl at ccr-120121ba-vsvwlj, read 16:38 UTC) has: SELL 6 MU at 707.9493, realized_pnl -137.7, reason 'stop -3% (entry 730.90, now 708.66)', logged 2026-11-10T15:56:16Z; the latest commits say '1 trades, 0 positions'. MU was 714.80 at 16:36:24 UTC, below the entry. The engine does not check stops outside market hours (news_live.py step(): 'if market_open_now(): self.check_stops(events)'), so of the 19.8 minutes only 14:30:00-14:38:38 counted. The local checkout (commit deee0c87, 15:30 UTC) still shows MU held; the roadmap was written from it.",
+    "correct_value": "MU was stopped out by the running engine at 15:56:16 UTC at 707.95, realized loss $137.70 (smaller than the $159 an earlier sale would have cost); the news book holds nothing, so question 1 no longer decides anything about MU. In-session blind time was 8.6 minutes in the second outage and about 10.7 minutes in the third (14:43:41-14:54:21), which is the longest. Uptime was 52-54% for the first 42 session minutes and about 87% by 16:54 UTC (124.8 of 144.1 minutes), because the engine then ran 2 hours without a gap (equity points every 5 minutes from 14:54:26 to 16:37:56 on the remote branch). The news book now has 2 trades (one round trip, a loss)."
+   },
+   {
+    "claim": "What the cloud container can do (sub-project 1, owner question 3): a tracked background command is stopped at a documented 2-hour cap; setting BASH_MAX_TIMEOUT_MS above 7200000 raises it; a session's VM pauses after a few minutes without activity; the engine launched as a tracked background command at 14:54 UTC stayed alive (seen for 44 minutes) and reaches the cap near 16:54 UTC.",
+    "verdict": "confirmed",
+    "evidence": "Docs fetched 2026-11-10 with curl. https://code.claude.com/docs/en/tools-reference.md: 'A command that Claude starts in the background gets 30 minutes, or the `timeout` Claude passes with `run_in_background`, up to a maximum of 2 hours' and 'Set `BASH_MAX_TIMEOUT_MS` above `7200000` to raise the 2-hour maximum to that value' (needs Claude Code v2.1.285 or later; the trader container reports 2.1.322). https://code.claude.com/docs/en/cloud-environments.md: 'after a few minutes without activity, a session's VM pauses with its files saved, and a paused VM can later be reclaimed'; 4 vCPUs, 16 GB of RAM. Observed in the trader session's transcript (list_events on session_<id left out>, read 16:55 UTC): pid 664 'python3 -u -m aitrader news-live --until 16:05' alive at 16:53:45 UTC with heartbeat 16:51:35, then at 16:54:07.888 UTC a task notification 'Background command ... was stopped after reaching its background time limit' (status killed), and a new background command started at 16:54:27. So the cap fired 2 h 0 min 7 s after the 14:54:00 launch, and the engine had run the whole 2 hours.",
+    "correct_value": "As stated, with three additions the owner card should carry. (1) The same docs page says an existing session 'keeps the values it last read until its VM is next restored or rebuilt', so approving the variable does not take effect in the running trader session at once. (2) The stop notice tells the session: 'If it already had the longest `timeout` allowed, do not restart it', so 'relaunch at every 2-hour stop' depends on the session choosing to do so. (3) Each cap needs a model turn to relaunch (20 s today, with no position open)."
+   },
+   {
+    "claim": "Scheduling and restart times (sub-projects 1 and 7): each scheduled task runs at most hourly; two news watchdogs fire at minutes 07 and 37; a task's 'SUCCEEDED' only means the wake was delivered (10-20 ms after firing); a dead engine waits up to about 39 minutes (30 min + 393 s late firing + 144 s turn); a crashed process on a live machine can be restarted in under 1 second (drill 337-449 ms, median 404 ms, n=6); 16 watchdog wakes a day.",
+    "verdict": "confirmed",
+    "evidence": "https://code.claude.com/docs/en/routines.md (fetched 2026-11-10): 'Expressions that run more often than once per hour are rejected'; scheduled runs '100 per hour' per account; Run now and API fires '30 per hour' per task; a run on the hour 'can start several minutes late'; 'Scheduled tasks are in research preview'. list_triggers (2026-11-10 about 16:35 UTC): watchdog crons 'CRON_TZ=America/New_York 7 8-15 * * 1-5' and '37 9-15 * * 1-5'; 8 enabled trader tasks, 7 bound to the trader session and 1 to the crypto session; last_run fired_at/finished_at 11-17 ms apart with status SUCCEEDED (for example 15:37:39.270 and 15:37:39.281); firing delays visible today 31 s, 39 s, 66 s and 162 s, inside the reported 37-393 s range. Arithmetic: 1800 + 393 + 144 = 2,337 s = 38.95 minutes. Restart drill repeated by me with a dummy child that imports pandas and requests (/tmp/claude-0/-home-user/8a7e2b07-38b8-554f-b854-0fa4d66f5fd9/scratchpad/research2/verifier/drill/sup.py, 16:42 UTC): kill -9 to the replacement's first heartbeat 284-454 ms, median 331 ms, n=6; the parent saw the death in 5-7 ms; importing the real engine module in a fresh process took 0.40 s.",
+    "correct_value": "As stated. Small correction: the two crons give 8 + 7 = 15 scheduled watchdog wakes a day, not 16. The docs also say that at a subscription usage limit runs are rejected until the window resets unless the organisation has usage credits turned on, so 'nothing can restart them' has one paid exception."
+   },
+   {
+    "claim": "Owner must switch the trader session's model himself with /model: 'it runs claude-opus-5-5 against his standing order' (sub-project 1, owner_must_do); the session's weekly usage limit shows a warning and resets 2026-11-15 06:00 UTC.",
+    "verdict": "wrong",
+    "evidence": "get_session on session_<id left out>, read 2026-11-10 about 16:37 UTC: session_context.model 'claude-fable-5-2', external_metadata.last_served_model 'claude-fable-5-2', user_switched_model 'claude-fable-5-2'; only configured_model, the value stored when the session was created, reads 'claude-opus-5-5'. The limit half is right: rate_limit_info = seven_day, status 'allowed_warning', resetsAt 1794722400, which is Sun 2026-11-15 06:00:00 UTC (date -u -d @1794722400). Context 351,999 of 1,000,000 tokens, session cost so far $12.55.",
+    "correct_value": "The trader session already runs Fable 5.2 and its last turn was served by Fable 5.2. Nothing is left for the owner to do on this item. The usage warning stands."
+   },
+   {
+    "claim": "Dead-man switch on ntfy (sub-projects 1 and 7): the pattern is documented by ntfy; the free limit is 250 messages a day (150 pings a trading day fits); $5 a month if that is too few; the owner is alerted 6-9 minutes after the machine goes silent.",
+    "verdict": "confirmed",
+    "evidence": "https://docs.ntfy.sh/publish/ (curl, 2026-11-10 16:35 UTC): 'This mechanism is also called a dead man's switch', with the example 'curl -H \"In: 5m\" -d \"Warning: Server heartbeat stopped!\" ntfy.sh/mytopic/heartbeat-check'; a scheduled message is replaced by publishing with the same sequence ID and cancelled with DELETE /<topic>/<sequence_id>; 'the minimum delay you can set is 10 seconds and the maximum delay is 3 days'; 'On ntfy.sh, the daily message limit is 250'; default request limit '60 requests per visitor at once', refilled one per 5 seconds. https://ntfy.sh/ pricing block (same time): Supporter '$6' and '$5' per month under a Monthly/Annually switch, '2,500 daily messages'. 7.5 h x 20 pings an hour = 150. Not drilled by me either: I was not allowed to publish.",
+    "correct_value": "Free limit and pattern as stated. Two corrections: the paid plan is $6 a month billed monthly and $5 a month only on annual billing; and with a ping every 3 minutes and a 6-minute delay the alert arrives 6 minutes after the last ping, that is 3-6 minutes after the death, not 6-9. The limits are per visitor address, so the shared cloud proxy address remains an open risk, as the roadmap says."
+   },
+   {
+    "claim": "Hosting price (sub-project 7, owner question 6): a small always-on server costs $4.00-$6.00 a month at DigitalOcean or EUR 5.49 excluding VAT at Hetzner ('shown as currently unavailable'), 'about $4-7 a month' in the owner's options.",
+    "verdict": "wrong",
+    "evidence": "The prices exist, but for machines too small for the engine as built. https://www.digitalocean.com/pricing/droplets (WebFetch 2026-11-10): $4.00 = 512 MiB RAM, 1 vCPU; $6.00 = 1 GiB; $12.00 = 2 GiB; $24.00 = 4 GiB, 2 vCPUs, 80 GiB. https://www.hetzner.com/cloud/regular-performance/ and /cost-optimized/ (curl, 2026-11-10 about 16:40 UTC): CPX02 1 vCPU, 1 GB, EUR 5.49 excl. VAT with no unavailability label; CPX12 2 GB EUR 9.99; CPX22 2 vCPU, 4 GB EUR 16.99; CX23 2 vCPU, 4 GB EUR 5.99 marked 'not available'; CAX11 4 GB EUR 6.49 marked 'not available'. The scorer is a `claude -p` subprocess (aitrader/news_live.py line 106), and https://code.claude.com/docs/en/setup.md (curl, same day) lists 'Hardware: 4 GB+ RAM' under system requirements.",
+    "correct_value": "A server that meets Claude Code's documented 4 GB requirement costs $24.00 a month at DigitalOcean or EUR 16.99 excl. VAT at Hetzner (CPX22, available); EUR 5.99 only if Hetzner's CX23 comes back. The EUR 5.49 plan is available, but it has 1 GB; the 'not available' label belongs to the EUR 5.99 plan. The $4-6 machines could only work if the scorer moved to direct API calls so that no Claude Code runs on the server, and nobody tested that."
+   }
+  ],
+  "unsupported_promises": [
+   "At least 99% uptime of session minutes in the cloud: no measurement supports it. The only positive evidence is one launch that ran 2 hours (14:54-16:54 UTC) and was then killed at the documented cap; the docs call cloud sessions and scheduled tasks a research preview with no uptime promise, every cap needs a model turn to relaunch, and the session's weekly usage limit already shows a warning.",
+   "Restart 'on the second': shown only for a dummy child process (337-449 ms in the lens's drill, 284-454 ms in mine). The real supervisor is not written, not tested with the real engine and not through the gate; as coded, a restarted engine polls and scores before it checks a stop (a 50-headline catch-up burst held it 47 s today). A paused or reclaimed machine cannot be restarted in a second at all, and the roadmap says so.",
+   "A stop checked 'every 10 seconds or less' and a price 'at most 3 seconds old' at a fill: Yahoo's chart reply carries Cache-Control max-age=10 (re-read by me at 16:36 UTC), and the lenses measured quotes 2.5-4.6 s old at the median and up to 17.1 s. Both targets are design goals with no test behind them, on a paper book that fills on Yahoo quotes.",
+   "The owner alerted 'in 6-9 minutes' by the dead-man switch: never drilled. Unknown whether replaced messages count against 250 a day and whether the limit is shared behind the cloud proxy's address. By arithmetic the alert would come 3-6 minutes after the death.",
+   "'Usage goes down': not measured. The roadmap removes some watchdog wakes but adds a second watcher session with two hourly tasks (about 14 more model turns a trading day), a shadow scorer that doubles scorer calls during the trial, and the improvement work itself, all on a weekly limit that already shows a warning.",
+   "Faster news for this bot: the 60-180 s figure holds for the wire feeds in general, but only 1 of 131 new releases in the lens's window named one of the bot's 74 stocks, and in my poll the tagged GlobeNewswire items were mostly foreign or small companies. The SEC's 'under a second' is the SEC's own sentence; the only measurement is one filing seen within 165 s. Whether any faster source covers the bot's names is still unknown.",
+   "Speed turning into profit: nothing supports it. The news rule has no backtest; its record is now one round trip, a stop-out with a realized loss of $137.70; the cited paper finds no significant return in minutes 1-15. The roadmap says this itself, but four of seven sub-projects still spend effort on speed.",
+   "A server for '$4-7 a month' that is 'always on': the machines at that price have 0.5-1 GB of RAM against Claude Code's documented 4 GB, the engine has never been run on one, and the scorer would still stop at the same weekly usage limit.",
+   "'Relaunch at each 2-hour stop' as the fallback if the owner does not approve the setting: the harness's own stop notice says not to restart a command that already had the longest timeout, the relaunch needs a model turn each time, and the supervisor parent would be killed by the same cap as the engine it watches.",
+   "The halt feed listed as a quick win that needs 'no contact detail and no account': using it is accepting a legal agreement in the owner's name (indemnity, New York law). Only the owner can accept that, so it cannot start before he answers. Two research lenses already polled the feed.",
+   "Archiving Yahoo one-minute bars and headlines into a public repository: Yahoo's terms for automated use and redistribution were never read (the terms page returned 404). The 30-day limit is real (Yahoo answered 'The requested range must be within the last 30 days' and 'Only 8 days worth of 1m granularity data are allowed to be fetched per request' at 16:39 UTC), but starting the archive in a public repository is a licence risk nobody checked.",
+   "A news time machine in '10-20 months': the figure rests on one buy signal in 690 scored rows and an assumed 3% spread. At the observed rate (one buy in about two trading days) 223 trades would take about 21 months, and the rate itself is a sample of one.",
+   "The insider-purchase figure (median one-month return -1.54% against the S&P 500, 47,458 events, 2020-2025): I could not find its source in one search, and the knowledge lens's report reached the roadmap cut off. It should not steer a decision until the source is named.",
+   "Three owner actions are already overtaken by events and should be removed before he sees them: switching the trader session's model (it runs Fable 5.2), deciding what to do with MU (sold at the stop at 15:56 UTC), and choosing whether the crypto sweep and critic come before go-live (the scheduled task already requires both)."
+  ]
+ },
+ "docs_N_D": {
+  "ntfy": {
+   "read_by": "the reviser, curl, 2026-11-10 20:36:39 UTC",
+   "https://docs.ntfy.sh/publish/": {
+    "delay_limits": "As of today, the minimum delay you can set is 10 seconds and the maximum delay is 3 days . This can be configured with the message-delay-limit option.",
+    "replace_and_dead_man_switch": "You can update or replace a scheduled message before it is delivered by publishing a new message with the same sequence ID . When you do this, the original scheduled message is deleted from the server and replaced with the new one. This is different from updating notifications after delivery, where both messages are kept in the cache. This is particularly useful for implementing a watchdog that triggers when your script stops sending heartbeat messages . This mechanism is also called a dead man's switch . For example, you could schedule a message to be delivered in 5 minutes, but continuously update it every minute to push the delivery time further into the future. If your script or system stops running, the message will eventually be delivered as an",
+    "dead_man_example": "# Dead man's switch: keeps pushing a scheduled message into the future # If this script stops, the alert will be delivered after 5 minutes while true ; do curl -H \"In: 5m\" -d \"Warning: Server heartbeat stopped!\" \\ ntfy.sh/mytopic/heartbeat-check sleep",
+    "cancel": "You can cancel a scheduled message before it is delivered by sending a DELETE request to the /<topic>/<sequence_id> endpoint, just like deleting notifications . Alternatively, you can send a GET request to /<topic>/<sequence_id>/delete . This will remove the scheduled message from the server so it will never be delivered, and emit a message_delete event to any subscribers. Command line (curl) ntfy",
+    "delete_event": "Deleting a notification means removing it from the notification drawer and from the client's database . To do this, send a DELETE request to the /<topic>/<sequence_id> endpoint. This will emit a message_delete event that is used by the clients (web app and Android app) to remove the notification entirely. Alternatively, if your client has limited HTTP support (e.g. webhooks or IoT devices), you can also delete a message by sending a GET request to /<topic>/<sequence",
+    "limits": "Message length Each message can be up to 4,096 bytes long. Longer messages are treated as attachments . Requests By default, the server is configured to allow 60 requests per visitor at once, and then refills the your allowed requests bucket at a rate of one request per 5 seconds. Daily messages By default, the number of messages is governed by the request limits. This can be overridden. On ntfy.sh, the daily message limit is 250. E-mai",
+    "json_fields": [
+     "delay - string 30min , 9am Timestamp or duration for delayed delivery",
+     "sequence_id - string my-sequence-123 Sequence ID for updating/deleting notifications Webho"
+    ]
+   },
+   "https://docs.ntfy.sh/subscribe/api/": {
+    "scheduled": "Messages that are scheduled to be delivered at a later date are not typically returned when subscribing via the API, which makes sense, because after all, the messages have technically not been delivered yet. To also return scheduled messages from the API, you can use the scheduled=1 (alias: sched=1 ) parameter (makes most sense with the poll=1 parameter): curl -s \"ntfy.sh/mytopic/json?poll=1&sched=1\" Replay limits",
+    "replay_limits": "Replay limits ¶ Reading cached messages (a poll=1 request, or any request with since= ) replays messages the server already stored, so unlike a live subscription its cost grows with the size of the topic's cache. Two server-side limits apply, both of which a well-behaved client should handle: The response is size-capped. A replay returns only the newest messages that fit in 10 MB per topic (counting body, title, tags and every other publisher-set field), and a capped response carries an X-Messages-Truncated: 1 header. If you see that header, older messages were dropped and you did not receive the full cache. In practice this only affects very large topics; a client polling with since= never comes close. Replayed bytes count against your daily bandwidth budget , the same one attachment downloads use (see limitations ). Exceeding it returns HTTP 429 with ntfy error code 42905 , and no mess"
+   },
+   "https://docs.ntfy.sh/config/": {
+    "visitor": "A visitor is identified by its IP address (or the X-Forwarded-For header if behind-proxy is set). All config o",
+    "http_429": "When a rate limit is hit, the server responds with HTTP 429 (Too Many Requests). If the server knows when the request would be allowed again, the response carries a Retry-After header with the number of seconds to wait: until the visitor's bucket has refilled enough (e.g. for the request, e-mail or topic creation limits), or until the visitor's day is over for a daily limit (e.g. messages, e-mails, phone calls or attachment bandwidth). Limits without a known wait, such as the subscription limit or the global topic limit, do not send the header. Publish responses, and every 429 caused by one of these limits, also carry the RateLimit-Policy and RateLimit headers of the IETF draft RateLimit header fields for HTTP (draft-ietf-httpapi-ratelimit-headers-11), so clients can slow down before they hit a limit. There is one policy for the request limit ( q is the burst, r the requests left, t the seconds until the next request is refilled) and one for the daily message limit ( q is the daily limit, r the messages left today, t the seconds until the visitor's day is over), e.g. RateLimit-Policy: \"messages\";q=250;w=86400 and RateLimit: \"messages\";r=249;t=3600 . Exempt visitors (see visitor-request-limit-exempt-hosts ) and unlimited limits do",
+    "request_bucket": "Each visitor has a bucket of 60 requests they can fire against the server (defined by visitor-request-limit-burst ). After the 60, new requests will encounter a 429 Too Many Requests response. The visitor request bucket is refilled at a rate of one request every 5s (defined by visitor-request-limit-replenish ) visitor-request-li",
+    "daily_window": "The day is a rolling 24-hour period per visitor, not the calendar day; the account page shows when the counts reset next"
+   }
+  },
+  "claude_code": {
+   "read_by": "reviewer 1, copies fetched 2026-11-10 20:24 UTC; each quote re-read in those copies by the reviser",
+   "https://code.claude.com/docs/en/tools-reference": {
+    "background_limit": "* A command that Claude starts in the background gets 30 minutes, or the `timeout` Claude passes with `run_in_background`, up to a maximum of 2 hours * A comman",
+    "stop_notice": "When a background command reaches its time limit, Claude Code stops it and tells Claude why, and Claude can start the command again with a longer `timeout` if the work still needs it. The stop notice reads `Background command \"<description>\" was stopped after reaching its background time limit`. #### Raise the time limit for ba",
+    "raise_limit": "* Set `BASH_MAX_TIMEOUT_MS` above `7200000` to raise the 2-hour maximum to that value. Setting `BASH_DEFAULT_TIMEOUT_MS` above `7200000` raises the maximum the same way #### Foreground comm"
+   },
+   "https://code.claude.com/docs/en/env-vars": {
+    "BASH_MAX_TIMEOUT_MS": "| `BASH_MAX_TIMEOUT_MS` | Maximum timeout the model can set for a foreground Bash or PowerShell tool command, in milliseconds (default: 600000, or 10 minutes). The effective ceiling is the larger of this and `BASH_DEFAULT_TIMEOUT_MS`. An effective ceiling longer than 2 hours also becomes the maximum [time limit for background commands](https://code.claude.com/docs/en/tools-reference.md#time-limit-for-background-commands) in unattended sessions. The background time limit requires Claude Code v2.1.285 or later | | `B"
+   },
+   "https://code.claude.com/docs/en/cloud-environments": {
+    "idle": "* **Idle sessions**: after a few minutes without activity, a session's VM pauses with its files saved, and a paused VM can later be reclaimed. [Set environment variables](#set-environment-variables) describes what a session picks up in each case, and",
+    "variable_takes_effect": "After you edit, add, or remove a variable, an existing session in an Anthropic-hosted environment keeps the values it last read until its VM is next restored or rebuilt, and uses your change from then on. Its VM pauses on its own once the session is idle, and you can't pause it yourself. To use a new value right away, ask Claude"
+   },
+   "https://code.claude.com/docs/en/routines": {
+    "preview": "> Scheduled tasks are in research preview. Behavior, limits, and the API surface may chang",
+    "hourly_minimum": "Expressions that run more often than once per hour are rejected. * **T",
+    "fire_limit": "| **Run now**, API fires, and setting a one-off task to run again | 30 per hour | Each scheduled task, one count shared by all three | The action fails until the limit resets | | **Run now**",
+    "usage_limit": "When a scheduled task hits your subscription usage limit, organizations with usage credits turned on can keep running scheduled tasks on metered overage. Without usage credits, additional runs are rejected until your usage window resets. Turn on usage credits at [claude.ai/settings/usage](https://claude.ai/settings/usage). On Te"
+   },
+   "https://code.claude.com/docs/en/claude-code-on-the-web": {
+    "expiry": "Cloud sessions stop after a period of inactivity and the session's VM is reclaimed. A session counts as inactive while it waits for you to approve an [MCP connector](https://code.claude.com/docs/en/cloud-environments.md#network-access) tool call or to sign in to an MCP server, and it can expire duri"
+   }
+  }
+ },
+ "triggers_T": {
+  "read_by": "the reviser, list_triggers, 2026-11-10 20:38 UTC (ids left out)",
+  "tasks": [
+   {
+    "slot": "news-watch (:07)",
+    "cron": "CRON_TZ=America/New_York 7 8-15 * * 1-5",
+    "bound_to": "trader session",
+    "prompt_updated_at": "2026-11-10T18:48:41Z",
+    "last_fired_at": "2026-11-10T20:08:36Z",
+    "last_run_fired_to_finished_ms": 10
+   },
+   {
+    "slot": "news-watch (:37)",
+    "cron": "CRON_TZ=America/New_York 37 9-15 * * 1-5",
+    "bound_to": "trader session",
+    "prompt_updated_at": "2026-11-10T18:48:41Z",
+    "last_fired_at": "2026-11-10T19:37:44Z",
+    "last_run_fired_to_finished_ms": 19
+   },
+   {
+    "slot": "dashboard",
+    "cron": "CRON_TZ=America/New_York 57 9-16 * * 1-5",
+    "bound_to": "trader session",
+    "prompt_updated_at": "2026-11-10T14:22:51Z",
+    "last_fired_at": "2026-11-10T19:58:06Z",
+    "last_run_fired_to_finished_ms": 14
+   },
+   {
+    "slot": "open",
+    "cron": "CRON_TZ=America/New_York 52 9 * * 1-5",
+    "bound_to": "trader session",
+    "prompt_updated_at": "2026-11-10T19:21:45Z",
+    "last_fired_at": "2026-11-10T14:53:06Z"
+   },
+   {
+    "slot": "midday",
+    "cron": "CRON_TZ=America/New_York 52 12 * * 1-5",
+    "bound_to": "trader session",
+    "prompt_updated_at": "2026-11-10T19:21:45Z",
+    "last_fired_at": "2026-11-10T17:52:24Z"
+   },
+   {
+    "slot": "close",
+    "cron": "CRON_TZ=America/New_York 22 16 * * 1-5",
+    "bound_to": "trader session",
+    "prompt_updated_at": "2026-11-10T17:24:03Z",
+    "last_fired_at": "2026-11-09T21:22:58Z"
+   },
+   {
+    "slot": "weekly",
+    "cron": "CRON_TZ=America/New_York 17 10 * * 6",
+    "bound_to": "trader session",
+    "prompt_updated_at": "2026-11-10T18:48:41Z"
+   },
+   {
+    "slot": "crypto go-live (one shot)",
+    "run_once_at": "2026-11-11T16:05:00Z",
+    "bound_to": "crypto session",
+    "note": "its prompt creates the three crypto tasks: 12 0 * * * UTC, 7 1 * * * UTC, CRON_TZ=Asia/Jerusalem 3 8 * * *"
+   }
+  ],
+  "prompt_facts": {
+   "every_trading_prompt_step_1": "git pull --rebase origin ccr-120121ba-vsvwlj",
+   "watchdog_launch": "start it as a BACKGROUND TASK OF THIS SESSION - the Bash tool with run_in_background true and timeout 7200000 - and NEVER with nohup, setsid or a trailing &. [...] `cd ai-trader && mkdir -p .cache && python3 -u -m aitrader news-live --until 16:05 --minutes 110 >> .cache/news_live.log 2>&1` Never start a second copy while one is running (a second one ends at once with exit code 3: that is not a start). Confirm with pgrep and a fresh heartbeat. If the heartbeat is old but a process is still listed, the engine hangs: stop that background task first (TaskStop; if there is no task to stop, kill the pid), then start a new one.",
+   "watchdog_condition": "If no process is running OR the heartbeat is older than 3 minutes, and New York time is before 16:00 on a trading day",
+   "watchdog_own_push": "If you had to start it, PushNotification to Nimrod: one short Hebrew line saying the news engine was down, for about how long (from the heartbeat age), that stops were not checked in that time, and that it is running again",
+   "watchdog_wake": "When the background task ends by itself this session is woken: start the engine again at once if New York time is before 16:00.",
+   "dashboard": "It reads the live state in this checkout (the engine writes it here), so do not pull or commit for this step. [the prompt has no commit and no push step]"
+  }
+ },
+ "environment_E": {
+  "read_by": "the reviser, get_environment, 2026-11-10 20:38 UTC",
+  "name": "Default",
+  "scope": "personal",
+  "is_default": true,
+  "applies_to": "my personal environment: all of my future sessions that use it, not only this one",
+  "variable_names": [
+   "AITRADER_NTFY_TOPIC"
+  ],
+  "has_setup_script": false,
+  "network": "unrestricted",
+  "other_environments": [
+   "2"
+  ]
+ },
+ "trader_session_G": {
+  "read_by": "the reviser, get_session on the trader session, 2026-11-10 20:55 UTC",
+  "model": "claude-fable-5-2",
+  "last_served_model": "claude-fable-5-2",
+  "configured_model": "claude-opus-5-5",
+  "permission_mode": "auto",
+  "container_cc_version": "2.1.322",
+  "same_environment_as_main_chat": true,
+  "rate_limit": {
+   "type": "seven_day",
+   "status": "allowed",
+   "resets_at": "2026-11-15T06:00:00Z"
+  },
+  "context_tokens_used": 250347,
+  "autocompact_threshold": 784000,
+  "cross_session_inbound": "available",
+  "tools_listed": [
+   "Bash",
+   "Write",
+   "Edit",
+   "Read",
+   "Glob",
+   "Grep",
+   "Agent",
+   "NotebookEdit",
+   "WebFetch",
+   "WebSearch",
+   "TaskStop",
+   "SearchMcpRegistry",
+   "SuggestConnectors",
+   "ListConnectors",
+   "Skill",
+   "Artifact",
+   "list_triggers",
+   "create_trigger",
+   "update_trigger",
+   "delete_trigger",
+   "fire_trigger",
+   "send_later",
+   "add_repo",
+   "check_repo_access",
+   "list_repos"
+  ],
+  "not_in_that_list": [
+   "get_session",
+   "list_events",
+   "get_environment",
+   "update_environment"
+  ],
+  "note": "the list may leave out tools that are loaded on demand"
+ },
+ "drills": {
+  "lens_supervisor_drill_output": "drill1 first heartbeat, import_s: 0.349\n  kill 1: pid 6758 -> 6762, kill->first heartbeat 399 ms (child import 363 ms)\n  kill 2: pid 6762 -> 6766, kill->first heartbeat 392 ms (child import 347 ms)\n  kill 3: pid 6766 -> 6770, kill->first heartbeat 449 ms (child import 405 ms)\n  kill 4: pid 6770 -> 6774, kill->first heartbeat 337 ms (child import 310 ms)\n  kill 5: pid 6774 -> 6786, kill->first heartbeat 439 ms (child import 402 ms)\n  kill 6: pid 6786 -> 6792, kill->first heartbeat 408 ms (child import 374 ms)\ndrill1 restart gap: median 404 ms, min 337, max 449 (n=6)\ndrill2 hang events: 3 starts: 4 first hang hb_age: 2.04\n  heartbeats stopped at ~start+2.0s; detected 2.18s after they stopped; new child started 0.01s after detection\ndrill3 crash loop: supervisor exit code 75 after 20.5 s; starts 6 backoffs [0.5, 1.0, 2.0, 4.0, 8.0] tripped True\ndrill4 final code: supervisor exit code 3 starts 1 last event {'ev': 'supervisor_stop', 'why': 'child exit code 3 is final', 't': 1794323794.543}\n",
+  "lens_engine_timing_output": "import aitrader.news_live: 0.32s\nload_config + NewsTrader(): 0.00s  (seen=2036, positions=['MU'], universe=74)\nchain check of ['news_grades.jsonl', 'news_predictions.jsonl', 'news_scores.jsonl', 'news_trades.jsonl']: 0.01s, broken=[]\none full headline poll, 74 feeds, 8 workers: 1.60s, items=1354, feeds returning nothing=0\nstop check quotes: {'MU': 735.605, 'MU_s': 0.4}  total 0.40s\nTOTAL cold start to first stop check if the stop were checked first: 0.73s; as coded (chain, queue, poll, score, then stops): >= 2.33s + scoring\nnewest headline published 2026-11-10T15:15:07+00:00 age_s 109\n",
+  "reviser_git_pull_test": "Reviser's replication, 2026-11-10 20:5x UTC, git 2.43.0, scratch repositories only (script: the Bash call in the reviser's transcript).\nSetup: the \"trader\" clone has one local commit that changes state/book.json (v1 -> v2) and adds state/added.json; \"origin\" has 5 newer commits to another file.\nA second process reads state/book.json in a tight loop while the pull runs.\ngit pull --rebase : old content seen in 4 of 4 rounds (712, 282, 190, 252 reads); file missing in 1 of 4 rounds (148 reads); the locally added file missing in 4 of 4 rounds.\ngit pull --no-rebase (merge): old content 0 of 4, missing 0 of 4, added file missing 0 of 4.\n",
+  "reviewer_1_git_pull_test": "rebase rewrote the state file in 4 of 4 runs, no file at all once; merge never touched it (4 of 4). Scratch repo under specs/_review_gitlab."
+ }
+}

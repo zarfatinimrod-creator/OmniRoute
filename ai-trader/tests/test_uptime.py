@@ -1,0 +1,416 @@
+"""uptime-report (supervisor spec 4.6, 8, 11.2): the uptime log as the day's percent of market time with its stops
+checked, its causes, and the close slot's lines (R4c, R9, R11). The rows are built here as the parent writes them;
+nothing here starts a process, and the command runs against a temporary state directory."""
+
+from helpers import no_phone  # noqa: F401  (first: a test run must never reach the owner's phone)
+
+import contextlib
+import io
+import json
+import shutil
+import tempfile
+import unittest
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from unittest import mock
+
+from aitrader import __main__ as cli
+from aitrader import journal, supervise, uptime
+
+CFG = supervise.load_cfg()  # the spec's defaults: mark_gap_max_seconds 150, up_hb_max_seconds 60, stops_stale 120
+
+
+def row(t: str, ev: str, **fields) -> dict:
+    """One row of the uptime log, as supervise.append_row writes it."""
+    return {"t": t, "ev": ev, "sup": 4242, **fields}
+
+
+def marks(day: str, first: str, last: str, outage: tuple[str, str] | None = None, skip: tuple = (),
+          **fields) -> list[dict]:
+    """One mark a minute from first to last (UTC), hb 5; inside the outage [start, end) hb is the seconds since its
+    start, the exit. skip: the minutes ("HH:MM") that have no mark. fields: the other values of every mark."""
+    t, end = (datetime.fromisoformat(f"{day}T{x}+00:00") for x in (first, last))
+    lo, hi = (datetime.fromisoformat(f"{day}T{x}+00:00") for x in outage) if outage else (None, None)
+    out = []
+    while t <= end:
+        if t.strftime("%H:%M") not in skip:
+            hb = (t - lo).total_seconds() if lo and lo <= t < hi else 5
+            out.append(row(t.isoformat(), "mark", **{"hb": hb, "stop": None, "n": 0, "open": True, "blind": [],
+                                                      "dm": None, "left": None, **fields}))
+        t += timedelta(minutes=1)
+    return out
+
+
+def edit(rows: list[dict], t: str, **fields) -> None:
+    """Changes the mark at t (UTC, ISO-8601) in place."""
+    next(r for r in rows if r["ev"] == "mark" and r["t"] == t).update(fields)
+
+
+def out_of(*args: str) -> str:
+    """The command's stdout, run against journal.STATE (the test's temporary directory)."""
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = cli.main(["uptime-report", *args])
+    assert code == 0, code
+    return out.getvalue()
+
+
+class Report(unittest.TestCase):
+    def state(self, rows: list[dict]) -> Path:
+        """A temporary state directory holding rows as state/uptime.jsonl; journal.STATE points at it."""
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / "uptime.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
+                                          encoding="utf-8")
+        self.enterContext(mock.patch.object(journal, "STATE", tmp))
+        return tmp
+
+    def test_one_known_gap_gives_exactly_99_percent(self):
+        rows = marks("2026-11-12", "14:30:00", "21:00:00", outage=("16:00:00", "16:03:54"))
+        rows += [row("2026-11-12T16:00:00+00:00", "exit", rc=1, why="exit"), row("2026-11-12T16:03:54+00:00", "up", down_s=234, blind_s=0, handover_s=None)]
+        r = uptime.day_report(sorted(rows, key=lambda x: x["t"]), date(2026, 11, 12), CFG)
+        self.assertEqual((r["session_s"], r["unprotected_s"], r["uptime"], r["missing_marks"], r["by_cause"]["restart"]), (23400, 234, 0.99, 0, 234))
+        self.assertIn("99.00%", uptime.render([r], CFG))
+
+    def test_five_minutes_without_marks_are_a_gap_of_300_s_and_4_missing_marks(self):  # no marks from 15:01 to 15:04
+        rows = marks("2026-11-12", "14:30:00", "21:00:00", skip=("15:01", "15:02", "15:03", "15:04"))
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["missing_marks"], r["by_cause"]["gap"]), (300, 4, 300))
+
+    def test_an_early_close_day_has_12600_session_seconds(self):  # Review Focus 3: 2026-11-27, a full day of marks
+        rows = marks("2026-11-27", "14:30:00", "18:00:00")  # 09:30 to 13:00 New York
+        r = uptime.day_report(rows, date(2026, 11, 27), CFG)
+        self.assertEqual((r["session_s"], r["unprotected_s"], r["uptime"]), (12600, 0, 1.0))
+
+    def test_close_lines_and_only_the_notify_form_prints_them(self):  # an exit at 20:50 UTC with no up; a tripped row; no alert rows
+        rows = [row("2026-11-12T13:07:00+00:00", "start", child=2, n=1, backoff_s=0),
+                row("2026-11-12T13:08:00+00:00", "up", down_s=None, blind_s=0, handover_s=None, held={"MU": 708.97})]
+        rows += marks("2026-11-12", "14:30:00", "20:50:00", n=1, stop=30)
+        loop = datetime.fromisoformat("2026-11-12T20:48:58+00:00")
+        for n in range(2, 7):  # a crash loop: five restarts (a start's n is restarts_today + 1); the sixth fall trips
+            t = loop + timedelta(seconds=12 * (n - 2))
+            rows += [row(t.isoformat(), "exit", child=n, rc=1, signal=None, ran_s=10.0, why="exit"),
+                     row((t + timedelta(seconds=2)).isoformat(), "start", child=n + 1, n=n, backoff_s=2)]
+        rows += [row("2026-11-12T20:50:00+00:00", "exit", child=7, rc=1, signal=None, ran_s=12.0, why="exit"),
+                 row("2026-11-12T20:50:00+00:00", "tripped", restarts=5, window_s=600, trips_today=1),
+                 row("2026-11-12T20:50:00+00:00", "sup_stop", why="crash_loop", rc=75)]
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R4c", "R11"])
+        self.assertTrue(all(l["text"].endswith("כסף נייר") for l in uptime.close_lines(r, rows, CFG)))
+        self.assertIn("המנוע נפל 6 פעמים,", uptime.close_lines(r, rows, CFG)[-1]["text"])  # falls: as R3 said, 5 + 1
+        tmp = self.state(rows)
+        self.assertEqual(("\"notify\"" in out_of("--day", "2026-11-12"), "\"notify\"" in out_of("--day", "2026-11-12", "--notify")), (False, True))
+        self.assertEqual([p.name for p in tmp.iterdir()], ["uptime.jsonl"])  # read-only: nothing written beside it
+
+    def test_an_empty_log_is_a_day_with_no_protected_second(self):
+        self.assertEqual(uptime.day_report([], date(2026, 11, 12), CFG)["uptime"], 0.0)
+
+    def test_each_cause_is_counted_once_under_the_first_that_fits(self):
+        """Restart, hang, handover, gap, stale stops (the brief's order). A hang with the switch off: hb above
+        up_hb_max_seconds in the marks, with stale stops inside it (hang wins). A hang kill: the hang row is written
+        after the kill, so the hang's start comes from the marks, and the mark with no beat right after the kill
+        goes on with the hang. A handover: the planned exit to the next parent's up. Marks 300 s apart whose later
+        one shows an old beat are a gap only: a VM pause freezes the parent and the engine together, so the beat is as
+        old as the pause (spec 4.6 names the mark gap the VM pause, the dead machine, the stalled parent). Marks a
+        minute apart with an old beat (15:01-15:03, 16:01-16:02) are still a hang."""
+        held = {"MU": 708.97}
+        rows = [row("2026-11-12T13:07:00+00:00", "start", child=7, n=1, backoff_s=0),
+                row("2026-11-12T13:08:00+00:00", "up", down_s=None, blind_s=0, handover_s=None, held=held)]
+        rows += marks("2026-11-12", "14:30:00", "21:00:00", skip=("19:01", "19:02", "19:03", "19:04"), n=1, stop=30)
+        for t, hb, stop in (("15:01", 65, 95), ("15:02", 125, 155), ("15:03", 185, 215), ("15:04", 5, 200),
+                            ("16:01", 65, 30), ("16:02", 125, 30), ("19:05", 290, 30)):
+            edit(rows, f"2026-11-12T{t}:00+00:00", hb=hb, stop=stop)
+        edit(rows, "2026-11-12T16:03:00+00:00", hb=None, stop=None, n=None)
+        edit(rows, "2026-11-12T17:19:00+00:00", hb=None, stop=None, n=None)
+        rows += [row("2026-11-12T16:02:30+00:00", "hang", child=7, hb=185.0, phase="score", killed_with="TERM"),
+                 row("2026-11-12T16:02:30+00:00", "exit", child=7, rc=None, signal=15, ran_s=900.0, why="hang"),
+                 row("2026-11-12T16:02:31+00:00", "start", child=8, n=2, backoff_s=0),
+                 row("2026-11-12T16:03:20+00:00", "up", child=8, down_s=50, blind_s=200, handover_s=None, held=held),
+                 row("2026-11-12T17:18:00+00:00", "exit", child=8, rc=143, signal=None, ran_s=4000.0, why="planned"),
+                 row("2026-11-12T17:18:01+00:00", "sup_stop", why="handover", rc=76),
+                 row("2026-11-12T17:18:30+00:00", "sup_start", until="16:05", handover=True),
+                 row("2026-11-12T17:18:30+00:00", "start", child=9, n=2, backoff_s=0),
+                 row("2026-11-12T17:19:10+00:00", "up", child=9, down_s=None, blind_s=70, handover_s=70.0, held=held)]
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual(r["by_cause"], {"restart": 0, "hang": 380, "handover": 70, "gap": 300, "stale_stops": 60})
+        self.assertEqual((r["unprotected_s"], r["exposed_s"], r["missing_marks"], r["handovers"], r["restarts"],
+                          r["longest_blind_s"]), (810, 810, 4, [70.0], 1, 200))
+
+    def test_r11_counts_only_the_r4_and_r4b_lines_that_reached_a_channel(self):
+        """Ruling P6 and the controller's addition: a line counts as reported when one of its rows says sent true
+        (counted once, by its id); a line that never did reports nothing, and its minutes count toward R11."""
+        rows = marks("2026-11-12", "14:30:00", "21:00:00", skip=tuple(f"15:{m:02d}" for m in range(1, 15)))
+        r4 = {"id": "R4-1", "kind": "R4", "text": "...", "m": 10}  # 15 unprotected minutes, 15:00 to 15:15
+        r4b = {"id": "R4b-2", "kind": "R4b", "text": "...", "m": 5}
+        rows += [row("2026-11-12T15:15:05+00:00", "alert", **r4, sent=False),
+                 row("2026-11-12T15:15:06+00:00", "alert", **r4b, sent=False),
+                 row("2026-11-12T15:16:05+00:00", "alert", **r4, sent=True),
+                 row("2026-11-12T15:17:05+00:00", "alert", **r4, sent=True)]  # a second true row of R4-1: once
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        lines = uptime.close_lines(r, rows, CFG)
+        self.assertEqual([l["id"] for l in lines], ["R11"])
+        self.assertIn(" 15 דקות ", lines[0]["text"])
+        rows.append(row("2026-11-12T15:18:05+00:00", "alert", **r4b, sent=True))
+        self.assertEqual(uptime.close_lines(uptime.day_report(rows, date(2026, 11, 12), CFG), rows, CFG), [])
+
+    def test_open_at_close_and_r4cs_held_are_the_held_of_the_days_last_up(self):  # ruling P11
+        rows = [row("2026-11-12T13:08:00+00:00", "up", down_s=None, blind_s=0, handover_s=None,
+                    held={"MU": 708.97, "AAA": 10.0})]
+        rows += marks("2026-11-12", "14:30:00", "20:30:00", n=1, stop=30)
+        rows += [row("2026-11-12T17:59:15+00:00", "exit", child=7, rc=1, signal=None, ran_s=900.0, why="exit"),
+                 row("2026-11-12T18:00:00+00:00", "up", child=8, down_s=45, blind_s=45, handover_s=None,
+                     held={"MU": 708.97}),  # AAA was sold
+                 row("2026-11-12T20:30:00+00:00", "exit", child=8, rc=1, signal=None, ran_s=9000.0, why="exit")]
+        r = uptime.day_report(sorted(rows, key=lambda x: x["t"]), date(2026, 11, 12), CFG)
+        self.assertEqual(r["open_at_close"], {"MU": 708.97})
+        r4c = uptime.close_lines(r, rows, CFG)[0]
+        self.assertEqual((r4c["id"], r4c["priority"]), ("R4c", "high"))
+        self.assertIn("מ-22:30 עד סוף המסחר: 30 דקות בלי בדיקת סטופים. פתוח: MU (סטופ 708.97).",
+                      r4c["text"])  # 20:30 UTC on the owner's clock; AAA, sold, is not in it
+
+    # Test added by Ruling 53 (Task 14d), Task 16's settled item: with no `held` map in the day's last `up`, R4c's
+    # {held} is "cannot tell" (Ruling 39), never "nothing held". The day's last outage, from 20:30 UTC, is open at the
+    # close and no R4 or R4b told it, so R4c is sent (Ruling 50).
+    def test_r4c_says_unknown_when_the_days_last_up_has_no_held_map(self):
+        rows = [row("2026-11-12T13:08:00+00:00", "up", down_s=None, blind_s=0, handover_s=None, held={"MU": 708.97})]
+        rows += marks("2026-11-12", "14:30:00", "20:30:00", n=1, stop=30)
+        rows += [row("2026-11-12T17:59:15+00:00", "exit", child=7, rc=1, signal=None, ran_s=900.0, why="exit"),
+                 row("2026-11-12T18:00:00+00:00", "up", child=8, down_s=45, blind_s=45, handover_s=None, held=None),
+                 row("2026-11-12T20:30:00+00:00", "exit", child=8, rc=1, signal=None, ran_s=9000.0, why="exit")]
+        rows.sort(key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        r4c = uptime.close_lines(r, rows, CFG)[0]
+        self.assertEqual((r["open_at_close"], r4c["id"]), (None, "R4c"))
+        self.assertIn("30 דקות בלי בדיקת סטופים. פתוח: לא ידוע. שעון ישראל.", r4c["text"])
+        self.assertNotIn("אין פוזיציות", r4c["text"])
+
+    def test_r4c_needs_an_engine_outage_as_long_as_r4_reports_and_r11_takes_what_it_leaves(self):
+        """Stale stops at the close are a live engine's (R6), not "the engine did not run"; an outage shorter than
+        outage_report_seconds (180) gets no line of its own, as for R4 and R4b. Both minutes go to R11."""
+        stale = marks("2026-11-12", "14:30:00", "21:00:00", n=1, stop=30)
+        for m in range(51, 61):
+            edit(stale, (datetime.fromisoformat("2026-11-12T20:00:00+00:00") + timedelta(minutes=m)).isoformat(),
+                 stop=200)
+        short = marks("2026-11-12", "14:30:00", "20:59:00")
+        short.append(row("2026-11-12T20:58:30+00:00", "exit", child=7, rc=1, signal=None, ran_s=9000.0, why="exit"))
+        for rows, cause, s in ((stale, "stale_stops", 600), (sorted(short, key=lambda x: x["t"]), "restart", 90)):
+            r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+            self.assertEqual((r["by_cause"][cause], r["unprotected_s"]), (s, s))
+            self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R11"])
+
+    def test_a_dead_man_alarm_is_true_when_the_engine_was_down_and_false_when_only_ntfy_was(self):
+        """Spec 11.2: dead-man alarms, true and false. A `new_seq` row comes at the first ping after the old message
+        was due, so the delay_seconds - seq_margin_seconds before it lie in the silence the alarm came from. True: the
+        engine was down then (an exit at 15:00, back at 15:08). False: the marks show a fresh beat all through and the
+        pings failed (17:00:30 to 17:05:30). False too: the next morning's new seq after a cancel that failed after the
+        close (what went out was DM3, or the DM1 that R9 calls false), although the night before it is a gap."""
+        rows = marks("2026-11-12", "14:30:00", "21:05:00", outage=("15:00:00", "15:08:00"))
+        rows += [row("2026-11-12T15:00:00+00:00", "exit", child=7, rc=1, signal=None, ran_s=900.0, why="exit"),
+                 row("2026-11-12T15:00:01+00:00", "start", child=8, n=2, backoff_s=1),
+                 row("2026-11-12T15:08:00+00:00", "up", child=8, down_s=480, blind_s=480, handover_s=None, held={}),
+                 row("2026-11-12T15:08:00+00:00", "deadman", what="new_seq")]
+        failed = datetime.fromisoformat("2026-11-12T17:00:00+00:00")
+        rows += [row((failed + timedelta(seconds=30 * k)).isoformat(), "deadman", what="ping_failed", status="URLError")
+                 for k in range(1, 12)]
+        rows += [row("2026-11-12T17:06:00+00:00", "deadman", what="new_seq"),
+                 row("2026-11-12T17:06:00+00:00", "deadman", what="recovered"),
+                 row("2026-11-12T21:03:00+00:00", "deadman", what="cancel_failed", dm3=True),
+                 row("2026-11-12T21:03:01+00:00", "deadman", what="disarmed")]
+        rows += marks("2026-11-13", "13:08:00", "13:12:00")
+        rows.append(row("2026-11-13T13:10:00+00:00", "deadman", what="new_seq"))
+        rows.sort(key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual(r["deadman"],
+                         {"alarms": 2, "alarms_true": 1, "alarms_false": 1, "ping_failed": 11, "cancel_failed": 1})
+        self.assertIn("dead-man alarms 2 (true 1, false 1)", uptime.render([r], CFG))
+        self.assertEqual(uptime.day_report(rows, date(2026, 11, 13), CFG)["deadman"],
+                         {"alarms": 1, "alarms_true": 0, "alarms_false": 1, "ping_failed": 0, "cancel_failed": 0})
+
+    def test_the_days_counts_and_r9(self):
+        """restarts (the parent's own count: n rises at a counted restart, a handover's start repeats it), commits,
+        failed ntfy lines, the lowest `left`, the dead-man's rows, the largest stop gap of the day; R9 when the close
+        cancel failed and DM3 could not be placed."""
+        rows = marks("2026-11-12", "14:30:00", "21:00:00", left=250)
+        edit(rows, "2026-11-12T20:00:00+00:00", left=240)
+        rows += [row("2026-11-12T13:07:00+00:00", "start", child=7, n=1, backoff_s=0),
+                 row("2026-11-12T13:07:05+00:00", "code", child=7, commit="abc1234", dirty=False, code_changed=False),
+                 row("2026-11-12T15:00:00+00:00", "exit", child=7, rc=1, signal=None, ran_s=6000.0, why="exit"),
+                 row("2026-11-12T15:00:01+00:00", "start", child=8, n=2, backoff_s=0),
+                 row("2026-11-12T15:00:40+00:00", "up", child=8, down_s=40, blind_s=40, handover_s=None, held={}),
+                 row("2026-11-12T15:00:41+00:00", "code", child=8, commit="abc1234", dirty=False, code_changed=False),
+                 row("2026-11-12T17:18:30+00:00", "start", child=9, n=2, backoff_s=0),
+                 row("2026-11-12T16:00:00+00:00", "alert", id="R6-1", kind="R6", text="...", sent=False),
+                 row("2026-11-12T16:30:00+00:00", "deadman", what="new_seq"),
+                 row("2026-11-12T16:31:00+00:00", "deadman", what="ping_failed", status=429),
+                 row("2026-11-12T16:32:00+00:00", "deadman", what="ping_failed", status="URLError"),
+                 row("2026-11-12T21:01:00+00:00", "deadman", what="cancel_failed", dm3=False)]
+        health = [{"at": "2026-11-11T20:00:00+00:00", "stop_gap_max_s": 99.0},
+                  {"at": "2026-11-12T15:00:00+00:00", "stop_gap_max_s": 18.6},
+                  {"at": "2026-11-12T20:00:00+00:00", "stop_gap_max_s": 31.2},
+                  {"at": "2026-11-12T20:05:00+00:00", "stop_gap_max_s": None}]
+        r = uptime.day_report(sorted(rows, key=lambda x: x["t"]), date(2026, 11, 12), CFG, health)
+        self.assertEqual((r["restarts"], r["trips"], r["commits"], r["ntfy_failed"], r["left_min"], r["deadman"],
+                          r["stop_gap_max_s"]),
+                         (1, 0, ["abc1234", "abc1234"], 1, 240,
+                          {"alarms": 1, "alarms_true": 0, "alarms_false": 1, "ping_failed": 2, "cancel_failed": 1},
+                          31.2))
+        self.assertIsNone(uptime.day_report(rows, date(2026, 11, 12), CFG)["stop_gap_max_s"])  # no file: null
+        self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R9", "R11"])  # 40 s: one minute untold
+        rows[-1]["dm3"] = True
+        self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R11"])
+
+    # Ruling 50 (Task 14c).
+    def test_one_outage_gives_one_line_no_r4c_after_the_r4_that_told_it(self):
+        """Spec 8: one outage gives at most DM1, R4 and W1. The day's last outage began at 15:40 New York (20:40 UTC)
+        and was open at the close; its parent came back at 16:10 and its R4 reached a channel: no R4c, and R11 counts
+        that R4 once against the day's 25 minutes (the trailing 20 and 5 untold minutes at 10:00)."""
+        rows = marks("2026-11-12", "14:30:00", "20:40:00", skip=("15:01", "15:02", "15:03", "15:04"))
+        rows += marks("2026-11-12", "21:10:00", "21:12:00")
+        rows += [row("2026-11-12T21:10:00+00:00", "sup_start", until="16:05", handover=False),
+                 row("2026-11-12T21:10:20+00:00", "up", child=8, down_s=None, blind_s=0, handover_s=None, held={})]
+        r4 = row("2026-11-12T21:10:25+00:00", "alert", id="R4-1", kind="R4", text="...", m=20, sent=True)
+        r = uptime.day_report(sorted(rows + [r4], key=lambda x: x["t"]), date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["gap"]), (1500, 1500))
+        lines = uptime.close_lines(r, sorted(rows + [r4], key=lambda x: x["t"]), CFG)
+        self.assertEqual([l["id"] for l in lines], ["R11"])
+        self.assertIn(" 25 דקות ", lines[0]["text"])
+        for told in ([], [{**r4, "sent": False}]):  # no R4 row, or one that reached no channel: R4c still goes out
+            lines = uptime.close_lines(r, sorted(rows + told, key=lambda x: x["t"]), CFG)
+            self.assertEqual([l["id"] for l in lines], ["R4c", "R11"])
+            self.assertIn("מ-22:40 עד סוף המסחר: 20 דקות ", lines[0]["text"])
+
+    def test_r11_counts_seconds_so_40_untold_seconds_beside_210_told_ones_are_not_lost(self):
+        """A 210 s parent gap told by R4 (`m` 4, `s` 210) and a 40 s restart that no line told: 250 s against 210 s
+        reported. Counted in minutes, each rounded on its own, that was 4 against 4 and no R11."""
+        gap = marks("2026-11-12", "14:30:00", "21:00:00", skip=("15:01", "15:02", "15:03"))
+        gap.append(row("2026-11-12T15:03:30+00:00", "mark", hb=5, stop=None, n=0, open=True, blind=[], dm=None,
+                       left=None))
+        r4 = row("2026-11-12T15:03:31+00:00", "alert", id="R4-1", kind="R4", text="...", m=4, s=210.0, sent=True)
+        restart = [row("2026-11-12T17:00:00+00:00", "exit", child=7, rc=1, signal=None, ran_s=900.0, why="exit"),
+                   row("2026-11-12T17:00:40+00:00", "up", child=8, down_s=40, blind_s=40, handover_s=None, held={})]
+
+        def ids(rows: list[dict]) -> list[str]:
+            rows = sorted(rows, key=lambda x: x["t"])
+            return [l["id"] for l in uptime.close_lines(uptime.day_report(rows, date(2026, 11, 12), CFG), rows, CFG)]
+
+        r = uptime.day_report(sorted(gap + [r4] + restart, key=lambda x: x["t"]), date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["gap"], r["by_cause"]["restart"]), (250, 210, 40))
+        lines = uptime.close_lines(r, sorted(gap + [r4] + restart, key=lambda x: x["t"]), CFG)
+        self.assertEqual([l["id"] for l in lines], ["R11"])
+        self.assertIn(" 4 דקות ", lines[0]["text"])             # {m} stays round(unprotected_s / 60)
+        self.assertEqual(ids(gap + [r4]), [])                    # a fully reported day
+        old = {k: v for k, v in r4.items() if k != "s"}         # a row written before `s`: its m counts as m * 60
+        self.assertEqual((ids(gap + [old]), ids(gap)), ([], ["R11"]))
+
+    # Tests of Ruling 58 (Task 14g): a planned handover is booked at its true length, and a short one is no untold outage.
+    @staticmethod
+    def handover(at: str, took: int, stop_s: int = 0) -> list[dict]:
+        """The rows of one planned handover on 2026-11-12 as the two parents write them. At `at` (UTC, a whole minute:
+        the old parent writes that minute's mark first, and marks() has it) plus stop_s (a planned stop that took that
+        long, or a handover that came due that far into the minute) the child's planned exit and the sup_stop.
+        The next parent starts 2 s before the exit + took: sup_start, its first mark (no child yet: hb null), start;
+        its child is up `took` seconds after the exit."""
+        t0 = datetime.fromisoformat(f"2026-11-12T{at}+00:00") + timedelta(seconds=stop_s)
+        new, up = ((t0 + timedelta(seconds=s)).isoformat() for s in (took - 2, took))
+        return [row(t0.isoformat(), "exit", child=7, rc=143, signal=None, ran_s=4000.0, why="planned"),
+                row(t0.isoformat(), "sup_stop", why="handover", rc=76),
+                row(new, "sup_start", until="16:05", handover=True),
+                row(new, "mark", hb=None, stop=None, n=None, open=None, blind=[], dm=None, left=None),
+                row(new, "start", child=8, n=1, backoff_s=0),
+                row(up, "up", child=8, down_s=None, blind_s=took, handover_s=float(took), held={})]
+
+    def handover_day(self, *took: int, skip: tuple = (), stop_s: int = 0) -> list[dict]:
+        """A whole day of marks from the 08:07 New York start, with the day's four handovers (09:18, 10:48, 12:28 and
+        14:17 New York), each as long as `took` says and each exit stop_s into its minute; skip: the minutes no parent
+        lived in."""
+        rows = marks("2026-11-12", "13:07:00", "21:05:00", skip=skip)
+        for at, s in zip(("14:18:00", "15:48:00", "17:28:00", "19:17:00"), took):
+            rows += self.handover(at, s, stop_s)
+        return sorted(rows, key=lambda x: x["t"])
+
+    def test_one_46_s_handover_is_booked_as_46_s(self):
+        """The old parent's mark of the handover minute shows a live beat, so the pair that ends at the next parent's
+        first mark (hb null) starts there and lies inside the exit-to-up stretch. Without that mark the pair starts a
+        minute earlier, while the engine still ran: that booked 106 s for a 46 s handover until Ruling 61 (Task 14h)
+        counted such a pair's gap from the exit inside it."""
+        rows = sorted(marks("2026-11-12", "14:30:00", "21:00:00") + self.handover("15:48:00", 46), key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"], r["handovers"]),
+                         (46, 46, 0, [46.0]))
+        old = [x for x in rows if not (x["ev"] == "mark" and x["t"] == "2026-11-12T15:48:00+00:00")]
+        self.assertEqual(uptime.day_report(old, date(2026, 11, 12), CFG)["unprotected_s"], 46)
+
+    def test_a_clean_day_of_four_short_handovers_sends_no_r11(self):   # spec 11.2: the first day ends with a quiet phone
+        rows = self.handover_day(46, 46, 46, 46)
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["restarts"], r["trips"]), (138, 138, 0, 0))
+        self.assertEqual(uptime.close_lines(r, rows, CFG), [])       # 09:18 is before the open; three of 46 s each
+        tripped = sorted(rows + [row("2026-11-12T20:50:00+00:00", "tripped", restarts=5, window_s=600, trips_today=1)],
+                         key=lambda x: x["t"])                        # a trip still sends R11
+        r = uptime.day_report(tripped, date(2026, 11, 12), CFG)
+        self.assertEqual([l["id"] for l in uptime.close_lines(r, tripped, CFG)], ["R11"])
+
+    # Tests of Ruling 61 (Task 14h): the parent writes no mark while stop() waits, so the seconds from the minute's mark
+    # to the old engine's exit are the engine still running, not an untold gap.
+    def test_a_25_s_planned_stop_books_only_its_exit_to_up_seconds(self):
+        # no parent lives at 15:49:00: the old one ended at 15:48:25 and the next writes its first mark at 15:49:09
+        rows = sorted(marks("2026-11-12", "14:30:00", "21:00:00", skip=("15:49",))
+                      + self.handover("15:48:00", 46, stop_s=25), key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"], r["handovers"]),
+                         (46, 46, 0, [46.0]))
+        rows = self.handover_day(46, 46, 46, 46, stop_s=25, skip=("14:19", "15:49", "17:29", "19:18"))
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)         # three in market hours: 75 s were booked as gap
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"]), (138, 138, 0))
+        self.assertEqual(uptime.close_lines(r, rows, CFG), [])
+
+    def test_a_handover_due_at_second_40_of_its_minute_books_the_same(self):   # the max_leg_minutes backstop
+        rows = sorted(marks("2026-11-12", "14:30:00", "21:00:00", skip=("15:49",))   # the next parent's mark: 15:49:24
+                      + self.handover("15:48:00", 46, stop_s=40), key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"], r["by_cause"]["gap"]), (46, 46, 0))
+        self.assertEqual(uptime.close_lines(r, rows, CFG), [])
+
+    def test_a_fall_inside_a_pair_that_ends_at_a_null_hb_mark_is_still_booked_and_counted(self):
+        """The engine falls at 15:48:25 and the mark of 15:49 finds the next child with no beat yet (hb null): the
+        fall's 45 s to the next up are a restart, counted, and R11 is due; only the 25 s before it are not a gap."""
+        rows = marks("2026-11-12", "14:30:00", "21:00:00")
+        edit(rows, "2026-11-12T15:49:00+00:00", hb=None, n=None, open=None)
+        rows += [row("2026-11-12T14:30:00+00:00", "start", child=7, n=1, backoff_s=0),
+                 row("2026-11-12T15:48:25+00:00", "exit", child=7, rc=1, signal=None, ran_s=4705.0, why="exit"),
+                 row("2026-11-12T15:48:27+00:00", "start", child=8, n=2, backoff_s=2),
+                 row("2026-11-12T15:49:10+00:00", "up", child=8, down_s=45, blind_s=45, handover_s=None, held={})]
+        rows.sort(key=lambda x: x["t"])
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["restart"], r["by_cause"]["gap"], r["restarts"]),
+                         (45, 45, 0, 1))
+        self.assertEqual([l["id"] for l in uptime.close_lines(r, rows, CFG)], ["R11"])
+        # with no exit and no sup_stop inside it, such a pair is a gap from its first mark, as before
+        bare = [x for x in rows if x["ev"] == "mark"]
+        self.assertEqual(uptime.day_report(bare, date(2026, 11, 12), CFG)["by_cause"]["gap"], 60)
+
+    def test_a_handover_as_long_as_r4b_reports_stays_untold_until_a_line_tells_it(self):
+        """200 s from the exit to the next up at 10:48 New York (outage_report_seconds is 180): R11, unless an R4b that
+        reached a channel told it. The day's other handovers, 46 s each, are no part of what is untold."""
+        rows = self.handover_day(46, 200, 46, 46, skip=("15:49", "15:50", "15:51"))
+        r = uptime.day_report(rows, date(2026, 11, 12), CFG)
+        self.assertEqual((r["unprotected_s"], r["by_cause"]["handover"]), (292, 292))
+        lines = uptime.close_lines(r, rows, CFG)
+        self.assertEqual([l["id"] for l in lines], ["R11"])
+        self.assertIn(" 5 דקות ", lines[0]["text"])                  # {m} stays the day's unprotected minutes
+        told = row("2026-11-12T15:51:21+00:00", "alert", id="R4b-1", kind="R4b", text="...", m=3, s=198.0, sent=True)
+        rows = sorted(rows + [told], key=lambda x: x["t"])
+        self.assertEqual(uptime.close_lines(uptime.day_report(rows, date(2026, 11, 12), CFG), rows, CFG), [])
+
+    def test_days_below_one_are_refused(self):
+        self.state([])
+        for days in ("0", "-1"):
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = cli.main(["uptime-report", "--days", days])
+            self.assertEqual((code, out.getvalue(), len(err.getvalue().splitlines())), (2, "", 1), err.getvalue())
+            self.assertIn(days, err.getvalue())
+
+
+if __name__ == "__main__":
+    unittest.main()
