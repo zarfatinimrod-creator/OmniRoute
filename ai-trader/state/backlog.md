@@ -314,6 +314,18 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     still null), so the decided value is +9.6 bp off the newer one: the second night running that a value with the 5m
     bar null moved later. Candidate finality rule for rule 4: decide only when the 1h 23:00 and 5m 23:55 bars agree
     in the same reply (both nights, the agreeing pair is the later value); tally decided-vs-daily now 4 of 8 over 5 bp.
+    WEEKLY PICK 2026-11-21 (the week's one improvement; build waits for Fable, back 2026-11-22 06:00 UTC, standing
+    order). Evidence for a Coinbase cross-check of the decision close (data, not a parameter; the strategy freeze
+    allows a data fix through rule 4): Coinbase BTC-USD daily candle close vs Yahoo's final daily close over 103 days
+    since 2026-08-01 (api.exchange.coinbase.com candles granularity 86400 vs .cache/BTC-USD_10y.csv): median |diff|
+    1.4 bp, 95% of days within 5 bp, mean -3.1 bp; the outliers (11-08 +22.7, 11-12 -327) sit on days the cache
+    holds a non-final Yahoo value. The two non-final values of this week would have been caught: 11-19 flicker
+    62,041.00 = +20.6 bp vs Coinbase 61,913.23 (the final 61,911.17 = -0.3 bp); 11-20 decided 58,868.49 = +9.1 bp vs
+    Coinbase 58,814.99 (the later 58,811.77 = -0.5 bp). Plan: accept a rebuilt or daily Yahoo close only when it is
+    within `crypto.close_xcheck_bp` (5) of the Coinbase daily close; otherwise decline as a rebuild_declined with
+    reason xcheck and let the late run retry (log mode first: write what it would have declined, change no
+    decision). Gate: unit tests + quant-critic; the change touches the crypto data path, so the critic names the
+    files and the crypto sweep runs before/after if data.py is touched.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
