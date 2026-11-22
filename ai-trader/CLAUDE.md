@@ -237,6 +237,23 @@ through his synced plugins; installing more only adds noise. Use these, by name:
 | A new data source or a market survey | `anthropic-skills:deep-research`, and the `web-researcher` agent |
 | Model ids and prices (scorer comparison, scoring cost) | `claude-api` |
 
+### Trading skills: when each one runs (Nimrod, 2026-11-22: "every trader skill runs, always")
+A session that meets a row's "When" invokes that skill (the Skill tool) without being asked, and says in its log that
+it did. "Always" means always when the row applies, not on a timer of its own. The rules above still bind every
+skill: paper money only, Claude can only reduce risk, rule 4 for any strategy change.
+
+| Skill | When | Called from |
+|---|---|---|
+| `trader` (`skills/trader/SKILL.md`) | every trading turn: each scheduled slot, and every conversation about the books | all nine slot files |
+| `trading-desk` | a rebalance day with new stock entries (the up to 5 largest), or when Nimrod asks for a deep look at one stock | `close.md` step 2, SKILL.md |
+| `trader-news` | a decision needs fresh headlines: crypto entries pending; a holding that gapped more than 4% at the open or is down 4% or more (8-K filings beside `aitrader news SYMBOL`); a loss review | `crypto-decide.md` step 3, `open.md` step 3, `midday.md` step 3, SKILL.md |
+| `trader-analyst` | a thesis rests on an earnings report, or Nimrod asks about a company's numbers | SKILL.md section 2 |
+| `strategy-time-machine` | before and after every change to strategy, risk or learning (rule 4). Never on a schedule: the parameters are frozen since 2026-11-16, and every sweep makes the Deflated Sharpe stricter | rule 4 |
+| `trader-screener`, `trader-copycat`, `trader-pelosi` | a research question from Nimrod (a shortlist, a fund's 13F, Congress trades). Research only, never an order | on request |
+| `trader-scanner`, `trader-entry`, `trader-exit`, `trader-timemachine`, `trader-budget`, `trader-risk`, `trader-alerts` | Nimrod plans a day trade on paper (scan, entry, exit, replay, size, risk check, alert). None feeds an engine; a day-trading book would be a new strategy, so it needs rule 4 and his approval first | on request |
+| `trader-rebalance`, `trader-tax` | a copied-portfolio rebalance or a tax-lot question. Proposals only | on request |
+| `trader-broker` | never by a session, a slot or an agent: only when Nimrod himself types `/trader-broker`, and only with an Alpaca paper account (hard rule 1) | - |
+
 Five user skills exist only on his PC and were asked for from session D on 2026-11-11 (they arrive in the
 age-of-blood repo under `skill/export-for-trader/`): `bug-hunt`, `context-budget`, `eval-harness`,
 `loop-design-check`, `council`. Each is read for injected instructions and for anything that pins a model before it
