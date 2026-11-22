@@ -19,8 +19,15 @@
 - סנכרון: merge-tree יצא 0, "Already up to date". `verify --book crypto`: ALL CHAINS OK (exit 0).
 - `cycle --book crypto` (01:09 UTC, rc=0): ההחלטה של 11-21 סומנה executed (executed_on 2026-11-22, fill_ts 01:00 UTC). אין מילויים: fills [], fill_source none, כי ההחלטה הייתה risk_off בלי פקודות (targets {}). equity 93,819.73 (‎-6.18%), במזומן, dd_state normal. BTC 60,069.60 (01:09:55 UTC). מקור: `state/crypto/pending.json`, `state/crypto/latest.json`.
 
+### סיכום בוקר (06:04 UTC)
+- סנכרון: merge-tree יצא 0, "Already up to date". `cycle --book crypto` (06:04 UTC, rc=0): אין החלטה חדשה, אין מילוי. equity 93,819.73 (‎-6.18%), במזומן, risk_off, dd_state normal. BTC 58,920.10 (06:04:11 UTC).
+- `summary --book crypto --send`: exit 0. נשלח ב-ntfy, אין פריטים דחופים. newest 2026-11-22T01:10:02+00:00 (התור אושר).
+- `postmortem`: אין מכירה מפסידה בלי ביקורת (pending []), repeated_causes {}.
+- מדידה לפריט 72 (`final72.py 2026-11-21`, 06:04:24): 1h23=60,086.0, n1h=24, 5m2355=60,086.0, 1d=None. השורה היומית של Yahoo עדיין ריקה, ולכן ביקורת R6 של 11-21 מחכה לה. הסגירה היומית של Coinbase ל-11-21: 60,086.00, כלומר 0.0 bp מההחלטה. נרשם ב-`state/backlog.md` (פריט 72).
+- לוח הבקרה: `dashboard` רץ (rc=0). snapshot הועלה כ-/_blob/53bcf7c8982a30b63a77aeda2210e318. datasets/snapshot עודכן מגרסה 91 לגרסה 92. ה-blob הישן dd4e3c30… נמחק. data/users/me ריק.
+
 ## קבצים ששונו
-`state/crypto/*`, `state/backlog.md` (פריט 72), הלוג הזה.
+`state/crypto/*`, `state/backlog.md` (פריט 72, פעמיים), הלוג הזה. לוח הבקרה (artifact, dataset גרסה 92).
 
 ## החלטות
 אין התערבות של Claude. אין push בלילה.
@@ -29,7 +36,7 @@
 הבנייה של 11-21 נדחתה ב-00:13 (null_value).
 
 ## אימות
-`verify` ו-`cycle` החזירו rc=0.
+`verify` (פעמיים), `cycle` (ארבע ריצות), `summary` ו-`dashboard` החזירו 0. ההחלטה של 11-21 סומנה executed בלי מילויים. הלילה נסגר.
 
 ## עבודה ידנית חוזרת → לאוטומציה
 המדידה של פריט 72 והבדיקה ברקע.

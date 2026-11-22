@@ -333,6 +333,9 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     next decision). Coinbase 58,814.99 = Yahoo daily -2.7 bp. Tally decided-vs-daily: 11-12 -3.8, 11-13 -53.8,
     11-14 -2.3, 11-15 -20.0, 11-16 -6.0, 11-17 -5.7, 11-18 -0.9, 11-19 +1.5, 11-20 +11.8 bp: 5 of 9 over 5 bp. The
     Coinbase cross-check (5 bp) would have held the 11-20 decision (+9.1 bp vs Coinbase at decision time).
+    2026-11-22 06:04: 11-21 was decided at 00:53:33 on 60,086.00 after a confirmed poll (two probes 5 s apart). The
+    Coinbase daily close of 11-21 is 60,086.00 (+0.0 bp; api.exchange.coinbase.com candles, granularity 86400);
+    the Yahoo daily row of 11-21 is still null at 06:04:24, so the R6 audit of 11-21 waits for it.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
