@@ -15,6 +15,10 @@
 - **ביקורת R6** של ההחלטה של 11-20: ‎-11.8 bp (ההחלטה על 58,868.49, ההיסטוריה 58,798.98; סף 5 bp). נרשמה שורת revised_close ב-`decisions.jsonl` והאירוע נכנס לתור הלילה. ההחלטה לא השתנתה (risk_off בכל מקרה). זה הפגם של פריט 72.
 - אין כניסה חדשה, ולכן אין בדיקת כותרות.
 
+### מילוי (01:08 UTC)
+- סנכרון: merge-tree יצא 0, "Already up to date". `verify --book crypto`: ALL CHAINS OK (exit 0).
+- `cycle --book crypto` (01:09 UTC, rc=0): ההחלטה של 11-21 סומנה executed (executed_on 2026-11-22, fill_ts 01:00 UTC). אין מילויים: fills [], fill_source none, כי ההחלטה הייתה risk_off בלי פקודות (targets {}). equity 93,819.73 (‎-6.18%), במזומן, dd_state normal. BTC 60,069.60 (01:09:55 UTC). מקור: `state/crypto/pending.json`, `state/crypto/latest.json`.
+
 ## קבצים ששונו
 `state/crypto/*`, `state/backlog.md` (פריט 72), הלוג הזה.
 
