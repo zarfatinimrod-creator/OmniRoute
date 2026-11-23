@@ -1020,3 +1020,4 @@
 {"t": "2026-11-23T13:14:38+00:00", "ev": "start", "sup": 233, "child": 238, "n": 1, "backoff_s": 0}
 {"t": "2026-11-23T13:14:40+00:00", "ev": "up", "sup": 233, "child": 238, "down_from": null, "down_s": null, "blind_s": 0, "handover_s": null, "held": {}, "blind": [], "commit": null, "dirty": null, "code_changed": null, "sold": []}
 {"t": "2026-11-23T13:14:45+00:00", "ev": "code", "sup": 233, "child": 238, "commit": "28a521fd", "dirty": false, "code_changed": true}
+{"t": "2026-11-23T13:15:00+00:00", "ev": "mark", "sup": 233, "hb": 11.4, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
