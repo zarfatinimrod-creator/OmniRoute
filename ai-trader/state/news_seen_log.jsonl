@@ -14430,3 +14430,5 @@
 {"key": "a1db4ec20d550b69", "symbol": "TSLA", "published": "2026-11-23T18:54:10+00:00", "first_seen": "2026-11-23T19:07:45.915806+00:00", "outcome": "scored"}
 {"key": "fb66f19d8f2a0f89", "symbol": "AMD", "published": "2026-11-23T18:54:10+00:00", "first_seen": "2026-11-23T19:08:25.909694+00:00", "outcome": "scored"}
 {"key": "3a9918358587c6ac", "symbol": "JPM", "published": "2026-11-23T18:03:00+00:00", "first_seen": "2026-11-23T19:08:45.930023+00:00", "outcome": "stale"}
+{"key": "dd8997ed04e20b7b", "symbol": "NVDA", "published": "2026-11-23T18:54:10+00:00", "first_seen": "2026-11-23T19:08:45.929721+00:00", "outcome": "scored"}
+{"key": "87895e46919a9936", "symbol": "NVDA", "published": "2026-11-23T18:52:00+00:00", "first_seen": "2026-11-23T19:08:45.929746+00:00", "outcome": "scored"}
