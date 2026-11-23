@@ -1078,3 +1078,16 @@
 {"t": "2026-11-23T14:10:00+00:00", "ev": "mark", "sup": 233, "hb": 1.2, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-23T14:11:00+00:00", "ev": "mark", "sup": 233, "hb": 1.2, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-23T14:12:00+00:00", "ev": "mark", "sup": 233, "hb": 1.2, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-23T14:13:00+00:00", "ev": "mark", "sup": 233, "hb": 1.3, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-23T14:14:00+00:00", "ev": "mark", "sup": 233, "hb": 1.4, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-23T14:15:00+00:00", "ev": "mark", "sup": 233, "hb": 1.2, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-23T14:16:00+00:00", "ev": "mark", "sup": 233, "hb": 1.3, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-23T14:17:00+00:00", "ev": "mark", "sup": 233, "hb": 1.0, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-23T14:18:00+00:00", "ev": "mark", "sup": 233, "hb": 0.8, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-23T14:18:06+00:00", "ev": "exit", "sup": 233, "child": 238, "rc": 143, "signal": null, "ran_s": 3807.6, "why": "planned"}
+{"t": "2026-11-23T14:18:06+00:00", "ev": "sup_stop", "sup": 233, "why": "handover", "rc": 76}
+{"t": "2026-11-23T14:18:17+00:00", "ev": "sup_start", "sup": 4565, "until": "16:05", "handover": true, "timeout_ms": 7200000, "prev_t": "2026-11-23T14:18:06+00:00", "prev_ev": "sup_stop", "gap_s": 12, "cold": false}
+{"t": "2026-11-23T14:18:17+00:00", "ev": "mark", "sup": 4565, "hb": null, "stop": null, "n": null, "open": null, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-23T14:18:17+00:00", "ev": "start", "sup": 4565, "child": 4573, "n": 1, "backoff_s": 0}
+{"t": "2026-11-23T14:18:18+00:00", "ev": "up", "sup": 4565, "child": 4573, "down_from": null, "down_s": null, "blind_s": 0, "handover_s": 12.0, "held": {}, "blind": [], "commit": null, "dirty": null, "code_changed": null, "sold": []}
+{"t": "2026-11-23T14:18:18+00:00", "ev": "code", "sup": 4565, "child": 4573, "commit": "c1292086", "dirty": false, "code_changed": true}
