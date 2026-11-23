@@ -13627,3 +13627,6 @@
 {"key": "0b3c5608a20baf69", "symbol": "ABBV", "published": "2026-11-23T13:41:00+00:00", "first_seen": "2026-11-23T14:52:40.600288+00:00", "outcome": "stale"}
 {"key": "b3d9ae3f2c796927", "symbol": "NVDA", "published": "2026-11-23T14:43:47+00:00", "first_seen": "2026-11-23T14:52:40.599620+00:00", "outcome": "scored"}
 {"key": "588a050d9054e5c0", "symbol": "NVDA", "published": "2026-11-23T14:50:23+00:00", "first_seen": "2026-11-23T14:55:00.634532+00:00", "outcome": "scored"}
+{"key": "396a72e78ee16523", "symbol": "NVDA", "published": "2026-11-23T14:49:21+00:00", "first_seen": "2026-11-23T14:57:00.664846+00:00", "outcome": "scored"}
+{"key": "0a75722b85967e2d", "symbol": "NVDA", "published": "2026-11-23T14:50:43+00:00", "first_seen": "2026-11-23T14:57:00.664869+00:00", "outcome": "scored"}
+{"key": "87f5325812ac94a3", "symbol": "TXN", "published": "2026-11-23T14:45:20+00:00", "first_seen": "2026-11-23T14:57:00.664952+00:00", "outcome": "scored"}
