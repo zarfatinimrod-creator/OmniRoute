@@ -5,14 +5,6 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-23 00:25 - trader session (backlog 72, the weekly pick of 2026-11-21)** - files: `aitrader/cycle.py`,
-  `config.json` (the crypto book's market block only: new keys `close_xcheck_bp` and `close_xcheck_mode`), new file
-  `tests/test_crypto_close_xcheck.py`. The main session's claim below names `config.json`; it is older than 24 hours
-  and nothing of it was pushed since 2026-11-12. Purpose: a log-mode cross-check of the crypto decision close against
-  the Coinbase daily candle at 5 bp: it writes what it would have declined and changes no decision. Built in a separate
-  worktree; it reaches this checkout only after the gate (quant-critic + unit suite). It touches no file the time
-  machine loads (data.py is reused, not changed).
-
 - **2026-11-11 10:09 (refreshed 21:10; rollout step 1 landed at 21:08 UTC, ab7b27f9) - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
@@ -54,6 +46,17 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
+
+- **2026-11-23 00:25 - trader session (backlog 72, the weekly pick of 2026-11-21)** - files: `aitrader/cycle.py`,
+  `config.json` (the crypto book's market block only: new keys `close_xcheck_bp` and `close_xcheck_mode`), new file
+  `tests/test_crypto_close_xcheck.py`. The main session's claim below names `config.json`; it is older than 24 hours
+  and nothing of it was pushed since 2026-11-12. Purpose: a log-mode cross-check of the crypto decision close against
+  the Coinbase daily candle at 5 bp: it writes what it would have declined and changes no decision. Built in a separate
+  worktree; it reaches this checkout only after the gate (quant-critic + unit suite). It touches no file the time
+  machine loads (data.py is reused, not changed).
+  **Done 2026-11-23 01:00**: cc173cf3 (merged d9bc73f7): cycle.py `_close_xcheck` + `seen` on `_coinbase_guard`, config
+  books.crypto.market close_xcheck_bp 5 / close_xcheck_mode "log", tests/test_crypto_close_xcheck.py (11), test_books.py
+  pin. Suite 941 OK; quant-critic PASS, live-path review PASS (wf_41efa60e-d60).
 
 - **2026-11-16 18:35 - trader session (owner decision)** - files: `CLAUDE.md` (hard rule 1 only, plus one new dated
   owner-decision paragraph under it). The main session's claim on `CLAUDE.md` (refreshed 2026-11-11 21:10) is older

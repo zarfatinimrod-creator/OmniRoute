@@ -341,6 +341,24 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     11-17 -5.7, 11-18 -0.9, 11-19 +1.5, 11-20 +11.8, 11-21 -1.3 bp: 5 of 10 over 5 bp. The two decisions taken
     only once the 1h 23:00 and 5m 23:55 bars agreed (11-19 at 06:05; 11-21 at 00:53 after a confirmed poll) are
     +1.5 and -1.3 bp; the 11-20 decision (00:13, 5m 23:55 bar still null) is +11.8 bp. Two cases, not proof.
+    2026-11-23 01:00 UTC: LOG MODE SHIPPED (commit cc173cf3, merged d9bc73f7). books.crypto.market close_xcheck_bp 5,
+    close_xcheck_mode "log"; every crypto decision row in state/crypto/decisions.jsonl now carries diag.close_xcheck
+    {mode, bp, symbols{close, coinbase, gap_bp}, would_decline, unreachable}, reusing the Coinbase guard's fetch. It
+    changes no decision. Gate: builder (Fable, separate worktree) suite 930 -> 941 OK; quant-critic PASS and live-path
+    review PASS (workflow wf_41efa60e-d60); no file the time machine loads touched, so no sweep (third ruling).
+    Forward read: from the first decision row logged after the merge, compare would_decline with the revised_close
+    row of the same date (R6, 5 bp): caught / false alarm / miss / unreachable, per day. Replay on the 11 logged
+    decisions (guard gaps, decision/Coinbase - 1): would_decline on 11-13 (-52.0), 11-15 (-21.6), 11-20 (+9.1); R6
+    fired on 11-13, 11-15, 11-16, 11-17, 11-20: 3 caught, 2 missed (11-16 guard 0.0 vs R6 +6.0; 11-17 -2.5 vs +5.7),
+    0 false alarms. The 5 bp line was chosen on this same sample: only the forward record counts. Notes before any
+    enforce mode (gate, nonblocking): (1) the boundary |gap| == bp is untested (a '>=' mutant survives); (2)
+    'unreachable' mixes "Coinbase gave nothing" with "decision close missing": tally them apart; (3) the guard gap is
+    exactly 0.0 on 11-12, 11-16, 11-18, 11-21, so Coinbase seems to track Yahoo's 1h close: the check catches a 1h
+    close that is not final yet, but cannot see Yahoo's hourly-vs-daily basis behind the 11-16/11-17 R6 alerts; split
+    misses by cause (compare with the final 1h 23:00 close too); (4) a book with the check on and coinbase_guard_pct 0
+    would fetch inside _decide, outside any try, before exec_ts is set: refuse that combination first. The reviewers
+    could not find '+20.6 bp' in the journal: it is the 11-19 flicker value 62,041.00 vs Coinbase 61,913.23, which
+    never reached a decision, so the figure is right but is not a journal row.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
@@ -404,6 +422,36 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
         prompt reads it.
     (k) supervise.MAX_AGE_S (30 days) is a literal: move it to a supervisor key with Task 22, the next change to
         config.json.
+
+
+81. [report][accuracy] The market line of reports/YYYY-MM-DD.md can show a stale benchmark quote after the close:
+    2026-11-18 close report said 'SPY 728.565, updated 15:52:53 UTC' while the close was 730.20 (Yahoo 1d,
+    regularMarketTime 21:00 UTC; equity.jsonl bench_price 730.20). Display only: decisions and the baseline returns use
+    the close. Basic law 2 (price age is tracked): find where market_status gets that quote and show its age or the close.
+82. [stocks][risk][rule] The sector cap (`risk.max_sector_pct` 0.30) does not count a sector ETF with its sector:
+    `universe` labels XLV 'SectorETF', so on 2026-11-19 the cap saw Health at 19.1% (TEVA 3.8, JNJ 3.9, ABBV 4.0,
+    LLY 2.8, MRK 2.4, AMGN 2.2) while XLV added 9.9% more health exposure (~29% together; weights from
+    reports/2026-11-19.md targets). That day's health sell-off stopped out XLV, TEVA and MRK together (fills
+    2026-11-20 open: -425.10, -413.17, -241.08 of the -1,532.54 total; state/trades.jsonl; loss review of
+    stocks:f854cc7b, 95900f0b, c03e84a5, f4b5248b, planned_loss). One day, one case: a rule change, not a defect, and the strategy freeze of
+    2026-11-16 holds. Candidate for rule 4 when the freeze allows: map each sector ETF to its sector for the cap.
+83. [desk][sizing] A desk 'Hold' on a new entry is documented as "shrink to 50%" (skills/trading-desk/SKILL.md step 5),
+    but for a new name it can act as a veto: the halved target falls under the rebalance band
+    (`risk.rebalance_band_pct` 0.02) and `broker.rebalance` skips any non-exit order with |target - current| < band
+    (the `force` path covers only shrinks of held names). 2026-11-20 close: raw targets PG 2.36%, V 2.38%, COST 2.66%
+    (state/pending.json targets_raw) were halved to 1.18%, 1.19%, 1.33% by three desk Holds, and none of them is in
+    the orders for the 2026-11-23 open (preview_at_close: only the XLP 32 entry is a buy). Reduce-only, so allowed by
+    hard rule 3, but the record says shrink while the effect is veto. Options for rule 4: let a desk shrink of a new
+    entry bypass the band (like `force`), or document that Hold on a sub-2x-band entry vetoes it.
+84. [crypto][defect, pre-existing, latent] Two gaps in the Coinbase guard path, found by the backlog 72 gate
+    (live-path review and quant-critic, 2026-11-23, workflow wf_41efa60e-d60), not added by it:
+    (a) data.coinbase_close (data.py:237-241) catches only RuntimeError/TypeError/ValueError/IndexError; a reply shaped
+    like [{...}] raises KeyError at r[0] and an infinite timestamp raises OverflowError at int(r[0]); either escapes
+    _coinbase_guard and aborts the crypto decision (checked by the reviewer with a stubbed KeyError: modes log and off
+    fail the same way). (b) _coinbase_guard writes unrounded gaps (cycle.py:244); with a NaN decision close it would
+    write NaN into the hash-chained decisions.jsonl (journal.py uses json.dumps with the default allow_nan). Neither
+    seen live (a stale or absent close skips the run first). data.py is on the rule-4 list: the fix gets the crypto
+    sweep before and after, the quant-critic and the unit suite.
 
 
 ## Done
@@ -485,23 +533,3 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
   session no longer starts the engine (exactly one engine, in the trader session).
 - 2026-11-09: overrides bypass the rebalance band (explicit shrinks always trade); reduce-only invariant asserted
   in code; untrusted_news + data_quality in the brief; desk canary, rebuttal round, Munger inversion.
-
-81. [report][accuracy] The market line of reports/YYYY-MM-DD.md can show a stale benchmark quote after the close:
-    2026-11-18 close report said 'SPY 728.565, updated 15:52:53 UTC' while the close was 730.20 (Yahoo 1d,
-    regularMarketTime 21:00 UTC; equity.jsonl bench_price 730.20). Display only: decisions and the baseline returns use
-    the close. Basic law 2 (price age is tracked): find where market_status gets that quote and show its age or the close.
-82. [stocks][risk][rule] The sector cap (`risk.max_sector_pct` 0.30) does not count a sector ETF with its sector:
-    `universe` labels XLV 'SectorETF', so on 2026-11-19 the cap saw Health at 19.1% (TEVA 3.8, JNJ 3.9, ABBV 4.0,
-    LLY 2.8, MRK 2.4, AMGN 2.2) while XLV added 9.9% more health exposure (~29% together; weights from
-    reports/2026-11-19.md targets). That day's health sell-off stopped out XLV, TEVA and MRK together (fills
-    2026-11-20 open: -425.10, -413.17, -241.08 of the -1,532.54 total; state/trades.jsonl; loss review of
-    stocks:f854cc7b, 95900f0b, c03e84a5, f4b5248b, planned_loss). One day, one case: a rule change, not a defect, and the strategy freeze of
-    2026-11-16 holds. Candidate for rule 4 when the freeze allows: map each sector ETF to its sector for the cap.
-83. [desk][sizing] A desk 'Hold' on a new entry is documented as "shrink to 50%" (skills/trading-desk/SKILL.md step 5),
-    but for a new name it can act as a veto: the halved target falls under the rebalance band
-    (`risk.rebalance_band_pct` 0.02) and `broker.rebalance` skips any non-exit order with |target - current| < band
-    (the `force` path covers only shrinks of held names). 2026-11-20 close: raw targets PG 2.36%, V 2.38%, COST 2.66%
-    (state/pending.json targets_raw) were halved to 1.18%, 1.19%, 1.33% by three desk Holds, and none of them is in
-    the orders for the 2026-11-23 open (preview_at_close: only the XLP 32 entry is a buy). Reduce-only, so allowed by
-    hard rule 3, but the record says shrink while the effect is veto. Options for rule 4: let a desk shrink of a new
-    entry bypass the band (like `force`), or document that Hold on a sub-2x-band entry vetoes it.
