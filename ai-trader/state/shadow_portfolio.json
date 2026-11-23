@@ -1,5 +1,5 @@
 {
-  "cash": 44812.358905506,
+  "cash": 60434.88251979433,
   "positions": {
     "AMGN": {
       "qty": 5,
@@ -7,7 +7,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 468.1099853515625,
       "last_price": 435.6400146484375,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "LLY": {
       "qty": 2,
@@ -15,7 +15,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 1443.5,
       "last_price": 1347.1099853515625,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "JNJ": {
       "qty": 14,
@@ -23,7 +23,7 @@
       "entry_date": "2026-11-09",
       "peak_close": 285.75,
       "last_price": 270.4700012207031,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "ABBV": {
       "qty": 14,
@@ -31,63 +31,91 @@
       "entry_date": "2026-11-09",
       "peak_close": 295.0299987792969,
       "last_price": 286.20001220703125,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "XOM": {
-      "qty": 27,
+      "qty": 10,
       "avg_cost": 163.89690994262693,
       "entry_date": "2026-11-09",
       "peak_close": 170.58999633789062,
       "last_price": 159.99000549316406,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "PM": {
-      "qty": 24,
+      "qty": 7,
       "avg_cost": 198.2990969467163,
       "entry_date": "2026-11-09",
       "peak_close": 198.9600067138672,
       "last_price": 184.08999633789062,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "CVX": {
-      "qty": 23,
+      "qty": 9,
       "avg_cost": 210.95543110656737,
       "entry_date": "2026-11-09",
       "peak_close": 219.88999938964844,
       "last_price": 208.3699951171875,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "UNP": {
-      "qty": 24,
+      "qty": 8,
       "avg_cost": 294.7593894767761,
       "entry_date": "2026-11-09",
       "peak_close": 304.20001220703125,
       "last_price": 287.2900085449219,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "AAPL": {
-      "qty": 20,
+      "qty": 8,
       "avg_cost": 346.2705447807312,
       "entry_date": "2026-11-09",
       "peak_close": 356.2699890136719,
       "last_price": 342.55999755859375,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "KO": {
-      "qty": 72,
+      "qty": 34,
       "avg_cost": 96.02702131455943,
       "entry_date": "2026-11-09",
       "peak_close": 99.4800033569336,
       "last_price": 96.98999786376953,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
     },
     "COP": {
-      "qty": 42,
+      "qty": 14,
       "avg_cost": 136.49820767211912,
       "entry_date": "2026-11-11",
       "peak_close": 142.27999877929688,
       "last_price": 136.1199951171875,
-      "ca_applied_through": "2026-11-20"
+      "ca_applied_through": "2026-11-23"
+    },
+    "PG": {
+      "qty": 13,
+      "avg_cost": 167.60376427459715,
+      "entry_date": "2026-11-23",
+      "peak_close": 167.52000427246094,
+      "last_price": 167.52000427246094
+    },
+    "V": {
+      "qty": 5,
+      "avg_cost": 404.2120147705078,
+      "entry_date": "2026-11-23",
+      "peak_close": 404.010009765625,
+      "last_price": 404.010009765625
+    },
+    "COST": {
+      "qty": 2,
+      "avg_cost": 1093.1863346557616,
+      "entry_date": "2026-11-23",
+      "peak_close": 1092.6400146484375,
+      "last_price": 1092.6400146484375
+    },
+    "XLP": {
+      "qty": 32,
+      "avg_cost": 89.5347428627014,
+      "entry_date": "2026-11-23",
+      "peak_close": 89.48999786376953,
+      "last_price": 89.48999786376953
     }
   },
   "peak_equity": 101770.54685771045,
@@ -98,5 +126,5 @@
     "MRK": "2026-12-04"
   },
   "last_mark": "2026-11-20",
-  "last_rebalance": "2026-11-16"
+  "last_rebalance": "2026-11-20"
 }

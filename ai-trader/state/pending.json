@@ -1,6 +1,6 @@
 {
   "decision_date": "2026-11-20",
-  "status": "pending",
+  "status": "executed",
   "rebalance": true,
   "exits_only": false,
   "targets": {
@@ -148,5 +148,98 @@
   "new_entries": [
     "XLP"
   ],
-  "logged_at": "2026-11-20T21:35:57+00:00"
+  "logged_at": "2026-11-20T21:35:57+00:00",
+  "open_source": {
+    "one_minute": [
+      "AAPL",
+      "ABBV",
+      "AMGN",
+      "COP",
+      "COST",
+      "CVX",
+      "JNJ",
+      "KO",
+      "LLY",
+      "PG",
+      "PM",
+      "UNP",
+      "V",
+      "XLP",
+      "XOM"
+    ],
+    "daily_fallback": []
+  },
+  "executed_on": "2026-11-23",
+  "fills": [
+    {
+      "date": "2026-11-23",
+      "symbol": "UNP",
+      "side": "SELL",
+      "qty": 16,
+      "price": 292.3338,
+      "value": 4677.34,
+      "realized_pnl": -84.13,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-23",
+      "symbol": "AAPL",
+      "side": "SELL",
+      "qty": 12,
+      "price": 347.6061,
+      "value": 4171.27,
+      "realized_pnl": 16.03,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-23",
+      "symbol": "CVX",
+      "side": "SELL",
+      "qty": 21,
+      "price": 205.897,
+      "value": 4323.84,
+      "realized_pnl": -125.72,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-23",
+      "symbol": "PM",
+      "side": "SELL",
+      "qty": 23,
+      "price": 182.2888,
+      "value": 4192.64,
+      "realized_pnl": -301.96,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-23",
+      "symbol": "KO",
+      "side": "SELL",
+      "qty": 38,
+      "price": 94.5527,
+      "value": 3593.0,
+      "realized_pnl": -61.18,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-23",
+      "symbol": "XOM",
+      "side": "SELL",
+      "qty": 17,
+      "price": 157.861,
+      "value": 2683.64,
+      "realized_pnl": -102.61,
+      "reason": "trim"
+    },
+    {
+      "date": "2026-11-23",
+      "symbol": "XLP",
+      "side": "BUY",
+      "qty": 32,
+      "price": 89.5347,
+      "value": 2865.11,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    }
+  ]
 }
