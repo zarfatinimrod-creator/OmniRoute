@@ -38,6 +38,7 @@ CRYPTO_MARKET = {
     "overlays": False, "corporate_actions": False, "news_engine": False, "fill_regime_on_no_picks": True,
     "equity_mark_per_bar": True, "delete_proposal_on_decision": True, "grading": "absolute",
     "stale_skips_run": True, "close_source": "yahoo", "coinbase_guard_pct": 0.01, "report_dir": "reports/crypto",
+    "close_xcheck_bp": 5, "close_xcheck_mode": "log",  # backlog 72: the tight Coinbase cross-check, log mode only
     "intraday_alert_pct": 0.08, "latest_max_age_hours": 26, "state_subdir": "crypto", "etf_groups": [],
     "quiet_hours": {"tz": "Asia/Jerusalem", "from": "23:00", "to": "08:00"},
     "revised_close_alert_bps": 5,  # ruling R6 (Task 6): crypto only
