@@ -9,3 +9,4 @@
 {"logged_at": "2026-11-20T01:08:21+00:00", "event": "rebuild_declined", "bar": "2026-11-19", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
 {"logged_at": "2026-11-22T00:13:41+00:00", "event": "rebuild_declined", "bar": "2026-11-21", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
 {"logged_at": "2026-11-23T00:13:28+00:00", "event": "rebuild_declined", "bar": "2026-11-22", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-23T01:09:22+00:00", "event": "rebuild_declined", "bar": "2026-11-22", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.3}
