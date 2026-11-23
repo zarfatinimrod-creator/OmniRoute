@@ -13849,3 +13849,6 @@
 {"key": "8de2a6d66ab16efd", "symbol": "MU", "published": "2026-11-23T14:20:26+00:00", "first_seen": "2026-11-23T15:48:13.283833+00:00", "outcome": "stale"}
 {"key": "a5331d9cbaa23edb", "symbol": "WMT", "published": "2026-11-23T14:42:00+00:00", "first_seen": "2026-11-23T15:48:13.284446+00:00", "outcome": "stale"}
 {"key": "79f34a28eaf6721f", "symbol": "COST", "published": "2026-11-23T14:42:00+00:00", "first_seen": "2026-11-23T15:48:13.284677+00:00", "outcome": "stale"}
+{"key": "e214bcd3ae79a70e", "symbol": "AAPL", "published": "2026-11-23T15:46:15+00:00", "first_seen": "2026-11-23T15:48:13.283661+00:00", "outcome": "scored"}
+{"key": "0f3f4fdc2e950aa4", "symbol": "ADBE", "published": "2026-11-23T15:41:01+00:00", "first_seen": "2026-11-23T15:48:13.283752+00:00", "outcome": "scored"}
+{"key": "264a6874b57f43c8", "symbol": "META", "published": "2026-11-23T15:46:15+00:00", "first_seen": "2026-11-23T15:48:13.284319+00:00", "outcome": "scored"}
