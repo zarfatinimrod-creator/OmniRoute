@@ -94,28 +94,32 @@
       "avg_cost": 167.60376427459715,
       "entry_date": "2026-11-23",
       "peak_close": 167.52000427246094,
-      "last_price": 167.52000427246094
+      "last_price": 167.52000427246094,
+      "ca_applied_through": "2026-11-23"
     },
     "V": {
       "qty": 5,
       "avg_cost": 404.2120147705078,
       "entry_date": "2026-11-23",
       "peak_close": 404.010009765625,
-      "last_price": 404.010009765625
+      "last_price": 404.010009765625,
+      "ca_applied_through": "2026-11-23"
     },
     "COST": {
       "qty": 2,
       "avg_cost": 1093.1863346557616,
       "entry_date": "2026-11-23",
       "peak_close": 1092.6400146484375,
-      "last_price": 1092.6400146484375
+      "last_price": 1092.6400146484375,
+      "ca_applied_through": "2026-11-23"
     },
     "XLP": {
       "qty": 32,
       "avg_cost": 89.5347428627014,
       "entry_date": "2026-11-23",
       "peak_close": 89.48999786376953,
-      "last_price": 89.48999786376953
+      "last_price": 89.48999786376953,
+      "ca_applied_through": "2026-11-23"
     }
   },
   "peak_equity": 101770.54685771045,
