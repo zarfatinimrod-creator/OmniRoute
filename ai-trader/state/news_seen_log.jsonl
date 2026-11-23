@@ -14523,3 +14523,13 @@
 {"key": "56a42e5482e18171", "symbol": "NVDA", "published": "2026-11-23T19:46:55+00:00", "first_seen": "2026-11-23T19:54:51.902357+00:00", "outcome": "scored"}
 {"key": "854fe72ff5cb8fbf", "symbol": "NVDA", "published": "2026-11-23T19:48:57+00:00", "first_seen": "2026-11-23T19:58:11.953878+00:00", "outcome": "scored"}
 {"key": "194c8a2bf9fc8cee", "symbol": "NVDA", "published": "2026-11-23T19:45:00+00:00", "first_seen": "2026-11-23T19:58:11.953893+00:00", "outcome": "scored"}
+{"key": "6f91f7f12333fa23", "symbol": "TSLA", "published": "2026-11-23T19:48:57+00:00", "first_seen": "2026-11-23T19:58:31.999966+00:00", "outcome": "scored"}
+{"key": "f9fedac8601172a9", "symbol": "NVDA", "published": "2026-11-23T19:57:21+00:00", "first_seen": "2026-11-23T19:59:32.023452+00:00", "outcome": "scored"}
+{"key": "ba4d6bf5a3122440", "symbol": "NVDA", "published": "2026-11-23T19:49:50+00:00", "first_seen": "2026-11-23T19:59:32.023466+00:00", "outcome": "scored"}
+{"key": "1cbab596795e440e", "symbol": "AAPL", "published": "2026-11-23T19:55:23+00:00", "first_seen": "2026-11-23T19:59:52.303474+00:00", "outcome": "scored"}
+{"key": "96c9235ea15b735e", "symbol": "AXP", "published": "2026-11-23T19:59:24+00:00", "first_seen": "2026-11-23T20:00:12.115725+00:00", "outcome": "scored"}
+{"key": "ada0732b556f5f58", "symbol": "NVDA", "published": "2026-11-23T19:38:18+00:00", "first_seen": "2026-11-23T20:01:32.181406+00:00", "outcome": "scored"}
+{"key": "c3702c0b6c67085b", "symbol": "AMD", "published": "2026-11-23T19:51:41+00:00", "first_seen": "2026-11-23T20:03:32.115190+00:00", "outcome": "scored"}
+{"key": "b125352d0da5025a", "symbol": "NVDA", "published": "2026-11-23T19:51:41+00:00", "first_seen": "2026-11-23T20:03:52.184288+00:00", "outcome": "scored"}
+{"key": "1914aae35cf6a552", "symbol": "NVDA", "published": "2026-11-23T19:54:04+00:00", "first_seen": "2026-11-23T20:03:52.184315+00:00", "outcome": "scored"}
+{"key": "fcb792603a0136d9", "symbol": "INTC", "published": "2026-11-23T19:51:41+00:00", "first_seen": "2026-11-23T20:03:52.184433+00:00", "outcome": "scored"}
