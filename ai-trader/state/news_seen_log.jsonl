@@ -13778,3 +13778,4 @@
 {"key": "494a4460b5bb858c", "symbol": "MSFT", "published": "2026-11-23T14:30:00+00:00", "first_seen": "2026-11-23T15:36:21.536961+00:00", "outcome": "stale"}
 {"key": "47f575ceda87b602", "symbol": "KO", "published": "2026-11-23T14:33:00+00:00", "first_seen": "2026-11-23T15:36:21.537548+00:00", "outcome": "stale"}
 {"key": "b4d551768d31c6a9", "symbol": "BRK-B", "published": "2026-11-23T14:33:00+00:00", "first_seen": "2026-11-23T15:36:41.558923+00:00", "outcome": "stale"}
+{"key": "497d5b80c26f2144", "symbol": "NVDA", "published": "2026-11-23T15:32:17+00:00", "first_seen": "2026-11-23T15:37:41.576044+00:00", "outcome": "scored"}
