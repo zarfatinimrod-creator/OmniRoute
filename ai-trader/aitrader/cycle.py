@@ -226,15 +226,18 @@ def _frozen_runs(held_frozen: set, ds: str) -> dict[str, int]:
     return runs
 
 
-def _coinbase_guard(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict) -> dict | None:
+def _coinbase_guard(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict, seen: dict | None = None) -> dict | None:
     """Planning decision 11: the decision close of each universe symbol against Coinbase's public daily candle.
-    None when market.coinbase_guard_pct is 0 (stocks). status: breach (a gap above the limit) > unreachable > ok."""
+    None when market.coinbase_guard_pct is 0 (stocks). status: breach (a gap above the limit) > unreachable > ok.
+    seen: filled with {symbol: the Coinbase value fetched, or None} for _close_xcheck (one fetch per symbol)."""
     pct = cfg.get("market", {}).get("coinbase_guard_pct", 0)
     if not pct:
         return None
     gaps, down = {}, []
     for s in sorted(cfg["universe"]):
         cb = coinbase_close(s, dec)
+        if seen is not None:
+            seen[s] = cb
         if cb is None:
             down.append(s)
         else:
@@ -242,6 +245,30 @@ def _coinbase_guard(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict) -> dict |
     breach = sorted(s for s, g in gaps.items() if abs(g) > pct)
     return {"status": "breach" if breach else "unreachable" if down else "ok", "pct": pct, "gaps": gaps,
             "breach": breach, "unreachable": down}
+
+
+def _close_xcheck(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict, seen: dict) -> dict | None:
+    """Backlog 72, LOG MODE ONLY: the decision close against Coinbase's daily candle of the decision date at a tight
+    line (market.close_xcheck_bp), for the diagnostics. It changes no target, order, event or alert. None (no field,
+    no fetch) unless market.close_xcheck_mode is "log" and the line is a positive number. seen: what the Coinbase
+    guard already fetched; a symbol it did not ask about is fetched here once. A missing or non-finite value on
+    either side is listed under unreachable and never written."""
+    mk = cfg.get("market", {})
+    bp = mk.get("close_xcheck_bp", 0)
+    if mk.get("close_xcheck_mode", "off") != "log" or not _price(bp):
+        return None
+    syms, decline, down = {}, [], []
+    for s in sorted(cfg["universe"]):
+        cb = seen[s] if s in seen else coinbase_close(s, dec)
+        c = float(close.at[dec, s]) if s in close.columns else float("nan")
+        if not (_price(cb) and _price(c)):
+            down.append(s)
+            continue
+        gap = (c / cb - 1) * 1e4
+        syms[s] = {"close": c, "coinbase": float(cb), "gap_bp": round(gap, 3)}
+        if abs(gap) > bp:
+            decline.append(s)
+    return {"mode": "log", "bp": bp, "symbols": syms, "would_decline": decline, "unreachable": down}
 
 
 def _brokers(cfg: dict, prices: dict, ds: str) -> tuple[PaperBroker, PaperBroker]:
@@ -606,7 +633,11 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     for s in list(targets_raw):  # held through a report: cap the size (ATR stops cannot protect an earnings gap)
         if s in bo and s in m.positions and cfg["universe"].get(s) not in etf and targets_raw[s] > cap:
             targets_raw[s] = cap
-    guard = _coinbase_guard(close, dec, cfg)
+    cb_seen: dict = {}
+    guard = _coinbase_guard(close, dec, cfg, cb_seen)
+    xcheck = _close_xcheck(close, dec, cfg, cb_seen)
+    if xcheck:  # backlog 72, log mode: written down, nothing acts on it
+        diag["close_xcheck"] = xcheck
     if guard:
         diag["coinbase_guard"] = guard
         if guard["status"] == "breach":  # exits only: nothing grows, no new names; stops and regime-off still sell
