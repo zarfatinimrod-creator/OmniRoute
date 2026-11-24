@@ -15309,3 +15309,4 @@
 {"key": "010d1c469a376e29", "symbol": "ORCL", "published": "2026-11-24T14:30:00+00:00", "first_seen": "2026-11-24T14:37:55.076342+00:00", "outcome": "scored"}
 {"key": "6e502db734d284e5", "symbol": "ORCL", "published": "2026-11-24T14:28:00+00:00", "first_seen": "2026-11-24T14:37:55.076360+00:00", "outcome": "scored"}
 {"key": "f7db22bae317c77e", "symbol": "ADBE", "published": "2026-11-24T14:29:00+00:00", "first_seen": "2026-11-24T14:37:55.076388+00:00", "outcome": "scored"}
+{"key": "25245defde9db559", "symbol": "LMT", "published": "2026-11-24T12:26:44+00:00", "first_seen": "2026-11-24T14:38:14.682943+00:00", "outcome": "stale"}
