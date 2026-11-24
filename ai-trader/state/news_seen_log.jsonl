@@ -15533,3 +15533,11 @@
 {"key": "d1e89e2d18eaf597", "symbol": "META", "published": "2026-11-24T15:16:00+00:00", "first_seen": "2026-11-24T15:45:36.034604+00:00", "outcome": "scored"}
 {"key": "7f2bc1dcc6f556c5", "symbol": "META", "published": "2026-11-24T15:44:08+00:00", "first_seen": "2026-11-24T15:45:36.034634+00:00", "outcome": "scored"}
 {"key": "56419a4ccb147d03", "symbol": "NFLX", "published": "2026-11-24T15:44:08+00:00", "first_seen": "2026-11-24T15:45:36.034660+00:00", "outcome": "scored"}
+{"key": "583fa2c8149e7bdc", "symbol": "LLY", "published": "2026-11-24T15:35:02+00:00", "first_seen": "2026-11-24T15:46:36.102728+00:00", "outcome": "scored"}
+{"key": "af398341355f984f", "symbol": "GOOGL", "published": "2026-11-24T14:30:00+00:00", "first_seen": "2026-11-24T15:46:56.105273+00:00", "outcome": "stale"}
+{"key": "72f9ca22a71fdf54", "symbol": "TSLA", "published": "2026-11-24T14:30:00+00:00", "first_seen": "2026-11-24T15:46:56.105741+00:00", "outcome": "stale"}
+{"key": "36effea767924074", "symbol": "UBER", "published": "2026-11-24T14:30:00+00:00", "first_seen": "2026-11-24T15:46:56.106308+00:00", "outcome": "stale"}
+{"key": "39967d0d206e58c7", "symbol": "NVDA", "published": "2026-11-24T15:39:08+00:00", "first_seen": "2026-11-24T15:47:16.054247+00:00", "outcome": "scored"}
+{"key": "6c6db29cead51cc8", "symbol": "AMD", "published": "2026-11-24T15:39:08+00:00", "first_seen": "2026-11-24T15:47:16.054322+00:00", "outcome": "scored"}
+{"key": "7ea1d669fbcfa071", "symbol": "WMT", "published": "2026-11-24T15:35:49+00:00", "first_seen": "2026-11-24T15:47:16.054586+00:00", "outcome": "scored"}
+{"key": "00fd89530542a5f8", "symbol": "TEVA", "published": "2026-11-24T14:40:00+00:00", "first_seen": "2026-11-24T15:48:13.660913+00:00", "outcome": "stale"}
