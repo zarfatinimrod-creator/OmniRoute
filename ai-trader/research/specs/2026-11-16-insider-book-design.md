@@ -1,5 +1,7 @@
 # Insider purchases book, log-only - design spec (2026-11-16, rev 2)
 
+**Owner's decision (Nimrod, 2026-11-24 ~17:55 UTC, in chat, answer א):** all 16 recommendations of section 9 are approved as written. Still missing, owner actions only: the SEC contact address as an environment variable (`AITRADER_SEC_CONTACT`, never in a file or log) and a free Tiingo key that he opens himself (it goes in as a network secret, never in a file).
+
 Status: a design for the owner's review. Rev 2 answers the first review round (a quant reviewer and a data reviewer,
 2026-11-16); the review log at the end lists every finding and what was done with it. Nothing here is built or has
 been run, and no trial is registered. It follows the owner's decision of 2026-11-16: the stock and crypto parameters

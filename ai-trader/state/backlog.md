@@ -18,6 +18,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
 3. [signal] SEC Form 4 opportunistic insider purchases (officers/directors, code P, Cohen-Malloy-Pomorski routine
    filter, cluster count) - strongest evidence in the research; start as a log-only overlay, promote only after a
    forward record + placebo gate.
+   2026-11-24: owner approved spec rev 2 (research/specs/2026-11-16-insider-book-design.md) with all 16
+   recommendations of its section 9 (answer א, in chat). Blocked only on owner actions: AITRADER_SEC_CONTACT (env var)
+   and a free Tiingo key (network secret). Build plan next (Fable builds, Opus gates, claims first), starting with the
+   parts that need neither.
 4. [measurement] Desk scorecard: per-rating table for source=desk, veto/shrink value line (20d excess of
    shrunk/vetoed names vs passed names = Claude vs shadow), slugging, n<20 warnings.
 5. [measurement] Residual-edge gate: alpha vs SPY + equal-weight + 12-1 momentum basket + gross-matched SPY/cash,
