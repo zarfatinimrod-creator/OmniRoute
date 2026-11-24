@@ -2019,3 +2019,13 @@
 {"t": "2026-11-24T20:55:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.6, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-24T20:56:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-24T20:57:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T20:58:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T20:59:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T21:00:00+00:00", "ev": "mark", "sup": 14496, "hb": 0.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T21:01:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.9, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T21:02:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.9, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T21:03:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.5, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T21:04:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.2, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T21:05:00+00:00", "ev": "mark", "sup": 14496, "hb": 5.5, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T21:05:13+00:00", "ev": "exit", "sup": 14496, "child": 14504, "rc": 0, "signal": null, "ran_s": 6483.7, "why": "exit"}
+{"t": "2026-11-24T21:05:13+00:00", "ev": "sup_stop", "sup": 14496, "why": "end_of_day", "rc": 0}
