@@ -1,289 +1,60 @@
 {
-  "decision_date": "2026-11-23",
-  "status": "executed",
-  "rebalance": true,
-  "exits_only": false,
+  "decision_date": "2026-11-24",
+  "status": "pending",
+  "rebalance": false,
+  "exits_only": true,
   "targets": {
-    "CVX": 0.03746368015728875,
-    "UNP": 0.04276417253647332,
-    "AMGN": 0.03249421816197114,
-    "LLY": 0.032278327778590236,
-    "KO": 0.06683183493462107,
-    "JNJ": 0.04175956718541174,
-    "ABBV": 0.05549801877233878,
-    "AAPL": 0.05123729654421108,
-    "COP": 0.03624957868087255,
-    "XLP": 0.05874282143866521,
-    "COST": 0.027047084919037723,
-    "V": 0.022316706101867333,
-    "PG": 0.022378544786779787,
-    "MA": 0.01979790593242832,
-    "TMO": 0.014959174837770279
+    "CVX": 0.019124123638584258,
+    "UNP": 0.02368554266217733,
+    "AMGN": 0.02412364637858553,
+    "LLY": 0.02865895344839683,
+    "KO": 0.06658367891674609,
+    "JNJ": 0.03940165781578673,
+    "ABBV": 0.04279653521854793,
+    "AAPL": 0.05046280005289246,
+    "COP": 0.028783762650502767,
+    "XLP": 0.05892718460917992,
+    "V": 0.0212144141285452,
+    "PG": 0.0210692454035015,
+    "COST": 0.02222754190452431
   },
   "targets_raw": {
-    "CVX": 0.03746368015728875,
-    "UNP": 0.04276417253647332,
-    "AMGN": 0.03249421816197114,
-    "LLY": 0.032278327778590236,
-    "KO": 0.06683183493462107,
-    "JNJ": 0.04175956718541174,
-    "ABBV": 0.05549801877233878,
-    "AAPL": 0.05123729654421108,
-    "COP": 0.03624957868087255,
-    "XLP": 0.05874282143866521,
-    "COST": 0.05409416983807545,
-    "V": 0.044633412203734665,
-    "PG": 0.044757089573559575,
-    "MA": 0.03959581186485664,
-    "TMO": 0.029918349675540558
+    "CVX": 0.019124123638584258,
+    "UNP": 0.02368554266217733,
+    "AMGN": 0.02412364637858553,
+    "LLY": 0.02865895344839683,
+    "KO": 0.06658367891674609,
+    "JNJ": 0.03940165781578673,
+    "ABBV": 0.04279653521854793,
+    "AAPL": 0.05046280005289246,
+    "COP": 0.028783762650502767,
+    "XLP": 0.05892718460917992,
+    "V": 0.0212144141285452,
+    "PG": 0.0210692454035015,
+    "COST": 0.02222754190452431
   },
-  "stopped_shadow": [
-    "XOM"
-  ],
+  "stopped_shadow": [],
   "shadow_hold": {
-    "AMGN": 0.023029420976991583,
-    "LLY": 0.02799389515851316,
-    "JNJ": 0.03877931867770745,
-    "ABBV": 0.04142157175189591,
-    "XOM": 0.016093514795878474,
-    "PM": 0.013103547451569036,
-    "CVX": 0.01903250503864586,
-    "UNP": 0.023705575046451818,
-    "AAPL": 0.028644610056784436,
-    "KO": 0.03343758527174953,
-    "COP": 0.018982553091660203,
-    "PG": 0.022615031280571112,
-    "V": 0.020996447149489852,
-    "COST": 0.02252292169147134,
-    "XLP": 0.029665404810842216
+    "AMGN": 0.024042890589197452,
+    "LLY": 0.02856301536455823,
+    "JNJ": 0.03926975769048323,
+    "ABBV": 0.04265327047612838,
+    "CVX": 0.019060104141840183,
+    "UNP": 0.023606253459179105,
+    "AAPL": 0.050293871890497346,
+    "KO": 0.06636078485392907,
+    "COP": 0.019124937838744856,
+    "PG": 0.043747321791270034,
+    "V": 0.0422867944424282,
+    "COST": 0.044306266945753035,
+    "XLP": 0.05872992125873736,
+    "TMO": 0.02823123933942926,
+    "MA": 0.039413833260568076
   },
-  "stopped": [
-    "XOM"
-  ],
-  "overrides": [
-    {
-      "symbol": "COST",
-      "action": "size x0.5",
-      "reason": "desk Hold p=0.48: Strong slow trend (trend 0.907, breakout 0.787, 12.39% above SMA200) but xsmom -0.126 and the regime turned risk_on, where staples can lag SPY; the book already",
-      "logged_at": "2026-11-23T21:43:27+00:00"
-    },
-    {
-      "symbol": "PG",
-      "action": "size x0.5",
-      "reason": "desk Hold p=0.48: Trend intact (trend 0.934, 14.19% above SMA200, 2.3% below the 52w high) but xsmom -0.14 and the 3m lead over SPY is shrinking as the regime turns risk_on; adds",
-      "logged_at": "2026-11-23T21:43:28+00:00"
-    },
-    {
-      "symbol": "V",
-      "action": "size x0.5",
-      "reason": "desk Hold p=0.50: Slow signals strong (trend 0.965, tsmom 0.835, 17.53% above SMA200) but fast ones weak (1w -4.0%, rsi2 -0.283, xsmom 0.071 and falling); a Nov 19 third-party ve",
-      "logged_at": "2026-11-23T21:43:29+00:00"
-    },
-    {
-      "symbol": "MA",
-      "action": "size x0.5",
-      "reason": "desk Hold p=0.50: Edge rests on slow trend (trend 0.961, tsmom 0.683, 16.93% above SMA200) while xsmom is -0.041 and 1w -3.96%; shares the Nov 19 vendor cyber incident and the pa",
-      "logged_at": "2026-11-23T21:43:30+00:00"
-    },
-    {
-      "symbol": "TMO",
-      "action": "size x0.5",
-      "reason": "desk Hold p=0.50: Score 0.401 comes mostly from a maxed-out trend (0.989) while xsmom is -0.052 and the move is stalling (1m +2.12%, 1w -0.47%); vol 28.95% and a 1y drawdown of -",
-      "logged_at": "2026-11-23T21:43:31+00:00"
-    }
-  ],
+  "stopped": [],
+  "overrides": [],
   "earnings_blackout": {},
-  "preview_at_close": [
-    {
-      "date": "2026-11-23",
-      "symbol": "XOM",
-      "side": "SELL",
-      "qty": 10,
-      "price": 156.8215,
-      "value": 1568.22,
-      "realized_pnl": -70.75,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-23",
-      "symbol": "PM",
-      "side": "SELL",
-      "qty": 7,
-      "price": 182.4087,
-      "value": 1276.86,
-      "realized_pnl": -91.06,
-      "reason": "exit"
-    },
-    {
-      "date": "2026-11-23",
-      "symbol": "V",
-      "side": "BUY",
-      "qty": 5,
-      "price": 409.6047,
-      "value": 2048.02,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-23",
-      "symbol": "PG",
-      "side": "BUY",
-      "qty": 12,
-      "price": 169.6848,
-      "value": 2036.22,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-23",
-      "symbol": "AAPL",
-      "side": "BUY",
-      "qty": 6,
-      "price": 349.2545,
-      "value": 2095.53,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-23",
-      "symbol": "COST",
-      "side": "BUY",
-      "qty": 2,
-      "price": 1098.459,
-      "value": 2196.92,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-23",
-      "symbol": "XLP",
-      "side": "BUY",
-      "qty": 31,
-      "price": 90.4252,
-      "value": 2803.18,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-23",
-      "symbol": "KO",
-      "side": "BUY",
-      "qty": 33,
-      "price": 95.9279,
-      "value": 3165.62,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    }
-  ],
-  "new_entries": [
-    "V",
-    "PG",
-    "COST"
-  ],
-  "logged_at": "2026-11-23T21:43:44+00:00",
-  "open_source": {
-    "one_minute": [
-      "AAPL",
-      "ABBV",
-      "AMGN",
-      "COP",
-      "COST",
-      "CVX",
-      "JNJ",
-      "KO",
-      "LLY",
-      "MA",
-      "PG",
-      "PM",
-      "TMO",
-      "UNP",
-      "V",
-      "XLP",
-      "XOM"
-    ],
-    "daily_fallback": []
-  },
-  "executed_on": "2026-11-24",
-  "fills": [
-    {
-      "date": "2026-11-24",
-      "symbol": "XOM",
-      "side": "SELL",
-      "qty": 10,
-      "price": 157.6211,
-      "value": 1576.21,
-      "realized_pnl": -62.76,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "PM",
-      "side": "SELL",
-      "qty": 7,
-      "price": 182.4487,
-      "value": 1277.14,
-      "realized_pnl": -90.78,
-      "reason": "exit"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "V",
-      "side": "BUY",
-      "qty": 5,
-      "price": 409.2045,
-      "value": 2046.02,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "PG",
-      "side": "BUY",
-      "qty": 12,
-      "price": 170.9905,
-      "value": 2051.89,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "AAPL",
-      "side": "BUY",
-      "qty": 6,
-      "price": 348.2941,
-      "value": 2089.76,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "COST",
-      "side": "BUY",
-      "qty": 2,
-      "price": 1071.9157,
-      "value": 2143.83,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "XLP",
-      "side": "BUY",
-      "qty": 31,
-      "price": 90.8154,
-      "value": 2815.28,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "KO",
-      "side": "BUY",
-      "qty": 33,
-      "price": 96.2881,
-      "value": 3177.51,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    }
-  ]
+  "preview_at_close": [],
+  "new_entries": [],
+  "logged_at": "2026-11-24T21:23:07+00:00"
 }
