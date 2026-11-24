@@ -794,8 +794,10 @@ def run_cycle(execute: bool = True, force_rebalance: bool = False, max_age_hours
         # fill on a split day must see the post-split share count. Idempotent (tracked per position).
         acts = {sym: corporate_actions(sym) for sym in set(main.positions) | set(shadow.positions)}
         w_hold = cfg["account"].get("dividend_withholding", 0.25)
-        ca_notes = main.apply_corporate_actions(acts, str(last.date()), w_hold)
-        shadow.apply_corporate_actions(acts, str(last.date()), w_hold)
+        # the feed's own closes, so a dividend moves the trailing-stop peak by the feed's adjustment (backlog 85)
+        ca_px = {s: {str(d.date()): float(v) for d, v in close[s].dropna().items()} for s in acts if s in close.columns}
+        ca_notes = main.apply_corporate_actions(acts, str(last.date()), w_hold, ca_px)
+        shadow.apply_corporate_actions(acts, str(last.date()), w_hold, ca_px)
     if propose:  # what the next decision would be, for the trading desk; changes no state
         return _decide(panel, cfg, main, shadow, dec_bar, force_rebalance, False, events, frozen)
 

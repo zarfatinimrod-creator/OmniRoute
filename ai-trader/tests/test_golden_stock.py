@@ -11,7 +11,8 @@ from unittest import mock
 
 from aitrader import backtest
 from aitrader import report as rep
-from golden_util import FIXTURES, frozen_env, load_panel, run_scripted_cycle
+from aitrader import cycle
+from golden_util import FIRST_BAR, FIXTURES, frozen_env, load_panel, run_scripted_cycle
 from test_core import cfg_for, synthetic_panel
 
 WRITE = os.environ.get("GOLDEN_WRITE") == "1"
@@ -51,6 +52,48 @@ class GoldenStock(unittest.TestCase):
         self.assertEqual(sorted(got), sorted(want))
         for name in want:
             self.assertEqual(got[name], want[name], name)
+
+
+class DividendPeakInTheCycle(unittest.TestCase):
+    """Backlog 85 end to end: run_cycle hands the panel's closes to the broker, so a dividend on a held name scales
+    the saved peak_close by the feed's factor. Without the closes the peak is left where it was."""
+
+    SYM, DIV = "S12", 1.0  # held from the first fill; its close falls on the next bars, so no new high hides the peak
+
+    def test_run_cycle_scales_the_saved_peak_on_a_dividend(self):
+        full = load_panel()
+        cfg = cfg_for(full)
+        cfg["risk"]["min_score"] = -1.0
+        idx = full["close"].index
+        ex_bar = FIRST_BAR + 1  # the newest bar of the third cycle
+        ex_date = str(idx[ex_bar].date())
+
+        def run(n):
+            cycle.load_market = lambda c, rng="10y", age=0.1: {k: v.iloc[:n] for k, v in full.items()}
+            cycle.run_cycle()
+
+        def acts(sym):
+            return {"splits": [], "dividends": [{"date": ex_date, "amount": self.DIV}] if sym == self.SYM else []}
+
+        with tempfile.TemporaryDirectory() as tmp, frozen_env(tmp, None):
+            cycle.load_config = lambda: cfg
+            book = lambda: json.loads(Path(tmp, "portfolio.json").read_text())  # noqa: E731
+            run(FIRST_BAR)  # decide
+            run(FIRST_BAR + 1)  # fill
+            before = book()
+            pos = before["positions"][self.SYM]
+            cycle.corporate_actions = acts
+            run(FIRST_BAR + 2)
+            after = book()
+        adj = float(full["close"][self.SYM].iloc[ex_bar - 1])  # the feed's close of the bar before the ex-date
+        want = pos["peak_close"] * adj / (adj + self.DIV)
+        got = after["positions"][self.SYM]
+        self.assertGreater(want, float(full["close"][self.SYM].iloc[ex_bar]))  # the mark does not set a new high
+        self.assertLess(want, pos["peak_close"] - 0.5)
+        self.assertAlmostEqual(got["peak_close"], want, places=9)
+        self.assertEqual(got["avg_cost"], pos["avg_cost"])
+        self.assertEqual(got["ca_applied_through"], ex_date)
+        self.assertAlmostEqual(after["cash"] - before["cash"], pos["qty"] * self.DIV * 0.75, delta=1.0)  # + a day's cash yield
 
 
 class TempDirs(unittest.TestCase):
