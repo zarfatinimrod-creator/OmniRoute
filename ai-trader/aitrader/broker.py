@@ -55,10 +55,20 @@ class PaperBroker:
         self.state["blocked"] = {s: d for s, d in self.state.get("blocked", {}).items() if d > date}
         return eq
 
-    def apply_corporate_actions(self, actions: dict, upto: str, withholding: float = 0.25) -> list[str]:
+    def apply_corporate_actions(self, actions: dict, upto: str, withholding: float = 0.25, closes: dict | None = None) -> list[str]:
         """Apply splits and cash dividends with ex-date in (last applied, upto] to held positions.
         Prices are split/dividend-adjusted by the data feed, so without this a 4:1 split would look like
-        a 75% loss and trigger the stop. Dividends are credited net of US withholding (W-8BEN 25%)."""
+        a 75% loss and trigger the stop. Dividends are credited net of US withholding (W-8BEN 25%).
+
+        closes: {symbol: {"YYYY-MM-DD": close}} from the same (adjusted) feed. On an ex-date the feed multiplies
+        every earlier close by 1 - dividend / raw close of the last bar before it, so peak_close (recorded before the
+        ex-date, in the old basis) is multiplied by the same factor; otherwise the trailing stop sits about one
+        dividend above the level the adjusted series gives (backlog 85). The feed's close of that bar is already
+        adjusted (raw - dividend for the newest ex-date, and scaled again by every later one), so the factor is
+        adj / (adj + dividend) with the later factors divided out first. With no usable close before the ex-date
+        the factor is not guessed: peak_close stays as it is and the note says so. avg_cost is never touched (the
+        dividend is credited as cash, so scaling the cost basis would count it twice in realized P&L), and neither
+        is last_price (the next mark overwrites it)."""
         notes = []
         for sym, pos in list(self.positions.items()):
             ca = actions.get(sym) or {}
@@ -73,11 +83,31 @@ class PaperBroker:
                     for k in ("avg_cost", "peak_close", "last_price"):
                         pos[k] = pos[k] / sp["ratio"]
                     notes.append(f"split {sym} {sp['ratio']:g}:1 on {sp['date']}")
-            for dv in ca.get("dividends", []):
-                if since < dv["date"] <= upto:
-                    cash = pos["qty"] * dv["amount"] * (1 - withholding)
-                    self.state["cash"] += cash
-                    notes.append(f"dividend {sym} {dv['amount']}/sh -> ${cash:,.2f} net on {dv['date']}")
+            px_by_date = (closes or {}).get(sym) or {}
+            later, div_notes = 1.0, []  # later: the feed's factors of the ex-dates after this one (None = unknown)
+            for dv in sorted(ca.get("dividends", []), key=lambda d: d["date"], reverse=True):  # newest first
+                if dv["date"] <= since:
+                    break
+                before = [d for d in px_by_date if d < dv["date"]]
+                adj = px_by_date[max(before)] if before and later else None
+                factor = None
+                if adj and adj == adj and adj > 0 and dv["amount"] > 0:
+                    base = adj / later  # that close in the price basis right after this ex-date: raw - dividend
+                    factor = base / (base + dv["amount"])  # = 1 - dividend / raw close before the ex-date
+                later = later * factor if factor else None
+                if dv["date"] > upto:
+                    continue
+                cash = pos["qty"] * dv["amount"] * (1 - withholding)
+                self.state["cash"] += cash
+                note = f"dividend {sym} {dv['amount']}/sh -> ${cash:,.2f} net on {dv['date']}"
+                if factor and "peak_close" in pos:
+                    old_peak = pos["peak_close"]
+                    pos["peak_close"] = old_peak * factor
+                    note += f"; peak_close {old_peak:.2f} -> {pos['peak_close']:.2f}"
+                else:
+                    note += "; peak_close unchanged (no close before the ex-date)"
+                div_notes.append(note)
+            notes.extend(reversed(div_notes))
             pos["ca_applied_through"] = max(since, upto)
             if pos["qty"] <= 0:
                 del self.positions[sym]
