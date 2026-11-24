@@ -15843,3 +15843,5 @@
 {"key": "5be835847ce1d28a", "symbol": "KO", "published": "2026-11-24T16:35:00+00:00", "first_seen": "2026-11-24T17:40:28.941555+00:00", "outcome": "stale"}
 {"key": "1bbfe0e650696761", "symbol": "KO", "published": "2026-11-24T16:32:00+00:00", "first_seen": "2026-11-24T17:40:28.941813+00:00", "outcome": "stale"}
 {"key": "0691842c33a5b760", "symbol": "COP", "published": "2026-11-24T16:28:00+00:00", "first_seen": "2026-11-24T17:40:28.942159+00:00", "outcome": "stale"}
+{"key": "95fa1f57b5dd1ce4", "symbol": "META", "published": "2026-11-24T16:35:00+00:00", "first_seen": "2026-11-24T17:41:08.922023+00:00", "outcome": "stale"}
+{"key": "50e92ef34fdf9488", "symbol": "PEP", "published": "2026-11-24T16:35:00+00:00", "first_seen": "2026-11-24T17:41:08.922483+00:00", "outcome": "stale"}
