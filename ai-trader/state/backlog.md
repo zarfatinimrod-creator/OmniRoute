@@ -366,6 +366,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     null (final72.py), the same pattern as 11-20. Log mode: the decision stood (risk_off either way: 61,424.91 vs SMA
     72,233.15). The R6 audit of 11-23 at the next decision says whether this was a catch or a false alarm.
     11-22 settled daily 61,161.91 (read 2026-11-24 00:13:38); decided 61,160.70 = -0.2 bp (under R6).
+    2026-11-24 06:04:44: the 11-23 1h 23:00 and 5m 23:55 bars now agree at 61,206.75 (daily row still null): the
+    decided 61,424.91 is +35.6 bp off it, and the agreeing value is +2.7 bp off Coinbase 61,189.97 (at 01:08:33 the 1h
+    bar read 61,274.46 with the 5m bar null). So the first flag looks like a true catch; the R6 audit against the
+    settled daily close decides it.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
