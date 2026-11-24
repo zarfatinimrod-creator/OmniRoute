@@ -23,8 +23,15 @@ written first) after defects; real-money gate = 6 months forward (CLAUDE.md hard
     LLY ($1.73, 11-13), AAPL ($0.27, 11-12), COP ($0.93, 11-16). Fix: scale peak_close on each ex-date by the feed's
     own factor (rule 4: broker.py is on the time-machine list -> sweep before/after, quant-critic, unit suite). The
     fix lowers those live stops (in raw price) to the tested level, which touches the Basic Law line "never widen a
-    stop": built and gated, merged only after Nimrod answers. Open question for the review: was XOM inside the targets
-    without the stop (score 0.3393 on 11-23), or would the ranking have exited it the same morning?
+    stop": built and gated, merged only after Nimrod answers.
+    2026-11-24 15:30 (workflow wf_7a3bf436-35a): (a) counterfactual: XOM rank 24 of the ranked names, inside the keep
+    limit 30 (15 x keep_rank_mult 2); the offline rerun matches all 21 recorded quant scores and the 15 recorded
+    targets; with the adjusted peak XOM stays at 0.0267 and TMO (the last new entry) drops out. So the defect alone
+    sold XOM. (b) Correction of the held list: only CVX, AMGN, COP carry a tighter stop (by 1.81, 2.69, 0.93); LLY's and
+    AAPL's peaks were set on or after their ex-dates and are already in the adjusted basis. (c) The code fix
+    (c74ff3c8, branch ai-trader-divpeak-85, 947 tests OK) is forward-only: CVX/AMGN/COP need a one-off correction of
+    state/portfolio.json peak_close (and the shadow book), which is the part that lowers live stops: owner's call.
+    (d) backtest.py never calls apply_corporate_actions, so the sweep cannot move (to be confirmed by the gate).
 First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (crypto data defect, found 2026-11-14), 33, 44, 34, 35, 39, 40 - then the list below.
 1. [defect] Learning label credits the overnight gap: learn.forward_excess uses close(d)->close(d+h) but fills are
    at open(d+1). Use open(d+1)->open(d+1+h); mature at asof-h-1; rerun placebo; add a test that the label equals
