@@ -1639,3 +1639,15 @@
 {"t": "2026-11-24T14:56:00+00:00", "ev": "mark", "sup": 4255, "hb": 5.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-24T14:57:00+00:00", "ev": "mark", "sup": 4255, "hb": 5.5, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-24T14:58:00+00:00", "ev": "mark", "sup": 4255, "hb": 5.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T14:59:00+00:00", "ev": "mark", "sup": 4255, "hb": 0.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:00:00+00:00", "ev": "mark", "sup": 4255, "hb": 5.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:01:00+00:00", "ev": "mark", "sup": 4255, "hb": 4.4, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:02:00+00:00", "ev": "mark", "sup": 4255, "hb": 5.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:03:00+00:00", "ev": "mark", "sup": 4255, "hb": 4.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:04:00+00:00", "ev": "mark", "sup": 4255, "hb": 4.9, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:05:00+00:00", "ev": "mark", "sup": 4255, "hb": 4.8, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:06:00+00:00", "ev": "mark", "sup": 4255, "hb": 4.9, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:07:00+00:00", "ev": "mark", "sup": 4255, "hb": 5.1, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:08:00+00:00", "ev": "mark", "sup": 4255, "hb": 5.1, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:09:00+00:00", "ev": "mark", "sup": 4255, "hb": 4.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T15:10:00+00:00", "ev": "mark", "sup": 4255, "hb": 4.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
