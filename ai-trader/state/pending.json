@@ -1,6 +1,6 @@
 {
   "decision_date": "2026-11-23",
-  "status": "pending",
+  "status": "executed",
   "rebalance": true,
   "exits_only": false,
   "targets": {
@@ -180,5 +180,110 @@
     "PG",
     "COST"
   ],
-  "logged_at": "2026-11-23T21:43:44+00:00"
+  "logged_at": "2026-11-23T21:43:44+00:00",
+  "open_source": {
+    "one_minute": [
+      "AAPL",
+      "ABBV",
+      "AMGN",
+      "COP",
+      "COST",
+      "CVX",
+      "JNJ",
+      "KO",
+      "LLY",
+      "MA",
+      "PG",
+      "PM",
+      "TMO",
+      "UNP",
+      "V",
+      "XLP",
+      "XOM"
+    ],
+    "daily_fallback": []
+  },
+  "executed_on": "2026-11-24",
+  "fills": [
+    {
+      "date": "2026-11-24",
+      "symbol": "XOM",
+      "side": "SELL",
+      "qty": 10,
+      "price": 157.6211,
+      "value": 1576.21,
+      "realized_pnl": -62.76,
+      "reason": "stop"
+    },
+    {
+      "date": "2026-11-24",
+      "symbol": "PM",
+      "side": "SELL",
+      "qty": 7,
+      "price": 182.4487,
+      "value": 1277.14,
+      "realized_pnl": -90.78,
+      "reason": "exit"
+    },
+    {
+      "date": "2026-11-24",
+      "symbol": "V",
+      "side": "BUY",
+      "qty": 5,
+      "price": 409.2045,
+      "value": 2046.02,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-24",
+      "symbol": "PG",
+      "side": "BUY",
+      "qty": 12,
+      "price": 170.9905,
+      "value": 2051.89,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-24",
+      "symbol": "AAPL",
+      "side": "BUY",
+      "qty": 6,
+      "price": 348.2941,
+      "value": 2089.76,
+      "realized_pnl": 0.0,
+      "reason": "add"
+    },
+    {
+      "date": "2026-11-24",
+      "symbol": "COST",
+      "side": "BUY",
+      "qty": 2,
+      "price": 1071.9157,
+      "value": 2143.83,
+      "realized_pnl": 0.0,
+      "reason": "entry"
+    },
+    {
+      "date": "2026-11-24",
+      "symbol": "XLP",
+      "side": "BUY",
+      "qty": 31,
+      "price": 90.8154,
+      "value": 2815.28,
+      "realized_pnl": 0.0,
+      "reason": "add"
+    },
+    {
+      "date": "2026-11-24",
+      "symbol": "KO",
+      "side": "BUY",
+      "qty": 33,
+      "price": 96.2881,
+      "value": 3177.51,
+      "realized_pnl": 0.0,
+      "reason": "add"
+    }
+  ]
 }

@@ -7,6 +7,24 @@ PASS -> only then merge. Sources: research/2026-11-09-repo-sweep-take-list.md, r
 Owner's decision 2026-11-16 (research/2026-11-16-real-money-review.md): stock and crypto strategy parameters FROZEN;
 the improvement effort goes to item 3 (opportunistic insider purchases, log-only book, sealed holdout, kill criterion
 written first) after defects; real-money gate = 6 months forward (CLAUDE.md hard rule 1).
+
+85. [stocks][DEFECT, top][loss review stocks:09c0dbc4 open] The live trailing stop compares a peak_close that is NOT
+    adjusted for cash dividends with a price series that IS (Yahoo back-adjusts history on each ex-date). broker.py
+    apply_corporate_actions divides peak_close on a split (its docstring: "Prices are split/dividend-adjusted by the
+    data feed, so without this a 4:1 split would look like a 75% loss and trigger the stop") but on a dividend only
+    credits cash. So every ex-date while a name is held tightens its live stop by about the dividend, against the
+    backtested rule (the time machine runs on the adjusted series). Evidence, XOM: entry 2026-11-09, ex-date
+    2026-11-16 $1.07 (.cache/XOM_events.json); portfolio peak_close 170.59 (state at commit f130f0ca) vs the adjusted
+    cache max close since entry 169.52 (11-13, .cache/XOM_10y.csv; 170.59 - 169.52 = 1.07); ATR14 4.424 (rolling mean,
+    signals.atr), 3x = 13.27. Live stop 157.32 > close 156.90 on 2026-11-23 -> stopped; on the adjusted peak the stop
+    is 156.25 < 156.90 -> NOT stopped. Sold 10 at 157.6211 on 2026-11-24, -62.76 (state/trades.jsonl). The four
+    2026-11-20 stops (XLV, DE, TEVA, MRK) had no ex-date in their hold, so that planned_loss review stands. Held now
+    with an ex-date since entry (their live stops are tighter than tested): CVX ($1.78, 11-18), AMGN ($2.52, 11-20),
+    LLY ($1.73, 11-13), AAPL ($0.27, 11-12), COP ($0.93, 11-16). Fix: scale peak_close on each ex-date by the feed's
+    own factor (rule 4: broker.py is on the time-machine list -> sweep before/after, quant-critic, unit suite). The
+    fix lowers those live stops (in raw price) to the tested level, which touches the Basic Law line "never widen a
+    stop": built and gated, merged only after Nimrod answers. Open question for the review: was XOM inside the targets
+    without the stop (score 0.3393 on 11-23), or would the ranking have exited it the same morning?
 First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (crypto data defect, found 2026-11-14), 33, 44, 34, 35, 39, 40 - then the list below.
 1. [defect] Learning label credits the overnight gap: learn.forward_excess uses close(d)->close(d+h) but fills are
    at open(d+1). Use open(d+1)->open(d+1+h); mature at asof-h-1; rerun placebo; add a test that the label equals

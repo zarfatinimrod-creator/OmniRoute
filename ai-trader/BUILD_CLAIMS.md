@@ -5,6 +5,13 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
+- **2026-11-24 15:10 - trader session (backlog 85, loss-protocol defect)** - files: `aitrader/broker.py`
+  (`apply_corporate_actions` only), new file `tests/test_broker_dividend_peak.py`. Purpose: scale a held position's
+  peak_close on each cash-dividend ex-date by the data feed's own adjustment, so the live trailing stop matches the
+  backtested rule (the XOM stop of 2026-11-23 came from an unadjusted peak). Built in a separate worktree; gated by the
+  time machine sweep before/after (broker.py is on the list), the quant-critic and the unit suite; merged only after
+  Nimrod answers, because it lowers the live stops of held names that passed an ex-date.
+
 - **2026-11-11 10:09 (refreshed 21:10; rollout step 1 landed at 21:08 UTC, ab7b27f9) - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
