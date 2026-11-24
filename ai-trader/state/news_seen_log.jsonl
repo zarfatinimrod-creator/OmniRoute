@@ -16218,3 +16218,14 @@
 {"key": "9038bf676103153e", "symbol": "TSLA", "published": "2026-11-24T19:27:26+00:00", "first_seen": "2026-11-24T20:36:53.944942+00:00", "outcome": "stale"}
 {"key": "7bf82dcfdf1a15f8", "symbol": "NVDA", "published": "2026-11-24T20:25:02+00:00", "first_seen": "2026-11-24T20:37:14.250076+00:00", "outcome": "scored"}
 {"key": "36cac546f746cfe5", "symbol": "MU", "published": "2026-11-24T20:25:02+00:00", "first_seen": "2026-11-24T20:37:33.997500+00:00", "outcome": "scored"}
+{"key": "f1ca7bc3d8d598e7", "symbol": "NVDA", "published": "2026-11-24T20:37:14+00:00", "first_seen": "2026-11-24T20:41:34.071161+00:00", "outcome": "scored"}
+{"key": "19d44261fd958555", "symbol": "MSFT", "published": "2026-11-24T20:42:11+00:00", "first_seen": "2026-11-24T20:43:54.164353+00:00", "outcome": "scored"}
+{"key": "920c621079689504", "symbol": "NVDA", "published": "2026-11-24T20:42:11+00:00", "first_seen": "2026-11-24T20:43:54.164380+00:00", "outcome": "scored"}
+{"key": "94fbde0c763f268a", "symbol": "NVDA", "published": "2026-11-24T20:16:19+00:00", "first_seen": "2026-11-24T20:45:54.174872+00:00", "outcome": "scored"}
+{"key": "6f78a5400b2b04a9", "symbol": "NVDA", "published": "2026-11-24T20:35:02+00:00", "first_seen": "2026-11-24T20:48:14.247632+00:00", "outcome": "scored"}
+{"key": "b34a026eea1ef89a", "symbol": "LLY", "published": "2026-11-24T20:44:31+00:00", "first_seen": "2026-11-24T20:48:34.257014+00:00", "outcome": "scored"}
+{"key": "3045cd41eadf88e6", "symbol": "INTC", "published": "2026-11-24T20:43:33+00:00", "first_seen": "2026-11-24T20:49:54.643263+00:00", "outcome": "scored"}
+{"key": "aebcf244d73c0c55", "symbol": "NVDA", "published": "2026-11-24T20:15:34+00:00", "first_seen": "2026-11-24T20:51:34.315636+00:00", "outcome": "stale"}
+{"key": "cf4a0bb2db04ca83", "symbol": "NFLX", "published": "2026-11-24T19:53:55+00:00", "first_seen": "2026-11-24T20:53:14.680466+00:00", "outcome": "stale"}
+{"key": "76795adc4aac00b6", "symbol": "GS", "published": "2026-11-24T19:53:55+00:00", "first_seen": "2026-11-24T20:53:14.680972+00:00", "outcome": "stale"}
+{"key": "5404b969e1ac7c09", "symbol": "DE", "published": "2026-11-24T14:43:39+00:00", "first_seen": "2026-11-24T20:55:34.437194+00:00", "outcome": "stale"}
