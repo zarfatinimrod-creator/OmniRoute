@@ -1,12 +1,12 @@
 {
   "date": "2026-11-24",
-  "as_of_utc": "2026-11-24T00:13:36+00:00",
+  "as_of_utc": "2026-11-24T01:08:31+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-24T00:00:00+00:00",
     "regular_end_utc": "2026-11-24T23:59:00+00:00",
-    "last_trade_utc": "2026-11-24T00:13:33+00:00",
-    "price": 61162.81
+    "last_trade_utc": "2026-11-24T01:08:26+00:00",
+    "price": 61436.03
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,14 +14,14 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.1703,
-    "equal_weight_since_start": -0.1703
+    "bench_since_start": -0.1666,
+    "equal_weight_since_start": -0.1666
   },
   "started": "2026-11-10",
   "regime": "risk_off",
   "dd_state": "normal",
   "drawdown": -0.0618,
-  "decided_now": true,
+  "decided_now": false,
   "weights": {
     "tsmom": 0.0,
     "xsmom": 0.0,
@@ -34,7 +34,7 @@
   },
   "pending": {
     "decision_date": "2026-11-23",
-    "status": "pending",
+    "status": "executed",
     "rebalance": false,
     "targets": {},
     "overrides": [],
@@ -42,12 +42,8 @@
     "preview_at_close": []
   },
   "executed": [],
-  "top_scores": {
-    "BTC-USD": -0.143
-  },
-  "bottom_scores": {
-    "BTC-USD": -0.143
-  },
+  "top_scores": null,
+  "bottom_scores": null,
   "stopped": [],
   "scorecard": {
     "open": 34,
