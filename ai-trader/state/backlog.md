@@ -361,6 +361,11 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     never reached a decision, so the figure is right but is not a journal row.
     First live row 2026-11-23 06:04 (decision 11-22, a 1h rebuild): close 61,160.70 vs Coinbase 61,163.01 = -0.378 bp,
     would_decline [], unreachable [] (state/crypto/decisions.jsonl row 17).
+    FIRST FLAG 2026-11-24 00:13:36 (decision 11-23, first try, 1h rebuild): close 61,424.91 vs Coinbase 61,189.97 =
+    +38.4 bp, would_decline [BTC-USD] (row 18). At 00:13:37 the 1h 23:00 bar read 61,424.91 while the 5m 23:55 bar was
+    null (final72.py), the same pattern as 11-20. Log mode: the decision stood (risk_off either way: 61,424.91 vs SMA
+    72,233.15). The R6 audit of 11-23 at the next decision says whether this was a catch or a false alarm.
+    11-22 settled daily 61,161.91 (read 2026-11-24 00:13:38); decided 61,160.70 = -0.2 bp (under R6).
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
