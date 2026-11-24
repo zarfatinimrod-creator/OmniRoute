@@ -5,14 +5,6 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-24 15:10 - trader session (backlog 85, loss-protocol defect)** - files: `aitrader/broker.py`
-  (`apply_corporate_actions` only), `aitrader/cycle.py` (added 2026-11-24 15:30: the one caller passes the panel closes,
-  under no other open claim), new file `tests/test_broker_dividend_peak.py`. Purpose: scale a held position's
-  peak_close on each cash-dividend ex-date by the data feed's own adjustment, so the live trailing stop matches the
-  backtested rule (the XOM stop of 2026-11-23 came from an unadjusted peak). Built in a separate worktree; gated by the
-  time machine sweep before/after (broker.py is on the list), the quant-critic and the unit suite; merged only after
-  Nimrod answers, because it lowers the live stops of held names that passed an ex-date.
-
 - **2026-11-11 10:09 (refreshed 21:10; rollout step 1 landed at 21:08 UTC, ab7b27f9) - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
@@ -54,6 +46,17 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
+
+- **2026-11-24 15:10 - trader session (backlog 85, loss-protocol defect)** - files: `aitrader/broker.py`
+  (`apply_corporate_actions` only), `aitrader/cycle.py` (added 2026-11-24 15:30: the one caller passes the panel closes,
+  under no other open claim), new file `tests/test_broker_dividend_peak.py`. Purpose: scale a held position's
+  peak_close on each cash-dividend ex-date by the data feed's own adjustment, so the live trailing stop matches the
+  backtested rule (the XOM stop of 2026-11-23 came from an unadjusted peak). Built in a separate worktree; gated by the
+  time machine sweep before/after (broker.py is on the list), the quant-critic and the unit suite; merged only after
+  Nimrod answers, because it lowers the live stops of held names that passed an ex-date.
+  **Done 2026-11-24 17:45**: merged 72968ef9 (c74ff3c8 + 623dee70): broker.py dividend peak scaling with finite guards,
+  cycle.py passes panel closes, tests/test_broker_dividend_peak.py (10) and one run_cycle test in tests/test_golden_stock.py.
+  952 tests OK; sweep identical; quant-critic, live-path and re-review PASS; owner answer א.
 
 - **2026-11-23 00:25 - trader session (backlog 72, the weekly pick of 2026-11-21)** - files: `aitrader/cycle.py`,
   `config.json` (the crypto book's market block only: new keys `close_xcheck_bp` and `close_xcheck_mode`), new file

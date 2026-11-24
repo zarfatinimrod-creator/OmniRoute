@@ -8,40 +8,6 @@ Owner's decision 2026-11-16 (research/2026-11-16-real-money-review.md): stock an
 the improvement effort goes to item 3 (opportunistic insider purchases, log-only book, sealed holdout, kill criterion
 written first) after defects; real-money gate = 6 months forward (CLAUDE.md hard rule 1).
 
-85. [stocks][DEFECT, top][loss review stocks:09c0dbc4 open] The live trailing stop compares a peak_close that is NOT
-    adjusted for cash dividends with a price series that IS (Yahoo back-adjusts history on each ex-date). broker.py
-    apply_corporate_actions divides peak_close on a split (its docstring: "Prices are split/dividend-adjusted by the
-    data feed, so without this a 4:1 split would look like a 75% loss and trigger the stop") but on a dividend only
-    credits cash. So every ex-date while a name is held tightens its live stop by about the dividend, against the
-    backtested rule (the time machine runs on the adjusted series). Evidence, XOM: entry 2026-11-09, ex-date
-    2026-11-16 $1.07 (.cache/XOM_events.json); portfolio peak_close 170.59 (state at commit f130f0ca) vs the adjusted
-    cache max close since entry 169.52 (11-13, .cache/XOM_10y.csv; 170.59 - 169.52 = 1.07); ATR14 4.424 (rolling mean,
-    signals.atr), 3x = 13.27. Live stop 157.32 > close 156.90 on 2026-11-23 -> stopped; on the adjusted peak the stop
-    is 156.25 < 156.90 -> NOT stopped. Sold 10 at 157.6211 on 2026-11-24, -62.76 (state/trades.jsonl). The four
-    2026-11-20 stops (XLV, DE, TEVA, MRK) had no ex-date in their hold, so that planned_loss review stands. Held now
-    with an ex-date since entry (their live stops are tighter than tested): CVX ($1.78, 11-18), AMGN ($2.52, 11-20),
-    LLY ($1.73, 11-13), AAPL ($0.27, 11-12), COP ($0.93, 11-16). Fix: scale peak_close on each ex-date by the feed's
-    own factor (rule 4: broker.py is on the time-machine list -> sweep before/after, quant-critic, unit suite). The
-    fix lowers those live stops (in raw price) to the tested level, which touches the Basic Law line "never widen a
-    stop": built and gated, merged only after Nimrod answers.
-    2026-11-24 15:30 (workflow wf_7a3bf436-35a): (a) counterfactual: XOM rank 24 of the ranked names, inside the keep
-    limit 30 (15 x keep_rank_mult 2); the offline rerun matches all 21 recorded quant scores and the 15 recorded
-    targets; with the adjusted peak XOM stays at 0.0267 and TMO (the last new entry) drops out. So the defect alone
-    sold XOM. (b) Correction of the held list: only CVX, AMGN, COP carry a tighter stop (by 1.81, 2.69, 0.93); LLY's and
-    AAPL's peaks were set on or after their ex-dates and are already in the adjusted basis. (c) The code fix
-    (c74ff3c8, branch ai-trader-divpeak-85, 947 tests OK) is forward-only: CVX/AMGN/COP need a one-off correction of
-    state/portfolio.json peak_close (and the shadow book), which is the part that lowers live stops: owner's call.
-    (d) backtest.py never calls apply_corporate_actions, so the sweep cannot move (to be confirmed by the gate).
-    2026-11-24 16:00: GATED, READY, NOT MERGED (waits for Nimrod: א fix code + one-off peak correction of CVX 218.08,
-    AMGN 465.42, COP 141.35 in portfolio.json and shadow_portfolio.json, set directly, never by clearing
-    ca_applied_through; ב code only, forward; ג nothing). Branch ai-trader-divpeak-85 at 623dee70 (c74ff3c8 + hardening:
-    finite guard so a NaN peak can never switch the stop off, '> upto' skip moved before the factor, multiplicative
-    and run_cycle wiring tests), 952 tests OK. Gates: registered sweep base vs branch identical in every row (DSR
-    0.518; the branch trial line is in scratchpad/tm-branch/ai-trader/state/trials.jsonl, to be appended to
-    state/trials.jsonl at merge so no run is hidden); unregistered single run byte-identical; quant-critic PASS;
-    live-path PASS; hardening re-review PASS (mutants killed: flat subtraction, upto skip, both guards, cycle wiring).
-    Leftover nonblocking: the shadow-book call has no test; a non-finite dividend amount could still put NaN in cash
-    (pre-existing, Yahoo cannot realistically produce it); the stale-events path advances ca_applied_through.
 First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (crypto data defect, found 2026-11-14), 33, 44, 34, 35, 39, 40 - then the list below.
 1. [defect] Learning label credits the overnight gap: learn.forward_excess uses close(d)->close(d+h) but fills are
    at open(d+1). Use open(d+1)->open(d+1+h); mature at asof-h-1; rerun placebo; add a test that the label equals
@@ -501,6 +467,7 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
 
 
 ## Done
+- 2026-11-24: backlog 85 done (loss review stocks:09c0dbc4, verdict bad_data): the live trailing-stop peak is now scaled on each cash-dividend ex-date by the feed's own factor (broker.apply_corporate_actions, merged 72968ef9 from c74ff3c8 + 623dee70; 952 tests OK; registered sweep identical before/after; quant-critic, live-path and re-review PASS). Owner's answer א (2026-11-24): one-off peak_close correction in portfolio.json and shadow_portfolio.json (CVX 219.89 -> 218.08, AMGN 468.11 -> 465.42, COP 142.28 -> 141.35; commit 48452a39). XOM was kept by the ranking without the defect (rank 24 of the keep limit 30). Leftover nonblocking: the shadow-book call has no test; a non-finite dividend amount could reach cash; a stale events file still advances ca_applied_through.
 - 2026-11-14: backlog 23 done (weekly review): the paired sweep re-run on code 3d5b1109 (run 2026-11-14-59a459da5016,
   state/trial_runs/): base Sharpe median 0.418 (registered 2026-11-09: 0.402), CAGR 7.40% (7.23%), maxDD -11.52%
   (-11.52%); the change is the five new trading days at the end of the history, the stock book is unchanged by the
