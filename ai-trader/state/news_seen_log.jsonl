@@ -15221,3 +15221,4 @@
 {"key": "07c6f736fa418df4", "symbol": "META", "published": "2026-11-24T14:00:00+00:00", "first_seen": "2026-11-24T14:10:50.461885+00:00", "outcome": "scored"}
 {"key": "81418229ec79874d", "symbol": "MU", "published": "2026-11-24T13:37:41+00:00", "first_seen": "2026-11-24T14:11:10.448920+00:00", "outcome": "stale"}
 {"key": "9c97ec03dcf9002b", "symbol": "NVDA", "published": "2026-11-24T13:46:01+00:00", "first_seen": "2026-11-24T14:11:10.448798+00:00", "outcome": "scored"}
+{"key": "efc29a69b66583cb", "symbol": "AMZN", "published": "2026-11-24T12:58:00+00:00", "first_seen": "2026-11-24T14:11:30.780796+00:00", "outcome": "stale"}
