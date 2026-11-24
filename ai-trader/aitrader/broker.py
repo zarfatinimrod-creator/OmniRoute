@@ -66,7 +66,9 @@ class PaperBroker:
         dividend above the level the adjusted series gives (backlog 85). The feed's close of that bar is already
         adjusted (raw - dividend for the newest ex-date, and scaled again by every later one), so the factor is
         adj / (adj + dividend) with the later factors divided out first. With no usable close before the ex-date
-        the factor is not guessed: peak_close stays as it is and the note says so. avg_cost is never touched (the
+        the factor is not guessed: peak_close stays as it is and the note says so; the same for a close that is not
+        finite or a factor outside (0, 1]. A dividend dated after upto is skipped whole: no cash, and it is not one
+        of the "later" factors, because the feed as of upto has not adjusted for it. avg_cost is never touched (the
         dividend is credited as cash, so scaling the cost basis would count it twice in realized P&L), and neither
         is last_price (the next mark overwrites it)."""
         notes = []
@@ -88,15 +90,17 @@ class PaperBroker:
             for dv in sorted(ca.get("dividends", []), key=lambda d: d["date"], reverse=True):  # newest first
                 if dv["date"] <= since:
                     break
+                if dv["date"] > upto:  # not ex yet: no cash, and the feed as of upto has not adjusted for it either
+                    continue
                 before = [d for d in px_by_date if d < dv["date"]]
                 adj = px_by_date[max(before)] if before and later else None
                 factor = None
-                if adj and adj == adj and adj > 0 and dv["amount"] > 0:
+                if isinstance(adj, (int, float)) and math.isfinite(adj) and adj > 0 and dv["amount"] > 0:
                     base = adj / later  # that close in the price basis right after this ex-date: raw - dividend
                     factor = base / (base + dv["amount"])  # = 1 - dividend / raw close before the ex-date
+                    if not (math.isfinite(factor) and 0 < factor <= 1):  # an inf or absurd close: never a NaN peak,
+                        factor = None  # which would switch the stop off for good ('px < nan' is always False)
                 later = later * factor if factor else None
-                if dv["date"] > upto:
-                    continue
                 cash = pos["qty"] * dv["amount"] * (1 - withholding)
                 self.state["cash"] += cash
                 note = f"dividend {sym} {dv['amount']}/sh -> ${cash:,.2f} net on {dv['date']}"
