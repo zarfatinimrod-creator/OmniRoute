@@ -1717,3 +1717,4 @@
 {"t": "2026-11-24T16:07:00+00:00", "ev": "mark", "sup": 25595, "hb": 3.0, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-24T16:08:00+00:00", "ev": "mark", "sup": 25595, "hb": 7.0, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-24T16:09:00+00:00", "ev": "mark", "sup": 25595, "hb": 1.4, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-24T16:10:00+00:00", "ev": "mark", "sup": 25595, "hb": 0.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}

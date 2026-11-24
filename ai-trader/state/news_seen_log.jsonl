@@ -15602,3 +15602,7 @@
 {"key": "a24a3deb46118ec1", "symbol": "NVDA", "published": "2026-11-24T15:54:27+00:00", "first_seen": "2026-11-24T16:07:33.457141+00:00", "outcome": "scored"}
 {"key": "7c7a71b0e568d1ce", "symbol": "TSLA", "published": "2026-11-24T15:51:19+00:00", "first_seen": "2026-11-24T16:07:33.457421+00:00", "outcome": "scored"}
 {"key": "cad920b7020c35f3", "symbol": "NVDA", "published": "2026-11-24T15:50:59+00:00", "first_seen": "2026-11-24T16:08:53.462649+00:00", "outcome": "scored"}
+{"key": "e571c7d8f6bb3af0", "symbol": "AMZN", "published": "2026-11-24T16:01:40+00:00", "first_seen": "2026-11-24T16:09:13.640799+00:00", "outcome": "scored"}
+{"key": "fe475b4ee72b7568", "symbol": "UBER", "published": "2026-11-24T16:01:40+00:00", "first_seen": "2026-11-24T16:09:13.641076+00:00", "outcome": "scored"}
+{"key": "50c6bedca89ca2df", "symbol": "GOOGL", "published": "2026-11-24T16:01:40+00:00", "first_seen": "2026-11-24T16:09:53.468240+00:00", "outcome": "scored"}
+{"key": "82b30d29e50dd057", "symbol": "TSLA", "published": "2026-11-24T16:01:40+00:00", "first_seen": "2026-11-24T16:09:53.468306+00:00", "outcome": "scored"}
