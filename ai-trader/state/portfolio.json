@@ -86,21 +86,24 @@
       "avg_cost": 409.2045,
       "entry_date": "2026-11-24",
       "peak_close": 409.0,
-      "last_price": 409.0
+      "last_price": 409.0,
+      "ca_applied_through": "2026-11-24"
     },
     "PG": {
       "qty": 12,
       "avg_cost": 170.99045127868652,
       "entry_date": "2026-11-24",
       "peak_close": 170.90499877929688,
-      "last_price": 170.90499877929688
+      "last_price": 170.90499877929688,
+      "ca_applied_through": "2026-11-24"
     },
     "COST": {
       "qty": 2,
       "avg_cost": 1071.9156948852537,
       "entry_date": "2026-11-24",
       "peak_close": 1071.3800048828125,
-      "last_price": 1071.3800048828125
+      "last_price": 1071.3800048828125,
+      "ca_applied_through": "2026-11-24"
     }
   },
   "peak_equity": 101696.69194607032,

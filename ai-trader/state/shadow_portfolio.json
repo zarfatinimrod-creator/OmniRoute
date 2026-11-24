@@ -110,14 +110,16 @@
       "avg_cost": 688.594125,
       "entry_date": "2026-11-24",
       "peak_close": 688.25,
-      "last_price": 688.25
+      "last_price": 688.25,
+      "ca_applied_through": "2026-11-24"
     },
     "MA": {
       "qty": 6,
       "avg_cost": 635.3574980163573,
       "entry_date": "2026-11-24",
       "peak_close": 635.0399780273438,
-      "last_price": 635.0399780273438
+      "last_price": 635.0399780273438,
+      "ca_applied_through": "2026-11-24"
     }
   },
   "peak_equity": 101770.54685771045,

@@ -1,26 +1,26 @@
 {
   "date": "2026-11-24",
-  "as_of_utc": "2026-11-24T14:53:30+00:00",
+  "as_of_utc": "2026-11-24T17:52:51+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-24T14:30:00+00:00",
     "regular_end_utc": "2026-11-24T21:00:00+00:00",
-    "last_trade_utc": "2026-11-24T14:53:26+00:00",
-    "price": 718.7
+    "last_trade_utc": "2026-11-24T17:52:48+00:00",
+    "price": 717.97
   },
-  "equity": 97898.72,
+  "equity": 98221.8,
   "cash": 54308.18,
-  "gross": 0.4453,
-  "return_since_start": -0.021,
-  "shadow_return_since_start": -0.0184,
+  "gross": 0.4471,
+  "return_since_start": -0.0178,
+  "shadow_return_since_start": -0.0147,
   "baselines": {
-    "spy_since_start": -0.0224,
-    "equal_weight_since_start": -0.0204
+    "spy_since_start": -0.0236,
+    "equal_weight_since_start": -0.02
   },
   "started": "2026-11-06",
   "regime": "risk_on+defensive",
   "dd_state": "normal",
-  "drawdown": -0.0373,
+  "drawdown": -0.0342,
   "decided_now": false,
   "weights": {
     "tsmom": 0.25,
@@ -169,88 +169,7 @@
       }
     ]
   },
-  "executed": [
-    {
-      "date": "2026-11-24",
-      "symbol": "XOM",
-      "side": "SELL",
-      "qty": 10,
-      "price": 157.6211,
-      "value": 1576.21,
-      "realized_pnl": -62.76,
-      "reason": "stop"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "PM",
-      "side": "SELL",
-      "qty": 7,
-      "price": 182.4487,
-      "value": 1277.14,
-      "realized_pnl": -90.78,
-      "reason": "exit"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "V",
-      "side": "BUY",
-      "qty": 5,
-      "price": 409.2045,
-      "value": 2046.02,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "PG",
-      "side": "BUY",
-      "qty": 12,
-      "price": 170.9905,
-      "value": 2051.89,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "AAPL",
-      "side": "BUY",
-      "qty": 6,
-      "price": 348.2941,
-      "value": 2089.76,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "COST",
-      "side": "BUY",
-      "qty": 2,
-      "price": 1071.9157,
-      "value": 2143.83,
-      "realized_pnl": 0.0,
-      "reason": "entry"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "XLP",
-      "side": "BUY",
-      "qty": 31,
-      "price": 90.8154,
-      "value": 2815.28,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    },
-    {
-      "date": "2026-11-24",
-      "symbol": "KO",
-      "side": "BUY",
-      "qty": 33,
-      "price": 96.2881,
-      "value": 3177.51,
-      "realized_pnl": 0.0,
-      "reason": "add"
-    }
-  ],
+  "executed": [],
   "top_scores": null,
   "bottom_scores": null,
   "stopped": [],
@@ -548,112 +467,109 @@
     "CVX": {
       "qty": 9,
       "avg_cost": 211.88,
-      "last": 209.73,
-      "pnl_pct": -0.0102,
+      "last": 209.82,
+      "pnl_pct": -0.0097,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 8,
       "avg_cost": 297.59,
-      "last": 288.57,
-      "pnl_pct": -0.0303,
+      "last": 289.77,
+      "pnl_pct": -0.0263,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 462.44,
-      "pnl_pct": -0.0063,
+      "last": 469.81,
+      "pnl_pct": 0.0095,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1407.23,
-      "pnl_pct": 0.0301,
+      "last": 1409.13,
+      "pnl_pct": 0.0315,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 67,
       "avg_cost": 96.22,
-      "last": 96.96,
-      "pnl_pct": 0.0076,
+      "last": 98.0,
+      "pnl_pct": 0.0184,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 273.09,
-      "pnl_pct": -0.0181,
+      "last": 276.03,
+      "pnl_pct": -0.0076,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 294.62,
-      "pnl_pct": 0.0021,
+      "last": 299.94,
+      "pnl_pct": 0.0202,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 14,
       "avg_cost": 347.14,
-      "last": 352.51,
-      "pnl_pct": 0.0155,
+      "last": 352.85,
+      "pnl_pct": 0.0165,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 135.32,
-      "pnl_pct": -0.0086,
+      "last": 134.96,
+      "pnl_pct": -0.0113,
       "since": "2026-11-11"
     },
     "XLP": {
       "qty": 63,
       "avg_cost": 90.16,
-      "last": 91.43,
-      "pnl_pct": 0.014,
+      "last": 92.17,
+      "pnl_pct": 0.0222,
       "since": "2026-11-23"
     },
     "V": {
       "qty": 5,
       "avg_cost": 409.2,
-      "last": 413.71,
-      "pnl_pct": 0.011,
+      "last": 415.61,
+      "pnl_pct": 0.0157,
       "since": "2026-11-24"
     },
     "PG": {
       "qty": 12,
       "avg_cost": 170.99,
-      "last": 171.49,
-      "pnl_pct": 0.0029,
+      "last": 172.54,
+      "pnl_pct": 0.0091,
       "since": "2026-11-24"
     },
     "COST": {
       "qty": 2,
       "avg_cost": 1071.92,
-      "last": 1080.11,
-      "pnl_pct": 0.0076,
+      "last": 1090.58,
+      "pnl_pct": 0.0174,
       "since": "2026-11-24"
     }
   },
   "day_moves": {
-    "CVX": 0.0173,
-    "UNP": -0.0011,
-    "AMGN": 0.0298,
-    "LLY": 0.0312,
-    "KO": 0.0113,
-    "JNJ": 0.0113,
-    "ABBV": 0.0214,
-    "AAPL": 0.0098,
-    "COP": 0.0237,
-    "XLP": 0.0116,
-    "V": 0.0105,
-    "PG": 0.0111,
-    "COST": -0.0162
+    "CVX": 0.0177,
+    "UNP": 0.003,
+    "AMGN": 0.0463,
+    "LLY": 0.0326,
+    "KO": 0.0221,
+    "JNJ": 0.0221,
+    "ABBV": 0.0398,
+    "AAPL": 0.0108,
+    "COP": 0.021,
+    "XLP": 0.0198,
+    "V": 0.0152,
+    "PG": 0.0174,
+    "COST": -0.0067
   },
-  "alert_channels": [],
-  "events": [
-    "בוצע בפתיחה 2026-11-24: SELL 10 XOM @ 157.6211, SELL 7 PM @ 182.4487, BUY 5 V @ 409.2045, BUY 12 PG @ 170.9905, BUY 6 AAPL @ 348.2941, BUY 2 COST @ 1071.9157, BUY 31 XLP @ 90.8154, BUY 33 KO @ 96.2881"
-  ]
+  "events": []
 }
