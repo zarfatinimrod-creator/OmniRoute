@@ -32,6 +32,16 @@ written first) after defects; real-money gate = 6 months forward (CLAUDE.md hard
     (c74ff3c8, branch ai-trader-divpeak-85, 947 tests OK) is forward-only: CVX/AMGN/COP need a one-off correction of
     state/portfolio.json peak_close (and the shadow book), which is the part that lowers live stops: owner's call.
     (d) backtest.py never calls apply_corporate_actions, so the sweep cannot move (to be confirmed by the gate).
+    2026-11-24 16:00: GATED, READY, NOT MERGED (waits for Nimrod: א fix code + one-off peak correction of CVX 218.08,
+    AMGN 465.42, COP 141.35 in portfolio.json and shadow_portfolio.json, set directly, never by clearing
+    ca_applied_through; ב code only, forward; ג nothing). Branch ai-trader-divpeak-85 at 623dee70 (c74ff3c8 + hardening:
+    finite guard so a NaN peak can never switch the stop off, '> upto' skip moved before the factor, multiplicative
+    and run_cycle wiring tests), 952 tests OK. Gates: registered sweep base vs branch identical in every row (DSR
+    0.518; the branch trial line is in scratchpad/tm-branch/ai-trader/state/trials.jsonl, to be appended to
+    state/trials.jsonl at merge so no run is hidden); unregistered single run byte-identical; quant-critic PASS;
+    live-path PASS; hardening re-review PASS (mutants killed: flat subtraction, upto skip, both guards, cycle wiring).
+    Leftover nonblocking: the shadow-book call has no test; a non-finite dividend amount could still put NaN in cash
+    (pre-existing, Yahoo cannot realistically produce it); the stale-events path advances ca_applied_through.
 First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (crypto data defect, found 2026-11-14), 33, 44, 34, 35, 39, 40 - then the list below.
 1. [defect] Learning label credits the overnight gap: learn.forward_excess uses close(d)->close(d+h) but fills are
    at open(d+1). Use open(d+1)->open(d+1+h); mature at asof-h-1; rerun placebo; add a test that the label equals
