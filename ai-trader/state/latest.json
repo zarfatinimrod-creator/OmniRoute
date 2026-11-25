@@ -1,27 +1,27 @@
 {
   "date": "2026-11-25",
-  "as_of_utc": "2026-11-25T17:53:50+00:00",
+  "as_of_utc": "2026-11-25T21:23:53+00:00",
   "market": {
-    "is_open": true,
+    "is_open": false,
     "regular_start_utc": "2026-11-25T14:30:00+00:00",
     "regular_end_utc": "2026-11-25T21:00:00+00:00",
-    "last_trade_utc": "2026-11-25T17:53:47+00:00",
-    "price": 710.8
+    "last_trade_utc": "2026-11-25T21:00:00+00:00",
+    "price": 716.7
   },
-  "equity": 98394.67,
-  "cash": 54315.6,
-  "gross": 0.448,
-  "return_since_start": -0.0161,
-  "shadow_return_since_start": -0.0122,
+  "equity": 98238.42,
+  "cash": 54323.01,
+  "gross": 0.447,
+  "return_since_start": -0.0176,
+  "shadow_return_since_start": -0.0136,
   "baselines": {
-    "spy_since_start": -0.0336,
-    "equal_weight_since_start": -0.0235
+    "spy_since_start": -0.0253,
+    "equal_weight_since_start": -0.0175
   },
   "started": "2026-11-06",
   "regime": "risk_on+defensive",
   "dd_state": "normal",
-  "drawdown": -0.0325,
-  "decided_now": false,
+  "drawdown": -0.034,
+  "decided_now": true,
   "weights": {
     "tsmom": 0.25,
     "xsmom": 0.25,
@@ -33,53 +33,202 @@
     "lowvol": 0.0
   },
   "pending": {
-    "decision_date": "2026-11-24",
-    "status": "executed",
+    "decision_date": "2026-11-25",
+    "status": "pending",
     "rebalance": false,
     "targets": {
-      "CVX": 0.019124123638584258,
-      "UNP": 0.02368554266217733,
-      "AMGN": 0.02412364637858553,
-      "LLY": 0.02865895344839683,
-      "KO": 0.06658367891674609,
-      "JNJ": 0.03940165781578673,
-      "ABBV": 0.04279653521854793,
-      "AAPL": 0.05046280005289246,
-      "COP": 0.028783762650502767,
-      "XLP": 0.05892718460917992,
-      "V": 0.0212144141285452,
-      "PG": 0.0210692454035015,
-      "COST": 0.02222754190452431
+      "CVX": 0.019325941201454783,
+      "UNP": 0.0242984362317646,
+      "AMGN": 0.02388271204822734,
+      "LLY": 0.028343695644087456,
+      "KO": 0.06655776429916153,
+      "JNJ": 0.039039308098797805,
+      "ABBV": 0.04196647359047753,
+      "AAPL": 0.05067385750837991,
+      "COP": 0.028862638712765464,
+      "XLP": 0.05919170990161337,
+      "V": 0.021600001549162754,
+      "PG": 0.02116035559889954,
+      "COST": 0.022125967283860168
     },
     "overrides": [],
     "earnings_blackout": {},
     "preview_at_close": []
   },
   "executed": [],
-  "top_scores": null,
-  "bottom_scores": null,
+  "top_scores": {
+    "AMGN": 0.606,
+    "PANW": 0.597,
+    "ABBV": 0.576,
+    "KO": 0.574,
+    "TEVA": 0.568,
+    "AAPL": 0.545,
+    "COP": 0.531,
+    "JNJ": 0.52,
+    "UNP": 0.518,
+    "LIN": 0.511
+  },
+  "bottom_scores": {
+    "NFLX": -0.793,
+    "ORCL": -0.678,
+    "BKNG": -0.636,
+    "NKE": -0.613,
+    "UBER": -0.552
+  },
   "stopped": [],
   "scorecard": {
-    "open": 1312,
-    "evaluated": 168,
+    "open": 1403,
+    "evaluated": 190,
     "quant_h5": {
-      "n": 168,
-      "hit_rate": 0.649,
-      "avg_excess_up_calls": 0.0023
+      "n": 190,
+      "hit_rate": 0.653,
+      "avg_excess_up_calls": 0.0024
     }
   },
   "overlays": {
     "insider_cluster": [
       {
+        "filing_date": "2026-11-25",
+        "trade_date": "2026-11-23",
+        "ticker": "AVEX",
+        "company": "Aevex Corp.",
+        "industry": "Aircraft",
+        "insiders": 2,
+        "price": 12.39,
+        "value": 227288.0,
+        "delta_own": "+15%"
+      },
+      {
+        "filing_date": "2026-11-25",
+        "trade_date": "2026-11-24",
+        "ticker": "BPRE",
+        "company": "Bluerock Private Real Estate Fund",
+        "industry": "Closed-End Funds",
+        "insiders": 3,
+        "price": 12.59,
+        "value": 41716652.0,
+        "delta_own": ">999%"
+      },
+      {
+        "filing_date": "2026-11-25",
+        "trade_date": "2026-11-23",
+        "ticker": "BBT",
+        "company": "Beacon Financial Corp",
+        "industry": "Savings Institutions, Not Federally Chartered",
+        "insiders": 4,
+        "price": 30.27,
+        "value": 282370.0,
+        "delta_own": "+12%"
+      },
+      {
+        "filing_date": "2026-11-25",
+        "trade_date": "2026-11-23",
+        "ticker": "PRE",
+        "company": "Prenetics Global Ltd",
+        "industry": "Pharmaceutical Preparations",
+        "insiders": 3,
+        "price": 9.92,
+        "value": 1264440.0,
+        "delta_own": "+18%"
+      },
+      {
+        "filing_date": "2026-11-25",
+        "trade_date": "2026-11-24",
+        "ticker": "VISN",
+        "company": "Vistance Networks, Inc.",
+        "industry": "Radio & Tv Broadcasting & Communications Equipment",
+        "insiders": 3,
+        "price": 4.09,
+        "value": 1226383.0,
+        "delta_own": "+15%"
+      },
+      {
+        "filing_date": "2026-11-25",
+        "trade_date": "2026-11-24",
+        "ticker": "BORR",
+        "company": "Borr Drilling Ltd",
+        "industry": "Drilling Oil & Gas Wells",
+        "insiders": 2,
+        "price": 3.99,
+        "value": 81926850.0,
+        "delta_own": "+66%"
+      },
+      {
+        "filing_date": "2026-11-25",
+        "trade_date": "2026-11-18",
+        "ticker": "DX",
+        "company": "Dynex Capital Inc",
+        "industry": "Real Estate Investment Trusts",
+        "insiders": 3,
+        "price": 11.15,
+        "value": 434808.0,
+        "delta_own": "+3%"
+      },
+      {
+        "filing_date": "2026-11-25",
+        "trade_date": "2026-11-24",
+        "ticker": "SCOR",
+        "company": "Comscore, Inc.",
+        "industry": "Business Services",
+        "insiders": 2,
+        "price": 3.66,
+        "value": 695262.0,
+        "delta_own": "+52%"
+      },
+      {
+        "filing_date": "2026-11-24",
+        "trade_date": "2026-11-20",
+        "ticker": "CTSO",
+        "company": "Cytosorbents Corp",
+        "industry": "Surgical & Medical Instruments & Apparatus",
+        "insiders": 4,
+        "price": 5.18,
+        "value": 469996.0,
+        "delta_own": "+60%"
+      },
+      {
+        "filing_date": "2026-11-24",
+        "trade_date": "2026-11-20",
+        "ticker": "RMIX",
+        "company": "Suncrete, Inc.",
+        "industry": "Concrete Products, Except Block & Brick",
+        "insiders": 5,
+        "price": 6.35,
+        "value": 1934887.0,
+        "delta_own": "+13%"
+      },
+      {
+        "filing_date": "2026-11-24",
+        "trade_date": "2026-11-24",
+        "ticker": "NPCE",
+        "company": "Neuropace Inc",
+        "industry": "Surgical & Medical Instruments & Apparatus",
+        "insiders": 4,
+        "price": 8.38,
+        "value": 399331.0,
+        "delta_own": "+21%"
+      },
+      {
+        "filing_date": "2026-11-24",
+        "trade_date": "2026-11-20",
+        "ticker": "COHR",
+        "company": "Coherent Corp.",
+        "industry": "Optical Instruments & Lenses",
+        "insiders": 3,
+        "price": 186.81,
+        "value": 16438969.0,
+        "delta_own": "+45%"
+      },
+      {
         "filing_date": "2026-11-24",
         "trade_date": "2026-11-23",
-        "ticker": "CBK",
-        "company": "Commercial Bancgroup, Inc.",
-        "industry": "State Commercial Banks",
+        "ticker": "SNEX",
+        "company": "Stonex Group Inc.",
+        "industry": "Security & Commodity Brokers, Dealers, Exchanges & Services",
         "insiders": 2,
-        "price": 32.58,
-        "value": 114916.0,
-        "delta_own": "+4%"
+        "price": 38.51,
+        "value": 497468.0,
+        "delta_own": "+3%"
       },
       {
         "filing_date": "2026-11-24",
@@ -150,17 +299,6 @@
       {
         "filing_date": "2026-11-23",
         "trade_date": "2026-11-19",
-        "ticker": "RMIX",
-        "company": "Suncrete, Inc.",
-        "industry": "Concrete Products, Except Block & Brick",
-        "insiders": 5,
-        "price": 6.36,
-        "value": 1906137.0,
-        "delta_own": "+13%"
-      },
-      {
-        "filing_date": "2026-11-23",
-        "trade_date": "2026-11-19",
         "ticker": "TMS",
         "company": "Teamshares Inc",
         "industry": "Miscellaneous Retail",
@@ -168,28 +306,6 @@
         "price": 4.29,
         "value": 924055.0,
         "delta_own": "+57%"
-      },
-      {
-        "filing_date": "2026-11-23",
-        "trade_date": "2026-11-19",
-        "ticker": "BPRE",
-        "company": "Bluerock Private Real Estate Fund",
-        "industry": "Closed-End Funds",
-        "insiders": 3,
-        "price": 12.6,
-        "value": 41607596.0,
-        "delta_own": ">999%"
-      },
-      {
-        "filing_date": "2026-11-23",
-        "trade_date": "2026-11-19",
-        "ticker": "SCOR",
-        "company": "Comscore, Inc.",
-        "industry": "Business Services",
-        "insiders": 2,
-        "price": 4.06,
-        "value": 569717.0,
-        "delta_own": "+41%"
       },
       {
         "filing_date": "2026-11-23",
@@ -245,105 +361,6 @@
         "price": 6.79,
         "value": 165897.0,
         "delta_own": "+2%"
-      },
-      {
-        "filing_date": "2026-11-23",
-        "trade_date": "2026-11-05",
-        "ticker": "KYN",
-        "company": "Kayne Anderson Energy Infrastructure Fund, Inc.",
-        "industry": "Closed-End Funds",
-        "insiders": 3,
-        "price": 13.1,
-        "value": 1066149.0,
-        "delta_own": "+8%"
-      },
-      {
-        "filing_date": "2026-11-23",
-        "trade_date": "2026-11-18",
-        "ticker": "PAM",
-        "company": "Pampa Energy Inc.",
-        "industry": "Electric Services",
-        "insiders": 3,
-        "price": 23.81,
-        "value": 69992330.0,
-        "delta_own": "+8%"
-      },
-      {
-        "filing_date": "2026-11-23",
-        "trade_date": "2026-11-20",
-        "ticker": "BORR",
-        "company": "Borr Drilling Ltd",
-        "industry": "Drilling Oil & Gas Wells",
-        "insiders": 2,
-        "price": 3.99,
-        "value": 77989550.0,
-        "delta_own": "+63%"
-      },
-      {
-        "filing_date": "2026-11-23",
-        "trade_date": "2026-11-20",
-        "ticker": "HOS",
-        "company": "Hornbeck Offshore Services, Inc.",
-        "industry": "Oil & Gas Field Services",
-        "insiders": 2,
-        "price": 5.27,
-        "value": 3246665.0,
-        "delta_own": "+11%"
-      },
-      {
-        "filing_date": "2026-11-23",
-        "trade_date": "2026-11-20",
-        "ticker": "GNL",
-        "company": "Global Net Lease, Inc.",
-        "industry": "Real Estate Investment Trusts",
-        "insiders": 7,
-        "price": 6.04,
-        "value": 636280.0,
-        "delta_own": "+2%"
-      },
-      {
-        "filing_date": "2026-11-20",
-        "trade_date": "2026-11-19",
-        "ticker": "UPST",
-        "company": "Upstart Holdings, Inc.",
-        "industry": "Finance Services",
-        "insiders": 2,
-        "price": 19.49,
-        "value": 5066953.0,
-        "delta_own": "+2%"
-      },
-      {
-        "filing_date": "2026-11-20",
-        "trade_date": "2026-11-20",
-        "ticker": "TTMI",
-        "company": "Ttm Technologies Inc",
-        "industry": "Printed Circuit Boards",
-        "insiders": 3,
-        "price": 73.6,
-        "value": 2575941.0,
-        "delta_own": "+14%"
-      },
-      {
-        "filing_date": "2026-11-20",
-        "trade_date": "2026-11-19",
-        "ticker": "EQPT",
-        "company": "Equipmentshare.Com Inc",
-        "industry": "Equipment Rental & Leasing",
-        "insiders": 3,
-        "price": 14.27,
-        "value": 1129878.0,
-        "delta_own": "+5%"
-      },
-      {
-        "filing_date": "2026-11-20",
-        "trade_date": "2026-11-18",
-        "ticker": "UPBD",
-        "company": "Upbound Group, Inc.",
-        "industry": "Equipment Rental & Leasing",
-        "insiders": 10,
-        "price": 23.5,
-        "value": 2288583.0,
-        "delta_own": "+19%"
       }
     ],
     "congress_buy": null,
@@ -353,109 +370,94 @@
     "CVX": {
       "qty": 9,
       "avg_cost": 211.88,
-      "last": 211.51,
-      "pnl_pct": -0.0018,
+      "last": 210.95,
+      "pnl_pct": -0.0044,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 8,
       "avg_cost": 297.59,
-      "last": 297.02,
-      "pnl_pct": -0.0019,
+      "last": 298.38,
+      "pnl_pct": 0.0026,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 470.65,
-      "pnl_pct": 0.0114,
+      "last": 469.24,
+      "pnl_pct": 0.0083,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1393.09,
-      "pnl_pct": 0.0198,
+      "last": 1392.22,
+      "pnl_pct": 0.0191,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 67,
       "avg_cost": 96.22,
-      "last": 98.56,
-      "pnl_pct": 0.0243,
+      "last": 97.59,
+      "pnl_pct": 0.0142,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 275.88,
-      "pnl_pct": -0.0081,
+      "last": 273.94,
+      "pnl_pct": -0.0151,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 297.7,
-      "pnl_pct": 0.0126,
+      "last": 294.48,
+      "pnl_pct": 0.0017,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 14,
       "avg_cost": 347.14,
-      "last": 353.16,
-      "pnl_pct": 0.0173,
+      "last": 355.58,
+      "pnl_pct": 0.0243,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 135.92,
-      "pnl_pct": -0.0042,
+      "last": 135.02,
+      "pnl_pct": -0.0108,
       "since": "2026-11-11"
     },
     "XLP": {
       "qty": 63,
       "avg_cost": 90.16,
-      "last": 92.67,
-      "pnl_pct": 0.0277,
+      "last": 92.3,
+      "pnl_pct": 0.0237,
       "since": "2026-11-23"
     },
     "V": {
       "qty": 5,
       "avg_cost": 409.2,
-      "last": 422.16,
-      "pnl_pct": 0.0317,
+      "last": 424.39,
+      "pnl_pct": 0.0371,
       "since": "2026-11-24"
     },
     "PG": {
       "qty": 12,
       "avg_cost": 170.99,
-      "last": 174.36,
-      "pnl_pct": 0.0197,
+      "last": 173.23,
+      "pnl_pct": 0.0131,
       "since": "2026-11-24"
     },
     "COST": {
       "qty": 2,
       "avg_cost": 1071.92,
-      "last": 1093.33,
-      "pnl_pct": 0.02,
+      "last": 1086.81,
+      "pnl_pct": 0.0139,
       "since": "2026-11-24"
     }
-  },
-  "day_moves": {
-    "CVX": 0.0133,
-    "UNP": 0.0213,
-    "AMGN": -0.0069,
-    "LLY": -0.0103,
-    "KO": 0.0096,
-    "JNJ": -0.0021,
-    "ABBV": -0.0086,
-    "AAPL": -0.0026,
-    "COP": 0.0095,
-    "XLP": 0.0085,
-    "V": 0.0129,
-    "PG": 0.011,
-    "COST": 0.0015
   },
   "events": []
 }

@@ -1,16 +1,148 @@
 {
-  "date": "2026-11-24",
+  "date": "2026-11-25",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "AVEX",
+      "company": "Aevex Corp.",
+      "industry": "Aircraft",
+      "insiders": 2,
+      "price": 12.39,
+      "value": 227288.0,
+      "delta_own": "+15%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-24",
+      "ticker": "BPRE",
+      "company": "Bluerock Private Real Estate Fund",
+      "industry": "Closed-End Funds",
+      "insiders": 3,
+      "price": 12.59,
+      "value": 41716652.0,
+      "delta_own": ">999%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "BBT",
+      "company": "Beacon Financial Corp",
+      "industry": "Savings Institutions, Not Federally Chartered",
+      "insiders": 4,
+      "price": 30.27,
+      "value": 282370.0,
+      "delta_own": "+12%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "PRE",
+      "company": "Prenetics Global Ltd",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 3,
+      "price": 9.92,
+      "value": 1264440.0,
+      "delta_own": "+18%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-24",
+      "ticker": "VISN",
+      "company": "Vistance Networks, Inc.",
+      "industry": "Radio & Tv Broadcasting & Communications Equipment",
+      "insiders": 3,
+      "price": 4.09,
+      "value": 1226383.0,
+      "delta_own": "+15%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-24",
+      "ticker": "BORR",
+      "company": "Borr Drilling Ltd",
+      "industry": "Drilling Oil & Gas Wells",
+      "insiders": 2,
+      "price": 3.99,
+      "value": 81926850.0,
+      "delta_own": "+66%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-18",
+      "ticker": "DX",
+      "company": "Dynex Capital Inc",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 3,
+      "price": 11.15,
+      "value": 434808.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-24",
+      "ticker": "SCOR",
+      "company": "Comscore, Inc.",
+      "industry": "Business Services",
+      "insiders": 2,
+      "price": 3.66,
+      "value": 695262.0,
+      "delta_own": "+52%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-20",
+      "ticker": "CTSO",
+      "company": "Cytosorbents Corp",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 4,
+      "price": 5.18,
+      "value": 469996.0,
+      "delta_own": "+60%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-20",
+      "ticker": "RMIX",
+      "company": "Suncrete, Inc.",
+      "industry": "Concrete Products, Except Block & Brick",
+      "insiders": 5,
+      "price": 6.35,
+      "value": 1934887.0,
+      "delta_own": "+13%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-24",
+      "ticker": "NPCE",
+      "company": "Neuropace Inc",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 4,
+      "price": 8.38,
+      "value": 399331.0,
+      "delta_own": "+21%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-20",
+      "ticker": "COHR",
+      "company": "Coherent Corp.",
+      "industry": "Optical Instruments & Lenses",
+      "insiders": 3,
+      "price": 186.81,
+      "value": 16438969.0,
+      "delta_own": "+45%"
+    },
     {
       "filing_date": "2026-11-24",
       "trade_date": "2026-11-23",
-      "ticker": "CBK",
-      "company": "Commercial Bancgroup, Inc.",
-      "industry": "State Commercial Banks",
+      "ticker": "SNEX",
+      "company": "Stonex Group Inc.",
+      "industry": "Security & Commodity Brokers, Dealers, Exchanges & Services",
       "insiders": 2,
-      "price": 32.58,
-      "value": 114916.0,
-      "delta_own": "+4%"
+      "price": 38.51,
+      "value": 497468.0,
+      "delta_own": "+3%"
     },
     {
       "filing_date": "2026-11-24",
@@ -81,17 +213,6 @@
     {
       "filing_date": "2026-11-23",
       "trade_date": "2026-11-19",
-      "ticker": "RMIX",
-      "company": "Suncrete, Inc.",
-      "industry": "Concrete Products, Except Block & Brick",
-      "insiders": 5,
-      "price": 6.36,
-      "value": 1906137.0,
-      "delta_own": "+13%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-19",
       "ticker": "TMS",
       "company": "Teamshares Inc",
       "industry": "Miscellaneous Retail",
@@ -99,28 +220,6 @@
       "price": 4.29,
       "value": 924055.0,
       "delta_own": "+57%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-19",
-      "ticker": "BPRE",
-      "company": "Bluerock Private Real Estate Fund",
-      "industry": "Closed-End Funds",
-      "insiders": 3,
-      "price": 12.6,
-      "value": 41607596.0,
-      "delta_own": ">999%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-19",
-      "ticker": "SCOR",
-      "company": "Comscore, Inc.",
-      "industry": "Business Services",
-      "insiders": 2,
-      "price": 4.06,
-      "value": 569717.0,
-      "delta_own": "+41%"
     },
     {
       "filing_date": "2026-11-23",
@@ -176,105 +275,6 @@
       "price": 6.79,
       "value": 165897.0,
       "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-05",
-      "ticker": "KYN",
-      "company": "Kayne Anderson Energy Infrastructure Fund, Inc.",
-      "industry": "Closed-End Funds",
-      "insiders": 3,
-      "price": 13.1,
-      "value": 1066149.0,
-      "delta_own": "+8%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-18",
-      "ticker": "PAM",
-      "company": "Pampa Energy Inc.",
-      "industry": "Electric Services",
-      "insiders": 3,
-      "price": 23.81,
-      "value": 69992330.0,
-      "delta_own": "+8%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-20",
-      "ticker": "BORR",
-      "company": "Borr Drilling Ltd",
-      "industry": "Drilling Oil & Gas Wells",
-      "insiders": 2,
-      "price": 3.99,
-      "value": 77989550.0,
-      "delta_own": "+63%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-20",
-      "ticker": "HOS",
-      "company": "Hornbeck Offshore Services, Inc.",
-      "industry": "Oil & Gas Field Services",
-      "insiders": 2,
-      "price": 5.27,
-      "value": 3246665.0,
-      "delta_own": "+11%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-20",
-      "ticker": "GNL",
-      "company": "Global Net Lease, Inc.",
-      "industry": "Real Estate Investment Trusts",
-      "insiders": 7,
-      "price": 6.04,
-      "value": 636280.0,
-      "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-20",
-      "trade_date": "2026-11-19",
-      "ticker": "UPST",
-      "company": "Upstart Holdings, Inc.",
-      "industry": "Finance Services",
-      "insiders": 2,
-      "price": 19.49,
-      "value": 5066953.0,
-      "delta_own": "+2%"
-    },
-    {
-      "filing_date": "2026-11-20",
-      "trade_date": "2026-11-20",
-      "ticker": "TTMI",
-      "company": "Ttm Technologies Inc",
-      "industry": "Printed Circuit Boards",
-      "insiders": 3,
-      "price": 73.6,
-      "value": 2575941.0,
-      "delta_own": "+14%"
-    },
-    {
-      "filing_date": "2026-11-20",
-      "trade_date": "2026-11-19",
-      "ticker": "EQPT",
-      "company": "Equipmentshare.Com Inc",
-      "industry": "Equipment Rental & Leasing",
-      "insiders": 3,
-      "price": 14.27,
-      "value": 1129878.0,
-      "delta_own": "+5%"
-    },
-    {
-      "filing_date": "2026-11-20",
-      "trade_date": "2026-11-18",
-      "ticker": "UPBD",
-      "company": "Upbound Group, Inc.",
-      "industry": "Equipment Rental & Leasing",
-      "insiders": 10,
-      "price": 23.5,
-      "value": 2288583.0,
-      "delta_own": "+19%"
     }
   ],
   "congress_buy": null,
