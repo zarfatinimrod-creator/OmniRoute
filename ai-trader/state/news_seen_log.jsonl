@@ -17278,3 +17278,4 @@
 {"key": "1c3d332a92f95c93", "symbol": "MSFT", "published": "2026-11-25T15:59:00+00:00", "first_seen": "2026-11-25T17:07:16.130826+00:00", "outcome": "stale"}
 {"key": "fff12cd8b3c1cf52", "symbol": "WMT", "published": "2026-11-25T17:00:00+00:00", "first_seen": "2026-11-25T17:07:16.131583+00:00", "outcome": "scored"}
 {"key": "45c1688e004cb9fe", "symbol": "UBER", "published": "2026-11-25T16:03:00+00:00", "first_seen": "2026-11-25T17:07:34.004414+00:00", "outcome": "stale"}
+{"key": "6d7d5b04d2b1a9df", "symbol": "META", "published": "2026-11-25T15:59:00+00:00", "first_seen": "2026-11-25T17:08:14.330377+00:00", "outcome": "stale"}
