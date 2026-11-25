@@ -17353,3 +17353,14 @@
 {"key": "62ebd4760c8d0c77", "symbol": "NVDA", "published": "2026-11-25T17:45:31+00:00", "first_seen": "2026-11-25T17:48:41.648279+00:00", "outcome": "scored"}
 {"key": "268b3245840735a5", "symbol": "NVDA", "published": "2026-11-25T17:35:44+00:00", "first_seen": "2026-11-25T17:48:41.648329+00:00", "outcome": "scored"}
 {"key": "8207e626dfb3ac27", "symbol": "NVDA", "published": "2026-11-25T17:49:10+00:00", "first_seen": "2026-11-25T17:49:41.998021+00:00", "outcome": "scored"}
+{"key": "2d98a1868ead4a94", "symbol": "AMZN", "published": "2026-11-25T17:47:41+00:00", "first_seen": "2026-11-25T17:54:41.466387+00:00", "outcome": "scored"}
+{"key": "eab6b2fd8747e5dd", "symbol": "MSFT", "published": "2026-11-25T17:52:57+00:00", "first_seen": "2026-11-25T17:55:21.549156+00:00", "outcome": "scored"}
+{"key": "8bbe06aafd9199db", "symbol": "META", "published": "2026-11-25T17:45:45+00:00", "first_seen": "2026-11-25T17:55:21.549393+00:00", "outcome": "scored"}
+{"key": "a18fc9065a4f5991", "symbol": "INTC", "published": "2026-11-25T17:45:02+00:00", "first_seen": "2026-11-25T17:55:41.486478+00:00", "outcome": "scored"}
+{"key": "184e0d103b58e8ad", "symbol": "AMD", "published": "2026-11-25T17:45:02+00:00", "first_seen": "2026-11-25T17:56:01.538361+00:00", "outcome": "scored"}
+{"key": "da4870b017591c3a", "symbol": "NVDA", "published": "2026-11-25T17:45:02+00:00", "first_seen": "2026-11-25T17:56:21.601606+00:00", "outcome": "scored"}
+{"key": "0f268578162f5f3d", "symbol": "NVDA", "published": "2026-11-25T17:51:02+00:00", "first_seen": "2026-11-25T17:56:21.601622+00:00", "outcome": "scored"}
+{"key": "f38f812248e06538", "symbol": "NVDA", "published": "2026-11-25T14:56:00+00:00", "first_seen": "2026-11-25T17:57:21.548378+00:00", "outcome": "stale"}
+{"key": "7be5167aed0e8997", "symbol": "META", "published": "2026-11-25T17:18:00+00:00", "first_seen": "2026-11-25T17:57:21.548860+00:00", "outcome": "stale"}
+{"key": "309b94aacac6e3d5", "symbol": "NVDA", "published": "2026-11-25T17:43:00+00:00", "first_seen": "2026-11-25T17:57:21.548367+00:00", "outcome": "scored"}
+{"key": "e806019c9ac59974", "symbol": "GOOGL", "published": "2026-11-25T17:18:00+00:00", "first_seen": "2026-11-25T17:58:01.589384+00:00", "outcome": "stale"}
