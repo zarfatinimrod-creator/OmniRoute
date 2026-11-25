@@ -16673,3 +16673,15 @@
 {"key": "d4d42c3d85bea1ff", "symbol": "PLD", "published": "2026-11-25T00:21:10+00:00", "first_seen": "2026-11-25T13:12:31.969255+00:00", "outcome": "stale"}
 {"key": "c6bc402868566760", "symbol": "CHKP", "published": "2026-11-25T08:37:08+00:00", "first_seen": "2026-11-25T13:12:31.969316+00:00", "outcome": "stale"}
 {"key": "f378a88d39cc7e71", "symbol": "NICE", "published": "2026-11-25T10:30:00+00:00", "first_seen": "2026-11-25T13:12:31.969372+00:00", "outcome": "stale"}
+{"key": "a04c22e77e4c962f", "symbol": "AAPL", "published": "2026-11-25T13:04:36+00:00", "first_seen": "2026-11-25T13:12:31.946359+00:00", "outcome": "scored"}
+{"key": "3df14a070bde9e5a", "symbol": "MSFT", "published": "2026-11-25T12:57:41+00:00", "first_seen": "2026-11-25T13:12:31.946835+00:00", "outcome": "scored"}
+{"key": "50d7bf40b6c6c953", "symbol": "NVDA", "published": "2026-11-25T13:00:00+00:00", "first_seen": "2026-11-25T13:12:31.947524+00:00", "outcome": "scored"}
+{"key": "086db6d066476b04", "symbol": "NVDA", "published": "2026-11-25T13:05:11+00:00", "first_seen": "2026-11-25T13:12:31.947528+00:00", "outcome": "scored"}
+{"key": "889991ca4106a293", "symbol": "NVDA", "published": "2026-11-25T13:04:36+00:00", "first_seen": "2026-11-25T13:12:31.947531+00:00", "outcome": "scored"}
+{"key": "4660cd32bcef785c", "symbol": "NVDA", "published": "2026-11-25T12:52:00+00:00", "first_seen": "2026-11-25T13:12:31.947533+00:00", "outcome": "scored"}
+{"key": "584a4fd4e48bfbfa", "symbol": "NVDA", "published": "2026-11-25T12:51:35+00:00", "first_seen": "2026-11-25T13:12:31.947535+00:00", "outcome": "scored"}
+{"key": "338b14e9a4e54bf1", "symbol": "NVDA", "published": "2026-11-25T12:50:02+00:00", "first_seen": "2026-11-25T13:12:31.947538+00:00", "outcome": "scored"}
+{"key": "6b0768b9e2295cff", "symbol": "NVDA", "published": "2026-11-25T12:43:58+00:00", "first_seen": "2026-11-25T13:12:31.947540+00:00", "outcome": "scored"}
+{"key": "6f60ba0cbb19067d", "symbol": "NVDA", "published": "2026-11-25T13:00:09+00:00", "first_seen": "2026-11-25T13:12:31.947773+00:00", "outcome": "scored"}
+{"key": "ddfde8e933ec841b", "symbol": "NVDA", "published": "2026-11-25T13:00:01+00:00", "first_seen": "2026-11-25T13:12:31.947779+00:00", "outcome": "scored"}
+{"key": "5d8980fa4baafd99", "symbol": "NVDA", "published": "2026-11-25T12:57:43+00:00", "first_seen": "2026-11-25T13:12:31.947838+00:00", "outcome": "scored"}
