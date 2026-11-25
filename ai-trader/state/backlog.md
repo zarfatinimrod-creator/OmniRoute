@@ -381,6 +381,10 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     live check so far: 2 rows, 1 flag, 1 true catch, 0 false alarms (one case, not proof). The code's own R6
     revised_close row for 11-23 is not written yet: the 11-24 decision is deferred (11-24 daily null at 00:13), and
     the audit runs at the next decision (backlog 71 (a): it is lost if the 11-24 row stays null past 24 h).
+    2026-11-25 00:49:47: the code's R6 row confirms it: revised_close 11-23, decision_close 61,424.91 (yahoo_1h) vs
+    history_close 61,210.98, gaps_bps -34.83, limit 5 (state/crypto/decisions.jsonl). The 11-24 decision (00:49:48,
+    1h rebuild after the 1h 23:00 and 5m 23:55 bars agreed at 59,740.87 on two probes) logged close_xcheck 0.0 bp vs
+    Coinbase 59,740.87, would_decline []. Tally: 3 rows, 1 flag, 1 true catch, 0 false alarms.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
