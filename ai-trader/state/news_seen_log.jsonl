@@ -16811,3 +16811,5 @@
 {"key": "2fb0721ebed4a646", "symbol": "PANW", "published": "2026-11-25T12:59:00+00:00", "first_seen": "2026-11-25T14:09:51.199308+00:00", "outcome": "stale"}
 {"key": "aadda3ec9e8201cb", "symbol": "LOW", "published": "2026-11-25T13:00:02+00:00", "first_seen": "2026-11-25T14:09:51.199548+00:00", "outcome": "stale"}
 {"key": "6668d4d0a9a8a11e", "symbol": "BRK-B", "published": "2026-11-25T14:03:00+00:00", "first_seen": "2026-11-25T14:09:51.199739+00:00", "outcome": "scored"}
+{"key": "bdadfa84ca026545", "symbol": "QCOM", "published": "2026-11-25T12:57:00+00:00", "first_seen": "2026-11-25T14:10:11.214809+00:00", "outcome": "stale"}
+{"key": "2bb901d5d223eb90", "symbol": "AMZN", "published": "2026-11-25T14:03:00+00:00", "first_seen": "2026-11-25T14:10:11.215256+00:00", "outcome": "scored"}
