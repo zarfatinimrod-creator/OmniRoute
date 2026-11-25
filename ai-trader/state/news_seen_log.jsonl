@@ -16685,3 +16685,15 @@
 {"key": "6f60ba0cbb19067d", "symbol": "NVDA", "published": "2026-11-25T13:00:09+00:00", "first_seen": "2026-11-25T13:12:31.947773+00:00", "outcome": "scored"}
 {"key": "ddfde8e933ec841b", "symbol": "NVDA", "published": "2026-11-25T13:00:01+00:00", "first_seen": "2026-11-25T13:12:31.947779+00:00", "outcome": "scored"}
 {"key": "5d8980fa4baafd99", "symbol": "NVDA", "published": "2026-11-25T12:57:43+00:00", "first_seen": "2026-11-25T13:12:31.947838+00:00", "outcome": "scored"}
+{"key": "dfc3036ac5b18941", "symbol": "NVDA", "published": "2026-11-25T12:57:41+00:00", "first_seen": "2026-11-25T13:12:31.947843+00:00", "outcome": "scored"}
+{"key": "7273ce72d80349c4", "symbol": "AMD", "published": "2026-11-25T13:05:11+00:00", "first_seen": "2026-11-25T13:12:31.950533+00:00", "outcome": "scored"}
+{"key": "7a25eefe16388755", "symbol": "AMD", "published": "2026-11-25T13:04:36+00:00", "first_seen": "2026-11-25T13:12:31.950537+00:00", "outcome": "scored"}
+{"key": "d9c06793bf9900cf", "symbol": "AMD", "published": "2026-11-25T12:57:43+00:00", "first_seen": "2026-11-25T13:12:31.950762+00:00", "outcome": "scored"}
+{"key": "0658e8bb049b1203", "symbol": "CSCO", "published": "2026-11-25T13:00:00+00:00", "first_seen": "2026-11-25T13:12:31.950818+00:00", "outcome": "scored"}
+{"key": "d1c4782c626b1962", "symbol": "MU", "published": "2026-11-25T12:47:51+00:00", "first_seen": "2026-11-25T13:12:31.952770+00:00", "outcome": "scored"}
+{"key": "eb56dd1c1231ed7d", "symbol": "GOOGL", "published": "2026-11-25T12:57:28+00:00", "first_seen": "2026-11-25T13:12:31.954927+00:00", "outcome": "scored"}
+{"key": "be94b1c17a978c55", "symbol": "META", "published": "2026-11-25T12:52:00+00:00", "first_seen": "2026-11-25T13:12:31.956402+00:00", "outcome": "scored"}
+{"key": "3911586f5e438fa3", "symbol": "AMZN", "published": "2026-11-25T12:54:29+00:00", "first_seen": "2026-11-25T13:12:31.957185+00:00", "outcome": "scored"}
+{"key": "b33edd998cc2056f", "symbol": "AMZN", "published": "2026-11-25T12:52:00+00:00", "first_seen": "2026-11-25T13:12:31.957969+00:00", "outcome": "scored"}
+{"key": "f8ff1935c4114122", "symbol": "TSLA", "published": "2026-11-25T12:52:00+00:00", "first_seen": "2026-11-25T13:12:31.958922+00:00", "outcome": "scored"}
+{"key": "d3d1d80f91c521a2", "symbol": "COST", "published": "2026-11-25T12:44:23+00:00", "first_seen": "2026-11-25T13:12:31.961149+00:00", "outcome": "scored"}
