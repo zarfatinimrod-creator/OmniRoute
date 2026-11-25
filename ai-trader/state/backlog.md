@@ -375,6 +375,12 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     decided 61,424.91 is +35.6 bp off it, and the agreeing value is +2.7 bp off Coinbase 61,189.97 (at 01:08:33 the 1h
     bar read 61,274.46 with the 5m bar null). So the first flag looks like a true catch; the R6 audit against the
     settled daily close decides it.
+    2026-11-25 00:13:18: 11-23 settled daily 61,210.98 (final72.py). Decided 61,424.91 = +34.9 bp off the settled
+    close (above R6's 5 bp); Coinbase 61,189.97 = -3.4 bp off it. FIRST FLAG = TRUE CATCH: the check would have
+    declined a close that was 35 bp wrong, and the Coinbase value was within 5 bp of the settled close. Tally of the
+    live check so far: 2 rows, 1 flag, 1 true catch, 0 false alarms (one case, not proof). The code's own R6
+    revised_close row for 11-23 is not written yet: the 11-24 decision is deferred (11-24 daily null at 00:13), and
+    the audit runs at the next decision (backlog 71 (a): it is lost if the 11-24 row stays null past 24 h).
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
