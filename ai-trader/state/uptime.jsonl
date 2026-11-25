@@ -2412,3 +2412,18 @@
 {"t": "2026-11-25T19:07:00+00:00", "ev": "mark", "sup": 16904, "hb": 17.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-25T19:08:00+00:00", "ev": "mark", "sup": 16904, "hb": 17.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-25T19:09:00+00:00", "ev": "mark", "sup": 16904, "hb": 17.2, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:10:00+00:00", "ev": "mark", "sup": 16904, "hb": 17.1, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:11:00+00:00", "ev": "mark", "sup": 16904, "hb": 17.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:12:00+00:00", "ev": "mark", "sup": 16904, "hb": 16.5, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:13:00+00:00", "ev": "mark", "sup": 16904, "hb": 9.4, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:14:00+00:00", "ev": "mark", "sup": 16904, "hb": 16.6, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:15:00+00:00", "ev": "mark", "sup": 16904, "hb": 16.6, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:16:00+00:00", "ev": "mark", "sup": 16904, "hb": 16.3, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:17:00+00:00", "ev": "mark", "sup": 16904, "hb": 16.8, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:17:00+00:00", "ev": "exit", "sup": 16904, "child": 16909, "rc": 143, "signal": null, "ran_s": 6521.4, "why": "planned"}
+{"t": "2026-11-25T19:17:00+00:00", "ev": "sup_stop", "sup": 16904, "why": "handover", "rc": 76}
+{"t": "2026-11-25T19:17:08+00:00", "ev": "sup_start", "sup": 23809, "until": "16:05", "handover": true, "timeout_ms": 7200000, "prev_t": "2026-11-25T19:17:00+00:00", "prev_ev": "sup_stop", "gap_s": 8, "cold": false}
+{"t": "2026-11-25T19:17:08+00:00", "ev": "mark", "sup": 23809, "hb": null, "stop": null, "n": null, "open": null, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T19:17:08+00:00", "ev": "start", "sup": 23809, "child": 23814, "n": 1, "backoff_s": 0}
+{"t": "2026-11-25T19:17:09+00:00", "ev": "up", "sup": 23809, "child": 23814, "down_from": null, "down_s": null, "blind_s": 0, "handover_s": 9.0, "held": {}, "blind": [], "commit": null, "dirty": null, "code_changed": null, "sold": []}
+{"t": "2026-11-25T19:17:09+00:00", "ev": "code", "sup": 23809, "child": 23814, "commit": "b1b99aa2", "dirty": false, "code_changed": true}
