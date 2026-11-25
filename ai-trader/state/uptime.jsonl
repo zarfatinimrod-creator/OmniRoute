@@ -2311,3 +2311,13 @@
 {"t": "2026-11-25T17:28:19+00:00", "ev": "start", "sup": 16904, "child": 16909, "n": 1, "backoff_s": 0}
 {"t": "2026-11-25T17:28:20+00:00", "ev": "up", "sup": 16904, "child": 16909, "down_from": null, "down_s": null, "blind_s": 0, "handover_s": 19.0, "held": {}, "blind": [], "commit": null, "dirty": null, "code_changed": null, "sold": []}
 {"t": "2026-11-25T17:28:20+00:00", "ev": "code", "sup": 16904, "child": 16909, "commit": "a5221f1d", "dirty": false, "code_changed": true}
+{"t": "2026-11-25T17:29:00+00:00", "ev": "mark", "sup": 16904, "hb": 19.1, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:30:00+00:00", "ev": "mark", "sup": 16904, "hb": 10.0, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:31:00+00:00", "ev": "mark", "sup": 16904, "hb": 19.1, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:32:00+00:00", "ev": "mark", "sup": 16904, "hb": 11.6, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:33:00+00:00", "ev": "mark", "sup": 16904, "hb": 10.5, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:34:00+00:00", "ev": "mark", "sup": 16904, "hb": 12.7, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:35:00+00:00", "ev": "mark", "sup": 16904, "hb": 18.8, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:36:00+00:00", "ev": "mark", "sup": 16904, "hb": 18.8, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:37:00+00:00", "ev": "mark", "sup": 16904, "hb": 12.6, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-25T17:38:00+00:00", "ev": "mark", "sup": 16904, "hb": 12.8, "stop": null, "n": 0, "open": true, "blind": [], "dm": null, "left": null}
