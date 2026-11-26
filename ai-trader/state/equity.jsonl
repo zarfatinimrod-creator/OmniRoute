@@ -40,3 +40,4 @@
 {"date": "2026-11-25", "logged_at": "2026-11-25T21:23:53+00:00", "equity": 98238.42, "shadow_equity": 98636.99, "cash": 54323.01, "gross": 0.447, "bench_price": 716.7000122070312, "market_open": false, "decided": true}
 {"date": "2026-11-25", "logged_at": "2026-11-26T14:53:38+00:00", "equity": 98238.42, "shadow_equity": 98636.99, "cash": 54323.01, "gross": 0.447, "bench_price": 716.7000122070312, "market_open": false, "decided": false}
 {"date": "2026-11-25", "logged_at": "2026-11-26T17:53:06+00:00", "equity": 98238.42, "shadow_equity": 98636.99, "cash": 54323.01, "gross": 0.447, "bench_price": 716.7000122070312, "market_open": false, "decided": false}
+{"date": "2026-11-25", "logged_at": "2026-11-26T21:23:09+00:00", "equity": 98238.42, "shadow_equity": 98636.99, "cash": 54323.01, "gross": 0.447, "bench_price": 716.7000122070312, "market_open": false, "decided": false}
