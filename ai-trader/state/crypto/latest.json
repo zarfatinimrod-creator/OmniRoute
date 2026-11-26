@@ -1,12 +1,12 @@
 {
-  "date": "2026-11-25",
-  "as_of_utc": "2026-11-25T06:05:01+00:00",
+  "date": "2026-11-26",
+  "as_of_utc": "2026-11-26T00:14:01+00:00",
   "market": {
     "is_open": true,
-    "regular_start_utc": "2026-11-25T00:00:00+00:00",
-    "regular_end_utc": "2026-11-25T23:59:00+00:00",
-    "last_trade_utc": "2026-11-25T06:04:56+00:00",
-    "price": 59010.99
+    "regular_start_utc": "2026-11-26T00:00:00+00:00",
+    "regular_end_utc": "2026-11-26T23:59:00+00:00",
+    "last_trade_utc": "2026-11-26T00:13:56+00:00",
+    "price": 60796.01
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,8 +14,8 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.1995,
-    "equal_weight_since_start": -0.1995
+    "bench_since_start": -0.1753,
+    "equal_weight_since_start": -0.1753
   },
   "started": "2026-11-10",
   "regime": "risk_off",
@@ -46,11 +46,11 @@
   "bottom_scores": null,
   "stopped": [],
   "scorecard": {
-    "open": 36,
-    "evaluated": 6,
+    "open": 35,
+    "evaluated": 7,
     "quant_h7": {
-      "n": 6,
-      "hit_rate": 0.5,
+      "n": 7,
+      "hit_rate": 0.571,
       "avg_excess_up_calls": -0.1302
     }
   },
@@ -62,9 +62,9 @@
   "positions": {},
   "day_moves": {},
   "alert_channels": [
-    "ntfy"
+    "queued"
   ],
   "events": [
-    "השורה היומית של 2026-11-24 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 59,740.87)"
+    "אין שורה יומית של 2026-11-25 בנתונים (הנר האחרון הסופי הוא 2026-11-24) - אין החלטה בריצה הזו, הזמנה ממתינה עדיין מתמלאת, ריצה מאוחרת תנסה שוב"
   ]
 }

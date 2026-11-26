@@ -385,6 +385,9 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     history_close 61,210.98, gaps_bps -34.83, limit 5 (state/crypto/decisions.jsonl). The 11-24 decision (00:49:48,
     1h rebuild after the 1h 23:00 and 5m 23:55 bars agreed at 59,740.87 on two probes) logged close_xcheck 0.0 bp vs
     Coinbase 59,740.87, would_decline []. Tally: 3 rows, 1 flag, 1 true catch, 0 false alarms.
+    2026-11-26 00:14:02: 11-24 settled daily 59,747.77 (final72.py); decided 59,740.87 = -1.15 bp (under R6), Coinbase
+    59,740.87 = -1.15 bp: the unflagged row is confirmed. Tally: 3 rows, 1 flag (true catch), 0 false alarms, 2 clean
+    rows confirmed by the settled close.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
