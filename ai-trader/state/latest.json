@@ -1,6 +1,6 @@
 {
   "date": "2026-11-25",
-  "as_of_utc": "2026-11-25T21:23:53+00:00",
+  "as_of_utc": "2026-11-26T14:53:38+00:00",
   "market": {
     "is_open": false,
     "regular_start_utc": "2026-11-25T14:30:00+00:00",
@@ -21,7 +21,7 @@
   "regime": "risk_on+defensive",
   "dd_state": "normal",
   "drawdown": -0.034,
-  "decided_now": true,
+  "decided_now": false,
   "weights": {
     "tsmom": 0.25,
     "xsmom": 0.25,
@@ -56,25 +56,8 @@
     "preview_at_close": []
   },
   "executed": [],
-  "top_scores": {
-    "AMGN": 0.606,
-    "PANW": 0.597,
-    "ABBV": 0.576,
-    "KO": 0.574,
-    "TEVA": 0.568,
-    "AAPL": 0.545,
-    "COP": 0.531,
-    "JNJ": 0.52,
-    "UNP": 0.518,
-    "LIN": 0.511
-  },
-  "bottom_scores": {
-    "NFLX": -0.793,
-    "ORCL": -0.678,
-    "BKNG": -0.636,
-    "NKE": -0.613,
-    "UBER": -0.552
-  },
+  "top_scores": null,
+  "bottom_scores": null,
   "stopped": [],
   "scorecard": {
     "open": 1403,
