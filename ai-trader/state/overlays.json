@@ -1,6 +1,61 @@
 {
-  "date": "2026-11-25",
+  "date": "2026-11-27",
   "insider_cluster": [
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "TMS",
+      "company": "Teamshares Inc",
+      "industry": "Miscellaneous Retail",
+      "insiders": 3,
+      "price": 4.32,
+      "value": 1180461.0,
+      "delta_own": "+73%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "HBCP",
+      "company": "Home Bancorp, Inc.",
+      "industry": "Savings Institutions, Not Federally Chartered",
+      "insiders": 2,
+      "price": 61.01,
+      "value": 345638.0,
+      "delta_own": "+18%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "SCM",
+      "company": "Stellus Capital Investment Corp",
+      "industry": "Closed-End Funds",
+      "insiders": 2,
+      "price": 6.4,
+      "value": 396932.0,
+      "delta_own": "+7%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-25",
+      "ticker": "GLXY",
+      "company": "Galaxy Digital Inc.",
+      "industry": "Security Brokers, Dealers & Flotation Companies",
+      "insiders": 3,
+      "price": 12.42,
+      "value": 16327911.0,
+      "delta_own": "+125%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "COHR",
+      "company": "Coherent Corp.",
+      "industry": "Optical Instruments & Lenses",
+      "insiders": 3,
+      "price": 198.1,
+      "value": 51091859.0,
+      "delta_own": "+132%"
+    },
     {
       "filing_date": "2026-11-25",
       "trade_date": "2026-11-23",
@@ -124,17 +179,6 @@
     },
     {
       "filing_date": "2026-11-24",
-      "trade_date": "2026-11-20",
-      "ticker": "COHR",
-      "company": "Coherent Corp.",
-      "industry": "Optical Instruments & Lenses",
-      "insiders": 3,
-      "price": 186.81,
-      "value": 16438969.0,
-      "delta_own": "+45%"
-    },
-    {
-      "filing_date": "2026-11-24",
       "trade_date": "2026-11-23",
       "ticker": "SNEX",
       "company": "Stonex Group Inc.",
@@ -212,17 +256,6 @@
     },
     {
       "filing_date": "2026-11-23",
-      "trade_date": "2026-11-19",
-      "ticker": "TMS",
-      "company": "Teamshares Inc",
-      "industry": "Miscellaneous Retail",
-      "insiders": 3,
-      "price": 4.29,
-      "value": 924055.0,
-      "delta_own": "+57%"
-    },
-    {
-      "filing_date": "2026-11-23",
       "trade_date": "2026-11-20",
       "ticker": "ETN",
       "company": "Eaton Corp Plc",
@@ -242,39 +275,6 @@
       "price": 9.88,
       "value": 138280.0,
       "delta_own": "+18%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-19",
-      "ticker": "CTVA",
-      "company": "Corteva, Inc.",
-      "industry": "Crops",
-      "insiders": 3,
-      "price": 9.23,
-      "value": 523185.0,
-      "delta_own": "+22%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-20",
-      "ticker": "APC",
-      "company": "Arko Petroleum Corp.",
-      "industry": "Petroleum & Petroleum Products (No Bulk Stations)",
-      "insiders": 3,
-      "price": 13.4,
-      "value": 402040.0,
-      "delta_own": "+75%"
-    },
-    {
-      "filing_date": "2026-11-23",
-      "trade_date": "2026-11-19",
-      "ticker": "AIIR",
-      "company": "Air Global Plc",
-      "industry": "Tobacco Products",
-      "insiders": 2,
-      "price": 6.79,
-      "value": 165897.0,
-      "delta_own": "+2%"
     }
   ],
   "congress_buy": null,
