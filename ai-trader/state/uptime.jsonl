@@ -2537,3 +2537,8 @@
 {"t": "2026-11-25T21:05:00+00:00", "ev": "mark", "sup": 23809, "hb": 7.5, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
 {"t": "2026-11-25T21:05:11+00:00", "ev": "exit", "sup": 23809, "child": 23814, "rc": 0, "signal": null, "ran_s": 6483.3, "why": "exit"}
 {"t": "2026-11-25T21:05:11+00:00", "ev": "sup_stop", "sup": 23809, "why": "end_of_day", "rc": 0}
+{"t": "2026-11-27T13:10:31+00:00", "ev": "sup_start", "sup": 236, "until": "16:05", "handover": true, "timeout_ms": 7200000, "prev_t": "2026-11-25T21:05:11+00:00", "prev_ev": "sup_stop", "gap_s": 144321, "cold": false}
+{"t": "2026-11-27T13:10:31+00:00", "ev": "mark", "sup": 236, "hb": null, "stop": null, "n": null, "open": null, "blind": [], "dm": null, "left": null}
+{"t": "2026-11-27T13:10:31+00:00", "ev": "start", "sup": 236, "child": 241, "n": 1, "backoff_s": 0}
+{"t": "2026-11-27T13:10:32+00:00", "ev": "up", "sup": 236, "child": 241, "down_from": null, "down_s": null, "blind_s": 0, "handover_s": null, "held": {}, "blind": [], "commit": null, "dirty": null, "code_changed": null, "sold": []}
+{"t": "2026-11-27T13:10:33+00:00", "ev": "code", "sup": 236, "child": 241, "commit": "2f630997", "dirty": false, "code_changed": true}
