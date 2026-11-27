@@ -1,26 +1,26 @@
 {
   "date": "2026-11-27",
-  "as_of_utc": "2026-11-27T14:53:38+00:00",
+  "as_of_utc": "2026-11-27T17:53:18+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-27T14:30:00+00:00",
     "regular_end_utc": "2026-11-27T18:00:00+00:00",
-    "last_trade_utc": "2026-11-27T14:53:35+00:00",
-    "price": 721.73
+    "last_trade_utc": "2026-11-27T17:53:16+00:00",
+    "price": 725.887
   },
-  "equity": 98318.14,
+  "equity": 98434.15,
   "cash": 54323.01,
-  "gross": 0.4475,
-  "return_since_start": -0.0168,
-  "shadow_return_since_start": -0.0128,
+  "gross": 0.4481,
+  "return_since_start": -0.0157,
+  "shadow_return_since_start": -0.011,
   "baselines": {
-    "spy_since_start": -0.0185,
-    "equal_weight_since_start": -0.0103
+    "spy_since_start": -0.0128,
+    "equal_weight_since_start": -0.0062
   },
   "started": "2026-11-06",
   "regime": "risk_on+defensive",
   "dd_state": "normal",
-  "drawdown": -0.0332,
+  "drawdown": -0.0321,
   "decided_now": false,
   "weights": {
     "tsmom": 0.25,
@@ -353,109 +353,109 @@
     "CVX": {
       "qty": 9,
       "avg_cost": 211.88,
-      "last": 214.5,
-      "pnl_pct": 0.0123,
+      "last": 212.59,
+      "pnl_pct": 0.0033,
       "since": "2026-11-09"
     },
     "UNP": {
       "qty": 8,
       "avg_cost": 297.59,
-      "last": 298.58,
-      "pnl_pct": 0.0033,
+      "last": 297.4,
+      "pnl_pct": -0.0006,
       "since": "2026-11-09"
     },
     "AMGN": {
       "qty": 5,
       "avg_cost": 465.37,
-      "last": 472.29,
-      "pnl_pct": 0.0149,
+      "last": 473.03,
+      "pnl_pct": 0.0165,
       "since": "2026-11-09"
     },
     "LLY": {
       "qty": 2,
       "avg_cost": 1366.08,
-      "last": 1390.54,
-      "pnl_pct": 0.0179,
+      "last": 1393.27,
+      "pnl_pct": 0.0199,
       "since": "2026-11-09"
     },
     "KO": {
       "qty": 67,
       "avg_cost": 96.22,
-      "last": 97.15,
-      "pnl_pct": 0.0097,
+      "last": 97.67,
+      "pnl_pct": 0.015,
       "since": "2026-11-09"
     },
     "JNJ": {
       "qty": 14,
       "avg_cost": 278.14,
-      "last": 273.86,
-      "pnl_pct": -0.0154,
+      "last": 276.24,
+      "pnl_pct": -0.0068,
       "since": "2026-11-09"
     },
     "ABBV": {
       "qty": 14,
       "avg_cost": 293.99,
-      "last": 291.92,
-      "pnl_pct": -0.007,
+      "last": 292.93,
+      "pnl_pct": -0.0036,
       "since": "2026-11-09"
     },
     "AAPL": {
       "qty": 14,
       "avg_cost": 347.14,
-      "last": 356.5,
-      "pnl_pct": 0.027,
+      "last": 358.61,
+      "pnl_pct": 0.033,
       "since": "2026-11-09"
     },
     "COP": {
       "qty": 21,
       "avg_cost": 136.5,
-      "last": 138.06,
-      "pnl_pct": 0.0114,
+      "last": 136.7,
+      "pnl_pct": 0.0015,
       "since": "2026-11-11"
     },
     "XLP": {
       "qty": 63,
       "avg_cost": 90.16,
-      "last": 92.34,
-      "pnl_pct": 0.0241,
+      "last": 92.66,
+      "pnl_pct": 0.0277,
       "since": "2026-11-23"
     },
     "V": {
       "qty": 5,
       "avg_cost": 409.2,
-      "last": 427.57,
-      "pnl_pct": 0.0449,
+      "last": 429.83,
+      "pnl_pct": 0.0504,
       "since": "2026-11-24"
     },
     "PG": {
       "qty": 12,
       "avg_cost": 170.99,
-      "last": 172.47,
-      "pnl_pct": 0.0087,
+      "last": 172.96,
+      "pnl_pct": 0.0115,
       "since": "2026-11-24"
     },
     "COST": {
       "qty": 2,
       "avg_cost": 1071.92,
-      "last": 1093.99,
-      "pnl_pct": 0.0206,
+      "last": 1100.69,
+      "pnl_pct": 0.0268,
       "since": "2026-11-24"
     }
   },
   "day_moves": {
-    "CVX": 0.0168,
-    "UNP": 0.0007,
-    "AMGN": 0.0065,
-    "LLY": -0.0012,
-    "KO": -0.0045,
-    "JNJ": -0.0003,
-    "ABBV": -0.0087,
-    "AAPL": 0.0026,
-    "COP": 0.0225,
-    "XLP": 0.0004,
-    "V": 0.0075,
-    "PG": -0.0044,
-    "COST": 0.0066
+    "CVX": 0.0078,
+    "UNP": -0.0033,
+    "AMGN": 0.0081,
+    "LLY": 0.0008,
+    "KO": 0.0008,
+    "JNJ": 0.0084,
+    "ABBV": -0.0052,
+    "AAPL": 0.0085,
+    "COP": 0.0124,
+    "XLP": 0.0039,
+    "V": 0.0128,
+    "PG": -0.0016,
+    "COST": 0.0128
   },
   "events": []
 }
