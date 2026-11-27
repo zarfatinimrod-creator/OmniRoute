@@ -1,12 +1,12 @@
 {
   "date": "2026-11-27",
-  "as_of_utc": "2026-11-27T01:08:07+00:00",
+  "as_of_utc": "2026-11-27T06:04:38+00:00",
   "market": {
     "is_open": true,
     "regular_start_utc": "2026-11-27T00:00:00+00:00",
     "regular_end_utc": "2026-11-27T23:59:00+00:00",
-    "last_trade_utc": "2026-11-27T01:08:02+00:00",
-    "price": 60694.86
+    "last_trade_utc": "2026-11-27T06:04:33+00:00",
+    "price": 61698.45
   },
   "equity": 93819.73,
   "cash": 93819.73,
@@ -14,8 +14,8 @@
   "return_since_start": -0.0618,
   "shadow_return_since_start": -0.0618,
   "baselines": {
-    "bench_since_start": -0.1767,
-    "equal_weight_since_start": -0.1767
+    "bench_since_start": -0.1631,
+    "equal_weight_since_start": -0.1631
   },
   "started": "2026-11-10",
   "regime": "risk_off",
@@ -62,9 +62,9 @@
   "positions": {},
   "day_moves": {},
   "alert_channels": [
-    "queued"
+    "ntfy"
   ],
   "events": [
-    "השורה היומית של 2026-11-26 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 60,455.83)"
+    "השורה היומית של 2026-11-26 ב-Yahoo ריקה - היום נבנה מ-24 נרות שעתיים של Yahoo (close BTC-USD 60,495.57)"
   ]
 }
