@@ -18918,3 +18918,11 @@
 {"key": "a165101c00554f56", "symbol": "AMAT", "published": "2026-11-27T18:49:21+00:00", "first_seen": "2026-11-27T18:55:13.495059+00:00", "outcome": "scored"}
 {"key": "4f64d578c4a87f61", "symbol": "AMD", "published": "2026-11-27T18:49:21+00:00", "first_seen": "2026-11-27T18:55:33.407792+00:00", "outcome": "scored"}
 {"key": "727902df80c17036", "symbol": "ADBE", "published": "2026-11-27T18:53:10+00:00", "first_seen": "2026-11-27T18:55:53.389838+00:00", "outcome": "scored"}
+{"key": "9a408a71fc93ba30", "symbol": "NVDA", "published": "2026-11-27T18:48:43+00:00", "first_seen": "2026-11-27T18:58:53.455653+00:00", "outcome": "scored"}
+{"key": "6235cad599abf1b5", "symbol": "CRM", "published": "2026-11-27T18:48:43+00:00", "first_seen": "2026-11-27T18:59:13.696101+00:00", "outcome": "scored"}
+{"key": "3a6c7ba47a9bdbad", "symbol": "TSLA", "published": "2026-11-27T18:48:43+00:00", "first_seen": "2026-11-27T18:59:13.696407+00:00", "outcome": "scored"}
+{"key": "0f511f0b5bc41695", "symbol": "BRK-B", "published": "2026-11-27T18:29:14+00:00", "first_seen": "2026-11-27T19:00:33.524978+00:00", "outcome": "stale"}
+{"key": "837c43f165b879dd", "symbol": "CVX", "published": "2026-11-27T18:29:14+00:00", "first_seen": "2026-11-27T19:00:53.526162+00:00", "outcome": "stale"}
+{"key": "6a500b6d8a1bcb12", "symbol": "NVDA", "published": "2026-11-27T18:57:52+00:00", "first_seen": "2026-11-27T19:04:13.590974+00:00", "outcome": "scored"}
+{"key": "b2b4406db4c62f0e", "symbol": "NVDA", "published": "2026-11-27T18:53:03+00:00", "first_seen": "2026-11-27T19:04:13.590991+00:00", "outcome": "scored"}
+{"key": "6b4673aa3bb1d573", "symbol": "PLTR", "published": "2026-11-27T13:00:04+00:00", "first_seen": "2026-11-27T19:07:53.692176+00:00", "outcome": "stale"}
