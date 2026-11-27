@@ -18926,3 +18926,5 @@
 {"key": "6a500b6d8a1bcb12", "symbol": "NVDA", "published": "2026-11-27T18:57:52+00:00", "first_seen": "2026-11-27T19:04:13.590974+00:00", "outcome": "scored"}
 {"key": "b2b4406db4c62f0e", "symbol": "NVDA", "published": "2026-11-27T18:53:03+00:00", "first_seen": "2026-11-27T19:04:13.590991+00:00", "outcome": "scored"}
 {"key": "6b4673aa3bb1d573", "symbol": "PLTR", "published": "2026-11-27T13:00:04+00:00", "first_seen": "2026-11-27T19:07:53.692176+00:00", "outcome": "stale"}
+{"key": "083dc11dab53bc38", "symbol": "AMZN", "published": "2026-11-27T19:03:00+00:00", "first_seen": "2026-11-27T19:09:54.285636+00:00", "outcome": "scored"}
+{"key": "48f9c4791ce4c97f", "symbol": "NVDA", "published": "2026-11-27T19:09:46+00:00", "first_seen": "2026-11-27T19:15:14.384262+00:00", "outcome": "scored"}
