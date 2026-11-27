@@ -18748,3 +18748,15 @@
 {"key": "0ec7a1455671b59e", "symbol": "AMD", "published": "2026-11-27T16:49:30+00:00", "first_seen": "2026-11-27T16:53:33.686938+00:00", "outcome": "scored"}
 {"key": "6b829e0036392582", "symbol": "NOW", "published": "2026-11-27T16:41:01+00:00", "first_seen": "2026-11-27T16:53:33.687012+00:00", "outcome": "scored"}
 {"key": "d4bf5e97832553e9", "symbol": "AAPL", "published": "2026-11-27T15:18:00+00:00", "first_seen": "2026-11-27T16:54:53.716389+00:00", "outcome": "stale"}
+{"key": "444680051678bd32", "symbol": "ISRG", "published": "2026-11-27T15:48:00+00:00", "first_seen": "2026-11-27T16:59:53.819684+00:00", "outcome": "stale"}
+{"key": "e380c336c6c9cffe", "symbol": "ISRG", "published": "2026-11-27T15:47:00+00:00", "first_seen": "2026-11-27T16:59:53.820029+00:00", "outcome": "stale"}
+{"key": "93026761d20f207b", "symbol": "AVGO", "published": "2026-11-27T16:45:37+00:00", "first_seen": "2026-11-27T17:02:54.150216+00:00", "outcome": "scored"}
+{"key": "81936d45e10923c0", "symbol": "TXN", "published": "2026-11-27T16:45:37+00:00", "first_seen": "2026-11-27T17:02:54.150345+00:00", "outcome": "scored"}
+{"key": "d21bab217f2b45d1", "symbol": "MU", "published": "2026-11-27T16:45:37+00:00", "first_seen": "2026-11-27T17:02:54.150380+00:00", "outcome": "scored"}
+{"key": "ff210b2cc7a04951", "symbol": "NVDA", "published": "2026-11-27T16:52:57+00:00", "first_seen": "2026-11-27T17:03:13.876863+00:00", "outcome": "scored"}
+{"key": "0d636e6e41ac2353", "symbol": "NVDA", "published": "2026-11-27T16:48:39+00:00", "first_seen": "2026-11-27T17:03:13.876878+00:00", "outcome": "scored"}
+{"key": "bd5e9dd1330319ca", "symbol": "MSFT", "published": "2026-11-27T16:57:26+00:00", "first_seen": "2026-11-27T17:03:33.883861+00:00", "outcome": "scored"}
+{"key": "f1b303836fc49119", "symbol": "INTC", "published": "2026-11-27T16:45:37+00:00", "first_seen": "2026-11-27T17:03:33.884031+00:00", "outcome": "scored"}
+{"key": "5ce8a3f36bfb5bba", "symbol": "AMZN", "published": "2026-11-27T16:57:26+00:00", "first_seen": "2026-11-27T17:03:33.884145+00:00", "outcome": "scored"}
+{"key": "ca41e6ac382b2725", "symbol": "UNH", "published": "2026-11-27T16:52:45+00:00", "first_seen": "2026-11-27T17:04:13.882911+00:00", "outcome": "scored"}
+{"key": "9b1074704dc7d010", "symbol": "GOOGL", "published": "2026-11-27T16:57:00+00:00", "first_seen": "2026-11-27T17:06:53.958083+00:00", "outcome": "scored"}
