@@ -18967,3 +18967,12 @@
 {"key": "24ad7309eaadfad1", "symbol": "AVGO", "published": "2026-11-27T19:46:42+00:00", "first_seen": "2026-11-27T20:02:53.121470+00:00", "outcome": "scored"}
 {"key": "938afa61c0ec4b0e", "symbol": "AMZN", "published": "2026-11-27T19:53:08+00:00", "first_seen": "2026-11-27T20:02:53.121733+00:00", "outcome": "scored"}
 {"key": "11b720fce0d8838c", "symbol": "ISRG", "published": "2026-11-27T19:00:00+00:00", "first_seen": "2026-11-27T20:08:12.875033+00:00", "outcome": "stale"}
+{"key": "205f319a89fd8520", "symbol": "TSLA", "published": "2026-11-27T18:11:31+00:00", "first_seen": "2026-11-27T20:18:33.082869+00:00", "outcome": "stale"}
+{"key": "22c966253f95331d", "symbol": "IBM", "published": "2026-11-27T19:59:21+00:00", "first_seen": "2026-11-27T20:18:33.082615+00:00", "outcome": "scored"}
+{"key": "9e5638e86bd891f5", "symbol": "PLTR", "published": "2026-11-27T19:59:21+00:00", "first_seen": "2026-11-27T20:18:53.055672+00:00", "outcome": "scored"}
+{"key": "84b6b469b65b8ae4", "symbol": "MSFT", "published": "2026-11-27T19:59:21+00:00", "first_seen": "2026-11-27T20:19:13.066622+00:00", "outcome": "scored"}
+{"key": "0a9e8687d730a82b", "symbol": "AMGN", "published": "2026-11-27T20:03:24+00:00", "first_seen": "2026-11-27T20:19:33.085589+00:00", "outcome": "scored"}
+{"key": "761193e97b7852c9", "symbol": "JPM", "published": "2026-11-27T20:19:00+00:00", "first_seen": "2026-11-27T20:23:13.143521+00:00", "outcome": "scored"}
+{"key": "3e4306ab8103a2c4", "symbol": "BRK-B", "published": "2026-11-27T20:08:38+00:00", "first_seen": "2026-11-27T20:27:13.241790+00:00", "outcome": "scored"}
+{"key": "ef6cc7fd31c4fc22", "symbol": "AVGO", "published": "2026-11-27T20:10:47+00:00", "first_seen": "2026-11-27T20:28:13.157052+00:00", "outcome": "scored"}
+{"key": "df7280f6c34d45d6", "symbol": "META", "published": "2026-11-27T20:15:58+00:00", "first_seen": "2026-11-27T20:30:13.297861+00:00", "outcome": "scored"}
