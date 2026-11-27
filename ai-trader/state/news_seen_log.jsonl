@@ -18839,3 +18839,11 @@
 {"key": "a4e26dae966bcc2a", "symbol": "META", "published": "2026-11-27T17:44:41+00:00", "first_seen": "2026-11-27T17:52:52.594647+00:00", "outcome": "scored"}
 {"key": "4e9f8f63cc5fa292", "symbol": "AMZN", "published": "2026-11-27T17:44:41+00:00", "first_seen": "2026-11-27T17:52:52.594682+00:00", "outcome": "scored"}
 {"key": "1d89b63059c0935e", "symbol": "MSFT", "published": "2026-11-27T17:44:41+00:00", "first_seen": "2026-11-27T17:53:32.603150+00:00", "outcome": "scored"}
+{"key": "7daa1de717682aec", "symbol": "ISRG", "published": "2026-11-27T16:45:03+00:00", "first_seen": "2026-11-27T17:56:52.707909+00:00", "outcome": "stale"}
+{"key": "352121908ce98790", "symbol": "TMUS", "published": "2026-11-27T17:42:09+00:00", "first_seen": "2026-11-27T17:56:52.707663+00:00", "outcome": "scored"}
+{"key": "6635b16798ceb399", "symbol": "NVDA", "published": "2026-11-27T16:52:00+00:00", "first_seen": "2026-11-27T17:57:12.675788+00:00", "outcome": "stale"}
+{"key": "5aad20130f54652a", "symbol": "PLTR", "published": "2026-11-27T16:52:00+00:00", "first_seen": "2026-11-27T17:57:32.697159+00:00", "outcome": "stale"}
+{"key": "49e99aec599a16cc", "symbol": "GOOGL", "published": "2026-11-27T16:52:00+00:00", "first_seen": "2026-11-27T17:57:32.697504+00:00", "outcome": "stale"}
+{"key": "b8a11a4976853341", "symbol": "AMZN", "published": "2026-11-27T16:52:00+00:00", "first_seen": "2026-11-27T17:57:32.697674+00:00", "outcome": "stale"}
+{"key": "9031af3ce65ee087", "symbol": "MSFT", "published": "2026-11-27T16:52:00+00:00", "first_seen": "2026-11-27T17:57:52.693886+00:00", "outcome": "stale"}
+{"key": "de6fbe92ab049d97", "symbol": "TMUS", "published": "2026-11-27T17:52:56+00:00", "first_seen": "2026-11-27T17:57:52.694558+00:00", "outcome": "scored"}
