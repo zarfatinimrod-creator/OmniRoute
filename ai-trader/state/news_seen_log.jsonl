@@ -18539,3 +18539,8 @@
 {"key": "d1888587f3faef52", "symbol": "LLY", "published": "2026-11-27T14:42:00+00:00", "first_seen": "2026-11-27T14:53:33.008330+00:00", "outcome": "scored"}
 {"key": "a930eeb23a510e2c", "symbol": "CVX", "published": "2026-11-27T13:44:21+00:00", "first_seen": "2026-11-27T14:53:52.756759+00:00", "outcome": "stale"}
 {"key": "91035bee4ed649b0", "symbol": "LMT", "published": "2026-11-27T14:45:00+00:00", "first_seen": "2026-11-27T14:53:52.757107+00:00", "outcome": "scored"}
+{"key": "452723fde2b5bbe4", "symbol": "MRK", "published": "2026-11-27T12:18:16+00:00", "first_seen": "2026-11-27T14:57:12.832018+00:00", "outcome": "stale"}
+{"key": "475ceb485c981dcc", "symbol": "LLY", "published": "2026-11-27T12:18:16+00:00", "first_seen": "2026-11-27T14:57:52.825964+00:00", "outcome": "stale"}
+{"key": "5cc6fa69037aa6a8", "symbol": "NVDA", "published": "2026-11-27T14:57:27+00:00", "first_seen": "2026-11-27T14:57:52.825355+00:00", "outcome": "scored"}
+{"key": "0f3be3397db89e69", "symbol": "AMD", "published": "2026-11-27T14:57:27+00:00", "first_seen": "2026-11-27T14:57:52.825461+00:00", "outcome": "scored"}
+{"key": "0de39699596d4137", "symbol": "PANW", "published": "2026-11-27T14:57:27+00:00", "first_seen": "2026-11-27T14:57:52.825640+00:00", "outcome": "scored"}
