@@ -1,6 +1,6 @@
 {
   "decision_date": "2026-11-26",
-  "status": "pending",
+  "status": "executed",
   "rebalance": true,
   "exits_only": false,
   "targets": {},
@@ -31,5 +31,9 @@
         "volume": 969687040.0
       }
     }
-  }
+  },
+  "executed_on": "2026-11-27",
+  "fills": [],
+  "fill_source": "none",
+  "fill_ts": "2026-11-27T01:00:00+00:00"
 }
