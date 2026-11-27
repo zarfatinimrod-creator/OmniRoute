@@ -2542,3 +2542,4 @@
 {"t": "2026-11-27T13:10:31+00:00", "ev": "start", "sup": 236, "child": 241, "n": 1, "backoff_s": 0}
 {"t": "2026-11-27T13:10:32+00:00", "ev": "up", "sup": 236, "child": 241, "down_from": null, "down_s": null, "blind_s": 0, "handover_s": null, "held": {}, "blind": [], "commit": null, "dirty": null, "code_changed": null, "sold": []}
 {"t": "2026-11-27T13:10:33+00:00", "ev": "code", "sup": 236, "child": 241, "commit": "2f630997", "dirty": false, "code_changed": true}
+{"t": "2026-11-27T13:11:00+00:00", "ev": "mark", "sup": 236, "hb": 5.5, "stop": null, "n": 0, "open": false, "blind": [], "dm": null, "left": null}
