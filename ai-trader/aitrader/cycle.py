@@ -588,7 +588,8 @@ def _audit_revised_close(panel: dict, dec_bar: pd.Timestamp, cfg: dict, events: 
     writes a revised_close record to decisions.jsonl and an event (alerted through notify). Audited once per decision;
     a history without that bar is retried by a later run.
     Backlog 72 step 2 (only while market.close_xcheck_mode is "log"): every completed audit, alert or not, also adds
-    one row to close_audits.jsonl (_log_close_audit), a measurement file outside the hash chains. It changes nothing
+    one row to close_audits.jsonl (_log_close_audit), a measurement file outside the hash chains, written before
+    pending.json so a crash between the two repeats the audit (the tally keeps the last row per date). It changes nothing
     above, and a failure to write it is printed and goes no further."""
     limit = cfg.get("market", {}).get("revised_close_alert_bps")
     pend = journal.load_json("pending.json") or {}
@@ -603,12 +604,12 @@ def _audit_revised_close(panel: dict, dec_bar: pd.Timestamp, cfg: dict, events: 
     big = {s: g for s, g in gaps.items() if abs(g) > limit}
     src = {"decision_close_source": pend["hourly_rebuild"]["source"]} if pend.get("hourly_rebuild") else {}  # backlog 70
     pend["close_audit"] = {"gaps_bps": gaps, "alert": bool(big), **src, "logged_at": journal.now_utc()}
-    journal.save_json("pending.json", pend)
-    if cfg.get("market", {}).get("close_xcheck_mode") == "log":
+    if cfg.get("market", {}).get("close_xcheck_mode") == "log":  # before pending.json: a crash between repeats the audit
         try:
             _log_close_audit(pend, hist, gaps, limit, bool(big))
         except Exception as e:  # noqa: BLE001 - a measurement: the audit and the cycle go on without it
             print(f"[cycle] backlog 72: close_audits.jsonl not written ({type(e).__name__}: {str(e)[:120]})")
+    journal.save_json("pending.json", pend)
     if big:
         journal.append("decisions.jsonl", {"event": "revised_close", "date": pend["decision_date"], "decision_close": used,
                                            "history_close": hist, "gaps_bps": gaps, "limit_bps": limit, **src, "logged_at": journal.now_utc()})
@@ -636,8 +637,10 @@ def _log_close_audit(pend: dict, hist: dict, gaps: dict, limit, alert: bool) -> 
 
 def xcheck_tally() -> list[str]:
     """`xcheck-tally` (backlog 72 step 2), read-only: one line per decision row that carries diag.close_xcheck, with the
-    R6 audit of that date from close_audits.jsonl ("awaiting" until it exists), then the totals. Writes nothing (the
-    files are read where they are; a missing one is empty)."""
+    R6 audit of that date from close_audits.jsonl, then the totals. A date with no audit row: the verdict of its R6
+    revised_close row in decisions.jsonl if there is one (R6 alerted: caught with a flag, else miss), else "unaudited"
+    when pending.json already holds a later decision (that audit can no longer run), else "awaiting". Only an audit
+    row says clean. Writes nothing (the files are read where they are; a missing one is empty)."""
     def rows(name: str) -> list[dict]:
         p, out = journal.STATE / name, []
         for line in p.read_text(encoding="utf-8", errors="replace").split("\n") if p.exists() else []:
@@ -651,14 +654,26 @@ def xcheck_tally() -> list[str]:
         return " ".join(f"{s}={v:+.1f}" if isinstance(v, (int, float)) else f"{s}=?" for s, v in sorted(d.items())) or "-"
 
     audits = {r.get("decision_date"): r for r in rows("close_audits.jsonl")}
-    keys = ("rows", "flags", "caught", "false_alarm", "miss", "clean", "awaiting")
+    decs = rows("decisions.jsonl")
+    r6 = {r.get("date"): r for r in decs if r.get("event") == "revised_close"}
+    try:  # only with decisions on disk: load_json would create the state folder
+        last = (journal.load_json("pending.json") if decs else {})["decision_date"]
+    except Exception:  # noqa: BLE001 - a missing or odd pending.json: no date is called unaudited
+        last = None
+    keys = ("rows", "flags", "caught", "false_alarm", "miss", "clean", "unaudited", "awaiting")
     lines, n = [], dict.fromkeys(keys + ("miss_5m", "miss_no_5m"), 0)
-    for r in rows("decisions.jsonl"):
+    for r in decs:
         x = (r.get("diag") or {}).get("close_xcheck")
         if not x:
             continue
-        a, f5 = audits.get(r.get("date")), x.get("final_5m")
-        verdict = a["verdict"] if a else "awaiting"
+        dd, f5 = r.get("date"), x.get("final_5m")
+        a, note = audits.get(dd), ""
+        if a:
+            verdict = a["verdict"]
+        elif dd in r6:
+            a, note, verdict = r6[dd], " (r6 row)", "caught" if x["would_decline"] else "miss"
+        else:
+            verdict = "unaudited" if isinstance(last, str) and isinstance(dd, str) and dd < last else "awaiting"
         n["rows"] += 1
         n["flags"] += bool(x["would_decline"])
         if verdict in n:
@@ -666,11 +681,11 @@ def xcheck_tally() -> list[str]:
         if verdict == "miss":
             n["miss_5m" if f5 else "miss_no_5m"] += 1
         closes = " ".join(f"{s}={v['close']:g}" for s, v in sorted(x["symbols"].items())) or "-"
-        lines.append(f"{r.get('date')} {(r['diag'].get('hourly_rebuild') or {}).get('source', 'daily')} | close {closes}"
+        lines.append(f"{dd} {(r['diag'].get('hourly_rebuild') or {}).get('source', 'daily')} | close {closes}"
                      f" | coinbase bp {bps({s: v['gap_bp'] for s, v in x['symbols'].items()})}"
                      f" | would_decline {','.join(x['would_decline']) or '-'}"
                      + (f" | 5m bp {bps({s: v.get('gap_5m_bp') for s, v in f5.items()})}" if f5 else "")
-                     + (f" | history bp {bps(a['gaps_bps'])} | {verdict}" if a else " | awaiting"))
+                     + (f" | history bp {bps(a.get('gaps_bps') or {})}" if a else "") + f" | {verdict}{note}")
     lines.append(" ".join(f"{k} {n[k]}" for k in keys) + f" | misses with final_5m {n['miss_5m']}, without {n['miss_no_5m']}")
     return lines
 

@@ -143,6 +143,33 @@ class ForwardRecord(Book):
             self.same_but_for_the_record(self.daily("log", 8.0, 10.0), self.daily("off", 8.0, 10.0))  # any failure of the record
         self.assertIn("close_audits.jsonl not written (ValueError", buf.getvalue())
 
+    def test_the_row_is_written_before_pending_and_a_repeat_keeps_one_verdict(self):
+        real = journal.save_json
+
+        def save(name, obj):
+            if name == "pending.json" and "close_audit" in obj:
+                raise OSError("killed")  # the crash between the row and pending.json
+            real(name, obj)
+
+        self.fresh("log")
+        self.cb = lambda sym, day: self.agree(sym, day) / (1 + (8.0 if sym == "BTC-USD" else 0.0) / 1e4)
+        self.decide(seed=self.seed(HELD, I))
+        self.set_bars(I + 1, 1)
+        self.at(I + 1, self.ts(I + 1, 1, 7))
+        night = lambda: self.at(I + 1, self.ts(I + 2, 0, 12), panel=self.panel(I + 1, self.revised(10.0)))
+        with mock.patch.object(journal, "save_json", save), self.assertRaises(OSError):
+            night()
+        self.assertEqual([r["verdict"] for r in tcc.read_jsonl(self.state, AUDITS)], ["caught"])  # the row is not lost
+        self.assertNotIn("close_audit", json.loads((self.state / "pending.json").read_text()))
+        self.assertEqual([r for r in tcc.read_jsonl(self.state, "decisions.jsonl") if r.get("event") == "revised_close"], [])
+        self.assertTrue(night()["decided_now"])  # the next run repeats the audit, then decides bar I+1
+        self.assertEqual([r["verdict"] for r in tcc.read_jsonl(self.state, AUDITS)], ["caught", "caught"])
+        self.assertEqual(len([r for r in tcc.read_jsonl(self.state, "decisions.jsonl") if r.get("event") == "revised_close"]), 1)
+        with mock.patch.object(journal, "STATE", self.state):
+            lines = cycle.xcheck_tally()
+        self.assertEqual([x.endswith("| caught") for x in lines if x.startswith(self.day(I))], [True])  # one verdict per date
+        self.assertEqual(lines[-1], "rows 2 flags 2 caught 1 false_alarm 0 miss 0 clean 0 unaudited 0 awaiting 1 | misses with final_5m 0, without 0")
+
     def test_tally_reads_the_cycles_own_files(self):
         self.daily("log", 8.0, 10.0)
         before = sorted((f.name, f.read_bytes()) for f in self.state.iterdir())
@@ -154,7 +181,7 @@ class ForwardRecord(Book):
         self.assertIn("| coinbase bp BTC-USD=+8.0 ETH-USD=+0.0 | would_decline BTC-USD | history bp BTC-USD=+10.0 ETH-USD=+0.0 | caught", lines[0])
         self.assertTrue(lines[1].startswith(f"{self.day(I + 1)} daily"))
         self.assertTrue(lines[1].endswith("| awaiting"))
-        self.assertEqual(lines[2], "rows 2 flags 2 caught 1 false_alarm 0 miss 0 clean 0 awaiting 1 | misses with final_5m 0, without 0")
+        self.assertEqual(lines[2], "rows 2 flags 2 caught 1 false_alarm 0 miss 0 clean 0 unaudited 0 awaiting 1 | misses with final_5m 0, without 0")
 
 
 class Final5m(Book):
@@ -305,7 +332,7 @@ class Final5m(Book):
             lines = cycle.xcheck_tally()
         self.assertTrue(lines[0].startswith(f"{self.day(I)} yahoo_1h | close "))
         self.assertIn("| 5m bp BTC-USD=+3.0 ETH-USD=+3.0 | history bp BTC-USD=+19.0 ETH-USD=+0.0 | miss", lines[0])
-        self.assertTrue(lines[-1].endswith("miss 1 clean 0 awaiting 1 | misses with final_5m 1, without 0"))
+        self.assertTrue(lines[-1].endswith("miss 1 clean 0 unaudited 0 awaiting 1 | misses with final_5m 1, without 0"))
 
 
 class Helper(unittest.TestCase):
@@ -364,14 +391,51 @@ class Cli(unittest.TestCase):
             "2026-11-23 daily | close BTC-USD=70000.5 | coinbase bp BTC-USD=+0.1 | would_decline - | history bp BTC-USD=+6.0 ETH-USD=+0.0 | miss",
             "2026-11-24 daily | close BTC-USD=70000.5 | coinbase bp BTC-USD=+0.1 | would_decline - | history bp BTC-USD=+0.5 ETH-USD=+0.0 | clean",
             "2026-11-25 daily | close BTC-USD=70000.5 | coinbase bp BTC-USD=+0.1 | would_decline - | awaiting",
-            "rows 6 flags 2 caught 1 false_alarm 1 miss 2 clean 1 awaiting 1 | misses with final_5m 1, without 1",
+            "rows 6 flags 2 caught 1 false_alarm 1 miss 2 clean 1 unaudited 0 awaiting 1 | misses with final_5m 1, without 1",
         ])
+
+    def test_a_date_with_no_audit_row(self):
+        r6 = lambda d, bp: {"event": "revised_close", "date": d, "gaps_bps": {"BTC-USD": bp, "ETH-USD": 0.0}}
+        f5 = {"BTC-USD": {"close_5m": 69990.0, "gap_5m_bp": 1.5}}
+        decisions = [xrow("2026-11-20", True)[0], r6("2026-11-20", 9.0), xrow("2026-11-21", False, f5=f5)[0], r6("2026-11-21", -7.0),
+                     xrow("2026-11-22", True)[0], xrow("2026-11-23", False, (0.5, "clean"))[0], xrow("2026-11-24", False)[0],
+                     xrow("2026-11-25", False)[0]]
+        head = "close BTC-USD=70000.5 | coinbase bp BTC-USD="
+        want = [f"2026-11-20 daily | {head}+7.2 | would_decline BTC-USD | history bp BTC-USD=+9.0 ETH-USD=+0.0 | caught (r6 row)",
+                f"2026-11-21 daily | {head}+0.1 | would_decline - | 5m bp BTC-USD=+1.5 | history bp BTC-USD=-7.0 ETH-USD=+0.0 | miss (r6 row)",
+                f"2026-11-22 daily | {head}+7.2 | would_decline BTC-USD | unaudited",
+                f"2026-11-23 daily | {head}+0.1 | would_decline - | history bp BTC-USD=+0.5 ETH-USD=+0.0 | clean",
+                f"2026-11-24 daily | {head}+0.1 | would_decline - | unaudited",
+                f"2026-11-25 daily | {head}+0.1 | would_decline - | awaiting",
+                "rows 6 flags 2 caught 1 false_alarm 0 miss 1 clean 1 unaudited 2 awaiting 1 | misses with final_5m 1, without 0"]
+        waiting = [x.replace("| unaudited", "| awaiting") for x in want[:-1]] + [want[-1].replace("unaudited 2 awaiting 1", "unaudited 0 awaiting 3")]
+        for pending, expect in (('{"decision_date": "2026-11-25"}', want), (None, waiting), ("{torn", waiting), ("[]", waiting),
+                                ('{"decision_date": 5}', waiting)):
+            with tempfile.TemporaryDirectory() as tmp:
+                state = Path(tmp) / data.load_config("crypto")["market"]["state_subdir"]
+                state.mkdir()
+                (state / "decisions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in decisions))
+                (state / AUDITS).write_text(json.dumps(xrow("2026-11-23", False, (0.5, "clean"))[1]) + "\n")
+                if pending:
+                    (state / "pending.json").write_text(pending)
+                before = sorted((f.name, f.read_bytes()) for f in state.iterdir())
+                code, lines = self.tally(Path(tmp))
+                self.assertEqual(sorted((f.name, f.read_bytes()) for f in state.iterdir()), before)  # it writes nothing
+            self.assertEqual((code, lines), (0, expect), pending)
+
+    def test_tally_refuses_the_stock_book(self):
+        out, err = io.StringIO(), io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(journal, "STATE", Path(tmp)), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = main(["xcheck-tally"])
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+        self.assertEqual((code, out.getvalue(), err.getvalue()), (1, "", "xcheck-tally is crypto-only: run it with --book crypto\n"))
 
     def test_tally_with_no_files_prints_zeros_and_creates_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
             code, lines = self.tally(Path(tmp))
             self.assertEqual(list(Path(tmp).iterdir()), [])
-        self.assertEqual((code, lines), (0, ["rows 0 flags 0 caught 0 false_alarm 0 miss 0 clean 0 awaiting 0 | misses with final_5m 0, without 0"]))
+        self.assertEqual((code, lines), (0, ["rows 0 flags 0 caught 0 false_alarm 0 miss 0 clean 0 unaudited 0 awaiting 0 | misses with final_5m 0, without 0"]))
 
 
 if __name__ == "__main__":

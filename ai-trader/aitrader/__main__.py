@@ -533,6 +533,9 @@ def _run(a: argparse.Namespace) -> int:
     elif a.cmd == "xcheck-tally":  # read-only (backlog 72 step 2)
         from .cycle import xcheck_tally
 
+        if a.book != "crypto":  # the cross-check exists on the crypto book only
+            print("xcheck-tally is crypto-only: run it with --book crypto", file=sys.stderr)
+            return 1
         print("\n".join(xcheck_tally()))
     elif a.cmd == "news":
         from .data import news_headlines
