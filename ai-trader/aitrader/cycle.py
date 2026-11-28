@@ -781,7 +781,10 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     if not persist:
         journal.save_json("proposal.json", decision)
         return decision
-    if expiring:  # decision 12: an unfilled order is recorded before a new decision overwrites it
+    row_at = journal.now_utc()
+    if rebuilt and xcheck:  # backlog 72 step 2, log only: the 1h close against the day's last 5-minute close. Fetched after
+        xcheck["final_5m"] = _final_5m(close, dec, cfg)  # exec_ts is fixed (a slow reply moves no order) and before anything
+    if expiring:  # is written (a kill during the fetch leaves a clean retry). decision 12: an unfilled order is recorded before a new decision overwrites it
         journal.append("decisions.jsonl", {"event": "expired_unfilled", "date": old.get("decision_date"), "exec_ts": old.get("exec_ts"),
                                            "targets": old.get("targets"), **({"carried_stops": carried} if carried else {}),
                                            "logged_at": journal.now_utc()})
@@ -795,9 +798,6 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     if mk.get("delete_proposal_on_decision"):  # spec 3.3: a stale proposal must not date a later veto
         (journal.STATE / "proposal.json").unlink(missing_ok=True)
     m.state["regime"], m.state["dd_state"] = diag.get("regime"), diag.get("dd_state")
-    row_at = journal.now_utc()
-    if rebuilt and xcheck:  # backlog 72 step 2, log only: the 1h close against the day's last 5-minute close. Fetched here,
-        xcheck["final_5m"] = _final_5m(close, dec, cfg)  # after exec_ts and pending.json are fixed: a slow reply moves no order
     journal.append("decisions.jsonl", {"date": ds, "logged_at": row_at, "due_rebalance": due, "weights": weights, "diag": diag,
                                        "overrides": applied, "earnings_blackout": skipped, "preview": preview})
     score = combine(signals, weights, dec)

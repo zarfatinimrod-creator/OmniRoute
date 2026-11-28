@@ -169,16 +169,17 @@ class Final5m(Book):
         c = None if mult is None else self.row(i, sym)["close"] * mult
         return hr.chart([self.end(i) + stamp_off], [(c, c, c, c, 0)])
 
-    def rebuilt(self, mode, fives, patches=None) -> tuple[dict, list]:
+    def rebuilt(self, mode, fives, patches=None, fresh=True) -> tuple[dict, list]:
         """The 00:12 run of day I+1 with row I missing: rebuild, decide. fives: {sym: 5m reply or exception} or a callable."""
-        self.fresh(mode)
+        if fresh:
+            self.fresh(mode)
         hours, calls = self.replies(I), []
 
         def get(url, params=None, **k):
             sym = next(s for s in hours if url == data.CHART_URL.format(sym=s))
             calls.append((sym, dict(params)))
             got = hours[sym] if params["interval"] == "1h" else fives[sym]
-            if isinstance(got, Exception):
+            if isinstance(got, BaseException):
                 raise got
             return got
 
@@ -251,6 +252,20 @@ class Final5m(Book):
         self.assertEqual(log["outs"][0]["events"], off["outs"][0]["events"])  # after the fetch carry the later clock
         self.assertTrue(any(self.ts(I + 1, 1, 0) in e for e in log["outs"][0]["events"]))  # "scheduled for 01:00"
         self.assertEqual((log["sent"], log["prios"]), (off["sent"], off["prios"]))
+
+    def test_a_kill_during_the_5m_fetch_leaves_a_clean_retry(self):
+        """Ctrl-C (or a session timeout) while Yahoo's 5m reply is awaited: nothing of the decision is written yet, so the
+        rerun decides it in full. A fetch after pending.json would leave an order with no decision row."""
+        fives = {s: self.five(I, s) for s in self.coins}
+        clean, _ = self.rebuilt("log", fives)
+        self.fresh("log")
+        with self.assertRaises(KeyboardInterrupt):
+            self.rebuilt("log", {s: KeyboardInterrupt() for s in self.coins}, fresh=False)
+        killed = self.snap([])["files"]
+        self.assertNotEqual(killed.get("pending.json", {}).get("decision_date"), self.day(I))
+        self.assertFalse([r for r in killed.get("decisions.jsonl", []) if r.get("date") == self.day(I)])
+        rerun, _ = self.rebuilt("log", fives, fresh=False)  # asserts decided_now
+        self.assertEqual(rerun, clean)
 
     def test_no_5m_fetch_on_a_daily_row_or_in_a_proposal(self):
         calls = []
