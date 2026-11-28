@@ -399,6 +399,11 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     60,495.57, would_decline [BTC-USD]: the second flag. Book risk_off and in cash, so no trade effect. Judge it at the
     next decision against the settled 11-26 close. Tally: 5 rows, 2 flags (1 true catch, 1 awaiting), 0 false alarms,
     3 clean rows confirmed.
+    2026-11-28 00:13:06: the second flag is a TRUE CATCH. Yahoo revised the 11-26 1h 23:00 bar to 60,495.57 and the
+    settled daily close is 60,494.71 (final72.py). The decision used 60,455.83 = -6.43 bp (over R6's 5 bp); Coinbase
+    60,495.57 = +0.14 bp. The code's own R6 revised_close row will come at the next decision. Tally: 5 rows, 2 flags,
+    2 true catches, 0 false alarms, 3 clean rows confirmed. Both catches were first-run 1h rebuilds where the 5m 23:55
+    bar was still null, so the hourly bar was provisional when the cycle read it.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
