@@ -9,6 +9,9 @@ the improvement effort goes to item 3 (opportunistic insider purchases, log-only
 written first) after defects; real-money gate = 6 months forward (CLAUDE.md hard rule 1).
 
 First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (crypto data defect, found 2026-11-14), 33, 44, 34, 35, 39, 40 - then the list below.
+2026-11-28 (weekly review): 84 moves up to right after 72. It is a live-path defect of the crypto book (an odd Coinbase
+reply can abort a decision, the same loss shape as the frozen exit of 2026-11-13, ops_defect -6,153.20), while the
+effects of 33, 34 and 35 are covered by the news hold for as long as it lasts. Order now: 72, 84, 33, 44, 34, 35, 39, 40.
 1. [defect] Learning label credits the overnight gap: learn.forward_excess uses close(d)->close(d+h) but fills are
    at open(d+1). Use open(d+1)->open(d+1+h); mature at asof-h-1; rerun placebo; add a test that the label equals
    the return the backtest earns (qlib leak-gap 2; FinRL-Trading label assertion).
@@ -498,6 +501,14 @@ First, from the MU loss review of 2026-11-10 (defects and owner decisions): 72 (
     seen live (a stale or absent close skips the run first). data.py is on the rule-4 list: the fix gets the crypto
     sweep before and after, the quant-critic and the unit suite.
 
+86. [stocks][rule][after-freeze] Regime flip in one day, 2026-11-20 -> 2026-11-23: SPY closed under the 2% band under
+    its 200-day average on 11-20 (689.81; regime risk_off+defensive), the 11-23 open filled the risk_off trims (UNP,
+    CVX, PM, KO, XOM -675.60 realized, AAPL +16.03; loss review planned_loss, regime_trim), SPY rose +4.71% that day
+    (722.29) and the 11-23 decision was risk_on+defensive again, so the 11-24 open bought back (KO 33 at 96.2881 after
+    selling 38 at 94.5527: +1.84%; AAPL 6 at 348.2941 after 12 at 347.6061: +0.20%) (state/decisions.jsonl,
+    state/trades.jsonl, state/equity.jsonl gross 0.54 -> 0.32 -> 0.45). The band is `risk.regime_band_mode` "offset";
+    a "hysteresis" mode exists in strategy.regime_series. One live case, not proof, and the parameters are frozen
+    (2026-11-16): evidence only, for rule 4 when the freeze allows. No new look at the history to tune it.
 
 ## Done
 - 2026-11-24: backlog 85 done (loss review stocks:09c0dbc4, verdict bad_data): the live trailing-stop peak is now scaled on each cash-dividend ex-date by the feed's own factor (broker.apply_corporate_actions, merged 72968ef9 from c74ff3c8 + 623dee70; 952 tests OK; registered sweep identical before/after; quant-critic, live-path and re-review PASS). Owner's answer א (2026-11-24): one-off peak_close correction in portfolio.json and shadow_portfolio.json (CVX 219.89 -> 218.08, AMGN 468.11 -> 465.42, COP 142.28 -> 141.35; commit 48452a39). XOM was kept by the ranking without the defect (rank 24 of the keep limit 30). Leftover nonblocking: the shadow-book call has no test; a non-finite dividend amount could reach cash; a stale events file still advances ca_applied_through.
