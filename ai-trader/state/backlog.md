@@ -407,6 +407,32 @@ effects of 33, 34 and 35 are covered by the news hold for as long as it lasts. O
     60,495.57 = +0.14 bp. The code's own R6 revised_close row will come at the next decision. Tally: 5 rows, 2 flags,
     2 true catches, 0 false alarms, 3 clean rows confirmed. Both catches were first-run 1h rebuilds where the 5m 23:55
     bar was still null, so the hourly bar was provisional when the cycle read it.
+    2026-11-28 17:30 UTC: STEP 2 SHIPPED (weekly review; merged 974b77c3 = 76278fd3, 0dfaa68a, f4c6e238, 1716834b), log
+    mode only, no decision/order/alert change. (1) Every completed R6 audit, fired or not, appends one row to
+    state/crypto/close_audits.jsonl (outside the hash chains) with decided vs settled close and a verdict: caught /
+    false_alarm / miss / clean / no_check. (2) A decision on a bar rebuilt from 1h bars carries
+    diag.close_xcheck.final_5m (Yahoo's 23:55 5m close, read at decision time after exec_ts is fixed). (3) unreachable is
+    split into close_missing and coinbase_missing. (4) |gap| == bp is pinned as not declined. (5) log mode with the
+    Coinbase guard off is refused (no fetch). (6) `python3 -m aitrader xcheck-tally --book crypto` prints the forward
+    record; pre-audit-log dates use the R6 revised_close row when one exists, else "unaudited". First run on the real
+    state: rows 6, flags 2, caught 2 (11-23, 11-26, both "r6 row"), false_alarm 0, miss 0, clean 0, unaudited 3
+    (11-22, 11-24, 11-25: clean by the hand record above, final72.py), awaiting 1 (11-27). From tonight the code writes
+    the clean rows too, and final72.py is no longer needed for the tally. Gates: wf_1816e500-97d (3 rounds; the 5m
+    fetch first sat before exec_ts, then between pending.json and the decision row; both fixed) and wf_a4691259-9dc:
+    quant-critic, live-path and test-adequacy PASS; 973 tests OK; no time-machine file (third ruling, no sweep).
+    Notes before any enforce mode (gates, nonblocking): (a) verdicts are per decision, not per symbol (fine for the
+    BTC-only profile; a two-coin book needs per-symbol matching); (b) a "miss" also counts a night when Coinbase gave
+    nothing (coinbase_missing) - split it out before judging the check; (c) final_5m is read seconds to minutes after
+    the 1h rebuild read, so a value there does not prove the 5m bar existed when the rebuild ran; (d) a failed
+    close_audits write or a mode switch leaves the date "awaiting", then "unaudited"; (e) the decision row's logged_at
+    is now read before an expired_unfilled row and its urgent alert (all modes, seconds resolution); (f) on rebuilt
+    nights the urgent "stop could not fill" alert can wait up to ~66 s per symbol behind the 5m fetch (exec_ts and orders
+    unaffected); (g) test gaps: mode key absent on the audit path (M07), 3-decimal rounding of gap_5m_bp (M20),
+    first-vs-last audit row per date (M8).
+    Bar for proposing enforce (written before the results): at least 20 decisions with an audit verdict and at least 4
+    flags, no false alarm, misses split by cause (Coinbase missing / basis / not final), and a written rule for a
+    decline that lasts past the fill time (a held position must never lose its exit to a decline: the 2026-11-13 loss).
+    Then rule 4 and the owner's word.
 71. [crypto][follow-ups of 70] Non-blocking notes of the backlog 70 gate (quant-critic and live-path review,
     2026-11-13, commit d2e0c77e): (a) the R6 audit of a rebuilt close is lost when Yahoo's daily row stays null
     for more than 24 hours, because the next decision replaces pending.json first (log when a decision carrying
@@ -511,6 +537,8 @@ effects of 33, 34 and 35 are covered by the news hold for as long as it lasts. O
     (2026-11-16): evidence only, for rule 4 when the freeze allows. No new look at the history to tune it.
 
 ## Done
+- 2026-11-28: backlog 72 step 2 shipped, log mode only (weekly review; merged 974b77c3): the forward record of the Coinbase close
+  cross-check is kept by the code (close_audits.jsonl, `xcheck-tally --book crypto`); item 72 stays open for the enforce decision.
 - 2026-11-24: backlog 85 done (loss review stocks:09c0dbc4, verdict bad_data): the live trailing-stop peak is now scaled on each cash-dividend ex-date by the feed's own factor (broker.apply_corporate_actions, merged 72968ef9 from c74ff3c8 + 623dee70; 952 tests OK; registered sweep identical before/after; quant-critic, live-path and re-review PASS). Owner's answer א (2026-11-24): one-off peak_close correction in portfolio.json and shadow_portfolio.json (CVX 219.89 -> 218.08, AMGN 468.11 -> 465.42, COP 142.28 -> 141.35; commit 48452a39). XOM was kept by the ranking without the defect (rank 24 of the keep limit 30). Leftover nonblocking: the shadow-book call has no test; a non-finite dividend amount could reach cash; a stale events file still advances ca_applied_through.
 - 2026-11-14: backlog 23 done (weekly review): the paired sweep re-run on code 3d5b1109 (run 2026-11-14-59a459da5016,
   state/trial_runs/): base Sharpe median 0.418 (registered 2026-11-09: 0.402), CAGR 7.40% (7.23%), maxDD -11.52%

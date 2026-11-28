@@ -5,17 +5,6 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
 
 ## Open
 
-- **2026-11-28 15:45 - trader session (weekly review: backlog 72 step 2, log mode only)** - files: `aitrader/cycle.py`
-  (`_close_xcheck`, `_audit_revised_close` and a read-only tally helper), `aitrader/__main__.py` (one new read-only
-  command, `xcheck-tally`), `tests/test_crypto_close_xcheck.py`, new file `tests/test_crypto_close_audit.py`. Purpose:
-  the forward record of the Coinbase close cross-check kept by the code instead of by hand (an audit row for every R6
-  audit, fired or not, with the verdict caught / false alarm / miss / clean), the 5m 23:55 bar of a rebuilt decision
-  bar in the diagnostics, unreachable split by cause, the |gap| == bp boundary pinned, and the check refused when the
-  Coinbase guard is off (the gate notes of 2026-11-23). It changes no decision, target, order, event or alert. The
-  `__main__.py` entry of the main session's claim of 2026-11-11 is older than 24 hours; this claim touches only the
-  new command there. Built in a separate worktree, gated by the quant-critic and the unit suite; no file the time
-  machine loads is touched (third ruling), so no sweep.
-
 - **2026-11-11 10:09 (refreshed 21:10; rollout step 1 landed at 21:08 UTC, ab7b27f9) - main session** - files: `aitrader/news_live.py`, `aitrader/__main__.py`,
   `aitrader/notify.py`, `aitrader/supervise.py`, `aitrader/deadman.py`, `aitrader/ownerlines.py`,
   `aitrader/uptime.py`, `aitrader/slots.py`, `aitrader/watch.py`, `config.json`, `.gitignore`, `CLAUDE.md`,
@@ -57,6 +46,23 @@ The rule is in `CLAUDE.md` ("One builder at a time"). Claims are listed newest f
      exist; Nimrod was told by push, as the 08:00 slot asked.
 
 ## Done
+
+- **2026-11-28 15:45 - trader session (weekly review: backlog 72 step 2, log mode only)** - files: `aitrader/cycle.py`
+  (`_close_xcheck`, `_audit_revised_close` and a read-only tally helper), `aitrader/__main__.py` (one new read-only
+  command, `xcheck-tally`), `tests/test_crypto_close_xcheck.py`, new file `tests/test_crypto_close_audit.py`. Purpose:
+  the forward record of the Coinbase close cross-check kept by the code instead of by hand (an audit row for every R6
+  audit, fired or not, with the verdict caught / false alarm / miss / clean), the 5m 23:55 bar of a rebuilt decision
+  bar in the diagnostics, unreachable split by cause, the |gap| == bp boundary pinned, and the check refused when the
+  Coinbase guard is off (the gate notes of 2026-11-23). It changes no decision, target, order, event or alert. The
+  `__main__.py` entry of the main session's claim of 2026-11-11 is older than 24 hours; this claim touches only the
+  new command there. Built in a separate worktree, gated by the quant-critic and the unit suite; no file the time
+  machine loads is touched (third ruling), so no sweep.
+  **Done 2026-11-28 17:30**: merged 974b77c3 (76278fd3, 0dfaa68a, f4c6e238, 1716834b): cycle.py (`_close_xcheck`,
+  `_final_5m`, `_log_close_audit`, `_audit_revised_close`, `xcheck_tally`), `__main__.py` (`xcheck-tally --book crypto`),
+  `tests/test_crypto_close_audit.py` (new), `tests/test_crypto_close_xcheck.py`, `tests/golden_util.py` (stubs the new
+  `close_5m` so no test reaches the network). Gates: workflow wf_1816e500-97d (3 rounds; round 1 and 2 HOLD on the 5m
+  fetch's place in _decide, fixed) and wf_a4691259-9dc (follow-up): quant-critic, live-path and test-adequacy PASS;
+  973 tests OK; no file the time machine loads touched (third ruling, no sweep).
 
 - **2026-11-24 15:10 - trader session (backlog 85, loss-protocol defect)** - files: `aitrader/broker.py`
   (`apply_corporate_actions` only), `aitrader/cycle.py` (added 2026-11-24 15:30: the one caller passes the panel closes,
