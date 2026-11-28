@@ -16,6 +16,7 @@ LLM layer adds or removes value. Every step is idempotent: re-running the same d
 from __future__ import annotations
 
 import copy
+import json
 import math
 import time
 from datetime import datetime, timedelta, timezone
@@ -250,25 +251,65 @@ def _coinbase_guard(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict, seen: dic
 def _close_xcheck(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict, seen: dict) -> dict | None:
     """Backlog 72, LOG MODE ONLY: the decision close against Coinbase's daily candle of the decision date at a tight
     line (market.close_xcheck_bp), for the diagnostics. It changes no target, order, event or alert. None (no field,
-    no fetch) unless market.close_xcheck_mode is "log" and the line is a positive number. seen: what the Coinbase
-    guard already fetched; a symbol it did not ask about is fetched here once. A missing or non-finite value on
-    either side is listed under unreachable and never written."""
+    no fetch) unless market.close_xcheck_mode is "log" and the line is a positive number. It fetches nothing itself:
+    seen is what the Coinbase guard already fetched, so log mode without that guard (market.coinbase_guard_pct 0) is
+    refused with one printed line. Logged: {mode, bp, symbols {sym: {close, coinbase, gap_bp}}, would_decline (a gap
+    strictly above the line; a gap equal to it is not declined), close_missing (the decision close is missing or not
+    a finite positive number), coinbase_missing (the same for Coinbase's value), unreachable (their sorted union)}. A
+    missing value is never written. _decide adds final_5m (_final_5m) when the decision bar was built from 1h bars."""
     mk = cfg.get("market", {})
     bp = mk.get("close_xcheck_bp", 0)
     if mk.get("close_xcheck_mode", "off") != "log" or not _price(bp):
         return None
-    syms, decline, down = {}, [], []
+    if not mk.get("coinbase_guard_pct"):
+        print("[cycle] backlog 72: close_xcheck_mode is log but coinbase_guard_pct is 0 - no cross-check (it only reads"
+              " what the Coinbase guard fetched)")
+        return None
+    syms, decline, no_close, no_cb = {}, [], [], []
     for s in sorted(cfg["universe"]):
-        cb = seen[s] if s in seen else coinbase_close(s, dec)
+        cb = seen.get(s)
         c = float(close.at[dec, s]) if s in close.columns else float("nan")
+        if not _price(c):
+            no_close.append(s)
+        if not _price(cb):
+            no_cb.append(s)
         if not (_price(cb) and _price(c)):
-            down.append(s)
             continue
         gap = (c / cb - 1) * 1e4
         syms[s] = {"close": c, "coinbase": float(cb), "gap_bp": round(gap, 3)}
         if abs(gap) > bp:
             decline.append(s)
-    return {"mode": "log", "bp": bp, "symbols": syms, "would_decline": decline, "unreachable": down}
+    return {"mode": "log", "bp": bp, "symbols": syms, "would_decline": decline,
+            "unreachable": sorted(set(no_close) | set(no_cb)), "close_missing": no_close, "coinbase_missing": no_cb}
+
+
+def close_5m(sym: str, day) -> float | None:
+    """Backlog 72 step 2: the close of Yahoo's 5-minute bar that starts at 23:55 UTC of `day`, the last one of the UTC
+    day. One chart call by period, as hourly_day_fold asks. None when the reply has no such bar or its close is not a
+    finite positive number; a failed fetch or a reply of another shape raises (_final_5m writes the error type)."""
+    end = int(UtcDailyCalendar.session_window(day)[1].timestamp())
+    got = data._get_json(data.CHART_URL.format(sym=sym), {"period1": end - 300, "period2": end, "interval": "5m"})
+    res = got["chart"]["result"][0]
+    for t, c in zip(res.get("timestamp") or [], res["indicators"]["quote"][0]["close"]):
+        if t == end - 300:
+            return float(c) if _price(c) else None
+    return None
+
+
+def _final_5m(close: pd.DataFrame, dec: pd.Timestamp, cfg: dict) -> dict:
+    """Backlog 72 step 2, log only: how far a decision close built from 1h bars sits from the day's last 5-minute
+    close, {sym: {close_5m, gap_5m_bp, error?}}, one fetch per universe symbol. Never raises: a failure is close_5m
+    None with the error's type name. Nothing reads it but the forward record (close_audits.jsonl, xcheck-tally)."""
+    out = {}
+    for s in sorted(cfg["universe"]):
+        try:
+            v, err = close_5m(s, dec), {}
+        except Exception as e:  # noqa: BLE001 - a measurement: no failure of it may reach the decision
+            v, err = None, {"error": type(e).__name__}
+        c = float(close.at[dec, s]) if s in close.columns else float("nan")
+        ok = _price(v) and _price(c)
+        out[s] = {"close_5m": float(v) if _price(v) else None, "gap_5m_bp": round((c / v - 1) * 1e4, 3) if ok else None, **err}
+    return out
 
 
 def _brokers(cfg: dict, prices: dict, ds: str) -> tuple[PaperBroker, PaperBroker]:
@@ -545,7 +586,10 @@ def _audit_revised_close(panel: dict, dec_bar: pd.Timestamp, cfg: dict, events: 
     """Ruling R6 (spec 4): the closes the last decision used against the history values of that bar, once it is no
     longer the decision bar (Yahoo rewrites the latest completed close). A gap above market.revised_close_alert_bps
     writes a revised_close record to decisions.jsonl and an event (alerted through notify). Audited once per decision;
-    a history without that bar is retried by a later run."""
+    a history without that bar is retried by a later run.
+    Backlog 72 step 2 (only while market.close_xcheck_mode is "log"): every completed audit, alert or not, also adds
+    one row to close_audits.jsonl (_log_close_audit), a measurement file outside the hash chains. It changes nothing
+    above, and a failure to write it is printed and goes no further."""
     limit = cfg.get("market", {}).get("revised_close_alert_bps")
     pend = journal.load_json("pending.json") or {}
     used = pend.get("decision_close")
@@ -560,12 +604,75 @@ def _audit_revised_close(panel: dict, dec_bar: pd.Timestamp, cfg: dict, events: 
     src = {"decision_close_source": pend["hourly_rebuild"]["source"]} if pend.get("hourly_rebuild") else {}  # backlog 70
     pend["close_audit"] = {"gaps_bps": gaps, "alert": bool(big), **src, "logged_at": journal.now_utc()}
     journal.save_json("pending.json", pend)
+    if cfg.get("market", {}).get("close_xcheck_mode") == "log":
+        try:
+            _log_close_audit(pend, hist, gaps, limit, bool(big))
+        except Exception as e:  # noqa: BLE001 - a measurement: the audit and the cycle go on without it
+            print(f"[cycle] backlog 72: close_audits.jsonl not written ({type(e).__name__}: {str(e)[:120]})")
     if big:
         journal.append("decisions.jsonl", {"event": "revised_close", "date": pend["decision_date"], "decision_close": used,
                                            "history_close": hist, "gaps_bps": gaps, "limit_bps": limit, **src, "logged_at": journal.now_utc()})
         events.append(f"סגירה מתוקנת: ההחלטה של {pend['decision_date']} השתמשה בסגירה שההיסטוריה שינתה - "
                       + ", ".join(f"{s} {g:+.1f}bp" for s, g in big.items()) + f" (סף {limit}bp). לבדוק את market.close_source"
                       + (" (סגירת ההחלטה נבנתה מנרות שעתיים, backlog 70)" if src else ""))
+
+
+def _log_close_audit(pend: dict, hist: dict, gaps: dict, limit, alert: bool) -> None:
+    """Backlog 72 step 2, the forward record: one row in close_audits.jsonl (plain JSON lines, not hash-chained, read
+    only by xcheck-tally) per completed R6 audit: did the cross-check of that decision (diag.close_xcheck of its row in
+    decisions.jsonl) flag a close that history then moved by more than the R6 limit? verdict: caught (flag and alert),
+    false_alarm (flag, no alert), miss (alert, no flag), clean (neither), no_check (that decision has no cross-check)."""
+    dd = pend["decision_date"]
+    row = next((r for r in reversed(journal.read("decisions.jsonl")) if r.get("date") == dd and "diag" in r), {})
+    x = row.get("diag", {}).get("close_xcheck")
+    flag = bool(x and x["would_decline"])
+    journal.append("close_audits.jsonl", {
+        "logged_at": journal.now_utc(), "decision_date": dd, "source": (pend.get("hourly_rebuild") or {}).get("source", "daily"),
+        "decision_close": pend["decision_close"], "history_close": hist, "gaps_bps": gaps, "limit_bps": limit, "alert": alert,
+        "xcheck": x and {"would_decline": x["would_decline"], "gap_bp": {s: v["gap_bp"] for s, v in x["symbols"].items()},
+                         **{k: x.get(k) for k in ("close_missing", "coinbase_missing", "final_5m")}},
+        "verdict": "no_check" if not x else ("caught" if alert else "false_alarm") if flag else "miss" if alert else "clean"})
+
+
+def xcheck_tally() -> list[str]:
+    """`xcheck-tally` (backlog 72 step 2), read-only: one line per decision row that carries diag.close_xcheck, with the
+    R6 audit of that date from close_audits.jsonl ("awaiting" until it exists), then the totals. Writes nothing (the
+    files are read where they are; a missing one is empty)."""
+    def rows(name: str) -> list[dict]:
+        p, out = journal.STATE / name, []
+        for line in p.read_text(encoding="utf-8", errors="replace").split("\n") if p.exists() else []:
+            try:
+                out.append(json.loads(line))
+            except ValueError:  # an empty or torn line
+                pass
+        return [r for r in out if isinstance(r, dict)]
+
+    def bps(d: dict) -> str:
+        return " ".join(f"{s}={v:+.1f}" if isinstance(v, (int, float)) else f"{s}=?" for s, v in sorted(d.items())) or "-"
+
+    audits = {r.get("decision_date"): r for r in rows("close_audits.jsonl")}
+    keys = ("rows", "flags", "caught", "false_alarm", "miss", "clean", "awaiting")
+    lines, n = [], dict.fromkeys(keys + ("miss_5m", "miss_no_5m"), 0)
+    for r in rows("decisions.jsonl"):
+        x = (r.get("diag") or {}).get("close_xcheck")
+        if not x:
+            continue
+        a, f5 = audits.get(r.get("date")), x.get("final_5m")
+        verdict = a["verdict"] if a else "awaiting"
+        n["rows"] += 1
+        n["flags"] += bool(x["would_decline"])
+        if verdict in n:
+            n[verdict] += 1
+        if verdict == "miss":
+            n["miss_5m" if f5 else "miss_no_5m"] += 1
+        closes = " ".join(f"{s}={v['close']:g}" for s, v in sorted(x["symbols"].items())) or "-"
+        lines.append(f"{r.get('date')} {(r['diag'].get('hourly_rebuild') or {}).get('source', 'daily')} | close {closes}"
+                     f" | coinbase bp {bps({s: v['gap_bp'] for s, v in x['symbols'].items()})}"
+                     f" | would_decline {','.join(x['would_decline']) or '-'}"
+                     + (f" | 5m bp {bps({s: v.get('gap_5m_bp') for s, v in f5.items()})}" if f5 else "")
+                     + (f" | history bp {bps(a['gaps_bps'])} | {verdict}" if a else " | awaiting"))
+    lines.append(" ".join(f"{k} {n[k]}" for k in keys) + f" | misses with final_5m {n['miss_5m']}, without {n['miss_no_5m']}")
+    return lines
 
 
 def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, persist: bool, events, frozen: set | None = None) -> dict:
@@ -651,6 +758,8 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     rebuilt = panel.get("_hourly_rebuild") if (panel.get("_hourly_rebuild") or {}).get("bar") == ds else None
     if rebuilt:  # backlog 70: this decision bar was built from Yahoo's 1h bars
         diag["hourly_rebuild"] = rebuilt
+        if xcheck and persist:  # backlog 72 step 2, log only: the 1h close against the day's last 5-minute close
+            xcheck["final_5m"] = _final_5m(close, dec, cfg)
     _, sdiag = build_targets(dec, panel, signals, weights, cfg, shadow.peak_ratio(px), shadow.positions, set(shadow.state.get("blocked", {})), aux, frozen)
     if utc:  # planning decision 12: execute on the first full hour after the decision is logged; overrides count until then
         logged_at = journal.now_utc()
