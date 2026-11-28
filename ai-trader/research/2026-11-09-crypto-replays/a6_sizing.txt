@@ -1,0 +1,24 @@
+2y ann vol: BTC-USD 44.1%, ETH-USD 68.5%, SOL-USD 75.9%, SPY 16.7%, AAPL 28.8%, MSFT 29.1%, JPM 23.5%, NVDA 44.5%, TSLA 57.0%, AMD 65.0%, PLTR 63.7%
+median single-stock vol of ['AAPL', 'MSFT', 'JPM', 'NVDA', 'TSLA', 'AMD', 'PLTR']: 44.5%
+
+-- risk-equivalent notional: same daily-vol risk as the owner's 5% news trade in a median stock / as a 10% max position --
+BTC-USD: 5% x 0.445/0.441 = 5.0% of account ; 10% cap -> 10.1% ; loss at -3% stop on 5% notional = 0.15% of account ; worst historical 1-day (-37%) on 5% = 1.86% of account
+ETH-USD: 5% x 0.445/0.685 = 3.2% of account ; 10% cap -> 6.5% ; loss at -3% stop on 5% notional = 0.15% of account ; worst historical 1-day (-42%) on 5% = 2.12% of account
+SOL-USD: 5% x 0.445/0.759 = 2.9% of account ; 10% cap -> 5.9% ; loss at -3% stop on 5% notional = 0.15% of account ; worst historical 1-day (-42%) on 5% = 2.12% of account
+
+BTC-SPY corr (stock-day sampling, 2y) 0.42; equal-weight 3-coin basket vs SPY corr 0.45; basket vol 56.8%
+-- equity book at 12% vol (config target_vol_annual) + crypto sleeve w; assumes crypto/equity-book corr = basket-SPY corr --
+  BTC only      w= 2.5%  portfolio vol 12.50%  crypto share of variance  4.3%
+  BTC only      w= 5.0%  portfolio vol 13.07%  crypto share of variance  9.3%
+  BTC only      w= 7.5%  portfolio vol 13.71%  crypto share of variance 14.6%
+  BTC only      w=10.0%  portfolio vol 14.41%  crypto share of variance 20.0%
+  BTC only      w=15.0%  portfolio vol 15.93%  crypto share of variance 30.3%
+  3-coin basket w= 2.5%  portfolio vol 12.70%  crypto share of variance  6.0%
+  3-coin basket w= 5.0%  portfolio vol 13.52%  crypto share of variance 12.8%
+  3-coin basket w= 7.5%  portfolio vol 14.43%  crypto share of variance 19.8%
+  3-coin basket w=10.0%  portfolio vol 15.41%  crypto share of variance 26.5%
+  3-coin basket w=15.0%  portfolio vol 17.57%  crypto share of variance 38.5%
+
+-- account hit from a crypto sleeve in the worst windows (coin returns from out/a4_regime.txt crash table) --
+  sleeve 5% split equally: buy&hold worst-window ~-4.4% of account ; with BTC>SMA200 filter ~-2.1% (config dd_halve -10%, dd_flat -20%)
+  sleeve 10% split equally: buy&hold worst-window ~-8.9% of account ; with BTC>SMA200 filter ~-4.3% (config dd_halve -10%, dd_flat -20%)

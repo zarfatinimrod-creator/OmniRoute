@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-23",
+  "vetoes": {},
+  "size_mult": {
+    "COST": [
+      0.5,
+      "desk Hold p=0.48: Strong slow trend (trend 0.907, breakout 0.787, 12.39% above SMA200) but xsmom -0.126 and the regime turned risk_on, where staples can lag SPY; the book already",
+      "2026-11-23T21:43:27+00:00"
+    ],
+    "PG": [
+      0.5,
+      "desk Hold p=0.48: Trend intact (trend 0.934, 14.19% above SMA200, 2.3% below the 52w high) but xsmom -0.14 and the 3m lead over SPY is shrinking as the regime turns risk_on; adds",
+      "2026-11-23T21:43:28+00:00"
+    ],
+    "V": [
+      0.5,
+      "desk Hold p=0.50: Slow signals strong (trend 0.965, tsmom 0.835, 17.53% above SMA200) but fast ones weak (1w -4.0%, rsi2 -0.283, xsmom 0.071 and falling); a Nov 19 third-party ve",
+      "2026-11-23T21:43:29+00:00"
+    ],
+    "MA": [
+      0.5,
+      "desk Hold p=0.50: Edge rests on slow trend (trend 0.961, tsmom 0.683, 16.93% above SMA200) while xsmom is -0.041 and 1w -3.96%; shares the Nov 19 vendor cyber incident and the pa",
+      "2026-11-23T21:43:30+00:00"
+    ],
+    "TMO": [
+      0.5,
+      "desk Hold p=0.50: Score 0.401 comes mostly from a maxed-out trend (0.989) while xsmom is -0.052 and the move is stalling (1m +2.12%, 1w -0.47%); vol 28.95% and a 1y drawdown of -",
+      "2026-11-23T21:43:31+00:00"
+    ]
+  }
+}

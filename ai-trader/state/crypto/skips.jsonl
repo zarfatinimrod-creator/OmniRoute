@@ -1,0 +1,17 @@
+{"logged_at": "2026-11-15T00:13:39+00:00", "event": "rebuild_declined", "bar": "2026-11-14", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-15T01:12:19+00:00", "event": "rebuild_declined", "bar": "2026-11-14", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.3}
+{"logged_at": "2026-11-17T00:13:28+00:00", "event": "rebuild_declined", "bar": "2026-11-16", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-17T00:36:23+00:00", "event": "rebuild_declined", "bar": "2026-11-16", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-19T00:14:00+00:00", "event": "rebuild_declined", "bar": "2026-11-18", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.3}
+{"logged_at": "2026-11-19T01:08:25+00:00", "event": "rebuild_declined", "bar": "2026-11-18", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.3}
+{"logged_at": "2026-11-20T00:13:40+00:00", "event": "rebuild_declined", "bar": "2026-11-19", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-20T00:18:19+00:00", "event": "rebuild_declined", "bar": "2026-11-19", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.4}
+{"logged_at": "2026-11-20T01:08:21+00:00", "event": "rebuild_declined", "bar": "2026-11-19", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-22T00:13:41+00:00", "event": "rebuild_declined", "bar": "2026-11-21", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-23T00:13:28+00:00", "event": "rebuild_declined", "bar": "2026-11-22", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-23T01:09:22+00:00", "event": "rebuild_declined", "bar": "2026-11-22", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.3}
+{"logged_at": "2026-11-25T00:13:00+00:00", "event": "rebuild_declined", "bar": "2026-11-24", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-26T00:14:01+00:00", "event": "rebuild_declined", "bar": "2026-11-25", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-26T01:08:19+00:00", "event": "rebuild_declined", "bar": "2026-11-25", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-28T00:13:04+00:00", "event": "rebuild_declined", "bar": "2026-11-27", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}
+{"logged_at": "2026-11-28T00:26:36+00:00", "event": "rebuild_declined", "bar": "2026-11-27", "symbols": ["BTC-USD"], "symbol": "BTC-USD", "reason": "null_value", "tries": 1, "waited_s": 0.1}

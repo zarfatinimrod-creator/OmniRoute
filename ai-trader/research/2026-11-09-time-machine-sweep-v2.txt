@@ -1,0 +1,16 @@
+                                 variant   cagr    vol  sharpe  max_drawdown  calmar  turnover_annual  psr_vs_0  trades
+                  base (learned weights) 0.0745 0.1020   0.756       -0.1190   0.626            13.89     0.986  2681.0
+             prior weights (no learning) 0.0745 0.1020   0.756       -0.1190   0.626            13.89     0.986  2681.0
+                             costs 15bps 0.0557 0.1012   0.587       -0.1216   0.459            13.85     0.957  2696.0
+                             costs 30bps 0.0234 0.0875   0.308       -0.1579   0.148            11.57     0.818  2560.0
+                         daily rebalance 0.0756 0.1053   0.745       -0.1234   0.613            18.59     0.985  3929.0
+                       monthly rebalance 0.0581 0.0873   0.690       -0.1281   0.453             9.02     0.978  1617.0
+                          target vol 10% 0.0711 0.0894   0.813       -0.1132   0.628            11.97     0.991  2549.0
+                          target vol 16% 0.0691 0.1126   0.650       -0.1416   0.488            15.27     0.972  2851.0
+                        no regime filter 0.0556 0.1008   0.588       -0.1329   0.419            13.67     0.957  2737.0
+                   no VIX defensive mode 0.0484 0.0951   0.545       -0.1420   0.341            12.61     0.945  2547.0
+                         8 positions max 0.0731 0.1078   0.709       -0.1171   0.625            16.50     0.981  2013.0
+ETF-only universe (no survivorship bias) 0.0596 0.0880   0.702       -0.1296   0.460            17.21     0.980  1496.0
+                       Equal-weight ETFs 0.1222 0.1585   0.807       -0.2993   0.408              NaN     0.991     NaN
+                            SPY buy&hold 0.1378 0.1899   0.775       -0.3372   0.409              NaN     0.989     NaN
+                   Equal-weight universe 0.1853 0.1890   0.995       -0.3287   0.564              NaN     0.998     NaN

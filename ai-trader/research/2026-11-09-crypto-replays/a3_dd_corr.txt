@@ -1,0 +1,56 @@
+== drawdown episodes (close-to-close, Yahoo daily) ==
+BTC-USD: max DD -83.4% ; current DD -40.2% (close 74584.65 on 2026-11-08, peak 124752.53)
+     -83.4%  peak 2017-12-16 trough 2018-12-15 recovered 2020-11-30 (days underwater 1079)
+     -76.6%  peak 2021-11-08 trough 2022-11-21 recovered 2024-03-04 (days underwater 846)
+     -61.1%  peak 2014-09-17 trough 2015-01-14 recovered 2015-12-15 (days underwater 453)
+     -53.1%  peak 2021-04-13 trough 2021-07-20 recovered 2021-10-19 (days underwater 188)
+    worst  1-day loss  -37.2% (2020-03-12)  5th pct   -5.2%  1st pct  -10.0%
+    worst  7-day loss  -45.2% (2020-03-12)  5th pct  -12.8%  1st pct  -22.4%
+    worst 30-day loss  -60.3% (2018-02-05)  5th pct  -24.0%  1st pct  -38.1%
+ETH-USD: max DD -94.0% ; current DD -56.1% (close 2120.98 on 2026-11-08, peak 4831.35)
+     -94.0%  peak 2018-01-13 trough 2018-12-14 recovered 2021-02-02 (days underwater 1115)
+     -79.4%  peak 2021-11-08 trough 2022-06-18 recovered 2025-08-22 (days underwater 1382)
+     -67.6%  peak 2025-08-22 trough 2026-06-25 recovered not recovered (days underwater 443)
+     -57.1%  peak 2021-05-11 trough 2021-07-20 recovered 2021-10-23 (days underwater 164)
+    worst  1-day loss  -42.3% (2020-03-12)  5th pct   -6.6%  1st pct  -12.6%
+    worst  7-day loss  -51.0% (2020-03-12)  5th pct  -17.3%  1st pct  -29.3%
+    worst 30-day loss  -58.2% (2020-03-16)  5th pct  -34.9%  1st pct  -48.9%
+SOL-USD: max DD -96.3% ; current DD -67.1% (close 86.24 on 2026-11-08, peak 261.87)
+     -96.3%  peak 2021-11-06 trough 2022-12-29 recovered 2025-01-18 (days underwater 1168)
+     -76.3%  peak 2025-01-18 trough 2026-06-06 recovered not recovered (days underwater 659)
+     -74.8%  peak 2020-08-31 trough 2020-12-23 recovered 2021-02-02 (days underwater 154)
+     -58.0%  peak 2021-05-18 trough 2021-07-20 recovered 2021-08-16 (days underwater 89)
+    worst  1-day loss  -42.3% (2022-11-09)  5th pct   -8.2%  1st pct  -13.5%
+    worst  7-day loss  -60.5% (2022-11-12)  5th pct  -19.2%  1st pct  -32.4%
+    worst 30-day loss  -62.4% (2022-12-05)  5th pct  -37.1%  1st pct  -54.2%
+SPY: max DD -55.2% ; current DD -5.6% (close 735.29 on 2026-11-06, peak 779.09)
+     -55.2%  peak 2007-10-09 trough 2009-03-09 recovered 2012-08-16 (days underwater 1772)
+     -47.5%  peak 2000-03-24 trough 2002-10-09 recovered 2006-10-26 (days underwater 2406)
+     -33.7%  peak 2020-02-19 trough 2020-03-23 recovered 2020-08-10 (days underwater 170)
+     -24.5%  peak 2022-01-03 trough 2022-10-12 recovered 2023-12-13 (days underwater 708)
+    worst  1-day loss  -10.9% (2020-03-16)  5th pct   -1.8%  1st pct   -3.2%
+    worst  7-day loss  -19.8% (2008-10-10)  5th pct   -3.6%  1st pct   -6.6%
+    worst 30-day loss  -32.8% (2020-03-23)  5th pct   -6.7%  1st pct  -12.3%
+
+== correlation of daily log returns (common dates = SPY trading days; crypto close 00:00 UTC vs SPY 16:00 ET, so daily corr understates -> also weekly W-WED) ==
+2018-2019  daily: BTC-ETH 0.78 BTC-SOL  n/a BTC-SPY 0.01 BTC-QQQ 0.01 ETH-SPY 0.07 | weekly: BTC-ETH 0.78 BTC-SOL nan BTC-SPY 0.10 BTC-QQQ 0.13
+2020-2021  daily: BTC-ETH 0.81 BTC-SOL 0.36 BTC-SPY 0.36 BTC-QQQ 0.36 ETH-SPY 0.36 | weekly: BTC-ETH 0.79 BTC-SOL 0.17 BTC-SPY 0.44 BTC-QQQ 0.36
+2022-2023  daily: BTC-ETH 0.89 BTC-SOL 0.74 BTC-SPY 0.45 BTC-QQQ 0.47 ETH-SPY 0.46 | weekly: BTC-ETH 0.88 BTC-SOL 0.74 BTC-SPY 0.50 BTC-QQQ 0.51
+2024-2026  daily: BTC-ETH 0.83 BTC-SOL 0.78 BTC-SPY 0.39 BTC-QQQ 0.39 ETH-SPY 0.44 | weekly: BTC-ETH 0.80 BTC-SOL 0.76 BTC-SPY 0.42 BTC-QQQ 0.39
+last 365d  daily: BTC-ETH 0.92 BTC-SOL 0.87 BTC-SPY 0.48 BTC-QQQ 0.45 ETH-SPY 0.47 | weekly: BTC-ETH 0.90 BTC-SOL 0.88 BTC-SPY 0.40 BTC-QQQ 0.40
+rolling 90d BTC-SPY daily corr since 2020: min -0.04 (2020-02-04) median 0.40 max 0.62 (2022-05-11) last 0.50
+
+== tail behaviour (since 2020-04-10, all three coins live) ==
+SPY days <= -2% (n=55): mean BTC -4.37% ETH -6.08% SOL -6.71% ; BTC down on 84% of them
+SPY days <= -3% (n=16): mean BTC -6.64% ETH -8.33% SOL -9.01% ; BTC down on 88% of them
+BTC days <= -5% (n=97, 7-day calendar): mean ETH -8.5% SOL -8.2% ; ETH also down >5% on 85%, SOL on 79%
+BTC days <= -10% (n=13, 7-day calendar): mean ETH -15.3% SOL -16.7% ; ETH also down >5% on 100%, SOL on 85%
+crypto-crypto daily corr since 2023 (7-day calendar): BTC-ETH 0.82 BTC-SOL 0.74 ETH-SOL 0.72
+since 2023: ann vol BTC 46.1% ETH 62.4% SOL 83.0% equal-weight basket (daily rebal) 58.6%
+
+== ATR(14) as % of close (Wilder-free simple mean of true range, like aitrader/signals.py atr) ==
+BTC-USD  ATR14%: last 3.10%  2y median 3.29%  2y p10 2.36% p90 5.00%  full median 3.71%  -> 3xATR (config atr_stop_mult=3) =  9.9% ; -3% stop = 0.91 ATR
+ETH-USD  ATR14%: last 4.35%  2y median 4.64%  2y p10 3.27% p90 7.39%  full median 5.06%  -> 3xATR (config atr_stop_mult=3) = 13.9% ; -3% stop = 0.65 ATR
+SOL-USD  ATR14%: last 4.72%  2y median 5.74%  2y p10 3.90% p90 9.19%  full median 7.06%  -> 3xATR (config atr_stop_mult=3) = 17.2% ; -3% stop = 0.52 ATR
+SPY      ATR14%: last 1.51%  2y median 0.97%  2y p10 0.73% p90 1.59%  full median 1.17%  -> 3xATR (config atr_stop_mult=3) =  2.9% ; -3% stop = 3.08 ATR
+QQQ      ATR14%: last 2.53%  2y median 1.41%  2y p10 1.08% p90 2.23%  full median 1.60%  -> 3xATR (config atr_stop_mult=3) =  4.2% ; -3% stop = 2.13 ATR

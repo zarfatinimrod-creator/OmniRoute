@@ -1,0 +1,1 @@
+{"date": "2021-07-13", "event": "bootstrap", "weights": {"tsmom": 0.25, "xsmom": 0.25, "trend": 0.2, "breakout": 0.2, "high52": 0.03, "reversal": 0.02, "rsi2": 0.05, "lowvol": 0.0}, "logged_at": "2026-01-01T00:00:00+00:00", "prev_hash": "genesis", "hash": "4e6ef13596b2de63cd66a07c34c2c67573eac027fd791de40f53c16547b12d07"}

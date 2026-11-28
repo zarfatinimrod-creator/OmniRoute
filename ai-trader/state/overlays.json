@@ -1,0 +1,282 @@
+{
+  "date": "2026-11-27",
+  "insider_cluster": [
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "TMS",
+      "company": "Teamshares Inc",
+      "industry": "Miscellaneous Retail",
+      "insiders": 3,
+      "price": 4.32,
+      "value": 1180461.0,
+      "delta_own": "+73%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "HBCP",
+      "company": "Home Bancorp, Inc.",
+      "industry": "Savings Institutions, Not Federally Chartered",
+      "insiders": 2,
+      "price": 61.01,
+      "value": 345638.0,
+      "delta_own": "+18%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "SCM",
+      "company": "Stellus Capital Investment Corp",
+      "industry": "Closed-End Funds",
+      "insiders": 2,
+      "price": 6.4,
+      "value": 396932.0,
+      "delta_own": "+7%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-25",
+      "ticker": "GLXY",
+      "company": "Galaxy Digital Inc.",
+      "industry": "Security Brokers, Dealers & Flotation Companies",
+      "insiders": 3,
+      "price": 12.42,
+      "value": 16327911.0,
+      "delta_own": "+125%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "COHR",
+      "company": "Coherent Corp.",
+      "industry": "Optical Instruments & Lenses",
+      "insiders": 3,
+      "price": 198.1,
+      "value": 51091859.0,
+      "delta_own": "+132%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "AVEX",
+      "company": "Aevex Corp.",
+      "industry": "Aircraft",
+      "insiders": 2,
+      "price": 12.39,
+      "value": 227288.0,
+      "delta_own": "+15%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-24",
+      "ticker": "BPRE",
+      "company": "Bluerock Private Real Estate Fund",
+      "industry": "Closed-End Funds",
+      "insiders": 3,
+      "price": 12.59,
+      "value": 41716652.0,
+      "delta_own": ">999%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "BBT",
+      "company": "Beacon Financial Corp",
+      "industry": "Savings Institutions, Not Federally Chartered",
+      "insiders": 4,
+      "price": 30.27,
+      "value": 282370.0,
+      "delta_own": "+12%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-23",
+      "ticker": "PRE",
+      "company": "Prenetics Global Ltd",
+      "industry": "Pharmaceutical Preparations",
+      "insiders": 3,
+      "price": 9.92,
+      "value": 1264440.0,
+      "delta_own": "+18%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-24",
+      "ticker": "VISN",
+      "company": "Vistance Networks, Inc.",
+      "industry": "Radio & Tv Broadcasting & Communications Equipment",
+      "insiders": 3,
+      "price": 4.09,
+      "value": 1226383.0,
+      "delta_own": "+15%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-24",
+      "ticker": "BORR",
+      "company": "Borr Drilling Ltd",
+      "industry": "Drilling Oil & Gas Wells",
+      "insiders": 2,
+      "price": 3.99,
+      "value": 81926850.0,
+      "delta_own": "+66%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-18",
+      "ticker": "DX",
+      "company": "Dynex Capital Inc",
+      "industry": "Real Estate Investment Trusts",
+      "insiders": 3,
+      "price": 11.15,
+      "value": 434808.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-25",
+      "trade_date": "2026-11-24",
+      "ticker": "SCOR",
+      "company": "Comscore, Inc.",
+      "industry": "Business Services",
+      "insiders": 2,
+      "price": 3.66,
+      "value": 695262.0,
+      "delta_own": "+52%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-20",
+      "ticker": "CTSO",
+      "company": "Cytosorbents Corp",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 4,
+      "price": 5.18,
+      "value": 469996.0,
+      "delta_own": "+60%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-20",
+      "ticker": "RMIX",
+      "company": "Suncrete, Inc.",
+      "industry": "Concrete Products, Except Block & Brick",
+      "insiders": 5,
+      "price": 6.35,
+      "value": 1934887.0,
+      "delta_own": "+13%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-24",
+      "ticker": "NPCE",
+      "company": "Neuropace Inc",
+      "industry": "Surgical & Medical Instruments & Apparatus",
+      "insiders": 4,
+      "price": 8.38,
+      "value": 399331.0,
+      "delta_own": "+21%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-23",
+      "ticker": "SNEX",
+      "company": "Stonex Group Inc.",
+      "industry": "Security & Commodity Brokers, Dealers, Exchanges & Services",
+      "insiders": 2,
+      "price": 38.51,
+      "value": 497468.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-20",
+      "ticker": "KMT",
+      "company": "Kennametal Inc",
+      "industry": "Machine Tools, Metal Cutting Types",
+      "insiders": 4,
+      "price": 26.05,
+      "value": 677258.0,
+      "delta_own": "+7%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-10-16",
+      "ticker": "GRF",
+      "company": "Eagle Capital Growth Fund, Inc.",
+      "industry": "Closed-End Funds",
+      "insiders": 2,
+      "price": 10.11,
+      "value": 157605.0,
+      "delta_own": "+3%"
+    },
+    {
+      "filing_date": "2026-11-24",
+      "trade_date": "2026-11-23",
+      "ticker": "GRNT",
+      "company": "Granite Ridge Resources, Inc.",
+      "industry": "Crude Petroleum & Natural Gas",
+      "insiders": 3,
+      "price": 5.13,
+      "value": 133250.0,
+      "delta_own": "+1%"
+    },
+    {
+      "filing_date": "2026-11-23",
+      "trade_date": "2026-11-19",
+      "ticker": "ENOV",
+      "company": "Enovis Corp",
+      "industry": "Orthopedic, Prosthetic & Surgical Appliances & Supplies",
+      "insiders": 5,
+      "price": 21.93,
+      "value": 747635.0,
+      "delta_own": "+9%"
+    },
+    {
+      "filing_date": "2026-11-23",
+      "trade_date": "2026-11-19",
+      "ticker": "FUN",
+      "company": "Six Flags Entertainment Corporation/New",
+      "industry": "Amusement & Recreation Services",
+      "insiders": 3,
+      "price": 10.88,
+      "value": 34952320.0,
+      "delta_own": "+62%"
+    },
+    {
+      "filing_date": "2026-11-23",
+      "trade_date": "2026-11-20",
+      "ticker": "FPS",
+      "company": "Forgent Power Solutions, Inc.",
+      "industry": "Electrical Industrial Apparatus",
+      "insiders": 3,
+      "price": 19.4,
+      "value": 771936.0,
+      "delta_own": "+24%"
+    },
+    {
+      "filing_date": "2026-11-23",
+      "trade_date": "2026-11-20",
+      "ticker": "ETN",
+      "company": "Eaton Corp Plc",
+      "industry": "Misc Industrial & Commercial Machinery & Equipment",
+      "insiders": 3,
+      "price": 332.87,
+      "value": 316223.0,
+      "delta_own": "+2%"
+    },
+    {
+      "filing_date": "2026-11-23",
+      "trade_date": "2026-11-20",
+      "ticker": "CCAP",
+      "company": "Crescent Capital Bdc, Inc.",
+      "industry": "Closed-End Funds",
+      "insiders": 2,
+      "price": 9.88,
+      "value": 138280.0,
+      "delta_own": "+18%"
+    }
+  ],
+  "congress_buy": null,
+  "logged": 50
+}
