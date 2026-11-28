@@ -13,6 +13,8 @@
   summary --book crypto [--send] [--ack TS]  crypto morning summary: urgent first; --send delivers (exit 0 ok, 2 ok+urgent,
                                           3 not delivered); without --book crypto it refuses (exit 1)
   verify                                  check the tamper-evident hash chains
+  xcheck-tally --book crypto              backlog 72 forward record, read-only: each decision's Coinbase cross-check next
+                                          to its R6 audit (close_audits.jsonl) and the totals; writes nothing
   news-live [--until 16:05] [--minutes N]  live news trader (separate paper book): headlines -> Claude score 1-10 -> rules
   news-live --supervised PARENT_PID       the same engine under a parent process: it dies with that parent and exits 143
                                           when its parent is another pid; SIGTERM is a planned stop (exit 143) either way
@@ -40,7 +42,7 @@
                                           (the close slot only) adds the day's R4c, R9 and R11 as one line {"notify": [...]}
 
   --book stocks|crypto (before or after the command; default stocks) picks the paper book. crypto runs in
-  state/crypto/ and is accepted by cycle, status, scorecard, backtest, verify, predict, context, veto, shrink, summary;
+  state/crypto/ and is accepted by cycle, status, scorecard, backtest, verify, predict, context, veto, shrink, summary, xcheck-tally;
   every other command is stock-only in v1 and refuses it.
 """
 
@@ -53,7 +55,7 @@ from datetime import datetime, timezone
 
 from . import journal
 
-BOOK_CMDS = {"cycle", "status", "scorecard", "backtest", "verify", "predict", "context", "veto", "shrink", "summary"}  # take --book crypto
+BOOK_CMDS = {"cycle", "status", "scorecard", "backtest", "verify", "predict", "context", "veto", "shrink", "summary", "xcheck-tally"}  # take --book crypto
 
 
 def _today_market_date() -> str:
@@ -92,6 +94,7 @@ def main(argv=None) -> int:
     cx = sub.add_parser("context")
     cx.add_argument("symbol")
     sub.add_parser("verify")
+    sub.add_parser("xcheck-tally")
     sm = sub.add_parser("summary")
     sm.add_argument("--send", action="store_true", help="deliver through notify (bypasses quiet hours); auto-acks up to newest")
     sm.add_argument("--ack", default=None, metavar="TS", help="drop queued alerts with queued_at <= TS (TS required: the printed 'newest')")
@@ -527,6 +530,13 @@ def _run(a: argparse.Namespace) -> int:
         print(uptime.render(reports, cfg))
         if a.notify:
             print(json.dumps({"notify": uptime.close_lines(reports[0], rows, cfg)}, ensure_ascii=False))
+    elif a.cmd == "xcheck-tally":  # read-only (backlog 72 step 2)
+        from .cycle import xcheck_tally
+
+        if a.book != "crypto":  # the cross-check exists on the crypto book only
+            print("xcheck-tally is crypto-only: run it with --book crypto", file=sys.stderr)
+            return 1
+        print("\n".join(xcheck_tally()))
     elif a.cmd == "news":
         from .data import news_headlines
 
