@@ -227,6 +227,31 @@ class Final5m(Book):
             json.dumps(log["files"], allow_nan=False)
             self.same_but_for_the_record(log, off)
 
+    def test_a_slow_5m_reply_moves_no_order(self):
+        """The clock is real in production: a decision that starts at 00:59:58 and waits 32 s for Yahoo's 5m reply still
+        executes at 01:00, as with the check off. The fetch runs after exec_ts and pending.json are fixed."""
+        fives = {s: self.five(I, s) for s in self.coins}
+
+        class Slow(dict):  # asking for the 5m reply moves the clock past the hour
+            def __getitem__(_, sym):
+                journal.now_utc = lambda: self.ts(I + 1, 1, 0, 30)
+                return fives[sym]
+
+        def late(mode, replies):
+            with mock.patch.object(Book, "at", lambda b, upto, clock, **k: tcc.CryptoBook.at(b, upto, self.ts(I + 1, 0, 59, 58), **k)):
+                return self.rebuilt(mode, replies)
+
+        log, calls = late("log", Slow())
+        off, _ = late("off", fives)
+        self.assertEqual(sum(p["interval"] == "5m" for _, p in calls), len(self.coins))
+        self.assertEqual(self.xc(log)["final_5m"]["BTC-USD"]["gap_5m_bp"], 0.0)
+        self.assertEqual(log["files"]["pending.json"]["exec_ts"], self.ts(I + 1, 1, 0))
+        for part in ("pending.json", "decisions.jsonl"):  # the order and the decision row (its logged_at too) are as with
+            self.assertEqual(strip(log["files"][part]), strip(off["files"][part]), part)  # the check off; rows written
+        self.assertEqual(log["outs"][0]["events"], off["outs"][0]["events"])  # after the fetch carry the later clock
+        self.assertTrue(any(self.ts(I + 1, 1, 0) in e for e in log["outs"][0]["events"]))  # "scheduled for 01:00"
+        self.assertEqual((log["sent"], log["prios"]), (off["sent"], off["prios"]))
+
     def test_no_5m_fetch_on_a_daily_row_or_in_a_proposal(self):
         calls = []
         spy = lambda sym, day: calls.append(sym)  # noqa: E731

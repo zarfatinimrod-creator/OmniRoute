@@ -758,8 +758,6 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     rebuilt = panel.get("_hourly_rebuild") if (panel.get("_hourly_rebuild") or {}).get("bar") == ds else None
     if rebuilt:  # backlog 70: this decision bar was built from Yahoo's 1h bars
         diag["hourly_rebuild"] = rebuilt
-        if xcheck and persist:  # backlog 72 step 2, log only: the 1h close against the day's last 5-minute close
-            xcheck["final_5m"] = _final_5m(close, dec, cfg)
     _, sdiag = build_targets(dec, panel, signals, weights, cfg, shadow.peak_ratio(px), shadow.positions, set(shadow.state.get("blocked", {})), aux, frozen)
     if utc:  # planning decision 12: execute on the first full hour after the decision is logged; overrides count until then
         logged_at = journal.now_utc()
@@ -797,7 +795,10 @@ def _decide(panel, cfg, main, shadow, dec: pd.Timestamp, force_rebalance: bool, 
     if mk.get("delete_proposal_on_decision"):  # spec 3.3: a stale proposal must not date a later veto
         (journal.STATE / "proposal.json").unlink(missing_ok=True)
     m.state["regime"], m.state["dd_state"] = diag.get("regime"), diag.get("dd_state")
-    journal.append("decisions.jsonl", {"date": ds, "logged_at": journal.now_utc(), "due_rebalance": due, "weights": weights, "diag": diag,
+    row_at = journal.now_utc()
+    if rebuilt and xcheck:  # backlog 72 step 2, log only: the 1h close against the day's last 5-minute close. Fetched here,
+        xcheck["final_5m"] = _final_5m(close, dec, cfg)  # after exec_ts and pending.json are fixed: a slow reply moves no order
+    journal.append("decisions.jsonl", {"date": ds, "logged_at": row_at, "due_rebalance": due, "weights": weights, "diag": diag,
                                        "overrides": applied, "earnings_blackout": skipped, "preview": preview})
     score = combine(signals, weights, dec)
     journal.record_predictions(ds, score, {k: v.loc[dec] for k, v in signals.items()}, px, px.get(bench),
